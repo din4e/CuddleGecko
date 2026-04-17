@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/auth'
 import { Button } from '../components/ui/button'
-import { Contact, Network, Tag, Bell, LayoutDashboard, LogOut } from 'lucide-react'
+import { Contact, Network, Tag, Bell, LayoutDashboard, LogOut, Moon, Sun } from 'lucide-react'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -15,6 +16,14 @@ export default function AppLayout() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
+
+  const toggleTheme = () => {
+    const next = !dark
+    setDark(next)
+    document.documentElement.classList.toggle('dark', next)
+    localStorage.setItem('theme', next ? 'dark' : 'light')
+  }
 
   const handleLogout = () => {
     logout()
@@ -24,7 +33,12 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen flex bg-background">
       <aside className="w-64 border-r bg-card p-4 flex flex-col">
-        <h1 className="text-xl font-bold px-2 mb-6">CuddleGecko</h1>
+        <div className="flex items-center justify-between px-2 mb-6">
+          <h1 className="text-xl font-bold">CuddleGecko</h1>
+          <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+        </div>
         <nav className="flex-1 space-y-1">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink

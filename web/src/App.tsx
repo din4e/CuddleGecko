@@ -5,6 +5,12 @@ import AppLayout from './layouts/AppLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import DashboardPage from './pages/DashboardPage'
+import ContactsPage from './pages/ContactsPage'
+import ContactDetailPage from './pages/ContactDetailPage'
+import GraphPage from './pages/GraphPage'
+import TagsPage from './pages/TagsPage'
+import RemindersPage from './pages/RemindersPage'
 
 export default function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth)
@@ -25,12 +31,12 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<div className="text-2xl font-bold">Dashboard</div>} />
-          <Route path="contacts" element={<div className="text-2xl font-bold">Contacts</div>} />
-          <Route path="contacts/:id" element={<div className="text-2xl font-bold">Contact Detail</div>} />
-          <Route path="graph" element={<div className="text-2xl font-bold">Network Graph</div>} />
-          <Route path="tags" element={<div className="text-2xl font-bold">Tags</div>} />
-          <Route path="reminders" element={<div className="text-2xl font-bold">Reminders</div>} />
+          <Route index element={<DashboardPage />} />
+          <Route path="contacts" element={<ContactsPage />} />
+          <Route path="contacts/:id" element={<ContactDetailPage />} />
+          <Route path="graph" element={<GraphPage />} />
+          <Route path="tags" element={<TagsPage />} />
+          <Route path="reminders" element={<RemindersPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
