@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import GeckoIcon from '../components/GeckoIcon'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -28,9 +29,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Card className="w-full max-w-sm">
-        <CardHeader>
+        <CardHeader className="text-center">
+          <div className="flex justify-center mb-2">
+            <GeckoIcon size={48} />
+          </div>
           <CardTitle className="text-2xl">CuddleGecko</CardTitle>
-          <CardDescription>Sign in to your account</CardDescription>
+          <CardDescription>小蜥抱抱 · Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

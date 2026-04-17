@@ -14,7 +14,13 @@ client.interceptors.request.use((config) => {
 })
 
 client.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Unwrap backend { code, data, message } envelope
+    if (response.data && typeof response.data === 'object' && 'data' in response.data && 'code' in response.data) {
+      response.data = response.data.data
+    }
+    return response
+  },
   async (error) => {
     const originalRequest = error.config
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -22,12 +28,13 @@ client.interceptors.response.use(
       const refreshToken = localStorage.getItem('refresh_token')
       if (refreshToken) {
         try {
-          const { data } = await axios.post('/api/auth/refresh', {
+          const { data: refreshData } = await axios.post('/api/auth/refresh', {
             refresh_token: refreshToken,
           })
-          localStorage.setItem('access_token', data.data.access_token)
-          localStorage.setItem('refresh_token', data.data.refresh_token)
-          originalRequest.headers.Authorization = `Bearer ${data.data.access_token}`
+          const tokens = refreshData.data ? refreshData.data : refreshData
+          localStorage.setItem('access_token', tokens.access_token)
+          localStorage.setItem('refresh_token', tokens.refresh_token)
+          originalRequest.headers.Authorization = `Bearer ${tokens.access_token}`
           return client(originalRequest)
         } catch {
           localStorage.removeItem('access_token')
