@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/auth'
 import { Button } from '../components/ui/button'
 import { Contact, Network, Tag, Bell, LayoutDashboard, LogOut, Moon, Sun } from 'lucide-react'
+import GeckoIcon from '../components/GeckoIcon'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -34,7 +35,10 @@ export default function AppLayout() {
     <div className="min-h-screen flex bg-background">
       <aside className="w-64 border-r bg-card p-4 flex flex-col">
         <div className="flex items-center justify-between px-2 mb-6">
-          <h1 className="text-xl font-bold">CuddleGecko</h1>
+          <div className="flex items-center gap-2">
+            <GeckoIcon size={28} />
+            <h1 className="text-xl font-bold">CuddleGecko</h1>
+          </div>
           <Button variant="ghost" size="icon" onClick={toggleTheme}>
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>

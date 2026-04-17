@@ -1,0 +1,61 @@
+# --- Go ---
+/bin/
+/dist/
+/build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+vendor/
+
+# Go workspace (optional)
+go.work
+go.work.sum
+
+# --- Frontend (Vite + React, run from web/) ---
+web/node_modules/
+web/dist/
+web/.vite/
+web/.eslintcache
+web/coverage/
+web/*.local
+
+# --- Local data & secrets ---
+data/
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.*
+!.env.example
+config.local.yaml
+config.*.local.yaml
+
+# --- Wails (future desktop) ---
+build/bin/
+frontend/dist/
+
+# --- IDE & OS ---
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Tooling / agent local state ---
+.omc/
+
+# --- Logs & temp ---
+*.log
+tmp/
+temp/
