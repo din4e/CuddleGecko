@@ -1,0 +1,17 @@
+server:
+  port: 8080
+  mode: debug
+
+database:
+  driver: sqlite
+  sqlite_path: ./data/cuddlegecko.db
+  mysql_dsn: ""
+
+jwt:
+  secret: "change-me-in-production"
+  access_ttl: 15m
+  refresh_ttl: 168h
+
+log:
+  level: info
+  format: json
