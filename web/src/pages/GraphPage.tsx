@@ -8,6 +8,19 @@ import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { useGraphSettings } from '../stores/graphSettings'
 
+const avatarImageCache = new Map<string, HTMLImageElement>()
+
+function loadAvatarImages(nodes: { avatar_url?: string }[]) {
+  for (const node of nodes) {
+    if (node.avatar_url && !avatarImageCache.has(node.avatar_url)) {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.src = node.avatar_url
+      img.onload = () => avatarImageCache.set(node.avatar_url!, img)
+    }
+  }
+}
+
 const labelColors: Record<string, string> = {
   family: '#ec4899',
   friend: '#22c55e',
@@ -50,7 +63,10 @@ export default function GraphPage() {
 
   useEffect(() => {
     graphApi.get()
-      .then((res) => setGraphData(res.data))
+      .then((res) => {
+        setGraphData(res.data)
+        if (res.data?.nodes) loadAvatarImages(res.data.nodes)
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -79,7 +95,7 @@ export default function GraphPage() {
 
   const handleNodeClick = useCallback((node: any) => {
     if (node.id === SELF_NODE_ID) return
-    navigate(`/contacts/${node.id}`)
+    navigate(`/buddies/${node.id}`)
   }, [navigate])
 
   // Collect all unique labels and relation types
@@ -284,7 +300,16 @@ export default function GraphPage() {
               ctx.shadowBlur = 0
 
               // Draw avatar content
-              if (hasEmoji) {
+              const avatarUrl = node.avatar_url as string | undefined
+              const avatarImg = avatarUrl ? avatarImageCache.get(avatarUrl) : null
+              if (avatarImg) {
+                ctx.save()
+                ctx.beginPath()
+                ctx.arc(node.x!, node.y!, r - 1 / globalScale, 0, 2 * Math.PI)
+                ctx.clip()
+                ctx.drawImage(avatarImg, node.x! - r, node.y! - r, r * 2, r * 2)
+                ctx.restore()
+              } else if (hasEmoji) {
                 ctx.font = `${emojiSize}px Sans-Serif`
                 ctx.textAlign = 'center'
                 ctx.textBaseline = 'middle'
