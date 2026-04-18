@@ -3,13 +3,16 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../stores/auth'
 import { Button } from '../components/ui/button'
-import { Heart, Network, Tag, Bell, LayoutDashboard, LogOut, Moon, Sun, Globe, Settings } from 'lucide-react'
+import { Heart, Network, Tag, Bell, LayoutDashboard, LogOut, Moon, Sun, Globe, Settings, Calendar, Wallet } from 'lucide-react'
 import GeckoIcon from '../components/GeckoIcon'
+import { BrandWordmark } from '../components/BrandWordmark'
 
 const navKeys = [
   { to: '/', label: 'nav.dashboard', icon: LayoutDashboard },
   { to: '/contacts', label: 'nav.contacts', icon: Heart },
   { to: '/graph', label: 'nav.network', icon: Network },
+  { to: '/events', label: 'nav.events', icon: Calendar },
+  { to: '/finance', label: 'nav.finance', icon: Wallet },
   { to: '/tags', label: 'nav.tags', icon: Tag },
   { to: '/reminders', label: 'nav.reminders', icon: Bell },
   { to: '/settings', label: 'nav.settings', icon: Settings },
@@ -42,21 +45,18 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen flex bg-background">
-      <aside className="w-64 border-r bg-card p-4 flex flex-col">
-        <div className="flex items-center justify-between px-2 mb-6">
-          <div className="flex items-center gap-2">
-            <GeckoIcon size={28} />
-            <h1 className="text-xl font-bold">{t('app.name')}</h1>
-          </div>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" onClick={toggleLang} title={t('lang.en')}>
-              <Globe className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={toggleTheme}>
-              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-          </div>
-        </div>
+      <aside className="flex w-64 shrink-0 flex-col border-r bg-card p-4">
+        <header className="mb-4">
+          <h1 className="flex min-w-0 items-center gap-2.5">
+            <GeckoIcon size={28} className="shrink-0" />
+            <BrandWordmark
+              label={t('app.name')}
+              compact
+              align="start"
+              className="min-w-0 flex-1 font-semibold"
+            />
+          </h1>
+        </header>
         <nav className="flex-1 space-y-1">
           {navKeys.map(({ to, label, icon: Icon }) => (
             <NavLink
@@ -74,13 +74,34 @@ export default function AppLayout() {
             </NavLink>
           ))}
         </nav>
-        <div className="border-t pt-4 mt-4">
-          <div className="px-3 py-2 text-sm text-muted-foreground">{user?.username}</div>
-          <Button variant="ghost" size="sm" className="w-full justify-start gap-3" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" />
-            {t('nav.signOut')}
-          </Button>
-        </div>
+        <footer className="mt-auto flex min-w-0 items-center justify-between gap-2 border-t border-border pt-4">
+          <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground" title={user?.username}>
+            {user?.username}
+          </p>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={toggleLang}
+              title={i18n.language === 'zh' ? t('lang.en') : t('lang.zh')}
+            >
+              <Globe className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={toggleTheme}
+              title={dark ? t('theme.light') : t('theme.dark')}
+            >
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button variant="ghost" size="icon" className="size-8" onClick={handleLogout} title={t('nav.signOut')}>
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+        </footer>
       </aside>
       <main className="flex-1 overflow-auto">
         <div className="p-6">

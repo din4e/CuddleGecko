@@ -9,6 +9,8 @@ import DashboardPage from './pages/DashboardPage'
 import ContactsPage from './pages/ContactsPage'
 import ContactDetailPage from './pages/ContactDetailPage'
 import GraphPage from './pages/GraphPage'
+import EventsPage from './pages/EventsPage'
+import FinancePage from './pages/FinancePage'
 import TagsPage from './pages/TagsPage'
 import RemindersPage from './pages/RemindersPage'
 import SettingsPage from './pages/SettingsPage'
@@ -36,6 +38,8 @@ export default function App() {
           <Route path="contacts" element={<ContactsPage />} />
           <Route path="contacts/:id" element={<ContactDetailPage />} />
           <Route path="graph" element={<GraphPage />} />
+          <Route path="events" element={<EventsPage />} />
+          <Route path="finance" element={<FinancePage />} />
           <Route path="tags" element={<TagsPage />} />
           <Route path="reminders" element={<RemindersPage />} />
           <Route path="settings" element={<SettingsPage />} />

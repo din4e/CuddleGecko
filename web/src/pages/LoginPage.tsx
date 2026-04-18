@@ -7,7 +7,10 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Sparkles } from 'lucide-react'
 import GeckoIcon from '../components/GeckoIcon'
+import { BrandWordmark } from '../components/BrandWordmark'
+import { AuthScaffold } from '../components/AuthScaffold'
 
 export default function LoginPage() {
   const { t } = useTranslation()
@@ -51,18 +54,27 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-2">
-            <GeckoIcon size={48} />
+    <AuthScaffold>
+      <Card className="w-full max-w-sm rounded-3xl border border-primary/15 bg-card/95 shadow-xl shadow-primary/10 backdrop-blur-sm dark:border-primary/25 dark:shadow-black/30">
+        <CardHeader className="gap-2.5 pb-2 text-center">
+          <div className="mx-auto flex justify-center">
+            <GeckoIcon size={48} cute className="-translate-y-px" />
           </div>
-          <CardTitle className="text-2xl">{t('app.name')}</CardTitle>
-          <CardDescription>{t('auth.signInTo')}</CardDescription>
+          <CardTitle className="text-center">
+            <BrandWordmark label={t('app.name')} />
+          </CardTitle>
+          <CardDescription className="flex items-center justify-center gap-1.5 text-pretty">
+            <Sparkles className="size-3.5 shrink-0 text-primary/80" aria-hidden />
+            <span>{t('auth.signInTo')}</span>
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && (
+              <p className="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
+                {error}
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="username">{t('auth.username')}</Label>
               <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
@@ -80,15 +92,21 @@ export default function LoginPage() {
                 </div>
               </div>
             )}
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="h-10 w-full rounded-2xl shadow-md shadow-primary/25" disabled={isLoading}>
               {isLoading ? t('auth.signingIn') : t('auth.signIn')}
             </Button>
-            <p className="text-sm text-center text-muted-foreground">
-              {t('auth.noAccount')} <Link to="/register" className="text-primary underline">{t('auth.register')}</Link>
+            <p className="text-center text-sm text-muted-foreground">
+              {t('auth.noAccount')}{' '}
+              <Link
+                to="/register"
+                className="font-medium text-primary underline decoration-primary/35 underline-offset-2 transition-colors hover:decoration-primary"
+              >
+                {t('auth.register')}
+              </Link>
             </p>
           </form>
         </CardContent>
       </Card>
-    </div>
+    </AuthScaffold>
   )
 }
