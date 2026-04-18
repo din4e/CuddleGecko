@@ -1,12 +1,13 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import ForceGraph2D from 'react-force-graph-2d'
 import { graphApi } from '../api/graph'
 import type { GraphData } from '../types'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { useGraphSettings } from '../stores/graphSettings'
+
+const ForceGraph2D = lazy(() => import('react-force-graph-2d'))
 
 const avatarImageCache = new Map<string, HTMLImageElement>()
 
@@ -111,7 +112,7 @@ export default function GraphPage() {
 
   // Build filtered data
   const fgData = useMemo(() => {
-    if (!graphData) return { nodes: [], links: [] }
+    if (!graphData) return { nodes: [], links: [], linkCounts: new Map() }
 
     let nodes = [...graphData.nodes]
     let edges = [...graphData.edges]
@@ -133,9 +134,6 @@ export default function GraphPage() {
 
     // Add self node — only connect to nodes that have edges (less clutter)
     if (showSelf && nodes.length > 0) {
-      const connectedNodeIds = new Set<number>()
-      edges.forEach((e) => { connectedNodeIds.add(e.source); connectedNodeIds.add(e.target) })
-      // Also include isolated nodes (connect self to everyone)
       nodes.push({ id: SELF_NODE_ID, name: t('graph.me'), relationship_labels: [], avatar_emoji: '', avatar_url: '' })
       nodes.forEach((n) => {
         if (n.id !== SELF_NODE_ID) {
@@ -144,9 +142,17 @@ export default function GraphPage() {
       })
     }
 
+    // Precompute link counts per node
+    const linkCounts = new Map<number, number>()
+    for (const e of edges) {
+      linkCounts.set(e.source, (linkCounts.get(e.source) || 0) + 1)
+      linkCounts.set(e.target, (linkCounts.get(e.target) || 0) + 1)
+    }
+
     return {
       nodes: nodes.map((n) => ({ ...n, id: n.id })),
       links: edges.map((e) => ({ source: e.source, target: e.target, relation_type: e.relation_type })),
+      linkCounts,
     }
   }, [graphData, activeFilters, filterMode, showSelf, t])
 
@@ -246,6 +252,7 @@ export default function GraphPage() {
 
       <Card>
         <CardContent className="p-0" ref={containerRef}>
+          <Suspense fallback={<div className="flex items-center justify-center h-[500px]"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>}>
           <ForceGraph2D
             ref={fgRef}
             graphData={fgData}
@@ -255,8 +262,8 @@ export default function GraphPage() {
               return getNodeColor(node.relationship_labels)
             }}
             nodeVal={(node: any) => {
-              const links = fgData.links.filter((l: any) => l.source.id === node.id || l.target.id === node.id)
-              return node.id === SELF_NODE_ID ? links.length + 2 : links.length + 1
+              const count = fgData.linkCounts.get(node.id) || 0
+              return node.id === SELF_NODE_ID ? count + 2 : count + 1
             }}
             linkLabel="relation_type"
             linkColor={(link: any) => {
@@ -343,6 +350,7 @@ export default function GraphPage() {
             cooldownTicks={100}
             onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
           />
+          </Suspense>
         </CardContent>
       </Card>
     </div>
