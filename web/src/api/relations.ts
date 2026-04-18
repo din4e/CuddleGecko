@@ -2,8 +2,8 @@ import client from './client'
 import type { ContactRelation } from '../types'
 
 export const relationsApi = {
-  list: (contactId: number) => client.get<ContactRelation[]>(`/contacts/${contactId}/relations`),
+  list: (contactId: number) => client.get<ContactRelation[]>(`/buddies/${contactId}/relations`),
   create: (contactId: number, data: { contact_id_b: number; relation_type: string }) =>
-    client.post<ContactRelation>(`/contacts/${contactId}/relations`, data),
+    client.post<ContactRelation>(`/buddies/${contactId}/relations`, data),
   delete: (id: number) => client.delete(`/relations/${id}`),
 }

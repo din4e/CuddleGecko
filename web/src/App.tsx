@@ -35,8 +35,8 @@ export default function App() {
           }
         >
           <Route index element={<DashboardPage />} />
-          <Route path="contacts" element={<ContactsPage />} />
-          <Route path="contacts/:id" element={<ContactDetailPage />} />
+          <Route path="buddies" element={<ContactsPage />} />
+          <Route path="buddies/:id" element={<ContactDetailPage />} />
           <Route path="graph" element={<GraphPage />} />
           <Route path="events" element={<EventsPage />} />
           <Route path="finance" element={<FinancePage />} />

@@ -19,13 +19,13 @@ function createHTTPAdapters(): AppAdapters {
     },
 
     contact: {
-      list: (params) => client.get('/contacts', { params }).then(r => r.data),
-      create: (data) => client.post('/contacts', data).then(r => r.data),
-      getByID: (id) => client.get<Contact>(`/contacts/${id}`).then(r => r.data),
-      update: (id, data) => client.put<Contact>(`/contacts/${id}`, data).then(r => r.data),
-      delete: (id) => client.delete(`/contacts/${id}`).then(() => {}),
-      getTags: (id) => client.get<Tag[]>(`/contacts/${id}/tags`).then(r => r.data),
-      replaceTags: (id, tagIDs) => client.put(`/contacts/${id}/tags`, { tag_ids: tagIDs }).then(() => {}),
+      list: (params) => client.get('/buddies', { params }).then(r => r.data),
+      create: (data) => client.post('/buddies', data).then(r => r.data),
+      getByID: (id) => client.get<Contact>(`/buddies/${id}`).then(r => r.data),
+      update: (id, data) => client.put<Contact>(`/buddies/${id}`, data).then(r => r.data),
+      delete: (id) => client.delete(`/buddies/${id}`).then(() => {}),
+      getTags: (id) => client.get<Tag[]>(`/buddies/${id}/tags`).then(r => r.data),
+      replaceTags: (id, tagIDs) => client.put(`/buddies/${id}/tags`, { tag_ids: tagIDs }).then(() => {}),
     },
 
     tag: {
@@ -37,9 +37,9 @@ function createHTTPAdapters(): AppAdapters {
 
     interaction: {
       listByContact: (contactID, page, pageSize) =>
-        client.get(`/contacts/${contactID}/interactions`, { params: { page, page_size: pageSize } }).then(r => r.data),
+        client.get(`/buddies/${contactID}/interactions`, { params: { page, page_size: pageSize } }).then(r => r.data),
       create: (contactID, data) =>
-        client.post<Interaction>(`/contacts/${contactID}/interactions`, data).then(r => r.data),
+        client.post<Interaction>(`/buddies/${contactID}/interactions`, data).then(r => r.data),
       update: (id, data) => client.put<Interaction>(`/interactions/${id}`, data).then(r => r.data),
       delete: (id) => client.delete(`/interactions/${id}`).then(() => {}),
     },
@@ -47,16 +47,16 @@ function createHTTPAdapters(): AppAdapters {
     reminder: {
       list: (status) => client.get<Reminder[]>('/reminders', { params: { status } }).then(r => r.data),
       create: (contactID, data) =>
-        client.post<Reminder>(`/contacts/${contactID}/reminders`, data).then(r => r.data),
+        client.post<Reminder>(`/buddies/${contactID}/reminders`, data).then(r => r.data),
       update: (id, data) => client.put<Reminder>(`/reminders/${id}`, data).then(r => r.data),
       delete: (id) => client.delete(`/reminders/${id}`).then(() => {}),
     },
 
     graph: {
       getGraph: () => client.get<GraphData>('/graph').then(r => r.data),
-      getRelations: (contactID) => client.get<ContactRelation[]>(`/contacts/${contactID}/relations`).then(r => r.data),
+      getRelations: (contactID) => client.get<ContactRelation[]>(`/buddies/${contactID}/relations`).then(r => r.data),
       createRelation: (contactIDA, data) =>
-        client.post<ContactRelation>(`/contacts/${contactIDA}/relations`, data).then(r => r.data),
+        client.post<ContactRelation>(`/buddies/${contactIDA}/relations`, data).then(r => r.data),
       deleteRelation: (id) => client.delete(`/relations/${id}`).then(() => {}),
     },
 

@@ -17,8 +17,8 @@ export interface Contact {
   nickname: string
   avatar_emoji: string
   avatar_url: string
-  phone: string
-  email: string
+  phones: string[]
+  emails: string[]
   birthday: string | null
   notes: string
   relationship_labels: string[]
@@ -114,7 +114,7 @@ export interface Event {
   start_time: string
   end_time: string | null
   location: string
-  contact_id: number | null
+  contact_ids: number[]
   color: string
   created_at: string
   updated_at: string
@@ -127,7 +127,7 @@ export interface Transaction {
   amount: number
   type: 'income' | 'expense'
   category: string
-  contact_id: number | null
+  contact_ids: number[]
   date: string
   notes: string
   created_at: string
