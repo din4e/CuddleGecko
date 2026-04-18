@@ -44,6 +44,8 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		&model.Interaction{},
 		&model.Reminder{},
 		&model.ContactRelation{},
+		&model.Event{},
+		&model.Transaction{},
 	); err != nil {
 		return nil, fmt.Errorf("auto migrate: %w", err)
 	}
