@@ -1,4 +1,20 @@
-export default function GeckoIcon({ className = '', size = 32 }: { className?: string; size?: number }) {
+import { useId } from 'react'
+import { cn } from '@/lib/utils'
+
+type GeckoIconProps = {
+  className?: string
+  size?: number
+  /** 登录等大图：腮红 + 更弯的笑 */
+  cute?: boolean
+}
+
+/**
+ * 品牌壁虎标：统一矢量，随主题 primary / foreground 变化。
+ */
+export default function GeckoIcon({ className = '', size = 32, cute = false }: GeckoIconProps) {
+  const rawId = useId()
+  const fid = `gecko-${rawId.replace(/:/g, '')}`
+
   return (
     <svg
       width={size}
@@ -6,36 +22,72 @@ export default function GeckoIcon({ className = '', size = 32 }: { className?: s
       viewBox="0 0 64 64"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={className}
+      className={cn('shrink-0 overflow-visible', className)}
+      aria-hidden
     >
-      {/* Body */}
-      <ellipse cx="32" cy="36" rx="16" ry="18" fill="#4ade80" />
-      {/* Head */}
-      <ellipse cx="32" cy="18" rx="12" ry="10" fill="#4ade80" />
-      {/* Eyes */}
-      <circle cx="27" cy="16" r="3" fill="white" />
-      <circle cx="37" cy="16" r="3" fill="white" />
-      <circle cx="28" cy="15.5" r="1.5" fill="#1e293b" />
-      <circle cx="38" cy="15.5" r="1.5" fill="#1e293b" />
-      {/* Smile */}
-      <path d="M28 21 Q32 24 36 21" stroke="#166534" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-      {/* Belly spots */}
-      <ellipse cx="30" cy="34" rx="4" ry="5" fill="#86efac" opacity="0.6" />
-      <ellipse cx="36" cy="40" rx="3" ry="4" fill="#86efac" opacity="0.6" />
-      {/* Front left leg */}
-      <path d="M18 30 L10 28 L8 24" stroke="#4ade80" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <circle cx="8" cy="24" r="2" fill="#4ade80" />
-      {/* Front right leg */}
-      <path d="M18 38 L10 40 L8 44" stroke="#4ade80" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <circle cx="8" cy="44" r="2" fill="#4ade80" />
-      {/* Back right leg */}
-      <path d="M46 30 L54 28 L56 24" stroke="#4ade80" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <circle cx="56" cy="24" r="2" fill="#4ade80" />
-      {/* Back left leg */}
-      <path d="M46 38 L54 40 L56 44" stroke="#4ade80" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <circle cx="56" cy="44" r="2" fill="#4ade80" />
-      {/* Tail */}
-      <path d="M32 54 Q28 60 22 58 Q16 56 14 50" stroke="#4ade80" strokeWidth="4" strokeLinecap="round" fill="none" />
+      <defs>
+        <filter id={fid} x="-25%" y="-25%" width="150%" height="150%" colorInterpolationFilters="sRGB">
+          <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodOpacity="0.14" />
+        </filter>
+      </defs>
+
+      <g filter={`url(#${fid})`}>
+        {/* tail — drawn first, behind body */}
+        <path
+          d="M46 40 C52 44 54 52 48 58 C42 60 36 56 34 50"
+          className="stroke-primary"
+          strokeWidth="5"
+          strokeLinecap="round"
+          fill="none"
+        />
+
+        {/* ear bumps */}
+        <circle cx="21" cy="17" r="5.5" className="fill-primary" />
+        <circle cx="43" cy="17" r="5.5" className="fill-primary" />
+
+        {/* head + body */}
+        <ellipse cx="32" cy="21" rx="12" ry="10" className="fill-primary" />
+        <ellipse cx="32" cy="36" rx="15" ry="17" className="fill-primary" />
+
+        {/* belly */}
+        <ellipse cx="32" cy="38" rx="9" ry="11" className="fill-primary-foreground/22" />
+
+        {/* legs — short capsules */}
+        <ellipse cx="17" cy="41" rx="4" ry="3.2" className="fill-primary" transform="rotate(-25 17 41)" />
+        <ellipse cx="47" cy="41" rx="4" ry="3.2" className="fill-primary" transform="rotate(25 47 41)" />
+        <ellipse cx="22" cy="48" rx="3.8" ry="3" className="fill-primary" transform="rotate(-8 22 48)" />
+        <ellipse cx="42" cy="48" rx="3.8" ry="3" className="fill-primary" transform="rotate(8 42 48)" />
+
+        {/* toes */}
+        <circle cx="14" cy="43" r="2" className="fill-primary" />
+        <circle cx="50" cy="43" r="2" className="fill-primary" />
+        <circle cx="19" cy="51" r="1.8" className="fill-primary" />
+        <circle cx="45" cy="51" r="1.8" className="fill-primary" />
+
+        {/* eyes */}
+        <ellipse cx="26" cy="19" rx="4.2" ry="4.8" className="fill-background" />
+        <ellipse cx="38" cy="19" rx="4.2" ry="4.8" className="fill-background" />
+        <circle cx="27.2" cy="18.2" r="2.2" className="fill-foreground" />
+        <circle cx="39.2" cy="18.2" r="2.2" className="fill-foreground" />
+        <circle cx="28.4" cy="17" r="0.9" className="fill-background" />
+        <circle cx="40.4" cy="17" r="0.9" className="fill-background" />
+
+        {/* smile */}
+        <path
+          d={cute ? 'M25.5 24.5 Q32 30.5 38.5 24.5' : 'M27 25 Q32 28.5 37 25'}
+          className={cute ? 'stroke-foreground/50' : 'stroke-foreground/40'}
+          strokeWidth={cute ? '1.5' : '1.4'}
+          strokeLinecap="round"
+          fill="none"
+        />
+
+        {cute && (
+          <>
+            <ellipse cx="22" cy="23" rx="3.2" ry="2.2" className="fill-rose-400/45 dark:fill-rose-300/35" />
+            <ellipse cx="42" cy="23" rx="3.2" ry="2.2" className="fill-rose-400/45 dark:fill-rose-300/35" />
+          </>
+        )}
+      </g>
     </svg>
   )
 }

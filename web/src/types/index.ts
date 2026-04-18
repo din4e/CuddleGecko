@@ -105,3 +105,37 @@ export interface PaginatedData<T> {
   page: number
   page_size: number
 }
+
+export interface Event {
+  id: number
+  user_id: number
+  title: string
+  description: string
+  start_time: string
+  end_time: string | null
+  location: string
+  contact_id: number | null
+  color: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Transaction {
+  id: number
+  user_id: number
+  title: string
+  amount: number
+  type: 'income' | 'expense'
+  category: string
+  contact_id: number | null
+  date: string
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TransactionSummary {
+  income: number
+  expense: number
+  balance: number
+}
