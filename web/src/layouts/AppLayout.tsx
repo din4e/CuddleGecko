@@ -18,6 +18,7 @@ import {
   Wallet,
   PanelLeftClose,
   PanelLeft,
+  Bot,
 } from 'lucide-react'
 import GeckoIcon from '../components/GeckoIcon'
 import { BrandWordmark } from '../components/BrandWordmark'
@@ -31,6 +32,7 @@ const navKeys = [
   { to: '/graph', label: 'nav.network', icon: Network },
   { to: '/events', label: 'nav.events', icon: Calendar },
   { to: '/finance', label: 'nav.finance', icon: Wallet },
+  { to: '/ai', label: 'nav.ai', icon: Bot },
   { to: '/tags', label: 'nav.tags', icon: Tag },
   { to: '/reminders', label: 'nav.reminders', icon: Bell },
   { to: '/settings', label: 'nav.settings', icon: Settings },

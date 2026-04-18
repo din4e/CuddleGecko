@@ -5,7 +5,9 @@ import { graphApi } from '../api/graph'
 import type { GraphData } from '../types'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
 import { useGraphSettings } from '../stores/graphSettings'
+import { ZoomIn, ZoomOut, Maximize, Minimize, RotateCcw, Crosshair } from 'lucide-react'
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d'))
 
@@ -58,9 +60,45 @@ export default function GraphPage() {
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set())
   const [filterMode, setFilterMode] = useState<'label' | 'relation'>('label')
   const [showSelf, setShowSelf] = useState(true)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
   const nodeRadius = useGraphSettings((s) => s.nodeRadius)
   const emojiSizeSetting = useGraphSettings((s) => s.emojiSize)
+
+  const handleZoomIn = useCallback(() => {
+    if (fgRef.current) {
+      const fg = fgRef.current
+      const currentZoom = fg.zoom()
+      fg.zoom(currentZoom * 1.4, 200)
+    }
+  }, [])
+
+  const handleZoomOut = useCallback(() => {
+    if (fgRef.current) {
+      const fg = fgRef.current
+      const currentZoom = fg.zoom()
+      fg.zoom(currentZoom / 1.4, 200)
+    }
+  }, [])
+
+  const handleFitAll = useCallback(() => {
+    fgRef.current?.zoomToFit(400, 40)
+  }, [])
+
+  const handleCenter = useCallback(() => {
+    const fg = fgRef.current
+    if (!fg) return
+    const nodes = fg.graphData().nodes as { x: number; y: number }[]
+    if (!nodes || nodes.length === 0) return
+    let cx = 0, cy = 0
+    for (const n of nodes) { cx += n.x; cy += n.y }
+    cx /= nodes.length; cy /= nodes.length
+    fg.centerAt(cx, cy, 400)
+  }, [])
+
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen((prev) => !prev)
+  }, [])
 
   useEffect(() => {
     graphApi.get()
@@ -74,16 +112,28 @@ export default function GraphPage() {
   // Responsive canvas sizing
   useEffect(() => {
     const updateSize = () => {
-      if (containerRef.current) {
+      if (isFullscreen) {
+        setDimensions({ width: window.innerWidth, height: window.innerHeight })
+      } else if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect()
-        setDimensions({ width: Math.floor(rect.width), height: Math.max(500, Math.floor(window.innerHeight - 320)) })
+        const height = Math.max(400, window.innerHeight - rect.top)
+        setDimensions({ width: Math.floor(rect.width), height: Math.floor(height) })
       }
     }
     updateSize()
     const ro = new ResizeObserver(updateSize)
     if (containerRef.current) ro.observe(containerRef.current)
-    return () => ro.disconnect()
-  }, [])
+    window.addEventListener('resize', updateSize)
+    return () => { ro.disconnect(); window.removeEventListener('resize', updateSize) }
+  }, [isFullscreen])
+
+  // Escape to exit fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsFullscreen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isFullscreen])
 
   const toggleFilter = (key: string) => {
     setActiveFilters((prev) => {
@@ -178,8 +228,10 @@ export default function GraphPage() {
   const dark = isDarkMode()
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+    <div className={isFullscreen ? 'fixed inset-0 z-50 bg-background' : 'space-y-4'}>
+      {!isFullscreen && (
+      <>
+      <div className="flex items-center justify-between flex-wrap gap-2 shrink-0">
         <h1 className="text-3xl font-bold">{t('graph.title')}</h1>
         <div className="flex items-center gap-3">
           <div className="text-sm text-muted-foreground">
@@ -192,6 +244,23 @@ export default function GraphPage() {
           >
             {showSelf ? t('graph.hideSelf') : t('graph.showSelf')}
           </Badge>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="size-8" onClick={handleZoomIn} title={t('graph.zoomIn')}>
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="size-8" onClick={handleZoomOut} title={t('graph.zoomOut')}>
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="size-8" onClick={handleFitAll} title={t('graph.fitAll')}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="size-8" onClick={handleCenter} title={t('graph.center')}>
+              <Crosshair className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="size-8" onClick={toggleFullscreen} title={isFullscreen ? t('graph.exitFullscreen') : t('graph.fullscreen')}>
+              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -249,8 +318,10 @@ export default function GraphPage() {
           </Badge>
         )}
       </div>
+      </>
+      )}
 
-      <Card>
+      <Card className={isFullscreen ? 'h-full rounded-none border-0' : ''}>
         <CardContent className="p-0" ref={containerRef}>
           <Suspense fallback={<div className="flex items-center justify-center h-[500px]"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>}>
           <ForceGraph2D

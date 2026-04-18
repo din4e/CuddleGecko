@@ -15,10 +15,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../components/ui/dialog'
-import { CalendarDays, Clock, MapPin, Plus, Pencil, Trash2, Heart } from 'lucide-react'
+import { CalendarDays, Clock, MapPin, Plus, Pencil, Trash2, Heart, Sparkles, Loader2 } from 'lucide-react'
 import BuddyPicker from '../components/BuddyPicker'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
+import { useModeStore } from '../stores/mode'
 import type { Event, Contact } from '../types'
 
 type TimeFilter = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'upcoming' | 'past'
@@ -113,6 +114,23 @@ export default function EventsPage() {
   const [editing, setEditing] = useState<Event | null>(null)
   const [form, setForm] = useState<EventFormData>(emptyForm)
   const [view, setView] = useViewMode('events')
+  const adapters = useModeStore((s) => s.adapters)
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null)
+  const [analyzingId, setAnalyzingId] = useState<number | null>(null)
+
+  const handleAnalyzeEvent = async (eventId: number) => {
+    if (!adapters?.ai) return
+    setAnalyzingId(eventId)
+    setAnalysisResult(null)
+    try {
+      const res = await adapters.ai.analyzeEvent(eventId)
+      setAnalysisResult(res.analysis)
+    } catch {
+      setAnalysisResult(t('ai.sendFailed'))
+    } finally {
+      setAnalyzingId(null)
+    }
+  }
 
   const filterKeys: { key: TimeFilter; label: string }[] = [
     { key: 'all', label: t('events.all') },
@@ -264,6 +282,9 @@ export default function EventsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAnalyzeEvent(e.id)} disabled={analyzingId === e.id} title={t('ai.analyzeEvent')}>
+                        {analyzingId === e.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
@@ -308,6 +329,9 @@ export default function EventsPage() {
                   </div>
                 )}
                 <div className="flex gap-1 pt-1">
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAnalyzeEvent(e.id)} disabled={analyzingId === e.id} title={t('ai.analyzeEvent')}>
+                    {analyzingId === e.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  </Button>
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
@@ -391,6 +415,19 @@ export default function EventsPage() {
               {editing ? t('events.editEvent') : t('events.newEvent')}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Analysis Result */}
+      <Dialog open={!!analysisResult} onOpenChange={() => setAnalysisResult(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              {t('ai.analysisTitle')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="whitespace-pre-wrap text-sm max-h-[60vh] overflow-auto">{analysisResult}</div>
         </DialogContent>
       </Dialog>
     </div>

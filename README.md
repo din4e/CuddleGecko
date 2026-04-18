@@ -7,9 +7,13 @@ A local-first, self-hosted personal CRM with network graph visualization.
 - **Contact Management** — CRUD with tags, relationship types, search & pagination
 - **Interaction Timeline** — Record meetings, calls, messages per contact
 - **Smart Reminders** — Schedule follow-ups with status tracking (pending/done/snoozed)
+- **Events** — Calendar events with color coding, buddy linking, and time filters
+- **Finance Tracking** — Income/expense records with category, buddy linking, and summary
 - **Network Graph** — Force-directed visualization of your relationship network
+- **AI Assistant** — Multi-provider LLM chat (DeepSeek, GLM, MiniMax, Kimi, Qwen, OpenAI, custom) with CRM data context, relationship analysis, and event insights
 - **Tag System** — Color-coded tags for contact categorization
 - **Dark Mode** — Green gecko brand theme with light/dark toggle
+- **i18n** — English and Chinese (中文) support
 - **Auth** — JWT + refresh token with automatic retry
 
 ## Tech Stack
@@ -19,8 +23,10 @@ A local-first, self-hosted personal CRM with network graph visualization.
 | Backend | Go 1.24, Gin, GORM, SQLite/MySQL |
 | Frontend | Vite, React 18, TypeScript, Tailwind CSS v4, shadcn/ui |
 | State | Zustand |
+| i18n | react-i18next |
 | Graph | react-force-graph-2d |
 | Charts | Recharts |
+| AI Icons | @lobehub/icons-static-svg (CDN) |
 
 ## Quick Start
 
@@ -46,14 +52,16 @@ internal/
 pkg/
   config/           # Viper config loading
   database/         # GORM init (SQLite/MySQL)
+  llm/              # OpenAI-compatible LLM streaming client
   middleware/        # JWT auth, CORS
   response/         # Unified JSON response helpers
 web/src/
-  api/              # Axios client + domain modules
+  api/              # Axios client + domain modules + dual-mode adapters
   components/       # UI components (shadcn/ui + GeckoIcon)
   layouts/          # App layout with sidebar
-  pages/            # Route-level views (7 pages)
-  stores/           # Zustand stores (auth)
+  pages/            # Route-level views
+  stores/           # Zustand stores (auth, mode, graph settings)
+  i18n/             # react-i18next locales (en, zh)
   types/            # TypeScript types matching backend models
 ```
 
@@ -67,12 +75,12 @@ All endpoints at `/api`:
 | POST | /auth/login | Login |
 | POST | /auth/refresh | Refresh token |
 | GET | /auth/me | Current user |
-| GET/POST | /contacts | List/Create contacts |
-| GET/PUT/DELETE | /contacts/:id | Contact CRUD |
-| GET/PUT | /contacts/:id/tags | Contact tags |
-| GET/POST | /contacts/:id/interactions | Interactions |
-| POST | /contacts/:id/reminders | Create reminder |
-| GET/POST | /contacts/:id/relations | Relations |
+| GET/POST | /buddies | List/Create contacts |
+| GET/PUT/DELETE | /buddies/:id | Contact CRUD |
+| GET/PUT | /buddies/:id/tags | Contact tags |
+| GET/POST | /buddies/:id/interactions | Interactions |
+| POST | /buddies/:id/reminders | Create reminder |
+| GET/POST | /buddies/:id/relations | Relations |
 | GET/POST | /tags | Tag CRUD |
 | PUT/DELETE | /tags/:id | Tag update/delete |
 | PUT/DELETE | /interactions/:id | Interaction update/delete |
@@ -80,6 +88,22 @@ All endpoints at `/api`:
 | PUT/DELETE | /reminders/:id | Reminder update/delete |
 | DELETE | /relations/:id | Delete relation |
 | GET | /graph | Network graph data |
+| GET/POST | /events | List/Create events |
+| PUT/DELETE | /events/:id | Event update/delete |
+| GET/POST | /transactions | List/Create transactions |
+| GET | /transactions/summary | Transaction summary |
+| PUT/DELETE | /transactions/:id | Transaction update/delete |
+| GET | /ai/presets | List AI provider presets |
+| GET/PUT | /ai/providers | List/Save AI providers |
+| POST | /ai/providers/:id/activate | Activate provider |
+| POST | /ai/providers/:id/test | Test connection |
+| GET/POST | /ai/conversations | List/Create chat conversations |
+| GET | /ai/conversations/:id/messages | Get conversation messages |
+| DELETE | /ai/conversations/:id | Delete conversation |
+| POST | /ai/chat | Stream chat (SSE) |
+| POST | /ai/chat/sync | Sync chat |
+| POST | /ai/analyze/relationship/:contactId | Analyze relationship |
+| POST | /ai/analyze/event/:eventId | Analyze event |
 
 ## Configuration
 

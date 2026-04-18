@@ -5,10 +5,11 @@ import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog'
 import type { Reminder, ReminderStatus } from '../types'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
-import { CheckCircle, Clock, AlertCircle, Trash2 } from 'lucide-react'
+import { CheckCircle, Clock, AlertCircle, Trash2, Pencil } from 'lucide-react'
 
 export default function RemindersPage() {
   const { t } = useTranslation()
@@ -22,6 +23,14 @@ export default function RemindersPage() {
   const [statusFilter, setStatusFilter] = useState<ReminderStatus | ''>('')
   const [loading, setLoading] = useState(true)
   const [view, setView] = useViewMode('reminders')
+
+  // Edit dialog state
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editing, setEditing] = useState<Reminder | null>(null)
+  const [formTitle, setFormTitle] = useState('')
+  const [formDesc, setFormDesc] = useState('')
+  const [formRemindAt, setFormRemindAt] = useState('')
+  const [formStatus, setFormStatus] = useState<ReminderStatus>('pending')
 
   const loadReminders = async () => {
     setLoading(true)
@@ -39,8 +48,29 @@ export default function RemindersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter])
 
-  const handleMarkDone = async (id: number) => {
-    await remindersApi.update(id, { status: 'done' } as Partial<Reminder>)
+  const openEdit = (r: Reminder) => {
+    setEditing(r)
+    setFormTitle(r.title)
+    setFormDesc(r.description || '')
+    setFormRemindAt(r.remind_at ? r.remind_at.slice(0, 16) : '')
+    setFormStatus(r.status)
+    setDialogOpen(true)
+  }
+
+  const handleSave = async () => {
+    if (!editing) return
+    await remindersApi.update(editing.id, {
+      title: formTitle,
+      description: formDesc,
+      remind_at: formRemindAt,
+      status: formStatus,
+    })
+    setDialogOpen(false)
+    loadReminders()
+  }
+
+  const handleStatusChange = async (id: number, status: ReminderStatus) => {
+    await remindersApi.update(id, { status })
     loadReminders()
   }
 
@@ -50,6 +80,17 @@ export default function RemindersPage() {
       loadReminders()
     }
   }
+
+  const renderActions = (r: Reminder) => (
+    <div className="flex justify-end gap-1">
+      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(r)} title={t('reminders.edit')}>
+        <Pencil className="h-3.5 w-3.5" />
+      </Button>
+      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(r)}>
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  )
 
   return (
     <div className="space-y-6">
@@ -72,11 +113,11 @@ export default function RemindersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8"></TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t('reminders.title_field')}</TableHead>
+                <TableHead>{t('reminders.description')}</TableHead>
+                <TableHead>{t('reminders.time')}</TableHead>
+                <TableHead>{t('reminders.status_label')}</TableHead>
+                <TableHead className="text-right">{t('reminders.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -89,15 +130,19 @@ export default function RemindersPage() {
                     <TableCell className="font-medium">{r.title}</TableCell>
                     <TableCell className="text-muted-foreground max-w-[200px] truncate">{r.description || '—'}</TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">{new Date(r.remind_at).toLocaleString()}</TableCell>
-                    <TableCell><Badge variant={cfg.variant}>{cfg.label}</Badge></TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {r.status === 'pending' && (
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleMarkDone(r.id)}>{t('reminders.markDone')}</Button>
-                        )}
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                      </div>
+                    <TableCell>
+                      <Badge
+                        variant={cfg.variant}
+                        className="cursor-pointer select-none"
+                        onClick={() => {
+                          const next: Record<ReminderStatus, ReminderStatus> = { pending: 'done', done: 'snoozed', snoozed: 'pending' }
+                          handleStatusChange(r.id, next[r.status])
+                        }}
+                      >
+                        {cfg.label}
+                      </Badge>
                     </TableCell>
+                    <TableCell className="text-right">{renderActions(r)}</TableCell>
                   </TableRow>
                 )
               })}
@@ -119,13 +164,19 @@ export default function RemindersPage() {
                   {r.description && <p className="text-sm text-muted-foreground line-clamp-2">{r.description}</p>}
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">{new Date(r.remind_at).toLocaleString()}</span>
-                    <Badge variant={cfg.variant} className="text-xs">{cfg.label}</Badge>
+                    <Badge
+                      variant={cfg.variant}
+                      className="cursor-pointer select-none text-xs"
+                      onClick={() => {
+                        const next: Record<ReminderStatus, ReminderStatus> = { pending: 'done', done: 'snoozed', snoozed: 'pending' }
+                        handleStatusChange(r.id, next[r.status])
+                      }}
+                    >
+                      {cfg.label}
+                    </Badge>
                   </div>
                   <div className="flex gap-1 pt-1">
-                    {r.status === 'pending' && (
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleMarkDone(r.id)}>{t('reminders.markDone')}</Button>
-                    )}
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleDelete(r.id)}>{t('reminders.delete')}</Button>
+                    {renderActions(r)}
                   </div>
                 </CardContent>
               </Card>
@@ -133,6 +184,42 @@ export default function RemindersPage() {
           })}
         </div>
       )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t('reminders.editReminder')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">{t('reminders.title_field')}</label>
+              <input className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">{t('reminders.description')}</label>
+              <textarea className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" rows={3} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">{t('reminders.time')}</label>
+              <input type="datetime-local" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={formRemindAt} onChange={(e) => setFormRemindAt(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">{t('reminders.status_label')}</label>
+              <div className="mt-1 flex gap-2">
+                {(['pending', 'done', 'snoozed'] as ReminderStatus[]).map((s) => (
+                  <Button key={s} size="sm" variant={formStatus === s ? 'default' : 'outline'} onClick={() => setFormStatus(s)}>
+                    {statusLabels[s]}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('reminders.cancel')}</Button>
+            <Button onClick={handleSave}>{t('reminders.save')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import client from './client'
 import type { AppAdapters } from './adapter'
-import type { AuthResponse, User, Contact, Tag, Interaction, Reminder, ContactRelation, GraphData } from '@/types'
+import type { AuthResponse, User, Contact, Tag, Interaction, Reminder, ContactRelation, GraphData, Event, Transaction, TransactionSummary, AIProvider, AIConversation, AIMessage } from '@/types'
 
 function createHTTPAdapters(): AppAdapters {
   return {
@@ -63,6 +63,36 @@ function createHTTPAdapters(): AppAdapters {
     export: {
       exportJSON: () => client.post('/export').then(r => r.data),
       importJSON: (data) => client.post('/import', { data }).then(() => {}),
+    },
+
+    event: {
+      list: (params) => client.get('/events', { params }).then(r => r.data),
+      create: (data) => client.post<Event>('/events', data).then(r => r.data),
+      update: (id, data) => client.put<Event>(`/events/${id}`, data).then(r => r.data),
+      delete: (id) => client.delete(`/events/${id}`).then(() => {}),
+    },
+
+    transaction: {
+      list: (params) => client.get('/transactions', { params }).then(r => r.data),
+      summary: () => client.get<TransactionSummary>('/transactions/summary').then(r => r.data),
+      create: (data) => client.post<Transaction>('/transactions', data).then(r => r.data),
+      update: (id, data) => client.put<Transaction>(`/transactions/${id}`, data).then(r => r.data),
+      delete: (id) => client.delete(`/transactions/${id}`).then(() => {}),
+    },
+
+    ai: {
+      listPresets: () => client.get('/ai/presets').then(r => r.data),
+      listProviders: () => client.get<AIProvider[]>('/ai/providers').then(r => r.data),
+      saveProvider: (data) => client.put<AIProvider>('/ai/providers', data).then(r => r.data),
+      activateProvider: (id) => client.post(`/ai/providers/${id}/activate`).then(() => {}),
+      testConnection: (id) => client.post(`/ai/providers/${id}/test`).then(r => r.data),
+      listConversations: (params) => client.get('/ai/conversations', { params }).then(r => r.data),
+      createConversation: (data) => client.post<AIConversation>('/ai/conversations', data).then(r => r.data),
+      getMessages: (conversationId) => client.get<AIMessage[]>(`/ai/conversations/${conversationId}/messages`).then(r => r.data),
+      deleteConversation: (id) => client.delete(`/ai/conversations/${id}`).then(() => {}),
+      analyzeRelationship: (contactId) => client.post(`/ai/analyze/relationship/${contactId}`).then(r => r.data),
+      analyzeEvent: (eventId) => client.post(`/ai/analyze/event/${eventId}`).then(r => r.data),
+      chat: (conversationId, message) => client.post<{ content: string }>('/ai/chat/sync', { conversation_id: conversationId, message }).then(r => r.data.content),
     },
   }
 }

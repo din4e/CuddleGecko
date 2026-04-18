@@ -1,6 +1,7 @@
 import type {
   User, Contact, Tag, Interaction, Reminder,
-  ContactRelation, GraphData, AuthResponse
+  ContactRelation, GraphData, AuthResponse, Event, Transaction, TransactionSummary,
+  AIProvider, AIConversation, AIMessage, AIProviderPreset
 } from '@/types'
 
 export interface AuthAdapter {
@@ -57,6 +58,36 @@ export interface ExportAdapter {
   importJSON(data: string): Promise<void>
 }
 
+export interface EventAdapter {
+  list(params?: { page?: number; page_size?: number; start_after?: string; end_before?: string }): Promise<{ items: Event[]; total: number; page: number; page_size: number }>
+  create(data: Partial<Event>): Promise<Event>
+  update(id: number, data: Partial<Event>): Promise<Event>
+  delete(id: number): Promise<void>
+}
+
+export interface TransactionAdapter {
+  list(params?: { page?: number; page_size?: number; type?: string }): Promise<{ items: Transaction[]; total: number; page: number; page_size: number }>
+  summary(): Promise<TransactionSummary>
+  create(data: Partial<Transaction>): Promise<Transaction>
+  update(id: number, data: Partial<Transaction>): Promise<Transaction>
+  delete(id: number): Promise<void>
+}
+
+export interface AIAdapter {
+  listPresets(): Promise<AIProviderPreset[]>
+  listProviders(): Promise<AIProvider[]>
+  saveProvider(data: { provider_type: string; api_key: string; model?: string; base_url?: string }): Promise<AIProvider>
+  activateProvider(id: number): Promise<void>
+  testConnection(id: number): Promise<{ success: boolean; error?: string }>
+  listConversations(params?: { page?: number; page_size?: number }): Promise<{ items: AIConversation[]; total: number; page: number; page_size: number }>
+  createConversation(data?: { title?: string }): Promise<AIConversation>
+  getMessages(conversationId: number): Promise<AIMessage[]>
+  deleteConversation(id: number): Promise<void>
+  analyzeRelationship(contactId: number): Promise<{ analysis: string }>
+  analyzeEvent(eventId: number): Promise<{ analysis: string }>
+  chat(conversationId: number, message: string): Promise<string>
+}
+
 export interface AppAdapters {
   auth: AuthAdapter
   captcha: CaptchaAdapter
@@ -66,4 +97,7 @@ export interface AppAdapters {
   reminder: ReminderAdapter
   graph: GraphAdapter
   export: ExportAdapter
+  event: EventAdapter
+  transaction: TransactionAdapter
+  ai: AIAdapter
 }

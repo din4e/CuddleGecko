@@ -1,7 +1,8 @@
 import type { AppAdapters } from './adapter'
 import type {
   Contact, Interaction, Reminder, ContactRelation,
-  GraphData, AuthResponse, User, Tag,
+  GraphData, AuthResponse, User, Tag, Event, Transaction, TransactionSummary,
+  AIProvider, AIConversation, AIMessage, AIProviderPreset,
 } from '@/types'
 
 // Wails bindings are generated at build time by `wails dev` or `wails build`.
@@ -22,6 +23,9 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     { List: ListReminders, Create: CreateReminder, Update: UpdateReminder, Delete: DeleteReminder },
     { GetGraph, GetRelations, CreateRelation, DeleteRelation },
     { ExportJSON, ImportJSON },
+    { List: ListEvents, Create: CreateEvent, Update: UpdateEvent, Delete: DeleteEvent },
+    { List: ListTransactions, Summary: TransactionSummary, Create: CreateTransaction, Update: UpdateTransaction, Delete: DeleteTransaction },
+    { ListProviders: AIListProviders, SaveProvider: AISaveProvider, ActivateProvider: AIActivateProvider, TestConnection: AITestConnection, ListConversations: AIListConversations, CreateConversation: AICreateConversation, GetMessages: AIGetMessages, DeleteConversation: AIDeleteConversation, Chat: AIChatFn, AnalyzeRelationship: AIAnalyzeRelationship, AnalyzeEvent: AIAnalyzeEvent, ListPresets: AIListPresets },
   ] = await Promise.all([
     import('@/wailsjs/go/bindings/AuthBinding'),
     import('@/wailsjs/go/bindings/CaptchaBinding'),
@@ -31,6 +35,9 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     import('@/wailsjs/go/bindings/ReminderBinding'),
     import('@/wailsjs/go/bindings/GraphBinding'),
     import('@/wailsjs/go/bindings/ExportBinding'),
+    import('@/wailsjs/go/bindings/EventBinding'),
+    import('@/wailsjs/go/bindings/TransactionBinding'),
+    import('@/wailsjs/go/bindings/AIBinding'),
   ])
 
   return {
@@ -191,6 +198,137 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     export: {
       exportJSON: () => ExportJSON(),
       importJSON: (data) => ImportJSON(data).then(() => {}),
+    },
+
+    event: {
+      list: async (params) => {
+        const r = await ListEvents({
+          page: params?.page || 1,
+          page_size: params?.page_size || 50,
+          start_after: params?.start_after || '',
+          end_before: params?.end_before || '',
+        } as any)
+        return r as any
+      },
+      create: async (data) => {
+        const r = await CreateEvent({
+          title: data.title || '',
+          description: data.description || '',
+          start_time: data.start_time || '',
+          end_time: data.end_time || '',
+          location: data.location || '',
+          contact_ids: data.contact_ids || [],
+          color: data.color || '',
+        } as any)
+        return r as any as Event
+      },
+      update: async (id, data) => {
+        const r = await UpdateEvent(id, {
+          title: data.title || '',
+          description: data.description || '',
+          start_time: data.start_time || '',
+          end_time: data.end_time || '',
+          location: data.location || '',
+          contact_ids: data.contact_ids || [],
+          color: data.color || '',
+        } as any)
+        return r as any as Event
+      },
+      delete: (id) => DeleteEvent(id).then(() => {}),
+    },
+
+    transaction: {
+      list: async (params) => {
+        const r = await ListTransactions({
+          page: params?.page || 1,
+          page_size: params?.page_size || 50,
+          type: params?.type || '',
+        } as any)
+        return r as any
+      },
+      summary: async () => {
+        const r = await TransactionSummary()
+        return r as any as TransactionSummary
+      },
+      create: async (data) => {
+        const r = await CreateTransaction({
+          title: data.title || '',
+          amount: data.amount || 0,
+          type: data.type || '',
+          category: data.category || '',
+          contact_ids: data.contact_ids || [],
+          date: data.date || '',
+          notes: data.notes || '',
+        } as any)
+        return r as any as Transaction
+      },
+      update: async (id, data) => {
+        const r = await UpdateTransaction(id, {
+          title: data.title || '',
+          amount: data.amount || 0,
+          type: data.type || '',
+          category: data.category || '',
+          contact_ids: data.contact_ids || [],
+          date: data.date || '',
+          notes: data.notes || '',
+        } as any)
+        return r as any as Transaction
+      },
+      delete: (id) => DeleteTransaction(id).then(() => {}),
+    },
+
+    ai: {
+      listPresets: async () => {
+        const r = await AIListPresets()
+        return r as any as AIProviderPreset[]
+      },
+      listProviders: async () => {
+        const r = await AIListProviders()
+        return r as any as AIProvider[]
+      },
+      saveProvider: async (data) => {
+        const r = await AISaveProvider({
+          provider_type: data.provider_type,
+          api_key: data.api_key,
+          model: data.model || '',
+          base_url: data.base_url || '',
+        } as any)
+        return r as any as AIProvider
+      },
+      activateProvider: (id) => AIActivateProvider(id).then(() => {}),
+      testConnection: async (id) => {
+        try {
+          await AITestConnection(id)
+          return { success: true }
+        } catch (e: any) {
+          return { success: false, error: e?.message || String(e) }
+        }
+      },
+      listConversations: async (params) => {
+        const r = await AIListConversations(params?.page || 1, params?.page_size || 20)
+        return r as any
+      },
+      createConversation: async (data) => {
+        const r = await AICreateConversation(data?.title || '')
+        return r as any as AIConversation
+      },
+      getMessages: async (conversationId) => {
+        const r = await AIGetMessages(conversationId)
+        return r as any as AIMessage[]
+      },
+      deleteConversation: (id) => AIDeleteConversation(id).then(() => {}),
+      analyzeRelationship: async (contactId) => {
+        const r = await AIAnalyzeRelationship(contactId)
+        return r as any as { analysis: string }
+      },
+      analyzeEvent: async (eventId) => {
+        const r = await AIAnalyzeEvent(eventId)
+        return r as any as { analysis: string }
+      },
+      chat: async (conversationId, message) => {
+        const r = await AIChatFn(conversationId, message)
+        return r as any as string
+      },
     },
   }
 }

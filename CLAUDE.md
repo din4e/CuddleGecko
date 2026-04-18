@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CuddleGecko (小蜥抱抱) is a local-first personal CRM with network graph visualization. Go backend + React SPA frontend. Supports Web mode (Gin server) and Desktop mode (Wails v2). Roadmap: Web → Desktop → SaaS cloud.
+CuddleGecko (小蜥抱抱) is a local-first personal CRM with network graph visualization, AI assistant, and finance tracking. Go backend + React SPA frontend. Supports Web mode (Gin server) and Desktop mode (Wails v2). Roadmap: Web → Desktop → SaaS cloud.
 
 ## Build & Run
 
@@ -40,9 +40,10 @@ cmd/server/main.go    → wires all dependencies (web mode entry point)
 internal/handler/     → Gin HTTP handlers, thin layer calling services
 internal/service/     → business logic, no HTTP awareness
 internal/repository/  → GORM database access, interfaces defined in service package
-internal/model/       → domain types (User, Contact, Tag, Interaction, Reminder, Relation)
+internal/model/       → domain types (User, Contact, Tag, Interaction, Reminder, Relation, Event, Transaction, AIProvider, AIConversation, AIMessage)
 pkg/config/           → Viper config with CG_ env prefix
 pkg/database/         → GORM init, SQLite WAL mode / MySQL switch
+pkg/llm/              → OpenAI-compatible LLM streaming client (pure net/http, no SDK)
 pkg/middleware/       → JWT Bearer auth, CORS
 pkg/response/         → unified JSON: {code, data, message}
 ```
@@ -54,7 +55,7 @@ main.go               → wails.Run() entry point (desktop mode)
 app.go                → App struct with startup/shutdown lifecycle
 cmd/desktop/bindings/ → Wails binding structs wrapping services
   state.go            → global binding state + userID tracking
-  auth.go, contact.go, tag.go, interaction.go, reminder.go, graph.go
+  auth.go, contact.go, tag.go, interaction.go, reminder.go, graph.go, event.go, transaction.go, ai.go
   export.go           → JSON import/export
   types.go            → request/response types for Wails bindings
 wails.json            → Wails project configuration
@@ -75,13 +76,21 @@ Mode switching is managed by `stores/mode.ts` using adapter interfaces defined i
 
 ```
 web/src/api/client.ts      → Axios with JWT interceptor + backend envelope unwrap
+web/src/api/adapter.ts     → AppAdapters interface (dual-mode: HTTP vs Wails IPC)
+web/src/api/http-adapter.ts → HTTP adapter using Axios
+web/src/api/wails-adapter.ts → Wails IPC adapter using dynamic imports
 web/src/api/{domain}.ts    → One module per domain (auth, contacts, tags, etc.)
 web/src/types/index.ts     → TypeScript types matching Go models
 web/src/stores/auth.ts     → Zustand auth store with localStorage persistence
+web/src/stores/mode.ts     → Local/remote mode switching
+web/src/stores/graphSettings.ts → Graph visualization settings
+web/src/i18n/              → react-i18next setup with en/zh locales
 web/src/layouts/AppLayout.tsx → Sidebar + header + dark mode toggle
 web/src/components/ProtectedRoute.tsx → Redirect to /login if unauthenticated
 web/src/components/GeckoIcon.tsx → SVG gecko logo
-web/src/pages/             → 7 page components
+web/src/components/BuddyPicker.tsx → Multi-select buddy picker with search
+web/src/components/ViewToggle.tsx → List/card view toggle
+web/src/pages/             → Route-level views
 ```
 
 **API response handling:** Backend wraps all responses in `{code, data, message}`. The Axios response interceptor in `client.ts` unwraps this so `res.data` is the actual payload. Pages access `res.data` directly.
@@ -95,6 +104,11 @@ web/src/pages/             → 7 page components
 - **Tag** — name, color (hex)
 - **Reminder** — title, description, remind_at, status (pending/done/snoozed)
 - **ContactRelation** — contact_id_a, contact_id_b, relation_type
+- **Event** — title, description, start_time, end_time, location, color, contact_ids[]
+- **Transaction** — title, amount, type (income/expense), category, contact_ids[], date, notes
+- **AIProvider** — provider_type, name, base_url, api_key, model, is_active
+- **AIConversation** — user_id, title, messages[]
+- **AIMessage** — conversation_id, role (user/assistant/system), content
 - **RelationshipLabels** — family, friend, colleague, client, pet, other (multi-select, supports custom)
 
 ## Seed Data
@@ -110,12 +124,15 @@ All at `/api`, JWT-protected except auth endpoints:
 | Group | Methods |
 |-------|---------|
 | Auth | POST register/login/refresh, GET me |
-| Contacts | GET/POST list/create, GET/PUT/DELETE /:id, GET/PUT /:id/tags |
+| Buddies | GET/POST list/create, GET/PUT/DELETE /:id, GET/PUT /:id/tags |
 | Tags | GET/POST list/create, PUT/DELETE /:id |
-| Interactions | GET/POST /contacts/:id/interactions, PUT/DELETE /:id |
-| Reminders | GET list (status filter), POST /contacts/:id/reminders, PUT/DELETE /:id |
-| Relations | GET/POST /contacts/:id/relations, DELETE /:id |
+| Interactions | GET/POST /buddies/:id/interactions, PUT/DELETE /:id |
+| Reminders | GET list (status filter), POST /buddies/:id/reminders, PUT/DELETE /:id |
+| Relations | GET/POST /buddies/:id/relations, DELETE /:id |
 | Graph | GET /graph (nodes + edges) |
+| Events | GET/POST list/create, PUT/DELETE /:id |
+| Transactions | GET/POST list/create, GET /summary, PUT/DELETE /:id |
+| AI | GET/PUT providers, POST activate/test, GET/POST conversations, POST chat (SSE), POST analyze |
 
 ## Conventions
 
