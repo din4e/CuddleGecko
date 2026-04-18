@@ -15,6 +15,7 @@ const FinancePage = lazy(() => import('./pages/FinancePage'))
 const TagsPage = lazy(() => import('./pages/TagsPage'))
 const RemindersPage = lazy(() => import('./pages/RemindersPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const AIChatPage = lazy(() => import('./pages/AIChatPage'))
 
 function PageLoader() {
   return (
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="finance" element={<Suspense fallback={<PageLoader />}><FinancePage /></Suspense>} />
           <Route path="tags" element={<Suspense fallback={<PageLoader />}><TagsPage /></Suspense>} />
           <Route path="reminders" element={<Suspense fallback={<PageLoader />}><RemindersPage /></Suspense>} />
+          <Route path="ai" element={<Suspense fallback={<PageLoader />}><AIChatPage /></Suspense>} />
           <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
         </Route>
       </Routes>

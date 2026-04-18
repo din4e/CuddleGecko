@@ -25,6 +25,9 @@ var (
 	Reminder    = &ReminderBinding{}
 	Graph       = &GraphBinding{}
 	Export      = &ExportBinding{}
+	Event       = &EventBinding{}
+	Transaction = &TransactionBinding{}
+	AI          = &AIBinding{}
 )
 
 func InitBindings(
@@ -35,13 +38,16 @@ func InitBindings(
 	interactionSvc *service.InteractionService,
 	reminderSvc *service.ReminderService,
 	relationSvc *service.RelationService,
+	eventSvc *service.EventService,
+	transactionSvc *service.TransactionService,
+	aiSvc *service.AIService,
 	contactRepo service.ContactRepository,
 	tagRepo service.TagRepository,
 	interactionRepo service.InteractionRepository,
 	reminderRepo service.ReminderRepository,
 	relationRepo service.RelationRepository,
 ) {
-	Auth = &AuthBinding{svc: authSvc, captcha: captchaSvc}
+	Auth = &AuthBinding{svc: authSvc}
 	Captcha = &CaptchaBinding{svc: captchaSvc}
 	Contact = &ContactBinding{svc: contactSvc}
 	Tag = &TagBinding{svc: tagSvc}
@@ -55,6 +61,9 @@ func InitBindings(
 		reminderRepo:    reminderRepo,
 		relationRepo:    relationRepo,
 	}
+	Event = &EventBinding{svc: eventSvc}
+	Transaction = &TransactionBinding{svc: transactionSvc}
+	AI = &AIBinding{svc: aiSvc}
 }
 
 func SetCurrentUserID(id uint) {

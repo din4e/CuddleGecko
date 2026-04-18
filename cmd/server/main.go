@@ -32,6 +32,7 @@ func main() {
 	relationRepo := repository.NewRelationRepo(db)
 	eventRepo := repository.NewEventRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
+	aiRepo := repository.NewAIRepo(db)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, &cfg.JWT)
@@ -43,9 +44,10 @@ func main() {
 	relationSvc := service.NewRelationService(relationRepo, contactRepo)
 	eventSvc := service.NewEventService(eventRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo)
+	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo)
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, transactionSvc, "./data/avatars")
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, transactionSvc, aiSvc, "./data/avatars")
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)

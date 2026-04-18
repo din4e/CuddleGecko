@@ -37,6 +37,9 @@ func main() {
 			bindings.Reminder,
 			bindings.Graph,
 			bindings.Export,
+			bindings.Event,
+			bindings.Transaction,
+			bindings.AI,
 		},
 	})
 	if err != nil {

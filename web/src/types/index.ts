@@ -139,3 +139,38 @@ export interface TransactionSummary {
   expense: number
   balance: number
 }
+
+export interface AIProvider {
+  id: number
+  user_id: number
+  provider_type: string
+  name: string
+  base_url: string
+  model: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AIConversation {
+  id: number
+  user_id: number
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AIMessage {
+  id: number
+  conversation_id: number
+  role: 'system' | 'user' | 'assistant'
+  content: string
+  created_at: string
+}
+
+export interface AIProviderPreset {
+  Type: string
+  Name: string
+  BaseURL: string
+  DefaultModel: string
+}

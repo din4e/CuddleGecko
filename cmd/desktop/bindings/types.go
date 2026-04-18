@@ -103,3 +103,71 @@ type ExportPayload struct {
 	Reminders    any `json:"reminders"`
 	Relations    any `json:"relations"`
 }
+
+// Event types
+type ListEventsInput struct {
+	Page       int    `json:"page"`
+	PageSize   int    `json:"page_size"`
+	StartAfter string `json:"start_after"`
+	EndBefore  string `json:"end_before"`
+}
+
+type PaginatedEvents struct {
+	Items    any   `json:"items"`
+	Total    int64 `json:"total"`
+	Page     int   `json:"page"`
+	PageSize int   `json:"page_size"`
+}
+
+type CreateEventInput struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	StartTime   string `json:"start_time"`
+	EndTime     string `json:"end_time"`
+	Location    string `json:"location"`
+	ContactIDs  []uint `json:"contact_ids"`
+	Color       string `json:"color"`
+}
+
+type UpdateEventInput = CreateEventInput
+
+// Transaction types
+type ListTransactionsInput struct {
+	Page     int    `json:"page"`
+	PageSize int    `json:"page_size"`
+	Type     string `json:"type"`
+}
+
+type PaginatedTransactions struct {
+	Items    any   `json:"items"`
+	Total    int64 `json:"total"`
+	Page     int   `json:"page"`
+	PageSize int   `json:"page_size"`
+}
+
+type CreateTransactionInput struct {
+	Title      string  `json:"title"`
+	Amount     float64 `json:"amount"`
+	Type       string  `json:"type"`
+	Category   string  `json:"category"`
+	ContactIDs []uint  `json:"contact_ids"`
+	Date       string  `json:"date"`
+	Notes      string  `json:"notes"`
+}
+
+type UpdateTransactionInput = CreateTransactionInput
+
+// AI types
+type SaveProviderInput struct {
+	ProviderType string `json:"provider_type"`
+	APIKey       string `json:"api_key"`
+	Model        string `json:"model"`
+	BaseURL      string `json:"base_url"`
+}
+
+type PaginatedConversations struct {
+	Items    any   `json:"items"`
+	Total    int64 `json:"total"`
+	Page     int   `json:"page"`
+	PageSize int   `json:"page_size"`
+}

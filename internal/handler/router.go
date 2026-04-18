@@ -18,6 +18,7 @@ type Handlers struct {
 	Upload      *UploadHandler
 	Event       *EventHandler
 	Transaction *TransactionHandler
+	AI          *AIHandler
 }
 
 func NewHandlers(
@@ -30,6 +31,7 @@ func NewHandlers(
 	relationSvc *service.RelationService,
 	eventSvc *service.EventService,
 	transactionSvc *service.TransactionService,
+	aiSvc *service.AIService,
 	uploadDir string,
 ) *Handlers {
 	return &Handlers{
@@ -43,6 +45,7 @@ func NewHandlers(
 		Upload:      NewUploadHandler(uploadDir),
 		Event:       NewEventHandler(eventSvc),
 		Transaction: NewTransactionHandler(transactionSvc),
+		AI:          NewAIHandler(aiSvc),
 	}
 }
 
@@ -112,6 +115,23 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig) {
 			protected.POST("/transactions", h.Transaction.Create)
 			protected.PUT("/transactions/:id", h.Transaction.Update)
 			protected.DELETE("/transactions/:id", h.Transaction.Delete)
+
+				ai := protected.Group("/ai")
+				{
+					ai.GET("/presets", h.AI.ListPresets)
+					ai.GET("/providers", h.AI.ListProviders)
+					ai.PUT("/providers", h.AI.SaveProvider)
+					ai.POST("/providers/:id/activate", h.AI.ActivateProvider)
+					ai.POST("/providers/:id/test", h.AI.TestConnection)
+					ai.GET("/conversations", h.AI.ListConversations)
+					ai.POST("/conversations", h.AI.CreateConversation)
+					ai.GET("/conversations/:id/messages", h.AI.GetMessages)
+					ai.DELETE("/conversations/:id", h.AI.DeleteConversation)
+					ai.POST("/chat", h.AI.StreamChat)
+					ai.POST("/chat/sync", h.AI.Chat)
+					ai.POST("/analyze/relationship/:contactId", h.AI.AnalyzeRelationship)
+					ai.POST("/analyze/event/:eventId", h.AI.AnalyzeEvent)
+				}
 		}
 	}
 }

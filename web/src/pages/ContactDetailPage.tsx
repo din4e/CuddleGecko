@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useModeStore } from '../stores/mode'
 import { contactsApi } from '../api/contacts'
 import { interactionsApi } from '../api/interactions'
 import { remindersApi } from '../api/reminders'
@@ -18,7 +19,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '../components/ui/dialog'
 import type { Contact, Interaction, Reminder, ContactRelation, InteractionType, Tag } from '../types'
-import { ArrowLeft, Mail, Phone, Calendar, Pencil, Plus, Trash2, X, Upload } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Calendar, Pencil, Plus, Trash2, X, Upload, Sparkles, Loader2 } from 'lucide-react'
 import AvatarDisplay from '../components/AvatarDisplay'
 import EmojiPicker from '../components/EmojiPicker'
 import BuddyPicker from '../components/BuddyPicker'
@@ -48,6 +49,25 @@ export default function ContactDetailPage() {
   const [allContacts, setAllContacts] = useState<Contact[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
+
+  // AI analysis
+  const adapters = useModeStore((s) => s.adapters)
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+
+  const handleAnalyzeRelationship = async () => {
+    if (!adapters?.ai) return
+    setAnalyzing(true)
+    setAnalysisResult(null)
+    try {
+      const res = await adapters.ai.analyzeRelationship(contactId)
+      setAnalysisResult(res.analysis)
+    } catch {
+      setAnalysisResult(t('ai.sendFailed'))
+    } finally {
+      setAnalyzing(false)
+    }
+  }
 
   // Edit contact dialog
   const [editOpen, setEditOpen] = useState(false)
@@ -215,6 +235,10 @@ export default function ContactDetailPage() {
               </div>
             </div>
             <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={handleAnalyzeRelationship} disabled={analyzing}>
+                {analyzing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                {t('ai.analyzeRelationship')}
+              </Button>
               <Button size="sm" variant="outline" onClick={openEditContact}><Pencil className="h-4 w-4 mr-1" />{t('contacts.editContact')}</Button>
               <Button variant="destructive" size="sm" onClick={handleDeleteContact}>{t('contacts.delete')}</Button>
             </div>
@@ -247,6 +271,21 @@ export default function ContactDetailPage() {
       </Card>
 
       {/* Tabs */}
+      {/* AI Analysis Result */}
+      {analysisResult && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Sparkles className="h-5 w-5" />
+              {t('ai.analysisTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="whitespace-pre-wrap text-sm">{analysisResult}</div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs defaultValue="interactions">
         <TabsList>
           <TabsTrigger value="interactions">{t('contacts.interactionsTab')} ({interactions.length})</TabsTrigger>
