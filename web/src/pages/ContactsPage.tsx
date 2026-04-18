@@ -101,7 +101,7 @@ export default function ContactsPage() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [newContact, setNewContact] = useState({
-    name: '', email: '', phone: '', avatar_emoji: '', avatar_url: '', relationship_labels: [] as string[],
+    name: '', emails: [] as string[], phones: [] as string[], avatar_emoji: '', avatar_url: '', relationship_labels: [] as string[],
   })
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -138,7 +138,7 @@ export default function ContactsPage() {
     e.preventDefault()
     await contactsApi.create(newContact)
     setDialogOpen(false)
-    setNewContact({ name: '', email: '', phone: '', avatar_emoji: '', avatar_url: '', relationship_labels: [] })
+    setNewContact({ name: '', emails: [] as string[], phones: [] as string[], avatar_emoji: '', avatar_url: '', relationship_labels: [] })
     loadContacts()
   }
 
@@ -191,11 +191,11 @@ export default function ContactsPage() {
               </div>
               <div className="space-y-2">
                 <Label>{t('auth.email')}</Label>
-                <Input type="email" value={newContact.email} onChange={(e) => setNewContact({ ...newContact, email: e.target.value })} />
+                <Input type="email" placeholder="email@example.com" value={newContact.emails.join(', ')} onChange={(e) => setNewContact({ ...newContact, emails: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
               </div>
               <div className="space-y-2">
                 <Label>{t('contacts.phone')}</Label>
-                <Input value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} />
+                <Input value={newContact.phones.join(', ')} onChange={(e) => setNewContact({ ...newContact, phones: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
               </div>
               <div className="space-y-2">
                 <Label>{t('contacts.relationship')}</Label>
@@ -228,7 +228,7 @@ export default function ContactsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {contacts.map((contact) => (
-            <Link key={contact.id} to={`/contacts/${contact.id}`}>
+            <Link key={contact.id} to={`/buddies/${contact.id}`}>
               <Card className="hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="pt-4">
                   <div className="flex items-center gap-3">
@@ -239,7 +239,7 @@ export default function ContactsPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{contact.name}</div>
-                      {contact.email && <div className="text-sm text-muted-foreground truncate">{contact.email}</div>}
+                      {contact.emails?.length > 0 && <div className="text-sm text-muted-foreground truncate">{contact.emails.join(', ')}</div>}
                     </div>
                     <div className="flex flex-wrap gap-0.5 justify-end max-w-[120px]">
                       {(contact.relationship_labels || []).slice(0, 2).map((label) => (
