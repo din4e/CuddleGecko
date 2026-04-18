@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { contactsApi } from '../api/contacts'
 import { remindersApi } from '../api/reminders'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
@@ -6,6 +7,7 @@ import type { Reminder } from '../types'
 import { Users, CalendarCheck, Bell } from 'lucide-react'
 
 export default function DashboardPage() {
+  const { t } = useTranslation()
   const [totalContacts, setTotalContacts] = useState(0)
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [loading, setLoading] = useState(true)
@@ -24,16 +26,16 @@ export default function DashboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div>Loading...</div>
+  if (loading) return <div>{t('dashboard.loading')}</div>
 
   const stats = [
-    { title: 'Total Contacts', value: totalContacts, icon: Users },
-    { title: 'Pending Reminders', value: reminders.length, icon: Bell },
+    { title: t('dashboard.totalContacts'), value: totalContacts, icon: Users },
+    { title: t('dashboard.pendingReminders'), value: reminders.length, icon: Bell },
   ]
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
+      <h1 className="text-3xl font-bold">{t('dashboard.title')}</h1>
       <div className="grid gap-4 md:grid-cols-2">
         {stats.map(({ title, value, icon: Icon }) => (
           <Card key={title}>
@@ -52,7 +54,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CalendarCheck className="h-5 w-5" />
-              Upcoming Reminders
+              {t('dashboard.upcomingReminders')}
             </CardTitle>
           </CardHeader>
           <CardContent>

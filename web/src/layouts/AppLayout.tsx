@@ -1,22 +1,25 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../stores/auth'
 import { Button } from '../components/ui/button'
-import { Contact, Network, Tag, Bell, LayoutDashboard, LogOut, Moon, Sun } from 'lucide-react'
+import { Heart, Network, Tag, Bell, LayoutDashboard, LogOut, Moon, Sun, Globe, Settings } from 'lucide-react'
 import GeckoIcon from '../components/GeckoIcon'
 
-const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/contacts', label: 'Contacts', icon: Contact },
-  { to: '/graph', label: 'Network', icon: Network },
-  { to: '/tags', label: 'Tags', icon: Tag },
-  { to: '/reminders', label: 'Reminders', icon: Bell },
+const navKeys = [
+  { to: '/', label: 'nav.dashboard', icon: LayoutDashboard },
+  { to: '/contacts', label: 'nav.contacts', icon: Heart },
+  { to: '/graph', label: 'nav.network', icon: Network },
+  { to: '/tags', label: 'nav.tags', icon: Tag },
+  { to: '/reminders', label: 'nav.reminders', icon: Bell },
+  { to: '/settings', label: 'nav.settings', icon: Settings },
 ]
 
 export default function AppLayout() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
+  const { t, i18n } = useTranslation()
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
 
   const toggleTheme = () => {
@@ -24,6 +27,12 @@ export default function AppLayout() {
     setDark(next)
     document.documentElement.classList.toggle('dark', next)
     localStorage.setItem('theme', next ? 'dark' : 'light')
+  }
+
+  const toggleLang = () => {
+    const next = i18n.language === 'zh' ? 'en' : 'zh'
+    i18n.changeLanguage(next)
+    localStorage.setItem('language', next)
   }
 
   const handleLogout = () => {
@@ -37,14 +46,19 @@ export default function AppLayout() {
         <div className="flex items-center justify-between px-2 mb-6">
           <div className="flex items-center gap-2">
             <GeckoIcon size={28} />
-            <h1 className="text-xl font-bold">CuddleGecko</h1>
+            <h1 className="text-xl font-bold">{t('app.name')}</h1>
           </div>
-          <Button variant="ghost" size="icon" onClick={toggleTheme}>
-            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" onClick={toggleLang} title={t('lang.en')}>
+              <Globe className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={toggleTheme}>
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
         <nav className="flex-1 space-y-1">
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {navKeys.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -56,7 +70,7 @@ export default function AppLayout() {
               }
             >
               <Icon className="h-4 w-4" />
-              {label}
+              {t(label)}
             </NavLink>
           ))}
         </nav>
@@ -64,7 +78,7 @@ export default function AppLayout() {
           <div className="px-3 py-2 text-sm text-muted-foreground">{user?.username}</div>
           <Button variant="ghost" size="sm" className="w-full justify-start gap-3" onClick={handleLogout}>
             <LogOut className="h-4 w-4" />
-            Sign out
+            {t('nav.signOut')}
           </Button>
         </div>
       </aside>

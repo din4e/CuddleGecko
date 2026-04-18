@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { tagsApi } from '../api/tags'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -9,6 +10,7 @@ import type { Tag } from '../types'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 
 export default function TagsPage() {
+  const { t } = useTranslation()
   const [tags, setTags] = useState<Tag[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTag, setEditingTag] = useState<Tag | null>(null)
@@ -44,7 +46,7 @@ export default function TagsPage() {
   }
 
   const handleDelete = async (id: number) => {
-    if (confirm('Delete this tag?')) {
+    if (confirm(t('tags.deleteConfirm'))) {
       await tagsApi.delete(id)
       loadTags()
     }
@@ -53,26 +55,26 @@ export default function TagsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Tags</h1>
+        <h1 className="text-3xl font-bold">{t('tags.title')}</h1>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingTag(null) }}>
           <DialogTrigger>
-            <Button><Plus className="h-4 w-4 mr-2" />New Tag</Button>
+            <Button><Plus className="h-4 w-4 mr-2" />{t('tags.newTag')}</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>{editingTag ? 'Edit Tag' : 'New Tag'}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingTag ? t('tags.editTag') : t('tags.newTag')}</DialogTitle></DialogHeader>
             <form onSubmit={handleSave} className="space-y-4">
               <div className="space-y-2">
-                <Label>Name</Label>
+                <Label>{t('tags.name')}</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} required />
               </div>
               <div className="space-y-2">
-                <Label>Color</Label>
+                <Label>{t('tags.color')}</Label>
                 <div className="flex gap-2 items-center">
                   <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-10 rounded cursor-pointer" />
                   <Input value={color} onChange={(e) => setColor(e.target.value)} className="flex-1" />
                 </div>
               </div>
-              <Button type="submit" className="w-full">{editingTag ? 'Update' : 'Create'}</Button>
+              <Button type="submit" className="w-full">{editingTag ? t('tags.update') : t('tags.create')}</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -94,7 +96,7 @@ export default function TagsPage() {
           </Card>
         ))}
       </div>
-      {tags.length === 0 && <p className="text-center text-muted-foreground py-12">No tags yet. Create one above.</p>}
+      {tags.length === 0 && <p className="text-center text-muted-foreground py-12">{t('tags.noTags')}</p>}
     </div>
   )
 }

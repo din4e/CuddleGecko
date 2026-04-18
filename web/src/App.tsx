@@ -11,6 +11,7 @@ import ContactDetailPage from './pages/ContactDetailPage'
 import GraphPage from './pages/GraphPage'
 import TagsPage from './pages/TagsPage'
 import RemindersPage from './pages/RemindersPage'
+import SettingsPage from './pages/SettingsPage'
 
 export default function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth)
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="graph" element={<GraphPage />} />
           <Route path="tags" element={<TagsPage />} />
           <Route path="reminders" element={<RemindersPage />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

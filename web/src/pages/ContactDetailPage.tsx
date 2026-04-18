@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { contactsApi } from '../api/contacts'
 import { interactionsApi } from '../api/interactions'
 import { remindersApi } from '../api/reminders'
@@ -10,8 +11,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Badge } from '../components/ui/badge'
 import type { Contact, Interaction, Reminder, ContactRelation } from '../types'
 import { ArrowLeft, Mail, Phone, Calendar } from 'lucide-react'
+import AvatarDisplay from '../components/AvatarDisplay'
+
+const labelColors: Record<string, string> = {
+  family: 'bg-pink-100 text-pink-800',
+  friend: 'bg-green-100 text-green-800',
+  colleague: 'bg-blue-100 text-blue-800',
+  client: 'bg-purple-100 text-purple-800',
+  pet: 'bg-amber-100 text-amber-800',
+  other: 'bg-gray-100 text-gray-800',
+}
 
 export default function ContactDetailPage() {
+  const { t } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
   const [contact, setContact] = useState<Contact | null>(null)
@@ -43,11 +55,11 @@ export default function ContactDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <div>Loading...</div>
-  if (!contact) return <div>Contact not found</div>
+  if (loading) return <div>{t('dashboard.loading')}</div>
+  if (!contact) return <div>{t('contacts.notFound')}</div>
 
   const handleDelete = async () => {
-    if (confirm('Delete this contact?')) {
+    if (confirm(t('contacts.deleteConfirm'))) {
       await contactsApi.delete(contact.id)
       navigate('/contacts')
     }
@@ -56,19 +68,26 @@ export default function ContactDetailPage() {
   return (
     <div className="space-y-6">
       <Button variant="ghost" onClick={() => navigate('/contacts')}>
-        <ArrowLeft className="h-4 w-4 mr-2" />Back to Contacts
+        <ArrowLeft className="h-4 w-4 mr-2" />{t('contacts.backToContacts')}
       </Button>
 
       <Card>
         <CardHeader>
           <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="text-2xl">{contact.name}</CardTitle>
-              {contact.nickname && <p className="text-muted-foreground">{contact.nickname}</p>}
+            <div className="flex items-center gap-4">
+              <AvatarDisplay
+                emoji={contact.avatar_emoji}
+                imageUrl={contact.avatar_url}
+                name={contact.name}
+                size="lg"
+              />
+              <div>
+                <CardTitle className="text-2xl">{contact.name}</CardTitle>
+                {contact.nickname && <p className="text-muted-foreground">{contact.nickname}</p>}
+              </div>
             </div>
             <div className="flex gap-2">
-              <Badge>{contact.relationship_type}</Badge>
-              <Button variant="destructive" size="sm" onClick={handleDelete}>Delete</Button>
+              <Button variant="destructive" size="sm" onClick={handleDelete}>{t('contacts.delete')}</Button>
             </div>
           </div>
         </CardHeader>
@@ -79,6 +98,15 @@ export default function ContactDetailPage() {
             {contact.birthday && <div className="flex items-center gap-2"><Calendar className="h-4 w-4" />{new Date(contact.birthday).toLocaleDateString()}</div>}
           </div>
           {contact.notes && <p className="mt-4 text-sm text-muted-foreground">{contact.notes}</p>}
+          {(contact.relationship_labels || []).length > 0 && (
+            <div className="flex gap-1 mt-4">
+              {contact.relationship_labels.map((label) => (
+                <Badge key={label} variant="secondary" className={labelColors[label] || ''}>
+                  {label in labelColors ? t(`relationships.${label}`) : label}
+                </Badge>
+              ))}
+            </div>
+          )}
           {contact.tags?.length > 0 && (
             <div className="flex gap-1 mt-4">
               {contact.tags.map((t) => (
@@ -91,13 +119,13 @@ export default function ContactDetailPage() {
 
       <Tabs defaultValue="interactions">
         <TabsList>
-          <TabsTrigger value="interactions">Interactions ({interactions.length})</TabsTrigger>
-          <TabsTrigger value="reminders">Reminders ({reminders.length})</TabsTrigger>
-          <TabsTrigger value="relations">Relations ({relations.length})</TabsTrigger>
+          <TabsTrigger value="interactions">{t('contacts.interactionsTab')} ({interactions.length})</TabsTrigger>
+          <TabsTrigger value="reminders">{t('contacts.remindersTab')} ({reminders.length})</TabsTrigger>
+          <TabsTrigger value="relations">{t('contacts.relationsTab')} ({relations.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="interactions" className="mt-4">
           {interactions.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No interactions recorded</p>
+            <p className="text-muted-foreground text-center py-8">{t('contacts.noInteractions')}</p>
           ) : (
             <div className="space-y-3">
               {interactions.map((i) => (
@@ -119,7 +147,7 @@ export default function ContactDetailPage() {
         </TabsContent>
         <TabsContent value="reminders" className="mt-4">
           {reminders.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No reminders</p>
+            <p className="text-muted-foreground text-center py-8">{t('contacts.noReminders')}</p>
           ) : (
             <div className="space-y-3">
               {reminders.map((r) => (
@@ -141,15 +169,15 @@ export default function ContactDetailPage() {
         </TabsContent>
         <TabsContent value="relations" className="mt-4">
           {relations.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No relations</p>
+            <p className="text-muted-foreground text-center py-8">{t('contacts.noRelations')}</p>
           ) : (
             <div className="space-y-3">
               {relations.map((r) => (
                 <Card key={r.id}>
                   <CardContent className="pt-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm">Related to contact #{r.contact_id_a === contact!.id ? r.contact_id_b : r.contact_id_a}</span>
-                      <Badge variant="outline">{r.relation_type || 'connected'}</Badge>
+                      <span className="text-sm">{t('contacts.relatedTo')} #{r.contact_id_a === contact!.id ? r.contact_id_b : r.contact_id_a}</span>
+                      <Badge variant="outline">{r.relation_type || t('contacts.connected')}</Badge>
                     </div>
                   </CardContent>
                 </Card>

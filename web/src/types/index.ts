@@ -1,5 +1,3 @@
-export type RelationshipType = 'family' | 'friend' | 'colleague' | 'client' | 'other'
-
 export type InteractionType = 'meeting' | 'call' | 'message' | 'email' | 'other'
 
 export type ReminderStatus = 'pending' | 'done' | 'snoozed'
@@ -17,12 +15,13 @@ export interface Contact {
   user_id: number
   name: string
   nickname: string
+  avatar_emoji: string
   avatar_url: string
   phone: string
   email: string
   birthday: string | null
   notes: string
-  relationship_type: RelationshipType
+  relationship_labels: string[]
   tags: Tag[]
   created_at: string
   updated_at: string
@@ -72,7 +71,8 @@ export interface ContactRelation {
 export interface GraphNode {
   id: number
   name: string
-  relationship_type: string
+  relationship_labels: string[]
+  avatar_emoji: string
   avatar_url: string
 }
 

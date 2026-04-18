@@ -5,6 +5,10 @@ const client = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+export function setBaseURL(url: string) {
+  client.defaults.baseURL = url + '/api'
+}
+
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) {
