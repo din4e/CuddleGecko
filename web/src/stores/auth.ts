@@ -7,8 +7,8 @@ interface AuthState {
   accessToken: string | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (username: string, password: string) => Promise<void>
-  register: (username: string, email: string, password: string) => Promise<void>
+  login: (username: string, password: string, captcha?: { captcha_id: string; captcha_answer: string }) => Promise<void>
+  register: (username: string, email: string, password: string, captcha?: { captcha_id: string; captcha_answer: string }) => Promise<void>
   logout: () => void
   checkAuth: () => Promise<void>
 }
@@ -19,10 +19,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: !!localStorage.getItem('access_token'),
   isLoading: false,
 
-  login: async (username, password) => {
+  login: async (username, password, captcha) => {
     set({ isLoading: true })
     try {
-      const { data } = await authApi.login(username, password)
+      const { data } = await authApi.login(username, password, captcha)
       localStorage.setItem('access_token', data.access_token)
       localStorage.setItem('refresh_token', data.refresh_token)
       set({ user: data.user, accessToken: data.access_token, isAuthenticated: true })
@@ -31,10 +31,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  register: async (username, email, password) => {
+  register: async (username, email, password, captcha) => {
     set({ isLoading: true })
     try {
-      const { data } = await authApi.register(username, email, password)
+      const { data } = await authApi.register(username, email, password, captcha)
       localStorage.setItem('access_token', data.access_token)
       localStorage.setItem('refresh_token', data.refresh_token)
       set({ user: data.user, accessToken: data.access_token, isAuthenticated: true })

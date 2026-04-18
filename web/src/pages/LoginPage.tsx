@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../stores/auth'
+import { captchaApi } from '../api/captcha'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -8,21 +10,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import GeckoIcon from '../components/GeckoIcon'
 
 export default function LoginPage() {
+  const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [captchaEnabled, setCaptchaEnabled] = useState(false)
+  const [captchaId, setCaptchaId] = useState('')
+  const [captchaImage, setCaptchaImage] = useState('')
+  const [captchaAnswer, setCaptchaAnswer] = useState('')
   const login = useAuthStore((s) => s.login)
   const isLoading = useAuthStore((s) => s.isLoading)
   const navigate = useNavigate()
+
+  const loadCaptcha = useCallback(async () => {
+    try {
+      const { data } = await captchaApi.get()
+      if (data.enabled) {
+        setCaptchaEnabled(true)
+        setCaptchaId(data.captcha_id || '')
+        setCaptchaImage(data.captcha_image || '')
+        setCaptchaAnswer('')
+      }
+    } catch {
+      // captcha not available, proceed without
+    }
+  }, [])
+
+  useEffect(() => { loadCaptcha() }, [loadCaptcha])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     try {
-      await login(username, password)
+      await login(username, password, captchaEnabled ? { captcha_id: captchaId, captcha_answer: captchaAnswer } : undefined)
       navigate('/')
     } catch {
-      setError('Invalid username or password')
+      setError(t('auth.invalidCredentials'))
+      if (captchaEnabled) loadCaptcha()
     }
   }
 
@@ -33,25 +57,34 @@ export default function LoginPage() {
           <div className="flex justify-center mb-2">
             <GeckoIcon size={48} />
           </div>
-          <CardTitle className="text-2xl">CuddleGecko</CardTitle>
-          <CardDescription>小蜥抱抱 · Sign in to your account</CardDescription>
+          <CardTitle className="text-2xl">{t('app.name')}</CardTitle>
+          <CardDescription>{t('auth.signInTo')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <p className="text-sm text-destructive">{error}</p>}
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">{t('auth.username')}</Label>
               <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('auth.password')}</Label>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
+            {captchaEnabled && captchaImage && (
+              <div className="space-y-2">
+                <Label>{t('auth.captcha')}</Label>
+                <div className="flex items-center gap-2">
+                  <img src={captchaImage} alt="captcha" className="h-10 rounded border cursor-pointer" onClick={loadCaptcha} title={t('auth.captchaRefresh')} />
+                  <Input value={captchaAnswer} onChange={(e) => setCaptchaAnswer(e.target.value)} required placeholder={t('auth.captchaPlaceholder')} className="flex-1" />
+                </div>
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? t('auth.signingIn') : t('auth.signIn')}
             </Button>
             <p className="text-sm text-center text-muted-foreground">
-              Don't have an account? <Link to="/register" className="text-primary underline">Register</Link>
+              {t('auth.noAccount')} <Link to="/register" className="text-primary underline">{t('auth.register')}</Link>
             </p>
           </form>
         </CardContent>
