@@ -75,7 +75,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="w-full max-w-full space-y-6">
       <h2 className="text-2xl font-bold">{t('settings.title')}</h2>
 
       {/* Connection Mode */}
