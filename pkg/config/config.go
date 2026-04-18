@@ -16,6 +16,13 @@ type Config struct {
 	Database DatabaseConfig
 	JWT      JWTConfig
 	Log      LogConfig
+	Captcha  CaptchaConfig
+}
+
+// CaptchaConfig holds image captcha settings.
+type CaptchaConfig struct {
+	Enabled bool
+	Length  int
 }
 
 // ServerConfig holds HTTP server settings.
@@ -75,6 +82,9 @@ func Load() (*Config, error) {
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "json")
 
+	v.SetDefault("captcha.enabled", true)
+	v.SetDefault("captcha.length", 4)
+
 	// Read config file; not found is acceptable
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -111,6 +121,10 @@ func Load() (*Config, error) {
 		Log: LogConfig{
 			Level:  v.GetString("log.level"),
 			Format: v.GetString("log.format"),
+		},
+		Captcha: CaptchaConfig{
+			Enabled: v.GetBool("captcha.enabled"),
+			Length:  v.GetInt("captcha.length"),
 		},
 	}
 

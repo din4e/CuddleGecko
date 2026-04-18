@@ -33,6 +33,7 @@ func main() {
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, &cfg.JWT)
+	captchaSvc := service.NewCaptchaService(cfg.Captcha)
 	contactSvc := service.NewContactService(contactRepo)
 	tagSvc := service.NewTagService(tagRepo)
 	interactionSvc := service.NewInteractionService(interactionRepo)
@@ -40,7 +41,7 @@ func main() {
 	relationSvc := service.NewRelationService(relationRepo, contactRepo)
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, "./data/avatars")
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)

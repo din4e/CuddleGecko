@@ -10,22 +10,27 @@ import (
 )
 
 type AuthHandler struct {
-	svc *service.AuthService
+	svc       *service.AuthService
+	captcha   *service.CaptchaService
 }
 
-func NewAuthHandler(svc *service.AuthService) *AuthHandler {
-	return &AuthHandler{svc: svc}
+func NewAuthHandler(svc *service.AuthService, captcha *service.CaptchaService) *AuthHandler {
+	return &AuthHandler{svc: svc, captcha: captcha}
 }
 
 type registerRequest struct {
-	Username string `json:"username" binding:"required,min=3,max=50"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
+	Username      string `json:"username" binding:"required,min=3,max=50"`
+	Email         string `json:"email" binding:"required,email"`
+	Password      string `json:"password" binding:"required,min=6"`
+	CaptchaID     string `json:"captcha_id"`
+	CaptchaAnswer string `json:"captcha_answer"`
 }
 
 type loginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Username      string `json:"username" binding:"required"`
+	Password      string `json:"password" binding:"required"`
+	CaptchaID     string `json:"captcha_id"`
+	CaptchaAnswer string `json:"captcha_answer"`
 }
 
 type refreshRequest struct {
@@ -43,6 +48,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
+	}
+
+	if h.captcha.Enabled() {
+		if !h.captcha.Verify(req.CaptchaID, req.CaptchaAnswer) {
+			response.BadRequest(c, "invalid or expired captcha")
+			return
+		}
 	}
 
 	result, err := h.svc.Register(c.Request.Context(), req.Username, req.Email, req.Password)
@@ -72,6 +84,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
+	}
+
+	if h.captcha.Enabled() {
+		if !h.captcha.Verify(req.CaptchaID, req.CaptchaAnswer) {
+			response.BadRequest(c, "invalid or expired captcha")
+			return
+		}
 	}
 
 	result, err := h.svc.Login(c.Request.Context(), req.Username, req.Password)
