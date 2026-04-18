@@ -9,36 +9,47 @@ import (
 
 type Handlers struct {
 	Auth        *AuthHandler
+	Captcha     *CaptchaHandler
 	Contact     *ContactHandler
 	Tag         *TagHandler
 	Interaction *InteractionHandler
 	Reminder    *ReminderHandler
 	Graph       *GraphHandler
+	Upload      *UploadHandler
 }
 
 func NewHandlers(
 	authSvc *service.AuthService,
+	captchaSvc *service.CaptchaService,
 	contactSvc *service.ContactService,
 	tagSvc *service.TagService,
 	interactionSvc *service.InteractionService,
 	reminderSvc *service.ReminderService,
 	relationSvc *service.RelationService,
+	uploadDir string,
 ) *Handlers {
 	return &Handlers{
-		Auth:        NewAuthHandler(authSvc),
+		Auth:        NewAuthHandler(authSvc, captchaSvc),
+		Captcha:     NewCaptchaHandler(captchaSvc),
 		Contact:     NewContactHandler(contactSvc),
 		Tag:         NewTagHandler(tagSvc),
 		Interaction: NewInteractionHandler(interactionSvc),
 		Reminder:    NewReminderHandler(reminderSvc),
 		Graph:       NewGraphHandler(relationSvc),
+		Upload:      NewUploadHandler(uploadDir),
 	}
 }
 
 func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig) {
 	r.Use(middleware.CORS())
 
+	// Serve uploaded avatar images
+	r.Static("/avatars", "./data/avatars")
+
 	api := r.Group("/api")
 	{
+		api.GET("/captcha", h.Captcha.Get)
+
 		auth := api.Group("/auth")
 		{
 			auth.POST("/register", h.Auth.Register)
@@ -50,6 +61,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig) {
 		protected.Use(middleware.JWTAuth(jwtCfg))
 		{
 			protected.GET("/auth/me", h.Auth.Me)
+
+			protected.POST("/upload/avatar", h.Upload.UploadAvatar)
 
 			contacts := protected.Group("/contacts")
 			{

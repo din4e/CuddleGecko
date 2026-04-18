@@ -63,13 +63,14 @@ func (s *ContactService) Update(ctx context.Context, userID, id uint, updates *m
 		contact.Name = updates.Name
 	}
 	contact.Nickname = updates.Nickname
+	contact.AvatarEmoji = updates.AvatarEmoji
 	contact.AvatarURL = updates.AvatarURL
 	contact.Phone = updates.Phone
 	contact.Email = updates.Email
 	contact.Birthday = updates.Birthday
 	contact.Notes = updates.Notes
-	if updates.RelationshipType != "" {
-		contact.RelationshipType = updates.RelationshipType
+	if updates.RelationshipLabels != nil {
+		contact.RelationshipLabels = updates.RelationshipLabels
 	}
 
 	if err := s.repo.Update(ctx, contact); err != nil {

@@ -20,25 +20,27 @@ func NewContactHandler(svc *service.ContactService) *ContactHandler {
 }
 
 type createContactRequest struct {
-	Name             string                 `json:"name" binding:"required"`
-	Nickname         string                 `json:"nickname"`
-	AvatarURL        string                 `json:"avatar_url"`
-	Phone            string                 `json:"phone"`
-	Email            string                 `json:"email"`
-	Birthday         *time.Time             `json:"birthday"`
-	Notes            string                 `json:"notes"`
-	RelationshipType model.RelationshipType `json:"relationship_type"`
+	Name               string     `json:"name" binding:"required"`
+	Nickname           string     `json:"nickname"`
+	AvatarEmoji        string     `json:"avatar_emoji"`
+	AvatarURL          string     `json:"avatar_url"`
+	Phone              string     `json:"phone"`
+	Email              string     `json:"email"`
+	Birthday           *time.Time `json:"birthday"`
+	Notes              string     `json:"notes"`
+	RelationshipLabels []string   `json:"relationship_labels"`
 }
 
 type updateContactRequest struct {
-	Name             string                 `json:"name"`
-	Nickname         string                 `json:"nickname"`
-	AvatarURL        string                 `json:"avatar_url"`
-	Phone            string                 `json:"phone"`
-	Email            string                 `json:"email"`
-	Birthday         *time.Time             `json:"birthday"`
-	Notes            string                 `json:"notes"`
-	RelationshipType model.RelationshipType `json:"relationship_type"`
+	Name               string     `json:"name"`
+	Nickname           string     `json:"nickname"`
+	AvatarEmoji        string     `json:"avatar_emoji"`
+	AvatarURL          string     `json:"avatar_url"`
+	Phone              string     `json:"phone"`
+	Email              string     `json:"email"`
+	Birthday           *time.Time `json:"birthday"`
+	Notes              string     `json:"notes"`
+	RelationshipLabels []string   `json:"relationship_labels"`
 }
 
 type replaceTagsRequest struct {
@@ -76,14 +78,15 @@ func (h *ContactHandler) Create(c *gin.Context) {
 	}
 
 	contact := &model.Contact{
-		Name:             req.Name,
-		Nickname:         req.Nickname,
-		AvatarURL:        req.AvatarURL,
-		Phone:            req.Phone,
-		Email:            req.Email,
-		Birthday:         req.Birthday,
-		Notes:            req.Notes,
-		RelationshipType: req.RelationshipType,
+		Name:               req.Name,
+		Nickname:           req.Nickname,
+		AvatarEmoji:        req.AvatarEmoji,
+		AvatarURL:          req.AvatarURL,
+		Phone:              req.Phone,
+		Email:              req.Email,
+		Birthday:           req.Birthday,
+		Notes:              req.Notes,
+		RelationshipLabels: req.RelationshipLabels,
 	}
 
 	result, err := h.svc.Create(c.Request.Context(), userID, contact)
@@ -127,14 +130,15 @@ func (h *ContactHandler) Update(c *gin.Context) {
 	}
 
 	contact := &model.Contact{
-		Name:             req.Name,
-		Nickname:         req.Nickname,
-		AvatarURL:        req.AvatarURL,
-		Phone:            req.Phone,
-		Email:            req.Email,
-		Birthday:         req.Birthday,
-		Notes:            req.Notes,
-		RelationshipType: req.RelationshipType,
+		Name:               req.Name,
+		Nickname:           req.Nickname,
+		AvatarEmoji:        req.AvatarEmoji,
+		AvatarURL:          req.AvatarURL,
+		Phone:              req.Phone,
+		Email:              req.Email,
+		Birthday:           req.Birthday,
+		Notes:              req.Notes,
+		RelationshipLabels: req.RelationshipLabels,
 	}
 
 	result, err := h.svc.Update(c.Request.Context(), userID, uint(id), contact)

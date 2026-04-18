@@ -18,10 +18,11 @@ type RelationRepository interface {
 }
 
 type GraphNode struct {
-	ID               uint   `json:"id"`
-	Name             string `json:"name"`
-	RelationshipType string `json:"relationship_type"`
-	AvatarURL        string `json:"avatar_url"`
+	ID                 uint     `json:"id"`
+	Name               string   `json:"name"`
+	RelationshipLabels []string `json:"relationship_labels"`
+	AvatarEmoji        string   `json:"avatar_emoji"`
+	AvatarURL          string   `json:"avatar_url"`
 }
 
 type GraphEdge struct {
@@ -75,10 +76,11 @@ func (s *RelationService) GetGraphData(ctx context.Context, userID uint) (*Graph
 	nodes := make([]GraphNode, len(contacts))
 	for i, c := range contacts {
 		nodes[i] = GraphNode{
-			ID:               c.ID,
-			Name:             c.Name,
-			RelationshipType: string(c.RelationshipType),
-			AvatarURL:        c.AvatarURL,
+			ID:                 c.ID,
+			Name:               c.Name,
+			RelationshipLabels: c.RelationshipLabels,
+			AvatarEmoji:        c.AvatarEmoji,
+			AvatarURL:          c.AvatarURL,
 		}
 	}
 
