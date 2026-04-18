@@ -1,0 +1,11 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "CuddleGecko",
+  "outputfilename": "cuddlegecko",
+  "frontend:dir": "web",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "http://127.0.0.1:3000",
+  "wailsjsdir": "./web/src"
+}
