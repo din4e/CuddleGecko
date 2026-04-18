@@ -37,7 +37,7 @@ func (h *UploadHandler) UploadAvatar(c *gin.Context) {
 		return
 	}
 
-	filename := fmt.Sprintf("%d_%d%s", time.Now().UnixMilli(), c.GetInt("user_id"), ext)
+	filename := fmt.Sprintf("%d_%d%s", time.Now().UnixMilli(), c.GetUint("user_id"), ext)
 	dst := filepath.Join(h.uploadDir, filename)
 
 	if err := c.SaveUploadedFile(file, dst); err != nil {

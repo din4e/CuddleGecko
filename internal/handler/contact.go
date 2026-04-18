@@ -24,8 +24,8 @@ type createContactRequest struct {
 	Nickname           string     `json:"nickname"`
 	AvatarEmoji        string     `json:"avatar_emoji"`
 	AvatarURL          string     `json:"avatar_url"`
-	Phone              string     `json:"phone"`
-	Email              string     `json:"email"`
+	Phone              []string   `json:"phones"`
+	Email              []string   `json:"emails"`
 	Birthday           *time.Time `json:"birthday"`
 	Notes              string     `json:"notes"`
 	RelationshipLabels []string   `json:"relationship_labels"`
@@ -36,8 +36,8 @@ type updateContactRequest struct {
 	Nickname           string     `json:"nickname"`
 	AvatarEmoji        string     `json:"avatar_emoji"`
 	AvatarURL          string     `json:"avatar_url"`
-	Phone              string     `json:"phone"`
-	Email              string     `json:"email"`
+	Phone              []string   `json:"phones"`
+	Email              []string   `json:"emails"`
 	Birthday           *time.Time `json:"birthday"`
 	Notes              string     `json:"notes"`
 	RelationshipLabels []string   `json:"relationship_labels"`
