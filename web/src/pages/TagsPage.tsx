@@ -5,8 +5,11 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardHeader, CardTitle } from '../components/ui/card'
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog'
 import type { Tag } from '../types'
+import { useViewMode } from '../hooks/useViewMode'
+import ViewToggle from '../components/ViewToggle'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 
 export default function TagsPage() {
@@ -16,6 +19,7 @@ export default function TagsPage() {
   const [editingTag, setEditingTag] = useState<Tag | null>(null)
   const [name, setName] = useState('')
   const [color, setColor] = useState('#6366f1')
+  const [view, setView] = useViewMode('tags')
 
   const loadTags = async () => {
     const res = await tagsApi.list()
@@ -56,47 +60,81 @@ export default function TagsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">{t('tags.title')}</h1>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingTag(null) }}>
-          <DialogTrigger>
-            <Button><Plus className="h-4 w-4 mr-2" />{t('tags.newTag')}</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>{editingTag ? t('tags.editTag') : t('tags.newTag')}</DialogTitle></DialogHeader>
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="space-y-2">
-                <Label>{t('tags.name')}</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label>{t('tags.color')}</Label>
-                <div className="flex gap-2 items-center">
-                  <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-10 rounded cursor-pointer" />
-                  <Input value={color} onChange={(e) => setColor(e.target.value)} className="flex-1" />
+        <div className="flex items-center gap-2">
+          <ViewToggle value={view} onChange={setView} />
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingTag(null) }}>
+            <DialogTrigger>
+              <Button><Plus className="h-4 w-4 mr-2" />{t('tags.newTag')}</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>{editingTag ? t('tags.editTag') : t('tags.newTag')}</DialogTitle></DialogHeader>
+              <form onSubmit={handleSave} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>{t('tags.name')}</Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} required />
                 </div>
-              </div>
-              <Button type="submit" className="w-full">{editingTag ? t('tags.update') : t('tags.create')}</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="space-y-2">
+                  <Label>{t('tags.color')}</Label>
+                  <div className="flex gap-2 items-center">
+                    <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-10 rounded cursor-pointer" />
+                    <Input value={color} onChange={(e) => setColor(e.target.value)} className="flex-1" />
+                  </div>
+                </div>
+                <Button type="submit" className="w-full">{editingTag ? t('tags.update') : t('tags.create')}</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {tags.map((tag) => (
-          <Card key={tag.id}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: tag.color }} />
-                {tag.name}
-              </CardTitle>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" onClick={() => handleEdit(tag)}><Pencil className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(tag.id)}><Trash2 className="h-4 w-4" /></Button>
-              </div>
-            </CardHeader>
-          </Card>
-        ))}
-      </div>
-      {tags.length === 0 && <p className="text-center text-muted-foreground py-12">{t('tags.noTags')}</p>}
+      {tags.length === 0 ? (
+        <p className="text-center text-muted-foreground py-12">{t('tags.noTags')}</p>
+      ) : view === 'grid' ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {tags.map((tag) => (
+            <Card key={tag.id}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                  {tag.name}
+                </CardTitle>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" onClick={() => handleEdit(tag)}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(tag.id)}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">Color</TableHead>
+                <TableHead>{t('tags.name')}</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tags.map((tag) => (
+                <TableRow key={tag.id}>
+                  <TableCell>
+                    <div className="h-4 w-4 rounded-full" style={{ backgroundColor: tag.color }} />
+                  </TableCell>
+                  <TableCell className="font-medium">{tag.name}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(tag)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(tag.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
     </div>
   )
 }

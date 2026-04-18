@@ -8,11 +8,14 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog'
 import { Label } from '../components/ui/label'
 import AvatarDisplay from '../components/AvatarDisplay'
 import EmojiPicker from '../components/EmojiPicker'
 import type { Contact } from '../types'
+import { useViewMode } from '../hooks/useViewMode'
+import ViewToggle from '../components/ViewToggle'
 import { Plus, Search, X, Upload } from 'lucide-react'
 
 const presetLabelKeys = ['family', 'friend', 'colleague', 'client', 'pet', 'other'] as const
@@ -106,6 +109,8 @@ export default function ContactsPage() {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [view, setView] = useViewMode('contacts')
+
   const pageSize = 12
 
   const loadContacts = async () => {
@@ -148,10 +153,12 @@ export default function ContactsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">{t('contacts.title')}</h1>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger>
-            <Button><Plus className="h-4 w-4 mr-2" />{t('contacts.addContact')}</Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <ViewToggle value={view} onChange={setView} />
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger>
+              <Button><Plus className="h-4 w-4 mr-2" />{t('contacts.addContact')}</Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{t('contacts.newContact')}</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4">
@@ -209,6 +216,7 @@ export default function ContactsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="relative">
@@ -225,7 +233,7 @@ export default function ContactsPage() {
         <div>{t('dashboard.loading')}</div>
       ) : contacts.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">{t('contacts.noContacts')}</div>
-      ) : (
+      ) : view === 'grid' ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {contacts.map((contact) => (
             <Link key={contact.id} to={`/buddies/${contact.id}`}>
@@ -266,6 +274,52 @@ export default function ContactsPage() {
             </Link>
           ))}
         </div>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40%]">{t('contacts.name')}</TableHead>
+                <TableHead>{t('auth.email')}</TableHead>
+                <TableHead>{t('contacts.phone')}</TableHead>
+                <TableHead>{t('contacts.relationship')}</TableHead>
+                <TableHead className="text-right">Tags</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {contacts.map((contact) => (
+                <TableRow key={contact.id} className="cursor-pointer" onClick={() => window.location.href = `/buddies/${contact.id}`}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <AvatarDisplay emoji={contact.avatar_emoji} imageUrl={contact.avatar_url} name={contact.name} />
+                      <span className="font-medium">{contact.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{contact.emails?.join(', ') || '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{contact.phones?.join(', ') || '—'}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {(contact.relationship_labels || []).map((label) => (
+                        <Badge key={label} variant="secondary" className={`text-xs ${labelColors[label] || ''}`}>
+                          {label in labelColors ? t(`relationships.${label}`) : label}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {contact.tags?.map((tag) => (
+                        <Badge key={tag.id} variant="outline" className="text-xs" style={{ borderColor: tag.color, color: tag.color }}>
+                          {tag.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       )}
 
       {totalPages > 1 && (

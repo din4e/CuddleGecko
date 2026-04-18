@@ -5,6 +5,7 @@ import { contactsApi } from '../api/contacts'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
@@ -17,6 +18,8 @@ import {
 } from '../components/ui/dialog'
 import { TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, Heart } from 'lucide-react'
 import BuddyPicker from '../components/BuddyPicker'
+import { useViewMode } from '../hooks/useViewMode'
+import ViewToggle from '../components/ViewToggle'
 import type { Transaction, TransactionSummary, Contact } from '../types'
 
 type TxType = '' | 'income' | 'expense'
@@ -51,6 +54,7 @@ export default function FinancePage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [form, setForm] = useState<TxFormData>(emptyForm)
+  const [view, setView] = useViewMode('finance')
 
   const loadData = async () => {
     setLoading(true)
@@ -129,10 +133,13 @@ export default function FinancePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">{t('finance.title')}</h1>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          {t('finance.newTransaction')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ViewToggle value={view} onChange={setView} />
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('finance.newTransaction')}
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -184,47 +191,97 @@ export default function FinancePage() {
         ))}
       </div>
 
-      {/* Transaction List */}
+      {/* Transaction List/Grid */}
       {loading ? (
         <div>{t('finance.loading')}</div>
       ) : transactions.length === 0 ? (
         <p className="text-center text-muted-foreground py-12">{t('finance.noTransactions')}</p>
+      ) : view === 'list' ? (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10">Type</TableHead>
+                <TableHead>{t('finance.title_field')}</TableHead>
+                <TableHead>{t('finance.date')}</TableHead>
+                <TableHead>{t('finance.category')}</TableHead>
+                <TableHead>Buddies</TableHead>
+                <TableHead className="text-right">{t('finance.amount')}</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transactions.map((tx) => (
+                <TableRow key={tx.id}>
+                  <TableCell>
+                    <div className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                      tx.type === 'income' ? 'bg-green-100 text-green-600 dark:bg-green-950' : 'bg-red-100 text-red-600 dark:bg-red-950'
+                    }`}>
+                      {tx.type === 'income' ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium">{tx.title}</TableCell>
+                  <TableCell className="text-muted-foreground whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    {tx.category ? <Badge variant="secondary" className="text-xs">{tx.category}</Badge> : '—'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {tx.contact_ids?.length > 0 ? (
+                      <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{tx.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}</span>
+                    ) : '—'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className={`font-semibold ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                      {tx.type === 'income' ? '+' : '-'}{fmt(tx.amount)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(tx)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(tx.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {transactions.map((tx) => (
             <Card key={tx.id}>
-              <CardContent className="pt-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                    tx.type === 'income' ? 'bg-green-100 text-green-600 dark:bg-green-950' : 'bg-red-100 text-red-600 dark:bg-red-950'
-                  }`}>
-                    {tx.type === 'income' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                  </div>
-                  <div>
-                    <div className="font-medium">{tx.title}</div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{new Date(tx.date).toLocaleDateString()}</span>
-                      {tx.category && (
-                        <Badge variant="secondary" className="text-xs">{tx.category}</Badge>
-                      )}
-                      {tx.contact_ids?.length > 0 && (
-                        <span className="flex items-center gap-1">
-                          <Heart className="h-3 w-3" />
-                          {tx.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}
-                        </span>
-                      )}
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                      tx.type === 'income' ? 'bg-green-100 text-green-600 dark:bg-green-950' : 'bg-red-100 text-red-600 dark:bg-red-950'
+                    }`}>
+                      {tx.type === 'income' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                     </div>
+                    <span className="font-medium">{tx.title}</span>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`font-semibold ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                  <span className={`font-semibold text-sm ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                     {tx.type === 'income' ? '+' : '-'}{fmt(tx.amount)}
                   </span>
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(tx)}>
-                    <Pencil className="h-4 w-4" />
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>{new Date(tx.date).toLocaleDateString()}</span>
+                  {tx.category && (
+                    <Badge variant="secondary" className="text-xs">{tx.category}</Badge>
+                  )}
+                </div>
+                {tx.contact_ids?.length > 0 && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Heart className="h-3 w-3" />
+                    {tx.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}
+                  </div>
+                )}
+                <div className="flex gap-1 pt-1">
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(tx)}>
+                    <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDelete(tx.id)}>
-                    <Trash2 className="h-4 w-4" />
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(tx.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </CardContent>

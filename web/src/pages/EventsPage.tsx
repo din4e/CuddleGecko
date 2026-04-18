@@ -1,10 +1,10 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { eventApi } from '../api/event'
 import { contactsApi } from '../api/contacts'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
-import { Badge } from '../components/ui/badge'
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
@@ -17,6 +17,8 @@ import {
 } from '../components/ui/dialog'
 import { CalendarDays, Clock, MapPin, Plus, Pencil, Trash2, Heart } from 'lucide-react'
 import BuddyPicker from '../components/BuddyPicker'
+import { useViewMode } from '../hooks/useViewMode'
+import ViewToggle from '../components/ViewToggle'
 import type { Event, Contact } from '../types'
 
 type TimeFilter = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'upcoming' | 'past'
@@ -110,6 +112,7 @@ export default function EventsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Event | null>(null)
   const [form, setForm] = useState<EventFormData>(emptyForm)
+  const [view, setView] = useViewMode('events')
 
   const filterKeys: { key: TimeFilter; label: string }[] = [
     { key: 'all', label: t('events.all') },
@@ -140,16 +143,6 @@ export default function EventsPage() {
     loadEvents()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter])
-
-  const grouped = useMemo(() => {
-    const groups: Record<string, Event[]> = {}
-    for (const e of events) {
-      const key = new Date(e.start_time).toDateString()
-      if (!groups[key]) groups[key] = []
-      groups[key].push(e)
-    }
-    return Object.entries(groups).sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
-  }, [events])
 
   const openCreate = () => {
     setEditing(null)
@@ -203,10 +196,13 @@ export default function EventsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">{t('events.title')}</h1>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          {t('events.newEvent')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ViewToggle value={view} onChange={setView} />
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('events.newEvent')}
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -226,64 +222,101 @@ export default function EventsPage() {
         <div>{t('events.loading')}</div>
       ) : events.length === 0 ? (
         <p className="text-center text-muted-foreground py-12">{t('events.noEvents')}</p>
-      ) : (
-        <div className="space-y-6">
-          {grouped.map(([dateKey, items]) => (
-            <div key={dateKey}>
-              <div className="flex items-center gap-2 mb-3">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  {formatDate(items[0].start_time)}
-                </span>
-                <Badge variant="secondary" className="text-xs">{items.length}</Badge>
-              </div>
-              <div className="space-y-2">
-                {items.map((e) => (
-                  <Card key={e.id} className="overflow-hidden">
-                    <div className="flex">
-                      {e.color && (
-                        <div className="w-1 shrink-0" style={{ backgroundColor: e.color }} />
-                      )}
-                      <CardContent className="flex-1 pt-4 flex items-center justify-between">
-                        <div className="space-y-1">
-                          <div className="font-medium">{e.title}</div>
-                          {e.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-2">{e.description}</p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatTime(e.start_time)}
-                              {e.end_time && ` — ${formatTime(e.end_time)}`}
-                            </span>
-                            {e.location && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {e.location}
-                              </span>
-                            )}
-                            {e.contact_ids?.length > 0 && (
-                              <span className="flex items-center gap-1">
-                                <Heart className="h-3 w-3" />
-                                {e.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(e)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDelete(e.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
+      ) : view === 'list' ? (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-4"></TableHead>
+                <TableHead>{t('events.title_field')}</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead>{t('events.location')}</TableHead>
+                <TableHead>Buddies</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {events.map((e) => (
+                <TableRow key={e.id}>
+                  <TableCell>
+                    {e.color && <div className="h-3 w-3 rounded-full" style={{ backgroundColor: e.color }} />}
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{e.title}</div>
+                      {e.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{e.description}</div>}
                     </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground whitespace-nowrap">
+                    <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{formatDate(e.start_time)}</span>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground whitespace-nowrap">
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatTime(e.start_time)}{e.end_time && ` — ${formatTime(e.end_time)}`}</span>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {e.location ? <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{e.location}</span> : '—'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {e.contact_ids?.length > 0 ? (
+                      <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{e.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}</span>
+                    ) : '—'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {events.map((e) => (
+            <Card key={e.id} className="overflow-hidden">
+              {e.color && (
+                <div className="h-1" style={{ backgroundColor: e.color }} />
+              )}
+              <CardContent className="pt-4 space-y-2">
+                <div className="font-medium">{e.title}</div>
+                {e.description && (
+                  <p className="text-sm text-muted-foreground line-clamp-2">{e.description}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <CalendarDays className="h-3 w-3" />
+                    {formatDate(e.start_time)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatTime(e.start_time)}
+                  </span>
+                  {e.location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {e.location}
+                    </span>
+                  )}
+                </div>
+                {e.contact_ids?.length > 0 && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Heart className="h-3 w-3" />
+                    {e.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}
+                  </div>
+                )}
+                <div className="flex gap-1 pt-1">
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(e.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
