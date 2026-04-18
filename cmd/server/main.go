@@ -30,6 +30,8 @@ func main() {
 	interactionRepo := repository.NewInteractionRepo(db)
 	reminderRepo := repository.NewReminderRepo(db)
 	relationRepo := repository.NewRelationRepo(db)
+	eventRepo := repository.NewEventRepo(db)
+	transactionRepo := repository.NewTransactionRepo(db)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, &cfg.JWT)
@@ -39,9 +41,11 @@ func main() {
 	interactionSvc := service.NewInteractionService(interactionRepo)
 	reminderSvc := service.NewReminderService(reminderRepo)
 	relationSvc := service.NewRelationService(relationRepo, contactRepo)
+	eventSvc := service.NewEventService(eventRepo)
+	transactionSvc := service.NewTransactionService(transactionRepo)
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, "./data/avatars")
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, transactionSvc, "./data/avatars")
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)
