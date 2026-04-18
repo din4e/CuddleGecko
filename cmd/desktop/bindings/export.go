@@ -112,8 +112,8 @@ func (b *ExportBinding) ImportJSON(jsonData string) error {
 		Name              string   `json:"name"`
 		Nickname          string   `json:"nickname"`
 		AvatarURL         string   `json:"avatar_url"`
-		Phone             string   `json:"phone"`
-		Email             string   `json:"email"`
+		Phone             []string `json:"phones"`
+		Email             []string `json:"emails"`
 		Birthday          string   `json:"birthday"`
 		Notes             string   `json:"notes"`
 		RelationshipLabels []string `json:"relationship_labels"`

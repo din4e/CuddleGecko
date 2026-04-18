@@ -56,15 +56,15 @@ func main() {
 	}
 
 	contacts := []model.Contact{
-		{UserID: user.ID, Name: "小明", Nickname: "明明", Email: "xiaoming@example.com", Phone: "13800138001", Birthday: birthday(1995, 3, 15), Notes: "大学同学，喜欢打篮球", RelationshipLabels: []string{"friend", "colleague"}},
-		{UserID: user.ID, Name: "小红", Nickname: "红红", Email: "xiaohong@example.com", Phone: "13800138002", Birthday: birthday(1998, 7, 22), RelationshipLabels: []string{"family"}},
-		{UserID: user.ID, Name: "张总", Email: "zhangzong@company.com", Phone: "13800138003", RelationshipLabels: []string{"colleague", "client"}},
+		{UserID: user.ID, Name: "小明", Nickname: "明明", Email: []string{"xiaoming@example.com"}, Phone: []string{"13800138001"}, Birthday: birthday(1995, 3, 15), Notes: "大学同学，喜欢打篮球", RelationshipLabels: []string{"friend", "colleague"}},
+		{UserID: user.ID, Name: "小红", Nickname: "红红", Email: []string{"xiaohong@example.com"}, Phone: []string{"13800138002"}, Birthday: birthday(1998, 7, 22), RelationshipLabels: []string{"family"}},
+		{UserID: user.ID, Name: "张总", Email: []string{"zhangzong@company.com"}, Phone: []string{"13800138003"}, RelationshipLabels: []string{"colleague", "client"}},
 		{UserID: user.ID, Name: "旺财", Nickname: "旺旺", Notes: "金毛寻回犬，3岁，喜欢游泳", RelationshipLabels: []string{"pet"}},
 		{UserID: user.ID, Name: "咪咪", Notes: "英短蓝猫，很黏人", RelationshipLabels: []string{"pet"}},
-		{UserID: user.ID, Name: "李老师", Email: "liteacher@school.com", Phone: "13800138005", RelationshipLabels: []string{"colleague", "friend"}},
-		{UserID: user.ID, Name: "王阿姨", Phone: "13800138006", RelationshipLabels: []string{"family", "friend"}},
+		{UserID: user.ID, Name: "李老师", Email: []string{"liteacher@school.com"}, Phone: []string{"13800138005"}, RelationshipLabels: []string{"colleague", "friend"}},
+		{UserID: user.ID, Name: "王阿姨", Phone: []string{"13800138006"}, RelationshipLabels: []string{"family", "friend"}},
 		{UserID: user.ID, Name: "豆豆", Notes: "柯基犬，2岁，腿短但跑得快", RelationshipLabels: []string{"pet", "friend"}},
-		{UserID: user.ID, Name: "陈医生", Email: "chendoctor@hospital.com", Phone: "13800138007", RelationshipLabels: []string{"client"}},
+		{UserID: user.ID, Name: "陈医生", Email: []string{"chendoctor@hospital.com"}, Phone: []string{"13800138007"}, RelationshipLabels: []string{"client"}},
 		{UserID: user.ID, Name: "大黄", Nickname: "大黄蜂", Notes: "中华田园猫，小区流浪猫，已经绝育", RelationshipLabels: []string{"pet", "other"}},
 	}
 

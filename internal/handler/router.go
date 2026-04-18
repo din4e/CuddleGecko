@@ -16,6 +16,8 @@ type Handlers struct {
 	Reminder    *ReminderHandler
 	Graph       *GraphHandler
 	Upload      *UploadHandler
+	Event       *EventHandler
+	Transaction *TransactionHandler
 }
 
 func NewHandlers(
@@ -26,6 +28,8 @@ func NewHandlers(
 	interactionSvc *service.InteractionService,
 	reminderSvc *service.ReminderService,
 	relationSvc *service.RelationService,
+	eventSvc *service.EventService,
+	transactionSvc *service.TransactionService,
 	uploadDir string,
 ) *Handlers {
 	return &Handlers{
@@ -37,6 +41,8 @@ func NewHandlers(
 		Reminder:    NewReminderHandler(reminderSvc),
 		Graph:       NewGraphHandler(relationSvc),
 		Upload:      NewUploadHandler(uploadDir),
+		Event:       NewEventHandler(eventSvc),
+		Transaction: NewTransactionHandler(transactionSvc),
 	}
 }
 
@@ -64,20 +70,20 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig) {
 
 			protected.POST("/upload/avatar", h.Upload.UploadAvatar)
 
-			contacts := protected.Group("/contacts")
+			buddies := protected.Group("/buddies")
 			{
-				contacts.GET("", h.Contact.List)
-				contacts.POST("", h.Contact.Create)
-				contacts.GET("/:id", h.Contact.GetByID)
-				contacts.PUT("/:id", h.Contact.Update)
-				contacts.DELETE("/:id", h.Contact.Delete)
-				contacts.GET("/:id/tags", h.Contact.GetTags)
-				contacts.PUT("/:id/tags", h.Contact.ReplaceTags)
-				contacts.GET("/:id/interactions", h.Interaction.ListByContact)
-				contacts.POST("/:id/interactions", h.Interaction.Create)
-				contacts.POST("/:id/reminders", h.Reminder.Create)
-				contacts.GET("/:id/relations", h.Graph.GetRelations)
-				contacts.POST("/:id/relations", h.Graph.CreateRelation)
+				buddies.GET("", h.Contact.List)
+				buddies.POST("", h.Contact.Create)
+				buddies.GET("/:id", h.Contact.GetByID)
+				buddies.PUT("/:id", h.Contact.Update)
+				buddies.DELETE("/:id", h.Contact.Delete)
+				buddies.GET("/:id/tags", h.Contact.GetTags)
+				buddies.PUT("/:id/tags", h.Contact.ReplaceTags)
+				buddies.GET("/:id/interactions", h.Interaction.ListByContact)
+				buddies.POST("/:id/interactions", h.Interaction.Create)
+				buddies.POST("/:id/reminders", h.Reminder.Create)
+				buddies.GET("/:id/relations", h.Graph.GetRelations)
+				buddies.POST("/:id/relations", h.Graph.CreateRelation)
 			}
 
 			protected.GET("/tags", h.Tag.List)
@@ -95,6 +101,17 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig) {
 			protected.DELETE("/relations/:id", h.Graph.DeleteRelation)
 
 			protected.GET("/graph", h.Graph.GetGraph)
+
+			protected.GET("/events", h.Event.List)
+			protected.POST("/events", h.Event.Create)
+			protected.PUT("/events/:id", h.Event.Update)
+			protected.DELETE("/events/:id", h.Event.Delete)
+
+			protected.GET("/transactions", h.Transaction.List)
+			protected.GET("/transactions/summary", h.Transaction.Summary)
+			protected.POST("/transactions", h.Transaction.Create)
+			protected.PUT("/transactions/:id", h.Transaction.Update)
+			protected.DELETE("/transactions/:id", h.Transaction.Delete)
 		}
 	}
 }

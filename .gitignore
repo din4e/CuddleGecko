@@ -60,3 +60,7 @@ Thumbs.db
 *.log
 tmp/
 temp/
+docs/superpowers/
+.omc/
+.claude/
+.cursor/

@@ -13,8 +13,8 @@ type Contact struct {
 	Nickname          string         `gorm:"size:100" json:"nickname"`
 	AvatarEmoji       string         `gorm:"size:10" json:"avatar_emoji"`
 	AvatarURL         string         `gorm:"size:500" json:"avatar_url"`
-	Phone             string         `gorm:"size:50" json:"phone"`
-	Email             string         `gorm:"size:100" json:"email"`
+	Phone             []string       `gorm:"type:text;serializer:json" json:"phones"`
+	Email             []string       `gorm:"type:text;serializer:json" json:"emails"`
 	Birthday          *time.Time     `json:"birthday"`
 	Notes             string         `gorm:"type:text" json:"notes"`
 	RelationshipLabels []string      `gorm:"type:text;serializer:json" json:"relationship_labels"`
