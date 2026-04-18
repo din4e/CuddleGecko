@@ -1,98 +1,117 @@
-# 🦎 CuddleGecko - 小蜥抱抱
+# CuddleGecko 小蜥抱抱
 
-**你的个人人脉可视化管理应用**  
-**A cute personal CRM / PRM with beautiful network visualization**
+A local-first, self-hosted personal CRM with network graph visualization.
 
----
+## Features
 
-## ✨ 项目简介
+- **Contact Management** — CRUD with tags, relationship types, search & pagination
+- **Interaction Timeline** — Record meetings, calls, messages per contact
+- **Smart Reminders** — Schedule follow-ups with status tracking (pending/done/snoozed)
+- **Network Graph** — Force-directed visualization of your relationship network
+- **Tag System** — Color-coded tags for contact categorization
+- **Dark Mode** — Green gecko brand theme with light/dark toggle
+- **Auth** — JWT + refresh token with automatic retry
 
-**CuddleGecko（小蜥抱抱）** 是一款**本地优先、自托管**的个人人脉管理系统。  
-像养一只超级爱抱抱的萌萌小蜥蜴助手（Cuddle）一样，帮你系统化记录、管理和可视化所有朋友、家人、同学、客户等“人脉资源”。
+## Tech Stack
 
-- **核心亮点**：
-  - 可爱小蜥蜴吉祥物 **Cuddle**（全程陪伴，爱抱抱）
-  - 关系网络图可视化（节点大小 + 颜色 + 动画）
-  - 互动记录 + 智能提醒
-  - **Web端 + Desktop GUI（Wails）** 双端支持
-  - **SaaS 化混合部署**（本地免费 + 云付费可选）
-  - PWA 手机端完美适配
+| Layer | Technology |
+|-------|-----------|
+| Backend | Go 1.24, Gin, GORM, SQLite/MySQL |
+| Frontend | Vite, React 18, TypeScript, Tailwind CSS v4, shadcn/ui |
+| State | Zustand |
+| Graph | react-force-graph-2d |
+| Charts | Recharts |
 
-**目标用户**：想把人脉管理做得像养宠物一样有趣的个人 / 自由职业者 / 社交爱好者。
+## Quick Start
 
-**当前开发优先级**：
-**✅ Web端** → Desktop GUI（Wails）→ SaaS 云版
+```bash
+# Backend (port 8080)
+go run ./cmd/server
 
----
+# Frontend (port 3001)
+cd web && npm install && npm run dev
+```
 
-## 🦎 吉祥物 - Cuddle
+Open http://127.0.0.1:3001 and register an account.
 
-Cuddle 是我们超级可爱的小蜥蜴助手！  
-- 大眼睛、圆圆脸、粉嫩腮红  
-- 超级爱“抱抱”朋友  
-- 添加朋友时会兴奋地爬过去  
-- 提醒跟进时会眨眼吐舌头说“该抱抱啦～”
+## Project Structure
 
-（Q版形象暂不展示，待 UI 阶段补充）
+```
+cmd/server/         # Entry point, dependency wiring
+internal/
+  handler/          # HTTP handlers (Gin)
+  service/          # Business logic
+  repository/       # Database access (GORM)
+  model/            # Domain types
+pkg/
+  config/           # Viper config loading
+  database/         # GORM init (SQLite/MySQL)
+  middleware/        # JWT auth, CORS
+  response/         # Unified JSON response helpers
+web/src/
+  api/              # Axios client + domain modules
+  components/       # UI components (shadcn/ui + GeckoIcon)
+  layouts/          # App layout with sidebar
+  pages/            # Route-level views (7 pages)
+  stores/           # Zustand stores (auth)
+  types/            # TypeScript types matching backend models
+```
 
----
+## API Endpoints
 
-## 📊 竞品分析（2026最新）
+All endpoints at `/api`:
 
-| 产品          | 自托管/本地优先 | 网络可视化图 | 可爱UI/吉祥物 | 定价模式                  | 强项                          | CuddleGecko 差异化优势 |
-|---------------|------------------|--------------|---------------|---------------------------|-------------------------------|------------------------|
-| Monica       | ✅ 优秀（开源） | ❌ 基础      | ❌ 传统       | 免费自托管 / $9/月云     | 个人关系记录最成熟           | 更可爱 + 强可视化 + Wails桌面 |
-| Dex          | ❌ 云优先       | ⚠️ 有Graph  | ❌ 简洁       | $12/月起                 | LinkedIn同步 + 提醒          | 本地隐私 + 萌系体验 + 免费核心 |
-| Folk         | ❌ 云优先       | ❌ 无       | ⚠️ Notion风  | $18/用户/月起            | 高度自定义 + 团队协作       | 纯个人 + 吉祥物 + 本地优先 |
-| Clay         | ❌ 云优先       | ⚠️ 部分     | ✅ 现代优雅   | $10/月起                 | AI数据富化 + 提醒            | 更萌 + 强网络图 + 免费本地版 |
-| Orvo         | ❌ 云优先       | ✅ 优秀      | ❌ 专业       | $15/月起                 | AI + 关系网络图              | **更可爱** + Wails桌面 + 混合SaaS |
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /auth/register | Register |
+| POST | /auth/login | Login |
+| POST | /auth/refresh | Refresh token |
+| GET | /auth/me | Current user |
+| GET/POST | /contacts | List/Create contacts |
+| GET/PUT/DELETE | /contacts/:id | Contact CRUD |
+| GET/PUT | /contacts/:id/tags | Contact tags |
+| GET/POST | /contacts/:id/interactions | Interactions |
+| POST | /contacts/:id/reminders | Create reminder |
+| GET/POST | /contacts/:id/relations | Relations |
+| GET/POST | /tags | Tag CRUD |
+| PUT/DELETE | /tags/:id | Tag update/delete |
+| PUT/DELETE | /interactions/:id | Interaction update/delete |
+| GET | /reminders | List reminders (filter by status) |
+| PUT/DELETE | /reminders/:id | Reminder update/delete |
+| DELETE | /relations/:id | Delete relation |
+| GET | /graph | Network graph data |
 
-**差异化总结**：  
-CuddleGecko 以「可爱 + 本地优先 + 强可视化」为核心，区别于竞品普遍的云优先、专业冷冰冰风格。
+## Configuration
 
----
+`config.yaml`:
 
-## 🔌 通信协议设计
+```yaml
+server:
+  port: 8080
+  debug: true
+database:
+  driver: sqlite    # sqlite or mysql
+  path: ./data/cuddlegecko.db
+  mysql_dsn: ""
+jwt:
+  secret: "your-secret-key"
+  access_ttl: 900000000000      # 15 minutes
+  refresh_ttl: 604800000000000  # 7 days
+```
 
-| 场景                  | 推荐协议                  | 实现方式                              | 优点 |
-|-----------------------|---------------------------|---------------------------------------|------|
-| Desktop GUI (Wails)   | Wails 内置绑定            | Go 方法直接暴露给 JS（无网络）       | 零延迟、本地安全、性能最高 |
-| Web端 / SaaS 云版     | RESTful API + JSON        | Go (Gin/Fiber) + OpenAPI             | 简单、生态成熟、易调试 |
-| 实时提醒              | WebSocket / SSE           | Gin WebSocket 或 Supabase Realtime   | 低延迟推送 |
+Environment variables with `CG_` prefix: `CG_SERVER_PORT`, `CG_DATABASE_DRIVER`, etc.
 
-- **认证**：JWT + Refresh Token（本地版使用简单本地 token）
-- **SaaS 多租户**：Tenant ID Header + 数据库隔离
-- **数据同步**：本地 SQLite ↔ 云端 JSON Diff Sync
+## Development
 
----
+```bash
+# Backend tests
+go test ./...
 
-## 🚀 核心功能（MVP）
+# Frontend
+cd web && npm run build    # production build
+cd web && npm run lint     # ESLint
+```
 
-### Web端（当前优先完成）
-- 联系人管理（CRUD + 标签 + 关系类型）
-- 互动记录 & 时间线
-- 关系网络图可视化（react-force-graph）
-- 智能提醒（浏览器通知 + Cuddle 弹窗）
-- 数据导入导出（JSON/CSV）
-- PWA 支持 + 深色模式 + 可爱主题
+## License
 
-**Desktop**：Wails v2 打包成原生桌面应用  
-**SaaS**：可选云同步 + AI分析 + 团队共享（付费）
-
----
-
-## 🛠 技术栈
-
-| 部分         | 技术选型                          |
-|--------------|-----------------------------------|
-| Web前端      | Vite + React 18 + TypeScript + Tailwind + shadcn/ui |
-| 可视化       | react-force-graph + Recharts     |
-| 状态管理     | Zustand                           |
-| 后端         | Go + Gin/Fiber + SQLite           |
-| Desktop      | Wails v2                          |
-| SaaS         | Docker + PostgreSQL + Supabase    |
-| PWA          | Vite PWA 插件                     |
-
----
-
-## 📁 项目目录结构
+MIT

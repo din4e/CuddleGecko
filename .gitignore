@@ -37,9 +37,10 @@ data/
 config.local.yaml
 config.*.local.yaml
 
-# --- Wails (future desktop) ---
+# --- Wails (desktop) ---
 build/bin/
 frontend/dist/
+web/src/wailsjs/
 
 # --- IDE & OS ---
 .idea/
