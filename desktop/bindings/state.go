@@ -28,6 +28,7 @@ var (
 	Event       = &EventBinding{}
 	Transaction = &TransactionBinding{}
 	AI          = &AIBinding{}
+	Desktop     = &DesktopBinding{}
 )
 
 func InitBindings(

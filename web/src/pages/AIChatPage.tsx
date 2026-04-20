@@ -16,7 +16,7 @@ export default function AIChatPage() {
   const [streaming, setStreaming] = useState(false)
   const [streamContent, setStreamContent] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const isWails = !!window.__WAILS__
+  const isWails = typeof window !== 'undefined' && !!(window as any).__WAILS__
 
   const loadConversations = useCallback(async () => {
     if (!adapters?.ai) return
@@ -150,7 +150,7 @@ export default function AIChatPage() {
   }, [messages, streamContent])
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-3rem)]">
+    <div className="flex gap-4 flex-1 min-h-0">
       {/* Conversation list */}
       <div className="w-64 shrink-0 flex flex-col gap-2">
         <Button onClick={handleNewChat} className="w-full">

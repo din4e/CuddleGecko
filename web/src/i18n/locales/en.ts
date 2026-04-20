@@ -14,6 +14,7 @@ export default {
     settings: 'Settings',
     ai: 'AI',
     signOut: 'Sign out',
+    userMenu: 'User menu',
     sidebarCollapse: 'Collapse sidebar',
     sidebarExpand: 'Expand sidebar',
   },

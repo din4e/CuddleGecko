@@ -14,6 +14,7 @@ export default {
     settings: '设置',
     ai: 'AI',
     signOut: '退出登录',
+    userMenu: '用户菜单',
     sidebarCollapse: '收起导航',
     sidebarExpand: '展开导航',
   },

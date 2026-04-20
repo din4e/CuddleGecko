@@ -26,6 +26,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     { List: ListEvents, Create: CreateEvent, Update: UpdateEvent, Delete: DeleteEvent },
     { List: ListTransactions, Summary: TransactionSummary, Create: CreateTransaction, Update: UpdateTransaction, Delete: DeleteTransaction },
     { ListProviders: AIListProviders, SaveProvider: AISaveProvider, ActivateProvider: AIActivateProvider, TestConnection: AITestConnection, ListConversations: AIListConversations, CreateConversation: AICreateConversation, GetMessages: AIGetMessages, DeleteConversation: AIDeleteConversation, Chat: AIChatFn, AnalyzeRelationship: AIAnalyzeRelationship, AnalyzeEvent: AIAnalyzeEvent, ListPresets: AIListPresets },
+    { Version: DesktopVersion, Platform: DesktopPlatform, Arch: DesktopArch, DataDir: DesktopDataDir, DatabasePath: DesktopDatabasePath, OpenDataDir: DesktopOpenDataDir },
   ] = await Promise.all([
     import('@/wailsjs/go/bindings/AuthBinding'),
     import('@/wailsjs/go/bindings/CaptchaBinding'),
@@ -38,6 +39,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     import('@/wailsjs/go/bindings/EventBinding'),
     import('@/wailsjs/go/bindings/TransactionBinding'),
     import('@/wailsjs/go/bindings/AIBinding'),
+    import('@/wailsjs/go/bindings/DesktopBinding'),
   ])
 
   return {
@@ -329,6 +331,15 @@ async function createWailsAdapters(): Promise<AppAdapters> {
         const r = await AIChatFn(conversationId, message)
         return r as any as string
       },
+    },
+
+    desktop: {
+      version: () => DesktopVersion(),
+      platform: () => DesktopPlatform(),
+      arch: () => DesktopArch(),
+      dataDir: () => DesktopDataDir(),
+      databasePath: () => DesktopDatabasePath(),
+      openDataDir: () => DesktopOpenDataDir().then(() => {}),
     },
   }
 }

@@ -4,6 +4,14 @@ import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../stores/auth'
 import { Button } from '../components/ui/button'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu'
+import { Avatar, AvatarFallback } from '../components/ui/avatar'
+import {
   Heart,
   Network,
   Tag,
@@ -19,9 +27,12 @@ import {
   PanelLeftClose,
   PanelLeft,
   Bot,
+  Menu,
 } from 'lucide-react'
 import GeckoIcon from '../components/GeckoIcon'
 import { BrandWordmark } from '../components/BrandWordmark'
+import DesktopMenuListener from '../components/DesktopMenuListener'
+import WindowTitleBar from '../components/WindowTitleBar'
 import { cn } from '@/lib/utils'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed'
@@ -75,19 +86,22 @@ export default function AppLayout() {
   }
 
   const username = user?.username?.trim() || ''
+  const initial = username ? username[0].toUpperCase() : '?'
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="h-screen flex flex-col bg-background">
+      <DesktopMenuListener />
+      <WindowTitleBar />
+      <div className="flex flex-1 min-h-0">
+
+      {/* Sidebar */}
       <aside
         className={cn(
-          'flex shrink-0 flex-col border-r bg-card p-4 transition-[width] duration-200 ease-out',
-          sidebarCollapsed ? 'w-[4.5rem] items-center overflow-x-hidden' : 'w-64',
+          'flex shrink-0 flex-col border-r bg-card transition-[width] duration-200 ease-out',
+          sidebarCollapsed ? 'w-[4.5rem] items-center overflow-x-hidden px-2 py-4' : 'w-64 p-4',
         )}
       >
-        <header
-          className={cn('mb-4 w-full min-w-0', sidebarCollapsed && 'flex justify-center')}
-          title={sidebarCollapsed && username ? username : undefined}
-        >
+        <header className={cn('mb-4 w-full min-w-0', sidebarCollapsed && 'flex justify-center')}>
           <h1 className={cn('flex min-w-0 items-center gap-2.5', sidebarCollapsed && 'justify-center')}>
             <GeckoIcon size={28} className="shrink-0" />
             {!sidebarCollapsed && (
@@ -100,6 +114,7 @@ export default function AppLayout() {
             )}
           </h1>
         </header>
+
         <nav className={cn('flex-1 space-y-1', sidebarCollapsed && 'flex w-full flex-col items-center')}>
           {navKeys.map(({ to, label, icon: Icon }) => (
             <NavLink
@@ -123,62 +138,98 @@ export default function AppLayout() {
             </NavLink>
           ))}
         </nav>
-        <footer
-          className={cn(
-            'mt-auto flex min-w-0 border-t border-border pt-4 w-full',
-            sidebarCollapsed ? 'justify-center' : 'items-center justify-between gap-2',
-          )}
-        >
-          {!sidebarCollapsed && (
-            <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground" title={username || undefined}>
-              {username || '—'}
-            </p>
-          )}
-          <div className="flex shrink-0 items-center gap-0.5">
+
+        {/* Sidebar bottom: only collapse toggle */}
+        <div className={cn('mt-auto pt-2', sidebarCollapsed ? '' : 'border-t border-border pt-4')}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            onClick={toggleSidebar}
+            title={sidebarCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse')}
+            aria-expanded={!sidebarCollapsed}
+            aria-label={sidebarCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse')}
+          >
+            {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </Button>
+        </div>
+      </aside>
+
+      {/* Main area: header + content */}
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* Header */}
+        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b bg-background/80 backdrop-blur-sm px-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 lg:hidden"
+            onClick={toggleSidebar}
+            aria-label={sidebarCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse')}
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+
+          <div className="ml-auto flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 shrink-0"
-              onClick={toggleSidebar}
-              title={sidebarCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse')}
-              aria-expanded={!sidebarCollapsed}
-              aria-label={sidebarCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse')}
+              className="size-8"
+              onClick={toggleLang}
+              title={i18n.language === 'zh' ? t('lang.en') : t('lang.zh')}
             >
-              {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              <Globe className="h-4 w-4" />
             </Button>
-            {!sidebarCollapsed && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  onClick={toggleLang}
-                  title={i18n.language === 'zh' ? t('lang.en') : t('lang.zh')}
-                >
-                  <Globe className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  onClick={toggleTheme}
-                  title={dark ? t('theme.light') : t('theme.dark')}
-                >
-                  {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                </Button>
-                <Button variant="ghost" size="icon" className="size-8" onClick={handleLogout} title={t('nav.signOut')}>
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={toggleTheme}
+              title={dark ? t('theme.light') : t('theme.dark')}
+            >
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="flex items-center gap-2 rounded-full p-1 hover:bg-muted transition-colors outline-none"
+                aria-label={t('nav.userMenu')}
+              >
+                <Avatar size="sm">
+                  <AvatarFallback className="text-xs font-medium">{initial}</AvatarFallback>
+                </Avatar>
+                {!sidebarCollapsed && username && (
+                  <span className="hidden sm:inline text-sm text-foreground truncate max-w-[120px]">{username}</span>
+                )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={8}>
+                {username && (
+                  <>
+                    <div className="px-2 py-1.5 text-sm font-medium text-foreground truncate">{username}</div>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem onClick={() => navigate('/settings')}>
+                  <Settings className="mr-1.5 h-4 w-4" />
+                  {t('nav.settings')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-1.5 h-4 w-4" />
+                  {t('nav.signOut')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        </footer>
-      </aside>
-      <main className="flex-1 overflow-auto">
-        <div className="p-6">
-          <Outlet />
-        </div>
-      </main>
+        </header>
+
+        {/* Content */}
+        <main className="flex-1 overflow-auto min-h-0">
+          <div className="h-full flex flex-col p-6">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+      </div>
     </div>
   )
 }
