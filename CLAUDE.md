@@ -51,14 +51,18 @@ pkg/response/         → unified JSON: {code, data, message}
 ### Desktop — Wails v2 (Go + React)
 
 ```
-main.go               → wails.Run() entry point (desktop mode)
-app.go                → App struct with startup/shutdown lifecycle
-cmd/desktop/bindings/ → Wails binding structs wrapping services
-  state.go            → global binding state + userID tracking
-  auth.go, contact.go, tag.go, interaction.go, reminder.go, graph.go, event.go, transaction.go, ai.go
-  export.go           → JSON import/export
-  types.go            → request/response types for Wails bindings
+main.go               → thin wrapper: embeds frontend assets, calls desktop.Run()
 wails.json            → Wails project configuration
+desktop/              → Wails desktop application
+  run.go              → Run(assets) with wails.Run() entry point
+  app.go              → App struct with startup/shutdown lifecycle
+  menu.go             → native menu bar (File, Edit, View, Help)
+  windowstate.go      → window position/size persistence
+  bindings/           → Wails binding structs wrapping services
+    state.go          → global binding state + userID tracking
+    auth.go, contact.go, tag.go, interaction.go, reminder.go, graph.go, event.go, transaction.go, ai.go, desktop.go
+    export.go         → JSON import/export
+    types.go          → request/response types for Wails bindings
 web/src/wailsjs/      → auto-generated JS bindings (gitignored)
 ```
 

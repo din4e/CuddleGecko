@@ -117,6 +117,7 @@ export default function EventsPage() {
   const adapters = useModeStore((s) => s.adapters)
   const [analysisResult, setAnalysisResult] = useState<string | null>(null)
   const [analyzingId, setAnalyzingId] = useState<number | null>(null)
+  const [aiAvailable, setAiAvailable] = useState(false)
 
   const handleAnalyzeEvent = async (eventId: number) => {
     if (!adapters?.ai) return
@@ -155,6 +156,9 @@ export default function EventsPage() {
 
   useEffect(() => {
     contactsApi.list({ page: 1, page_size: 200 }).then((res) => setBuddies(res.data.items || []))
+    adapters?.ai?.listProviders().then((providers) => {
+      setAiAvailable(providers?.some((p) => p.is_active) ?? false)
+    }).catch(() => setAiAvailable(false))
   }, [])
 
   useEffect(() => {
@@ -282,9 +286,11 @@ export default function EventsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      {aiAvailable && (
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAnalyzeEvent(e.id)} disabled={analyzingId === e.id} title={t('ai.analyzeEvent')}>
                         {analyzingId === e.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                       </Button>
+                      )}
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
@@ -329,9 +335,11 @@ export default function EventsPage() {
                   </div>
                 )}
                 <div className="flex gap-1 pt-1">
+                  {aiAvailable && (
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAnalyzeEvent(e.id)} disabled={analyzingId === e.id} title={t('ai.analyzeEvent')}>
                     {analyzingId === e.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                   </Button>
+                  )}
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>

@@ -88,6 +88,15 @@ export interface AIAdapter {
   chat(conversationId: number, message: string): Promise<string>
 }
 
+export interface DesktopAdapter {
+  version(): Promise<string>
+  platform(): Promise<string>
+  arch(): Promise<string>
+  dataDir(): Promise<string>
+  databasePath(): Promise<string>
+  openDataDir(): Promise<void>
+}
+
 export interface AppAdapters {
   auth: AuthAdapter
   captcha: CaptchaAdapter
@@ -100,4 +109,5 @@ export interface AppAdapters {
   event: EventAdapter
   transaction: TransactionAdapter
   ai: AIAdapter
+  desktop?: DesktopAdapter
 }

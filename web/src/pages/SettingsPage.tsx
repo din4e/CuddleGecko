@@ -51,6 +51,12 @@ export default function SettingsPage() {
   const setEmojiSize = useGraphSettings((s) => s.setEmojiSize)
   const resetGraphSettings = useGraphSettings((s) => s.reset)
 
+  // Desktop info
+  const [desktopVersion, setDesktopVersion] = useState('')
+  const [desktopPlatform, setDesktopPlatform] = useState('')
+  const [desktopDataDir, setDesktopDataDir] = useState('')
+  const [desktopDbPath, setDesktopDbPath] = useState('')
+
   // AI provider state
   const [presets, setPresets] = useState<AIProviderPreset[]>([])
   const [providers, setProviders] = useState<AIProvider[]>([])
@@ -72,6 +78,15 @@ export default function SettingsPage() {
   useEffect(() => {
     loadAIProviders()
   }, [loadAIProviders])
+
+  // Load desktop info
+  useEffect(() => {
+    if (!adapters?.desktop) return
+    adapters.desktop.version().then(v => setDesktopVersion(v))
+    adapters.desktop.platform().then(p => setDesktopPlatform(p))
+    adapters.desktop.dataDir().then(d => setDesktopDataDir(d))
+    adapters.desktop.databasePath().then(d => setDesktopDbPath(d))
+  }, [adapters?.desktop])
 
   const handleModeChange = (newMode: 'local' | 'remote') => {
     setMode(newMode)
@@ -317,12 +332,15 @@ export default function SettingsPage() {
                 <Label>{t('ai.model')}</Label>
                 <Input value={modelName} onChange={(e) => setModelName(e.target.value)} className="mt-1.5" />
               </div>
-              {selectedType === 'custom' && (
-                <div>
-                  <Label>{t('ai.baseUrl')}</Label>
-                  <Input value={customBaseUrl} onChange={(e) => setCustomBaseUrl(e.target.value)} className="mt-1.5" />
-                </div>
-              )}
+              <div>
+                <Label>{t('ai.baseUrl')}</Label>
+                <Input
+                  value={customBaseUrl}
+                  onChange={(e) => setCustomBaseUrl(e.target.value)}
+                  placeholder="https://api.example.com/v1"
+                  className="mt-1.5"
+                />
+              </div>
               <Button onClick={handleSaveAIProvider} disabled={!apiKey} size="sm">
                 {t('ai.save')}
               </Button>
@@ -405,12 +423,31 @@ export default function SettingsPage() {
           <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex justify-between">
               <span>{t('settings.version')}</span>
-              <span>v0.1.0</span>
+              <span>v{desktopVersion || '0.1.0'}</span>
             </div>
-            {isWails && mode === 'local' && (
+            {isWails && mode === 'local' && desktopPlatform && (
               <div className="flex justify-between">
+                <span>Platform</span>
+                <span className="text-xs">{desktopPlatform}</span>
+              </div>
+            )}
+            {isWails && mode === 'local' && desktopDataDir && (
+              <div className="flex items-center justify-between gap-4">
                 <span>{t('settings.dataPath')}</span>
-                <span className="text-xs">~/CuddleGecko/</span>
+                <span className="max-w-[200px] truncate text-xs" title={desktopDataDir}>{desktopDataDir}</span>
+              </div>
+            )}
+            {isWails && mode === 'local' && desktopDbPath && (
+              <div className="flex items-center justify-between gap-4">
+                <span>Database</span>
+                <span className="max-w-[200px] truncate text-xs" title={desktopDbPath}>{desktopDbPath}</span>
+              </div>
+            )}
+            {isWails && mode === 'local' && adapters?.desktop && (
+              <div className="pt-2">
+                <Button variant="outline" size="sm" onClick={() => adapters.desktop?.openDataDir()}>
+                  Open Data Folder
+                </Button>
               </div>
             )}
           </div>

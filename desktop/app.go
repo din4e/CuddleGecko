@@ -1,15 +1,16 @@
-package main
+package desktop
 
 import (
 	"context"
 	"os"
 	"path/filepath"
 
-	"github.com/din4e/cuddlegecko/cmd/desktop/bindings"
+	"github.com/din4e/cuddlegecko/desktop/bindings"
 	"github.com/din4e/cuddlegecko/internal/repository"
 	"github.com/din4e/cuddlegecko/internal/service"
 	"github.com/din4e/cuddlegecko/pkg/config"
 	"github.com/din4e/cuddlegecko/pkg/database"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App is the Wails application struct. Its public methods are bound to the frontend.
@@ -76,6 +77,40 @@ func (a *App) startup(ctx context.Context) {
 		contactRepo, tagRepo, interactionRepo,
 		reminderRepo, relationRepo,
 	)
+
+	// Restore window state after a short delay (let Wails finish init)
+	go a.restoreWindowState()
 }
 
-func (a *App) shutdown(_ context.Context) {}
+func (a *App) shutdown(_ context.Context) {
+	a.saveWindowState()
+}
+
+func (a *App) saveWindowState() {
+	if a.ctx == nil {
+		return
+	}
+	x, y := runtime.WindowGetPosition(a.ctx)
+	w, h := runtime.WindowGetSize(a.ctx)
+	maximised := runtime.WindowIsMaximised(a.ctx)
+
+	state := &windowState{
+		X: x, Y: y, Width: w, Height: h, Maximised: maximised,
+	}
+	_ = state.save()
+}
+
+func (a *App) restoreWindowState() {
+	if a.ctx == nil {
+		return
+	}
+	state, err := loadWindowState()
+	if err != nil {
+		return
+	}
+	runtime.WindowSetPosition(a.ctx, state.X, state.Y)
+	runtime.WindowSetSize(a.ctx, state.Width, state.Height)
+	if state.Maximised {
+		runtime.WindowMaximise(a.ctx)
+	}
+}

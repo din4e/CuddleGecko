@@ -81,11 +81,11 @@ func (s *AIService) SaveProvider(ctx context.Context, userID uint, providerType,
 	}
 
 	baseURL := preset.BaseURL
-	if providerType == "custom" {
-		if customBaseURL == "" {
-			return nil, fmt.Errorf("base URL is required for custom provider")
-		}
+	if customBaseURL != "" {
 		baseURL = customBaseURL
+	}
+	if baseURL == "" {
+		return nil, fmt.Errorf("base URL is required")
 	}
 
 	if modelName == "" {
