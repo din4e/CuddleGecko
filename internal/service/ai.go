@@ -492,6 +492,179 @@ func (s *AIService) buildSystemPrompt(ctx context.Context, userID uint) (string,
 	return sb.String(), nil
 }
 
+// --- Comprehensive Analysis ---
+
+type AnalyzeRequest struct {
+	Type       string `json:"type"`
+	ContactIDs []uint `json:"contact_ids"`
+	EventIDs   []uint `json:"event_ids"`
+	Question   string `json:"question"`
+}
+
+func (s *AIService) AnalyzeComprehensive(ctx context.Context, userID uint, req AnalyzeRequest) (string, error) {
+	client, err := s.getActiveClient(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	var sb strings.Builder
+
+	switch req.Type {
+	case "contact", "comprehensive":
+		s.buildContactAnalysis(ctx, userID, req.ContactIDs, &sb)
+	case "event":
+		s.buildEventAnalysis(ctx, userID, req.EventIDs, &sb)
+	case "financial":
+		// financial only below
+	}
+
+	if req.Type == "financial" || req.Type == "comprehensive" {
+		s.buildFinancialAnalysis(ctx, userID, &sb)
+	}
+
+	if req.Question != "" {
+		sb.WriteString(fmt.Sprintf("\n## User Question\n%s\n", req.Question))
+	}
+
+	if sb.Len() == 0 {
+		return "", fmt.Errorf("no data selected for analysis")
+	}
+
+	systemPrompt := "You are CuddleGecko AI, a comprehensive personal CRM analyst. Analyze the provided data and give structured, actionable insights. Include relationship quality assessment, patterns, risks, and concrete suggestions. Respond in the user's language (Chinese for zh, English for en). Use markdown formatting."
+	if req.Type == "contact" {
+		systemPrompt = "You are a personal relationship analyst. Analyze the contacts and their associated data deeply. Cover: relationship health score (1-10), communication frequency, interaction quality, suggestions for improvement, potential risks. Respond in the user's language. Use markdown."
+	} else if req.Type == "event" {
+		systemPrompt = "You are a personal event analyst. Analyze the events and provide: importance assessment, preparation suggestions, timeline recommendations, related contact insights. Respond in the user's language. Use markdown."
+	} else if req.Type == "financial" {
+		systemPrompt = "You are a personal finance analyst. Analyze the financial data and provide: spending patterns, savings rate, category breakdown, budget recommendations, trends. Respond in the user's language. Use markdown."
+	}
+
+	messages := []llm.Message{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: sb.String()},
+	}
+
+	return client.Chat(ctx, messages)
+}
+
+func (s *AIService) buildContactAnalysis(ctx context.Context, userID uint, contactIDs []uint, sb *strings.Builder) {
+	if len(contactIDs) == 0 {
+		return
+	}
+	sb.WriteString("## Contact Analysis Request\n\n")
+
+	for _, cid := range contactIDs {
+		contact, err := s.contactRepo.GetByID(ctx, userID, cid)
+		if err != nil {
+			continue
+		}
+
+		sb.WriteString(fmt.Sprintf("### Contact: %s\n", contact.Name))
+		if len(contact.RelationshipLabels) > 0 {
+			sb.WriteString(fmt.Sprintf("- Labels: %s\n", strings.Join(contact.RelationshipLabels, ", ")))
+		}
+		if contact.Notes != "" {
+			sb.WriteString(fmt.Sprintf("- Notes: %s\n", contact.Notes))
+		}
+
+		interactions, _, err := s.interactionRepo.ListByContact(ctx, userID, cid, 1, 20)
+		if err == nil && len(interactions) > 0 {
+			sb.WriteString("- Interactions:\n")
+			for _, i := range interactions {
+				sb.WriteString(fmt.Sprintf("  - [%s] %s (%s): %s\n", i.Type, i.Title, i.OccurredAt.Format("2006-01-02"), truncate(i.Content, 100)))
+			}
+		}
+
+		relations, err := s.relationRepo.ListByContact(ctx, userID, cid)
+		if err == nil && len(relations) > 0 {
+			sb.WriteString("- Relations:\n")
+			for _, r := range relations {
+				sb.WriteString(fmt.Sprintf("  - %s\n", r.RelationType))
+			}
+		}
+
+		txs, _, err := s.transactionRepo.List(ctx, userID, 1, 20, nil, &cid)
+		if err == nil && len(txs) > 0 {
+			sb.WriteString("- Financial transactions:\n")
+			for _, tx := range txs {
+				sb.WriteString(fmt.Sprintf("  - [%s] %s: %.2f (%s)\n", tx.Type, tx.Title, tx.Amount, tx.Date.Format("2006-01-02")))
+			}
+		}
+
+		sb.WriteString("\n")
+	}
+}
+
+func (s *AIService) buildEventAnalysis(ctx context.Context, userID uint, eventIDs []uint, sb *strings.Builder) {
+	if len(eventIDs) == 0 {
+		return
+	}
+	sb.WriteString("## Event Analysis Request\n\n")
+
+	for _, eid := range eventIDs {
+		event, err := s.eventRepo.GetByID(ctx, userID, eid)
+		if err != nil {
+			continue
+		}
+
+		sb.WriteString(fmt.Sprintf("### Event: %s\n", event.Title))
+		if event.Description != "" {
+			sb.WriteString(fmt.Sprintf("- Description: %s\n", event.Description))
+		}
+		sb.WriteString(fmt.Sprintf("- Time: %s", event.StartTime.Format("2006-01-02 15:04")))
+		if event.EndTime != nil {
+			sb.WriteString(fmt.Sprintf(" - %s", event.EndTime.Format("2006-01-02 15:04")))
+		}
+		sb.WriteString("\n")
+		if event.Location != "" {
+			sb.WriteString(fmt.Sprintf("- Location: %s\n", event.Location))
+		}
+
+		if len(event.ContactIDs) > 0 {
+			sb.WriteString("- Participants:\n")
+			for _, cid := range event.ContactIDs {
+				contact, err := s.contactRepo.GetByID(ctx, userID, cid)
+				if err == nil {
+					labels := strings.Join(contact.RelationshipLabels, ", ")
+					sb.WriteString(fmt.Sprintf("  - %s", contact.Name))
+					if labels != "" {
+						sb.WriteString(fmt.Sprintf(" (%s)", labels))
+					}
+					sb.WriteString("\n")
+				}
+			}
+		}
+
+		sb.WriteString("\n")
+	}
+}
+
+func (s *AIService) buildFinancialAnalysis(ctx context.Context, userID uint, sb *strings.Builder) {
+	income, expense, err := s.transactionRepo.Summary(ctx, userID)
+	if err != nil {
+		return
+	}
+
+	sb.WriteString("## Financial Analysis Request\n\n")
+	sb.WriteString(fmt.Sprintf("- Total Income: %.2f\n", income))
+	sb.WriteString(fmt.Sprintf("- Total Expense: %.2f\n", expense))
+	sb.WriteString(fmt.Sprintf("- Balance: %.2f\n\n", income-expense))
+
+	txs, _, err := s.transactionRepo.List(ctx, userID, 1, 30, nil, nil)
+	if err == nil && len(txs) > 0 {
+		sb.WriteString("### Recent Transactions\n")
+		for _, tx := range txs {
+			cat := tx.Category
+			if cat == "" {
+				cat = "uncategorized"
+			}
+			sb.WriteString(fmt.Sprintf("- [%s] %s: %.2f (%s, %s)\n",
+				tx.Type, tx.Title, tx.Amount, tx.Date.Format("2006-01-02"), cat))
+		}
+		sb.WriteString("\n")
+	}
+}
+
 // --- Helpers ---
 
 func maskKey(key string) string {

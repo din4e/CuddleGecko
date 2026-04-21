@@ -119,6 +119,31 @@ func (b *AIBinding) AnalyzeEvent(eventID uint) (string, error) {
 	return b.svc.AnalyzeEvent(ctx, userID, eventID)
 }
 
+type AnalyzeComprehensiveInput struct {
+	Type       string `json:"type"`
+	ContactIDs []uint `json:"contact_ids"`
+	EventIDs   []uint `json:"event_ids"`
+	Question   string `json:"question"`
+}
+
+func (b *AIBinding) AnalyzeComprehensive(input AnalyzeComprehensiveInput) (map[string]interface{}, error) {
+	ctx := context.Background()
+	userID := GetCurrentUserID()
+	if userID == 0 {
+		return nil, ErrNotAuthenticated
+	}
+	result, err := b.svc.AnalyzeComprehensive(ctx, userID, service.AnalyzeRequest{
+		Type:       input.Type,
+		ContactIDs: input.ContactIDs,
+		EventIDs:   input.EventIDs,
+		Question:   input.Question,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{"analysis": result}, nil
+}
+
 func (b *AIBinding) ListPresets() []service.ProviderPreset {
 	return service.ProviderPresets
 }

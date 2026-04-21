@@ -279,6 +279,40 @@ func (h *AIHandler) AnalyzeEvent(c *gin.Context) {
 	response.OK(c, gin.H{"analysis": result})
 }
 
+// --- Comprehensive Analysis ---
+
+type analyzeComprehensiveRequest struct {
+	Type       string `json:"type" binding:"required"`
+	ContactIDs []uint `json:"contact_ids"`
+	EventIDs   []uint `json:"event_ids"`
+	Question   string `json:"question"`
+}
+
+func (h *AIHandler) AnalyzeComprehensive(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	var req analyzeComprehensiveRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	result, err := h.svc.AnalyzeComprehensive(c.Request.Context(), userID, service.AnalyzeRequest{
+		Type:       req.Type,
+		ContactIDs: req.ContactIDs,
+		EventIDs:   req.EventIDs,
+		Question:   req.Question,
+	})
+	if err != nil {
+		if err == service.ErrNoActiveProvider {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.InternalError(c, "failed to analyze")
+		return
+	}
+	response.OK(c, gin.H{"analysis": result})
+}
+
 // --- Presets (public within auth) ---
 
 func (h *AIHandler) ListPresets(c *gin.Context) {

@@ -85,6 +85,12 @@ export interface AIAdapter {
   deleteConversation(id: number): Promise<void>
   analyzeRelationship(contactId: number): Promise<{ analysis: string }>
   analyzeEvent(eventId: number): Promise<{ analysis: string }>
+  analyzeComprehensive(data: {
+    type: 'contact' | 'event' | 'financial' | 'comprehensive'
+    contact_ids?: number[]
+    event_ids?: number[]
+    question?: string
+  }): Promise<{ analysis: string }>
   chat(conversationId: number, message: string): Promise<string>
 }
 

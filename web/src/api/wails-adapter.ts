@@ -327,6 +327,15 @@ async function createWailsAdapters(): Promise<AppAdapters> {
         const r = await AIAnalyzeEvent(eventId)
         return r as any as { analysis: string }
       },
+      analyzeComprehensive: async (data) => {
+        // Fallback to HTTP API until Wails bindings are regenerated
+        const resp = await fetch('/api/ai/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+          body: JSON.stringify(data),
+        })
+        return resp.json().then((r: { data: { analysis: string } }) => r.data)
+      },
       chat: async (conversationId, message) => {
         const r = await AIChatFn(conversationId, message)
         return r as any as string
