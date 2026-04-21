@@ -131,6 +131,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig) {
 					ai.POST("/chat/sync", h.AI.Chat)
 					ai.POST("/analyze/relationship/:contactId", h.AI.AnalyzeRelationship)
 					ai.POST("/analyze/event/:eventId", h.AI.AnalyzeEvent)
+					ai.POST("/analyze", h.AI.AnalyzeComprehensive)
 				}
 		}
 	}

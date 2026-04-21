@@ -92,6 +92,7 @@ function createHTTPAdapters(): AppAdapters {
       deleteConversation: (id) => client.delete(`/ai/conversations/${id}`).then(() => {}),
       analyzeRelationship: (contactId) => client.post(`/ai/analyze/relationship/${contactId}`).then(r => r.data),
       analyzeEvent: (eventId) => client.post(`/ai/analyze/event/${eventId}`).then(r => r.data),
+      analyzeComprehensive: (data) => client.post('/ai/analyze', data).then(r => r.data),
       chat: (conversationId, message) => client.post<{ content: string }>('/ai/chat/sync', { conversation_id: conversationId, message }).then(r => r.data.content),
     },
   }
