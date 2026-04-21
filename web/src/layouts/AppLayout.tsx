@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../stores/auth'
@@ -71,8 +71,13 @@ export default function AppLayout() {
     const next = !dark
     setDark(next)
     document.documentElement.classList.toggle('dark', next)
+    document.documentElement.style.colorScheme = next ? 'dark' : 'light'
     localStorage.setItem('theme', next ? 'dark' : 'light')
   }
+
+  useEffect(() => {
+    document.documentElement.style.colorScheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  }, [])
 
   const toggleLang = () => {
     const next = i18n.language === 'zh' ? 'en' : 'zh'
@@ -176,6 +181,7 @@ export default function AppLayout() {
               className="size-8"
               onClick={toggleLang}
               title={i18n.language === 'zh' ? t('lang.en') : t('lang.zh')}
+              aria-label={i18n.language === 'zh' ? t('lang.en') : t('lang.zh')}
             >
               <Globe className="h-4 w-4" />
             </Button>
@@ -185,13 +191,14 @@ export default function AppLayout() {
               className="size-8"
               onClick={toggleTheme}
               title={dark ? t('theme.light') : t('theme.dark')}
+              aria-label={dark ? t('theme.light') : t('theme.dark')}
             >
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger
-                className="flex items-center gap-2 rounded-full p-1 hover:bg-muted transition-colors outline-none"
+                className="flex items-center gap-2 rounded-full p-1 hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-full"
                 aria-label={t('nav.userMenu')}
               >
                 <Avatar size="sm">

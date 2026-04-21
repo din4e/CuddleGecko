@@ -99,8 +99,8 @@ export default function TagsPage() {
                   {tag.name}
                 </CardTitle>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => handleEdit(tag)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(tag.id)}><Trash2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => handleEdit(tag)} aria-label={t('tags.editTag')}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(tag.id)} aria-label={t('tags.delete')}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </CardHeader>
             </Card>
@@ -125,8 +125,8 @@ export default function TagsPage() {
                   <TableCell className="font-medium">{tag.name}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(tag)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(tag.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(tag)} aria-label={t('tags.editTag')}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(tag.id)} aria-label={t('tags.delete')}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </TableCell>
                 </TableRow>

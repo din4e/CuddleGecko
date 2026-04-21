@@ -414,7 +414,7 @@ export default function ContactDetailPage() {
                     }}
                   />
                   <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                    <Upload className="h-4 w-4 mr-1" />{uploading ? '...' : t('contacts.uploadImage')}
+                    <Upload className="h-4 w-4 mr-1" />{uploading ? '…' : t('contacts.uploadImage')}
                   </Button>
                   {editForm.avatar_url && (
                     <div className="flex items-center gap-1">
@@ -440,11 +440,11 @@ export default function ContactDetailPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{t('auth.email')}</Label>
-                <Input placeholder="email@example.com" value={editForm.emails.join(', ')} onChange={(e) => setEditForm({ ...editForm, emails: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
+                <Input placeholder="email@example.com" spellCheck={false} value={editForm.emails.join(', ')} onChange={(e) => setEditForm({ ...editForm, emails: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
               </div>
               <div className="space-y-2">
                 <Label>{t('contacts.phone')}</Label>
-                <Input value={editForm.phones.join(', ')} onChange={(e) => setEditForm({ ...editForm, phones: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
+                <Input type="tel" value={editForm.phones.join(', ')} onChange={(e) => setEditForm({ ...editForm, phones: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
               </div>
             </div>
             <div className="space-y-2">

@@ -245,19 +245,19 @@ export default function GraphPage() {
             {showSelf ? t('graph.hideSelf') : t('graph.showSelf')}
           </Badge>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="size-8" onClick={handleZoomIn} title={t('graph.zoomIn')}>
+            <Button variant="outline" size="icon" className="size-8" onClick={handleZoomIn} title={t('graph.zoomIn')} aria-label={t('graph.zoomIn')}>
               <ZoomIn className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" className="size-8" onClick={handleZoomOut} title={t('graph.zoomOut')}>
+            <Button variant="outline" size="icon" className="size-8" onClick={handleZoomOut} title={t('graph.zoomOut')} aria-label={t('graph.zoomOut')}>
               <ZoomOut className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" className="size-8" onClick={handleFitAll} title={t('graph.fitAll')}>
+            <Button variant="outline" size="icon" className="size-8" onClick={handleFitAll} title={t('graph.fitAll')} aria-label={t('graph.fitAll')}>
               <RotateCcw className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" className="size-8" onClick={handleCenter} title={t('graph.center')}>
+            <Button variant="outline" size="icon" className="size-8" onClick={handleCenter} title={t('graph.center')} aria-label={t('graph.center')}>
               <Crosshair className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" className="size-8" onClick={toggleFullscreen} title={isFullscreen ? t('graph.exitFullscreen') : t('graph.fullscreen')}>
+            <Button variant="outline" size="icon" className="size-8" onClick={toggleFullscreen} title={isFullscreen ? t('graph.exitFullscreen') : t('graph.fullscreen')} aria-label={isFullscreen ? t('graph.exitFullscreen') : t('graph.fullscreen')}>
               {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
             </Button>
           </div>

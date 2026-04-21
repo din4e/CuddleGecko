@@ -271,28 +271,28 @@ export default function EventsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap">
-                    <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{formatDate(e.start_time)}</span>
+                    <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" aria-hidden="true" />{formatDate(e.start_time)}</span>
                   </TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap">
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatTime(e.start_time)}{e.end_time && ` — ${formatTime(e.end_time)}`}</span>
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" aria-hidden="true" />{formatTime(e.start_time)}{e.end_time && ` — ${formatTime(e.end_time)}`}</span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {e.location ? <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{e.location}</span> : '—'}
+                    {e.location ? <span className="flex items-center gap-1"><MapPin className="h-3 w-3" aria-hidden="true" />{e.location}</span> : '—'}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {e.contact_ids?.length > 0 ? (
-                      <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{e.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}</span>
+                      <span className="flex items-center gap-1"><Heart className="h-3 w-3" aria-hidden="true" />{e.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}</span>
                     ) : '—'}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       {aiAvailable && (
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAnalyzeEvent(e.id)} disabled={analyzingId === e.id} title={t('ai.analyzeEvent')}>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAnalyzeEvent(e.id)} disabled={analyzingId === e.id} title={t('ai.analyzeEvent')} aria-label={t('ai.analyzeEvent')}>
                         {analyzingId === e.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                       </Button>
                       )}
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)} aria-label={t('events.editEvent')}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(e.id)} aria-label={t('events.deleteEvent')}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -314,36 +314,36 @@ export default function EventsPage() {
                 )}
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <CalendarDays className="h-3 w-3" />
+                    <CalendarDays className="h-3 w-3" aria-hidden="true" />
                     {formatDate(e.start_time)}
                   </span>
                   <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
+                    <Clock className="h-3 w-3" aria-hidden="true" />
                     {formatTime(e.start_time)}
                   </span>
                   {e.location && (
                     <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
+                      <MapPin className="h-3 w-3" aria-hidden="true" />
                       {e.location}
                     </span>
                   )}
                 </div>
                 {e.contact_ids?.length > 0 && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Heart className="h-3 w-3" />
+                    <Heart className="h-3 w-3" aria-hidden="true" />
                     {e.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}
                   </div>
                 )}
                 <div className="flex gap-1 pt-1">
                   {aiAvailable && (
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAnalyzeEvent(e.id)} disabled={analyzingId === e.id} title={t('ai.analyzeEvent')}>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAnalyzeEvent(e.id)} disabled={analyzingId === e.id} title={t('ai.analyzeEvent')} aria-label={t('ai.analyzeEvent')}>
                     {analyzingId === e.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                   </Button>
                   )}
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)}>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)} aria-label={t('events.editEvent')}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(e.id)}>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(e.id)} aria-label={t('events.deleteEvent')}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -396,7 +396,7 @@ export default function EventsPage() {
                   <button
                     key={c.value}
                     type="button"
-                    className={`h-7 w-7 rounded-full border-2 transition-all ${
+                    className={`h-7 w-7 rounded-full border-2 transition-[border-color,transform] ${
                       form.color === c.value ? 'border-foreground scale-110' : 'border-transparent'
                     }`}
                     style={{ backgroundColor: c.value || 'hsl(var(--muted))' }}
