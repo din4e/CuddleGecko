@@ -83,10 +83,10 @@ export default function RemindersPage() {
 
   const renderActions = (r: Reminder) => (
     <div className="flex justify-end gap-1">
-      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(r)} title={t('reminders.edit')}>
+      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(r)} aria-label={t('reminders.edit')}>
         <Pencil className="h-3.5 w-3.5" />
       </Button>
-      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(r.id)}>
+      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(r.id)} aria-label={t('reminders.delete')}>
         <Trash2 className="h-3.5 w-3.5" />
       </Button>
     </div>
@@ -192,20 +192,20 @@ export default function RemindersPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">{t('reminders.title_field')}</label>
-              <input className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} />
+              <label htmlFor="rem-title" className="text-sm font-medium">{t('reminders.title_field')}</label>
+              <input id="rem-title" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} />
             </div>
             <div>
-              <label className="text-sm font-medium">{t('reminders.description')}</label>
-              <textarea className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" rows={3} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
+              <label htmlFor="rem-desc" className="text-sm font-medium">{t('reminders.description')}</label>
+              <textarea id="rem-desc" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" rows={3} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
             </div>
             <div>
-              <label className="text-sm font-medium">{t('reminders.time')}</label>
-              <input type="datetime-local" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={formRemindAt} onChange={(e) => setFormRemindAt(e.target.value)} />
+              <label htmlFor="rem-time" className="text-sm font-medium">{t('reminders.time')}</label>
+              <input id="rem-time" type="datetime-local" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={formRemindAt} onChange={(e) => setFormRemindAt(e.target.value)} />
             </div>
             <div>
-              <label className="text-sm font-medium">{t('reminders.status_label')}</label>
-              <div className="mt-1 flex gap-2">
+              <label htmlFor="rem-status" className="text-sm font-medium">{t('reminders.status_label')}</label>
+              <div id="rem-status" role="group" className="mt-1 flex gap-2">
                 {(['pending', 'done', 'snoozed'] as ReminderStatus[]).map((s) => (
                   <Button key={s} size="sm" variant={formStatus === s ? 'default' : 'outline'} onClick={() => setFormStatus(s)}>
                     {statusLabels[s]}

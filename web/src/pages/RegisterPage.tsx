@@ -78,15 +78,15 @@ export default function RegisterPage() {
             )}
             <div className="space-y-2">
               <Label htmlFor="username">{t('auth.username')}</Label>
-              <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} required minLength={3} />
+              <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} required minLength={3} autoComplete="username" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">{t('auth.email')}</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" spellCheck={false} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">{t('auth.password')}</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
             </div>
             {captchaEnabled && captchaImage && (
               <div className="space-y-2">

@@ -77,11 +77,11 @@ export default function LoginPage() {
             )}
             <div className="space-y-2">
               <Label htmlFor="username">{t('auth.username')}</Label>
-              <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+              <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} required autoComplete="username" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">{t('auth.password')}</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
             </div>
             {captchaEnabled && captchaImage && (
               <div className="space-y-2">

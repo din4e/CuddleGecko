@@ -147,28 +147,28 @@ export default function FinancePage() {
         <div className="grid grid-cols-3 gap-4">
           <Card>
             <CardContent className="pt-4 flex items-center gap-3">
-              <TrendingUp className="h-8 w-8 text-green-500" />
+              <TrendingUp className="h-8 w-8 text-green-500" aria-hidden="true" />
               <div>
                 <p className="text-xs text-muted-foreground">{t('finance.totalIncome')}</p>
-                <p className="text-xl font-bold text-green-600">{fmt(summary.income)}</p>
+                <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(summary.income)}</p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4 flex items-center gap-3">
-              <TrendingDown className="h-8 w-8 text-red-500" />
+              <TrendingDown className="h-8 w-8 text-red-500" aria-hidden="true" />
               <div>
                 <p className="text-xs text-muted-foreground">{t('finance.totalExpense')}</p>
-                <p className="text-xl font-bold text-red-600">{fmt(summary.expense)}</p>
+                <p className="text-xl font-bold text-red-600 tabular-nums">{fmt(summary.expense)}</p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4 flex items-center gap-3">
-              <Wallet className="h-8 w-8 text-blue-500" />
+              <Wallet className="h-8 w-8 text-blue-500" aria-hidden="true" />
               <div>
                 <p className="text-xs text-muted-foreground">{t('finance.balance')}</p>
-                <p className={`text-xl font-bold ${summary.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <p className={`text-xl font-bold tabular-nums ${summary.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {fmt(summary.balance)}
                 </p>
               </div>
@@ -217,7 +217,7 @@ export default function FinancePage() {
                     <div className={`flex h-7 w-7 items-center justify-center rounded-full ${
                       tx.type === 'income' ? 'bg-green-100 text-green-600 dark:bg-green-950' : 'bg-red-100 text-red-600 dark:bg-red-950'
                     }`}>
-                      {tx.type === 'income' ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                      {tx.type === 'income' ? <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" /> : <TrendingDown className="h-3.5 w-3.5" aria-hidden="true" />}
                     </div>
                   </TableCell>
                   <TableCell className="font-medium">{tx.title}</TableCell>
@@ -231,14 +231,14 @@ export default function FinancePage() {
                     ) : '—'}
                   </TableCell>
                   <TableCell className="text-right">
-                    <span className={`font-semibold ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`font-semibold tabular-nums ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                       {tx.type === 'income' ? '+' : '-'}{fmt(tx.amount)}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(tx)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(tx.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(tx)} aria-label={t('finance.editTransaction')}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(tx.id)} aria-label={t('finance.deleteTransaction')}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -277,10 +277,10 @@ export default function FinancePage() {
                   </div>
                 )}
                 <div className="flex gap-1 pt-1">
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(tx)}>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(tx)} aria-label={t('finance.editTransaction')}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(tx.id)}>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(tx.id)} aria-label={t('finance.deleteTransaction')}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>

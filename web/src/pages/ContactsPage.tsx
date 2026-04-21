@@ -86,7 +86,7 @@ function LabelPicker({ selected, onChange, t }: {
           {selected.map((label) => (
             <Badge key={label} variant="secondary" className="gap-1">
               {label in labelColors ? t(`relationships.${label}`) : label}
-              <X className="h-3 w-3 cursor-pointer" onClick={() => onChange(selected.filter((l) => l !== label))} />
+              <button type="button" className="text-muted-foreground hover:text-destructive" aria-label="Remove" onClick={() => onChange(selected.filter((l) => l !== label))}><X className="h-3 w-3" /></button>
             </Badge>
           ))}
         </div>
@@ -178,8 +178,8 @@ export default function ContactsPage() {
                       className="hidden"
                       onChange={handleImageUpload}
                     />
-                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                      <Upload className="h-4 w-4 mr-1" />{uploading ? '...' : t('contacts.uploadImage')}
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading} aria-label={t('contacts.uploadImage')}>
+                      <Upload className="h-4 w-4 mr-1" />{uploading ? '…' : t('contacts.uploadImage')}
                     </Button>
                     {newContact.avatar_url && (
                       <div className="flex items-center gap-1">
@@ -193,16 +193,16 @@ export default function ContactsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>{t('contacts.name')}</Label>
-                <Input value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} required />
+                <Label htmlFor="contact-name">{t('contacts.name')}</Label>
+                <Input id="contact-name" value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} required />
               </div>
               <div className="space-y-2">
-                <Label>{t('auth.email')}</Label>
-                <Input type="email" placeholder="email@example.com" value={newContact.emails.join(', ')} onChange={(e) => setNewContact({ ...newContact, emails: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
+                <Label htmlFor="contact-email">{t('auth.email')}</Label>
+                <Input id="contact-email" type="email" placeholder="email@example.com" spellCheck={false} value={newContact.emails.join(', ')} onChange={(e) => setNewContact({ ...newContact, emails: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
               </div>
               <div className="space-y-2">
-                <Label>{t('contacts.phone')}</Label>
-                <Input value={newContact.phones.join(', ')} onChange={(e) => setNewContact({ ...newContact, phones: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
+                <Label htmlFor="contact-phone">{t('contacts.phone')}</Label>
+                <Input id="contact-phone" type="tel" value={newContact.phones.join(', ')} onChange={(e) => setNewContact({ ...newContact, phones: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
               </div>
               <div className="space-y-2">
                 <Label>{t('contacts.relationship')}</Label>
@@ -288,12 +288,12 @@ export default function ContactsPage() {
             </TableHeader>
             <TableBody>
               {contacts.map((contact) => (
-                <TableRow key={contact.id} className="cursor-pointer" onClick={() => window.location.href = `/buddies/${contact.id}`}>
+                <TableRow key={contact.id} className="cursor-pointer">
                   <TableCell>
-                    <div className="flex items-center gap-3">
+                    <Link to={`/buddies/${contact.id}`} className="flex items-center gap-3 hover:underline">
                       <AvatarDisplay emoji={contact.avatar_emoji} imageUrl={contact.avatar_url} name={contact.name} />
                       <span className="font-medium">{contact.name}</span>
-                    </div>
+                    </Link>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{contact.emails?.join(', ') || '—'}</TableCell>
                   <TableCell className="text-muted-foreground">{contact.phones?.join(', ') || '—'}</TableCell>
