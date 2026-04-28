@@ -14,11 +14,12 @@ type ContactBinding struct {
 func (b *ContactBinding) List(input ListContactsInput) (*PaginatedContacts, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
 
-	contacts, total, err := b.svc.List(ctx, userID, input.Page, input.PageSize, input.Search, input.TagIDs)
+	contacts, total, err := b.svc.List(ctx, userID, workspaceID, input.Page, input.PageSize, input.Search, input.TagIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -34,6 +35,7 @@ func (b *ContactBinding) List(input ListContactsInput) (*PaginatedContacts, erro
 func (b *ContactBinding) Create(input CreateContactInput) (*model.Contact, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
@@ -49,21 +51,23 @@ func (b *ContactBinding) Create(input CreateContactInput) (*model.Contact, error
 		RelationshipLabels: input.RelationshipLabels,
 	}
 
-	return b.svc.Create(ctx, userID, contact)
+	return b.svc.Create(ctx, userID, workspaceID, contact)
 }
 
 func (b *ContactBinding) GetByID(id uint) (*model.Contact, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
-	return b.svc.GetByID(ctx, userID, id)
+	return b.svc.GetByID(ctx, userID, workspaceID, id)
 }
 
 func (b *ContactBinding) Update(id uint, input UpdateContactInput) (*model.Contact, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
@@ -79,32 +83,35 @@ func (b *ContactBinding) Update(id uint, input UpdateContactInput) (*model.Conta
 		RelationshipLabels: input.RelationshipLabels,
 	}
 
-	return b.svc.Update(ctx, userID, id, updates)
+	return b.svc.Update(ctx, userID, workspaceID, id, updates)
 }
 
 func (b *ContactBinding) Delete(id uint) error {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return ErrNotAuthenticated
 	}
-	return b.svc.Delete(ctx, userID, id)
+	return b.svc.Delete(ctx, userID, workspaceID, id)
 }
 
 func (b *ContactBinding) GetTags(contactID uint) ([]model.Tag, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
-	return b.svc.GetTags(ctx, userID, contactID)
+	return b.svc.GetTags(ctx, userID, workspaceID, contactID)
 }
 
 func (b *ContactBinding) ReplaceTags(contactID uint, tagIDs []uint) error {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return ErrNotAuthenticated
 	}
-	return b.svc.ReplaceTags(ctx, userID, contactID, tagIDs)
+	return b.svc.ReplaceTags(ctx, userID, workspaceID, contactID, tagIDs)
 }

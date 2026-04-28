@@ -10,7 +10,8 @@ import (
 var (
 	mu sync.RWMutex
 
-	currentUserID uint
+	currentUserID     uint
+	currentWorkspaceID uint
 )
 
 // Package-level binding instances for Wails Bind in main.go.
@@ -29,6 +30,7 @@ var (
 	Transaction = &TransactionBinding{}
 	AI          = &AIBinding{}
 	Desktop     = &DesktopBinding{}
+	Workspace   = &WorkspaceBinding{}
 )
 
 func InitBindings(
@@ -42,6 +44,7 @@ func InitBindings(
 	eventSvc *service.EventService,
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
+	workspaceSvc *service.WorkspaceService,
 	contactRepo service.ContactRepository,
 	tagRepo service.TagRepository,
 	interactionRepo service.InteractionRepository,
@@ -65,6 +68,7 @@ func InitBindings(
 	Event = &EventBinding{svc: eventSvc}
 	Transaction = &TransactionBinding{svc: transactionSvc}
 	AI = &AIBinding{svc: aiSvc}
+	Workspace = &WorkspaceBinding{svc: workspaceSvc}
 }
 
 func SetCurrentUserID(id uint) {
@@ -77,6 +81,18 @@ func GetCurrentUserID() uint {
 	mu.RLock()
 	defer mu.RUnlock()
 	return currentUserID
+}
+
+func SetCurrentWorkspaceID(id uint) {
+	mu.Lock()
+	defer mu.Unlock()
+	currentWorkspaceID = id
+}
+
+func GetCurrentWorkspaceID() uint {
+	mu.RLock()
+	defer mu.RUnlock()
+	return currentWorkspaceID
 }
 
 func Ctx() context.Context {

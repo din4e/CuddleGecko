@@ -11,10 +11,10 @@ var ErrRelationNotFound = errors.New("relation not found")
 
 type RelationRepository interface {
 	Create(ctx context.Context, relation *model.ContactRelation) error
-	GetByID(ctx context.Context, userID, id uint) (*model.ContactRelation, error)
-	ListByContact(ctx context.Context, userID, contactID uint) ([]model.ContactRelation, error)
-	Delete(ctx context.Context, userID, id uint) error
-	GetAllByUser(ctx context.Context, userID uint) ([]model.ContactRelation, error)
+	GetByID(ctx context.Context, workspaceID, id uint) (*model.ContactRelation, error)
+	ListByContact(ctx context.Context, workspaceID, contactID uint) ([]model.ContactRelation, error)
+	Delete(ctx context.Context, workspaceID, id uint) error
+	GetAllByWorkspace(ctx context.Context, workspaceID uint) ([]model.ContactRelation, error)
 }
 
 type GraphNode struct {
@@ -45,8 +45,9 @@ func NewRelationService(relationRepo RelationRepository, contactRepo ContactRepo
 	return &RelationService{relationRepo: relationRepo, contactRepo: contactRepo}
 }
 
-func (s *RelationService) Create(ctx context.Context, userID, contactIDA uint, relation *model.ContactRelation) (*model.ContactRelation, error) {
+func (s *RelationService) Create(ctx context.Context, userID, workspaceID, contactIDA uint, relation *model.ContactRelation) (*model.ContactRelation, error) {
 	relation.UserID = userID
+	relation.WorkspaceID = workspaceID
 	relation.ContactIDA = contactIDA
 	if err := s.relationRepo.Create(ctx, relation); err != nil {
 		return nil, err
@@ -54,21 +55,21 @@ func (s *RelationService) Create(ctx context.Context, userID, contactIDA uint, r
 	return relation, nil
 }
 
-func (s *RelationService) ListByContact(ctx context.Context, userID, contactID uint) ([]model.ContactRelation, error) {
-	return s.relationRepo.ListByContact(ctx, userID, contactID)
+func (s *RelationService) ListByContact(ctx context.Context, userID, workspaceID, contactID uint) ([]model.ContactRelation, error) {
+	return s.relationRepo.ListByContact(ctx, workspaceID, contactID)
 }
 
-func (s *RelationService) Delete(ctx context.Context, userID, id uint) error {
-	return s.relationRepo.Delete(ctx, userID, id)
+func (s *RelationService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+	return s.relationRepo.Delete(ctx, workspaceID, id)
 }
 
-func (s *RelationService) GetGraphData(ctx context.Context, userID uint) (*GraphData, error) {
-	contacts, _, err := s.contactRepo.List(ctx, userID, 1, 1000, "", nil)
+func (s *RelationService) GetGraphData(ctx context.Context, userID, workspaceID uint) (*GraphData, error) {
+	contacts, _, err := s.contactRepo.List(ctx, workspaceID, 1, 1000, "", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	relations, err := s.relationRepo.GetAllByUser(ctx, userID)
+	relations, err := s.relationRepo.GetAllByWorkspace(ctx, workspaceID)
 	if err != nil {
 		return nil, err
 	}

@@ -11,11 +11,11 @@ var ErrTransactionNotFound = errors.New("transaction not found")
 
 type TransactionRepository interface {
 	Create(ctx context.Context, tx *model.Transaction) error
-	GetByID(ctx context.Context, userID, id uint) (*model.Transaction, error)
-	List(ctx context.Context, userID uint, page, pageSize int, txType *string, contactID *uint) ([]model.Transaction, int64, error)
-	Summary(ctx context.Context, userID uint) (income float64, expense float64, err error)
+	GetByID(ctx context.Context, workspaceID, id uint) (*model.Transaction, error)
+	List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint) ([]model.Transaction, int64, error)
+	Summary(ctx context.Context, workspaceID uint) (income float64, expense float64, err error)
 	Update(ctx context.Context, tx *model.Transaction) error
-	Delete(ctx context.Context, userID, id uint) error
+	Delete(ctx context.Context, workspaceID, id uint) error
 }
 
 type TransactionService struct {
@@ -26,28 +26,29 @@ func NewTransactionService(repo TransactionRepository) *TransactionService {
 	return &TransactionService{repo: repo}
 }
 
-func (s *TransactionService) Create(ctx context.Context, userID uint, tx *model.Transaction) (*model.Transaction, error) {
+func (s *TransactionService) Create(ctx context.Context, userID, workspaceID uint, tx *model.Transaction) (*model.Transaction, error) {
 	tx.UserID = userID
+	tx.WorkspaceID = workspaceID
 	if err := s.repo.Create(ctx, tx); err != nil {
 		return nil, err
 	}
 	return tx, nil
 }
 
-func (s *TransactionService) GetByID(ctx context.Context, userID, id uint) (*model.Transaction, error) {
-	return s.repo.GetByID(ctx, userID, id)
+func (s *TransactionService) GetByID(ctx context.Context, userID, workspaceID, id uint) (*model.Transaction, error) {
+	return s.repo.GetByID(ctx, workspaceID, id)
 }
 
-func (s *TransactionService) List(ctx context.Context, userID uint, page, pageSize int, txType *string, contactID *uint) ([]model.Transaction, int64, error) {
-	return s.repo.List(ctx, userID, page, pageSize, txType, contactID)
+func (s *TransactionService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, txType *string, contactID *uint) ([]model.Transaction, int64, error) {
+	return s.repo.List(ctx, workspaceID, page, pageSize, txType, contactID)
 }
 
-func (s *TransactionService) Summary(ctx context.Context, userID uint) (income float64, expense float64, err error) {
-	return s.repo.Summary(ctx, userID)
+func (s *TransactionService) Summary(ctx context.Context, userID, workspaceID uint) (income float64, expense float64, err error) {
+	return s.repo.Summary(ctx, workspaceID)
 }
 
-func (s *TransactionService) Update(ctx context.Context, userID, id uint, updates *model.Transaction) (*model.Transaction, error) {
-	tx, err := s.repo.GetByID(ctx, userID, id)
+func (s *TransactionService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Transaction) (*model.Transaction, error) {
+	tx, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrTransactionNotFound
 	}
@@ -74,6 +75,6 @@ func (s *TransactionService) Update(ctx context.Context, userID, id uint, update
 	return tx, nil
 }
 
-func (s *TransactionService) Delete(ctx context.Context, userID, id uint) error {
-	return s.repo.Delete(ctx, userID, id)
+func (s *TransactionService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+	return s.repo.Delete(ctx, workspaceID, id)
 }

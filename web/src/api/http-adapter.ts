@@ -1,6 +1,6 @@
 import client from './client'
 import type { AppAdapters } from './adapter'
-import type { AuthResponse, User, Contact, Tag, Interaction, Reminder, ContactRelation, GraphData, Event, Transaction, TransactionSummary, AIProvider, AIConversation, AIMessage } from '@/types'
+import type { AuthResponse, User, Contact, Tag, Interaction, Reminder, ContactRelation, GraphData, Event, Transaction, TransactionSummary, AIProvider, AIConversation, AIMessage, Workspace } from '@/types'
 
 function createHTTPAdapters(): AppAdapters {
   return {
@@ -94,6 +94,15 @@ function createHTTPAdapters(): AppAdapters {
       analyzeEvent: (eventId) => client.post(`/ai/analyze/event/${eventId}`).then(r => r.data),
       analyzeComprehensive: (data) => client.post('/ai/analyze', data).then(r => r.data),
       chat: (conversationId, message) => client.post<{ content: string }>('/ai/chat/sync', { conversation_id: conversationId, message }).then(r => r.data.content),
+    },
+
+    workspace: {
+      list: () => client.get<Workspace[]>('/workspaces').then(r => r.data),
+      create: (data) => client.post<Workspace>('/workspaces', data).then(r => r.data),
+      update: (id, data) => client.put<Workspace>(`/workspaces/${id}`, data).then(r => r.data),
+      delete: (id) => client.delete(`/workspaces/${id}`).then(() => {}),
+      switch: (id) => client.post<Workspace>(`/workspaces/${id}/switch`).then(r => r.data),
+      getDefault: () => client.get<Workspace>('/workspaces/default').then(r => r.data),
     },
   }
 }

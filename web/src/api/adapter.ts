@@ -1,7 +1,7 @@
 import type {
   User, Contact, Tag, Interaction, Reminder,
   ContactRelation, GraphData, AuthResponse, Event, Transaction, TransactionSummary,
-  AIProvider, AIConversation, AIMessage, AIProviderPreset
+  AIProvider, AIConversation, AIMessage, AIProviderPreset, Workspace
 } from '@/types'
 
 export interface AuthAdapter {
@@ -103,6 +103,15 @@ export interface DesktopAdapter {
   openDataDir(): Promise<void>
 }
 
+export interface WorkspaceAdapter {
+  list(): Promise<Workspace[]>
+  create(data: { name: string; description?: string; icon?: string }): Promise<Workspace>
+  update(id: number, data: { name?: string; description?: string; icon?: string }): Promise<Workspace>
+  delete(id: number): Promise<void>
+  switch(id: number): Promise<Workspace>
+  getDefault(): Promise<Workspace>
+}
+
 export interface AppAdapters {
   auth: AuthAdapter
   captcha: CaptchaAdapter
@@ -116,4 +125,5 @@ export interface AppAdapters {
   transaction: TransactionAdapter
   ai: AIAdapter
   desktop?: DesktopAdapter
+  workspace: WorkspaceAdapter
 }

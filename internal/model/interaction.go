@@ -17,9 +17,10 @@ const (
 )
 
 type Interaction struct {
-	ID         uint            `gorm:"primaryKey" json:"id"`
-	UserID     uint            `gorm:"index;not null" json:"user_id"`
-	ContactID  uint            `gorm:"index;not null" json:"contact_id"`
+	ID          uint            `gorm:"primaryKey" json:"id"`
+	UserID      uint            `gorm:"index;not null" json:"user_id"`
+	WorkspaceID uint            `gorm:"index;not null;default:0" json:"workspace_id"`
+	ContactID   uint            `gorm:"index;not null" json:"contact_id"`
 	Type       InteractionType `gorm:"size:20;not null" json:"type"`
 	Title      string          `gorm:"size:200;not null" json:"title"`
 	Content    string          `gorm:"type:text" json:"content"`

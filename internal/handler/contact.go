@@ -49,6 +49,7 @@ type replaceTagsRequest struct {
 
 func (h *ContactHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	search := c.Query("search")
@@ -60,7 +61,7 @@ func (h *ContactHandler) List(c *gin.Context) {
 		}
 	}
 
-	contacts, total, err := h.svc.List(c.Request.Context(), userID, page, pageSize, search, tagIDs)
+	contacts, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, search, tagIDs)
 	if err != nil {
 		response.InternalError(c, "failed to list contacts")
 		return
@@ -71,6 +72,7 @@ func (h *ContactHandler) List(c *gin.Context) {
 
 func (h *ContactHandler) Create(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	var req createContactRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -89,7 +91,7 @@ func (h *ContactHandler) Create(c *gin.Context) {
 		RelationshipLabels: req.RelationshipLabels,
 	}
 
-	result, err := h.svc.Create(c.Request.Context(), userID, contact)
+	result, err := h.svc.Create(c.Request.Context(), userID, workspaceID, contact)
 	if err != nil {
 		response.InternalError(c, "failed to create contact")
 		return
@@ -100,13 +102,14 @@ func (h *ContactHandler) Create(c *gin.Context) {
 
 func (h *ContactHandler) GetByID(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid contact id")
 		return
 	}
 
-	contact, err := h.svc.GetByID(c.Request.Context(), userID, uint(id))
+	contact, err := h.svc.GetByID(c.Request.Context(), userID, workspaceID, uint(id))
 	if err != nil {
 		response.NotFound(c, "contact not found")
 		return
@@ -117,6 +120,7 @@ func (h *ContactHandler) GetByID(c *gin.Context) {
 
 func (h *ContactHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid contact id")
@@ -141,7 +145,7 @@ func (h *ContactHandler) Update(c *gin.Context) {
 		RelationshipLabels: req.RelationshipLabels,
 	}
 
-	result, err := h.svc.Update(c.Request.Context(), userID, uint(id), contact)
+	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), contact)
 	if err != nil {
 		if err == service.ErrContactNotFound {
 			response.NotFound(c, "contact not found")
@@ -156,13 +160,14 @@ func (h *ContactHandler) Update(c *gin.Context) {
 
 func (h *ContactHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid contact id")
 		return
 	}
 
-	if err := h.svc.Delete(c.Request.Context(), userID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
 		response.NotFound(c, "contact not found")
 		return
 	}
@@ -172,13 +177,14 @@ func (h *ContactHandler) Delete(c *gin.Context) {
 
 func (h *ContactHandler) GetTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid contact id")
 		return
 	}
 
-	tags, err := h.svc.GetTags(c.Request.Context(), userID, uint(id))
+	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, uint(id))
 	if err != nil {
 		response.NotFound(c, "contact not found")
 		return
@@ -189,6 +195,7 @@ func (h *ContactHandler) GetTags(c *gin.Context) {
 
 func (h *ContactHandler) ReplaceTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid contact id")
@@ -201,7 +208,7 @@ func (h *ContactHandler) ReplaceTags(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.ReplaceTags(c.Request.Context(), userID, uint(id), req.TagIDs); err != nil {
+	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
 		response.NotFound(c, "contact not found")
 		return
 	}

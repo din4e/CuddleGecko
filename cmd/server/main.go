@@ -33,9 +33,11 @@ func main() {
 	eventRepo := repository.NewEventRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
 	aiRepo := repository.NewAIRepo(db)
+	workspaceRepo := repository.NewWorkspaceRepo(db)
 
 	// Services
-	authSvc := service.NewAuthService(userRepo, &cfg.JWT)
+	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
+	authSvc := service.NewAuthService(userRepo, &cfg.JWT, workspaceSvc)
 	captchaSvc := service.NewCaptchaService(cfg.Captcha)
 	contactSvc := service.NewContactService(contactRepo)
 	tagSvc := service.NewTagService(tagRepo)
@@ -47,12 +49,12 @@ func main() {
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo)
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, transactionSvc, aiSvc, "./data/avatars")
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, transactionSvc, aiSvc, workspaceSvc, "./data/avatars")
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)
 	r := gin.Default()
-	handler.RegisterRoutes(r, handlers, &cfg.JWT)
+	handler.RegisterRoutes(r, handlers, &cfg.JWT, workspaceSvc)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("CuddleGecko server starting on %s", addr)

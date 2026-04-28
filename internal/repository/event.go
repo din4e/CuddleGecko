@@ -23,19 +23,19 @@ func (r *EventRepo) Create(ctx context.Context, event *model.Event) error {
 	return nil
 }
 
-func (r *EventRepo) GetByID(ctx context.Context, userID, id uint) (*model.Event, error) {
+func (r *EventRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Event, error) {
 	var event model.Event
-	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).First(&event).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&event).Error; err != nil {
 		return nil, err
 	}
 	return &event, nil
 }
 
-func (r *EventRepo) List(ctx context.Context, userID uint, page, pageSize int, startAfter, endBefore *string) ([]model.Event, int64, error) {
+func (r *EventRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, startAfter, endBefore *string) ([]model.Event, int64, error) {
 	var events []model.Event
 	var total int64
 
-	query := r.db.WithContext(ctx).Where("user_id = ?", userID)
+	query := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID)
 
 	if startAfter != nil {
 		query = query.Where("start_time >= ?", *startAfter)
@@ -66,8 +66,8 @@ func (r *EventRepo) Update(ctx context.Context, event *model.Event) error {
 	return nil
 }
 
-func (r *EventRepo) Delete(ctx context.Context, userID, id uint) error {
-	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&model.Event{}).Error; err != nil {
+func (r *EventRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Event{}).Error; err != nil {
 		return fmt.Errorf("delete event: %w", err)
 	}
 	return nil

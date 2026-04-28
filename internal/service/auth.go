@@ -37,12 +37,13 @@ type AuthResult struct {
 }
 
 type AuthService struct {
-	repo   UserRepository
-	jwtCfg *config.JWTConfig
+	repo      UserRepository
+	jwtCfg    *config.JWTConfig
+	wsSvc     *WorkspaceService
 }
 
-func NewAuthService(repo UserRepository, jwtCfg *config.JWTConfig) *AuthService {
-	return &AuthService{repo: repo, jwtCfg: jwtCfg}
+func NewAuthService(repo UserRepository, jwtCfg *config.JWTConfig, wsSvc *WorkspaceService) *AuthService {
+	return &AuthService{repo: repo, jwtCfg: jwtCfg, wsSvc: wsSvc}
 }
 
 func (s *AuthService) Register(ctx context.Context, username, email, password string) (*AuthResult, error) {
@@ -64,6 +65,14 @@ func (s *AuthService) Register(ctx context.Context, username, email, password st
 	user := &model.User{Username: username, Email: email, PasswordHash: hash}
 	if err := s.repo.CreateUser(ctx, user); err != nil {
 		return nil, err
+	}
+
+	// Create default workspace for new user
+	if s.wsSvc != nil {
+		if _, wsErr := s.wsSvc.CreateDefaultWorkspace(ctx, user.ID); wsErr != nil {
+			// Log but don't fail registration
+			_ = wsErr
+		}
 	}
 
 	return s.generateTokens(ctx, user)

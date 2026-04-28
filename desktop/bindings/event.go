@@ -15,6 +15,7 @@ type EventBinding struct {
 func (b *EventBinding) List(input ListEventsInput) (*PaginatedEvents, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
@@ -27,7 +28,7 @@ func (b *EventBinding) List(input ListEventsInput) (*PaginatedEvents, error) {
 		endBefore = &input.EndBefore
 	}
 
-	events, total, err := b.svc.List(ctx, userID, input.Page, input.PageSize, startAfter, endBefore)
+	events, total, err := b.svc.List(ctx, userID, workspaceID, input.Page, input.PageSize, startAfter, endBefore)
 	if err != nil {
 		return nil, err
 	}
@@ -43,6 +44,7 @@ func (b *EventBinding) List(input ListEventsInput) (*PaginatedEvents, error) {
 func (b *EventBinding) Create(input CreateEventInput) (*model.Event, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
@@ -64,12 +66,13 @@ func (b *EventBinding) Create(input CreateEventInput) (*model.Event, error) {
 		Color:       input.Color,
 	}
 
-	return b.svc.Create(ctx, userID, event)
+	return b.svc.Create(ctx, userID, workspaceID, event)
 }
 
 func (b *EventBinding) Update(id uint, input UpdateEventInput) (*model.Event, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
@@ -91,14 +94,15 @@ func (b *EventBinding) Update(id uint, input UpdateEventInput) (*model.Event, er
 		Color:       input.Color,
 	}
 
-	return b.svc.Update(ctx, userID, id, updates)
+	return b.svc.Update(ctx, userID, workspaceID, id, updates)
 }
 
 func (b *EventBinding) Delete(id uint) error {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return ErrNotAuthenticated
 	}
-	return b.svc.Delete(ctx, userID, id)
+	return b.svc.Delete(ctx, userID, workspaceID, id)
 }

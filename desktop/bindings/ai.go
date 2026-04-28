@@ -95,28 +95,31 @@ func (b *AIBinding) DeleteConversation(id uint) error {
 func (b *AIBinding) Chat(conversationID uint, message string) (string, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return "", ErrNotAuthenticated
 	}
-	return b.svc.Chat(ctx, userID, conversationID, message)
+	return b.svc.Chat(ctx, userID, workspaceID, conversationID, message)
 }
 
 func (b *AIBinding) AnalyzeRelationship(contactID uint) (string, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return "", ErrNotAuthenticated
 	}
-	return b.svc.AnalyzeRelationship(ctx, userID, contactID)
+	return b.svc.AnalyzeRelationship(ctx, userID, workspaceID, contactID)
 }
 
 func (b *AIBinding) AnalyzeEvent(eventID uint) (string, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return "", ErrNotAuthenticated
 	}
-	return b.svc.AnalyzeEvent(ctx, userID, eventID)
+	return b.svc.AnalyzeEvent(ctx, userID, workspaceID, eventID)
 }
 
 type AnalyzeComprehensiveInput struct {
@@ -129,10 +132,11 @@ type AnalyzeComprehensiveInput struct {
 func (b *AIBinding) AnalyzeComprehensive(input AnalyzeComprehensiveInput) (map[string]interface{}, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
-	result, err := b.svc.AnalyzeComprehensive(ctx, userID, service.AnalyzeRequest{
+	result, err := b.svc.AnalyzeComprehensive(ctx, userID, workspaceID, service.AnalyzeRequest{
 		Type:       input.Type,
 		ContactIDs: input.ContactIDs,
 		EventIDs:   input.EventIDs,
