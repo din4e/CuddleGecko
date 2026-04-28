@@ -19,6 +19,7 @@ type Handlers struct {
 	Event       *EventHandler
 	Transaction *TransactionHandler
 	AI          *AIHandler
+	Workspace   *WorkspaceHandler
 }
 
 func NewHandlers(
@@ -32,6 +33,7 @@ func NewHandlers(
 	eventSvc *service.EventService,
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
+	workspaceSvc *service.WorkspaceService,
 	uploadDir string,
 ) *Handlers {
 	return &Handlers{
@@ -46,10 +48,11 @@ func NewHandlers(
 		Event:       NewEventHandler(eventSvc),
 		Transaction: NewTransactionHandler(transactionSvc),
 		AI:          NewAIHandler(aiSvc),
+		Workspace:   NewWorkspaceHandler(workspaceSvc),
 	}
 }
 
-func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig) {
+func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig, workspaceSvc *service.WorkspaceService) {
 	r.Use(middleware.CORS())
 
 	// Serve uploaded avatar images
@@ -71,9 +74,23 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig) {
 		{
 			protected.GET("/auth/me", h.Auth.Me)
 
-			protected.POST("/upload/avatar", h.Upload.UploadAvatar)
+			// Workspace management (no workspace context needed)
+			protected.GET("/workspaces", h.Workspace.List)
+			protected.POST("/workspaces", h.Workspace.Create)
+			protected.PUT("/workspaces/:id", h.Workspace.Update)
+			protected.DELETE("/workspaces/:id", h.Workspace.Delete)
+			protected.POST("/workspaces/:id/switch", h.Workspace.Switch)
+				protected.GET("/workspaces/default", h.Workspace.GetDefault)
+		}
 
-			buddies := protected.Group("/buddies")
+		// Workspace-scoped routes
+		wsProtected := api.Group("")
+		wsProtected.Use(middleware.JWTAuth(jwtCfg))
+		wsProtected.Use(middleware.WorkspaceAuth(workspaceSvc))
+		{
+			wsProtected.POST("/upload/avatar", h.Upload.UploadAvatar)
+
+			buddies := wsProtected.Group("/buddies")
 			{
 				buddies.GET("", h.Contact.List)
 				buddies.POST("", h.Contact.Create)
@@ -89,50 +106,50 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig) {
 				buddies.POST("/:id/relations", h.Graph.CreateRelation)
 			}
 
-			protected.GET("/tags", h.Tag.List)
-			protected.POST("/tags", h.Tag.Create)
-			protected.PUT("/tags/:id", h.Tag.Update)
-			protected.DELETE("/tags/:id", h.Tag.Delete)
+			wsProtected.GET("/tags", h.Tag.List)
+			wsProtected.POST("/tags", h.Tag.Create)
+			wsProtected.PUT("/tags/:id", h.Tag.Update)
+			wsProtected.DELETE("/tags/:id", h.Tag.Delete)
 
-			protected.PUT("/interactions/:id", h.Interaction.Update)
-			protected.DELETE("/interactions/:id", h.Interaction.Delete)
+			wsProtected.PUT("/interactions/:id", h.Interaction.Update)
+			wsProtected.DELETE("/interactions/:id", h.Interaction.Delete)
 
-			protected.GET("/reminders", h.Reminder.List)
-			protected.PUT("/reminders/:id", h.Reminder.Update)
-			protected.DELETE("/reminders/:id", h.Reminder.Delete)
+			wsProtected.GET("/reminders", h.Reminder.List)
+			wsProtected.PUT("/reminders/:id", h.Reminder.Update)
+			wsProtected.DELETE("/reminders/:id", h.Reminder.Delete)
 
-			protected.DELETE("/relations/:id", h.Graph.DeleteRelation)
+			wsProtected.DELETE("/relations/:id", h.Graph.DeleteRelation)
 
-			protected.GET("/graph", h.Graph.GetGraph)
+			wsProtected.GET("/graph", h.Graph.GetGraph)
 
-			protected.GET("/events", h.Event.List)
-			protected.POST("/events", h.Event.Create)
-			protected.PUT("/events/:id", h.Event.Update)
-			protected.DELETE("/events/:id", h.Event.Delete)
+			wsProtected.GET("/events", h.Event.List)
+			wsProtected.POST("/events", h.Event.Create)
+			wsProtected.PUT("/events/:id", h.Event.Update)
+			wsProtected.DELETE("/events/:id", h.Event.Delete)
 
-			protected.GET("/transactions", h.Transaction.List)
-			protected.GET("/transactions/summary", h.Transaction.Summary)
-			protected.POST("/transactions", h.Transaction.Create)
-			protected.PUT("/transactions/:id", h.Transaction.Update)
-			protected.DELETE("/transactions/:id", h.Transaction.Delete)
+			wsProtected.GET("/transactions", h.Transaction.List)
+			wsProtected.GET("/transactions/summary", h.Transaction.Summary)
+			wsProtected.POST("/transactions", h.Transaction.Create)
+			wsProtected.PUT("/transactions/:id", h.Transaction.Update)
+			wsProtected.DELETE("/transactions/:id", h.Transaction.Delete)
 
-				ai := protected.Group("/ai")
-				{
-					ai.GET("/presets", h.AI.ListPresets)
-					ai.GET("/providers", h.AI.ListProviders)
-					ai.PUT("/providers", h.AI.SaveProvider)
-					ai.POST("/providers/:id/activate", h.AI.ActivateProvider)
-					ai.POST("/providers/:id/test", h.AI.TestConnection)
-					ai.GET("/conversations", h.AI.ListConversations)
-					ai.POST("/conversations", h.AI.CreateConversation)
-					ai.GET("/conversations/:id/messages", h.AI.GetMessages)
-					ai.DELETE("/conversations/:id", h.AI.DeleteConversation)
-					ai.POST("/chat", h.AI.StreamChat)
-					ai.POST("/chat/sync", h.AI.Chat)
-					ai.POST("/analyze/relationship/:contactId", h.AI.AnalyzeRelationship)
-					ai.POST("/analyze/event/:eventId", h.AI.AnalyzeEvent)
-					ai.POST("/analyze", h.AI.AnalyzeComprehensive)
-				}
+			ai := wsProtected.Group("/ai")
+			{
+				ai.GET("/presets", h.AI.ListPresets)
+				ai.GET("/providers", h.AI.ListProviders)
+				ai.PUT("/providers", h.AI.SaveProvider)
+				ai.POST("/providers/:id/activate", h.AI.ActivateProvider)
+				ai.POST("/providers/:id/test", h.AI.TestConnection)
+				ai.GET("/conversations", h.AI.ListConversations)
+				ai.POST("/conversations", h.AI.CreateConversation)
+				ai.GET("/conversations/:id/messages", h.AI.GetMessages)
+				ai.DELETE("/conversations/:id", h.AI.DeleteConversation)
+				ai.POST("/chat", h.AI.StreamChat)
+				ai.POST("/chat/sync", h.AI.Chat)
+				ai.POST("/analyze/relationship/:contactId", h.AI.AnalyzeRelationship)
+				ai.POST("/analyze/event/:eventId", h.AI.AnalyzeEvent)
+				ai.POST("/analyze", h.AI.AnalyzeComprehensive)
+			}
 		}
 	}
 }

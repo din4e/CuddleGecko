@@ -11,10 +11,10 @@ var ErrContactNotFound = errors.New("contact not found")
 
 type ContactRepository interface {
 	Create(ctx context.Context, contact *model.Contact) error
-	GetByID(ctx context.Context, userID, id uint) (*model.Contact, error)
-	List(ctx context.Context, userID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error)
+	GetByID(ctx context.Context, workspaceID, id uint) (*model.Contact, error)
+	List(ctx context.Context, workspaceID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error)
 	Update(ctx context.Context, contact *model.Contact) error
-	Delete(ctx context.Context, userID, id uint) error
+	Delete(ctx context.Context, workspaceID, id uint) error
 	ReplaceTags(ctx context.Context, contactID uint, tags []model.Tag) error
 	GetTags(ctx context.Context, contactID uint) ([]model.Tag, error)
 }
@@ -27,34 +27,35 @@ func NewContactService(repo ContactRepository) *ContactService {
 	return &ContactService{repo: repo}
 }
 
-func (s *ContactService) Create(ctx context.Context, userID uint, contact *model.Contact) (*model.Contact, error) {
+func (s *ContactService) Create(ctx context.Context, userID, workspaceID uint, contact *model.Contact) (*model.Contact, error) {
 	contact.UserID = userID
+	contact.WorkspaceID = workspaceID
 	if err := s.repo.Create(ctx, contact); err != nil {
 		return nil, err
 	}
 	return contact, nil
 }
 
-func (s *ContactService) GetByID(ctx context.Context, userID, id uint) (*model.Contact, error) {
-	contact, err := s.repo.GetByID(ctx, userID, id)
+func (s *ContactService) GetByID(ctx context.Context, userID, workspaceID, id uint) (*model.Contact, error) {
+	contact, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrContactNotFound
 	}
 	return contact, nil
 }
 
-func (s *ContactService) List(ctx context.Context, userID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error) {
+func (s *ContactService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error) {
 	if page < 1 {
 		page = 1
 	}
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20
 	}
-	return s.repo.List(ctx, userID, page, pageSize, search, tagIDs)
+	return s.repo.List(ctx, workspaceID, page, pageSize, search, tagIDs)
 }
 
-func (s *ContactService) Update(ctx context.Context, userID, id uint, updates *model.Contact) (*model.Contact, error) {
-	contact, err := s.repo.GetByID(ctx, userID, id)
+func (s *ContactService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Contact) (*model.Contact, error) {
+	contact, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrContactNotFound
 	}
@@ -79,12 +80,12 @@ func (s *ContactService) Update(ctx context.Context, userID, id uint, updates *m
 	return contact, nil
 }
 
-func (s *ContactService) Delete(ctx context.Context, userID, id uint) error {
-	return s.repo.Delete(ctx, userID, id)
+func (s *ContactService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+	return s.repo.Delete(ctx, workspaceID, id)
 }
 
-func (s *ContactService) ReplaceTags(ctx context.Context, userID, contactID uint, tagIDs []uint) error {
-	if _, err := s.repo.GetByID(ctx, userID, contactID); err != nil {
+func (s *ContactService) ReplaceTags(ctx context.Context, userID, workspaceID, contactID uint, tagIDs []uint) error {
+	if _, err := s.repo.GetByID(ctx, workspaceID, contactID); err != nil {
 		return ErrContactNotFound
 	}
 	tags := make([]model.Tag, len(tagIDs))
@@ -94,8 +95,8 @@ func (s *ContactService) ReplaceTags(ctx context.Context, userID, contactID uint
 	return s.repo.ReplaceTags(ctx, contactID, tags)
 }
 
-func (s *ContactService) GetTags(ctx context.Context, userID, contactID uint) ([]model.Tag, error) {
-	if _, err := s.repo.GetByID(ctx, userID, contactID); err != nil {
+func (s *ContactService) GetTags(ctx context.Context, userID, workspaceID, contactID uint) ([]model.Tag, error) {
+	if _, err := s.repo.GetByID(ctx, workspaceID, contactID); err != nil {
 		return nil, ErrContactNotFound
 	}
 	return s.repo.GetTags(ctx, contactID)

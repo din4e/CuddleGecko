@@ -67,7 +67,6 @@ func (s *AIService) ListProviders(ctx context.Context, userID uint) ([]model.AIP
 	if err != nil {
 		return nil, err
 	}
-	// Mask API keys
 	for i := range providers {
 		providers[i].APIKey = maskKey(providers[i].APIKey)
 	}
@@ -92,14 +91,12 @@ func (s *AIService) SaveProvider(ctx context.Context, userID uint, providerType,
 		modelName = preset.DefaultModel
 	}
 
-	// Try to find existing provider of this type for this user
 	existing, err := s.aiRepo.GetProviderByType(ctx, userID, providerType)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 
 	if existing != nil {
-		// Update existing
 		existing.APIKey = apiKey
 		existing.Model = modelName
 		existing.BaseURL = baseURL
@@ -111,7 +108,6 @@ func (s *AIService) SaveProvider(ctx context.Context, userID uint, providerType,
 		return &result, nil
 	}
 
-	// Create new
 	p := &model.AIProvider{
 		UserID:       userID,
 		ProviderType: providerType,
@@ -210,7 +206,7 @@ func (s *AIService) DeleteConversation(ctx context.Context, userID, id uint) err
 
 // --- Chat ---
 
-func (s *AIService) StreamChat(ctx context.Context, userID, conversationID uint, userMessage string) (<-chan llm.StreamChunk, error) {
+func (s *AIService) StreamChat(ctx context.Context, userID, workspaceID, conversationID uint, userMessage string) (<-chan llm.StreamChunk, error) {
 	client, err := s.getActiveClient(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -224,7 +220,6 @@ func (s *AIService) StreamChat(ctx context.Context, userID, conversationID uint,
 		return nil, err
 	}
 
-	// Save user message
 	if err := s.aiRepo.CreateMessage(ctx, &model.AIMessage{
 		ConversationID: conversationID,
 		Role:           model.AIMessageUser,
@@ -233,32 +228,28 @@ func (s *AIService) StreamChat(ctx context.Context, userID, conversationID uint,
 		return nil, err
 	}
 
-	// Load history
 	messages, err := s.aiRepo.ListMessagesByConversation(ctx, conversationID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Build system prompt
-	systemPrompt, err := s.buildSystemPrompt(ctx, userID)
+	systemPrompt, err := s.buildSystemPrompt(ctx, userID, workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("build system prompt: %w", err)
 	}
 
-	// Assemble LLM messages
 	llmMessages := []llm.Message{{Role: "system", Content: systemPrompt}}
 	for _, m := range messages {
 		llmMessages = append(llmMessages, llm.Message{Role: string(m.Role), Content: m.Content})
 	}
 
-	// Update conversation title if first message
 	if conv.Title == "" {
 		title := userMessage
 		if len(title) > 50 {
 			title = title[:50] + "..."
 		}
 		conv.Title = title
-		s.aiRepo.CreateConversation(ctx, conv) // best effort
+		s.aiRepo.CreateConversation(ctx, conv)
 	}
 
 	stream, err := client.StreamChat(ctx, llmMessages)
@@ -266,7 +257,6 @@ func (s *AIService) StreamChat(ctx context.Context, userID, conversationID uint,
 		return nil, err
 	}
 
-	// Tee the stream: forward to caller channel while accumulating for DB save
 	out := make(chan llm.StreamChunk, 64)
 	go func() {
 		defer close(out)
@@ -291,7 +281,7 @@ func (s *AIService) StreamChat(ctx context.Context, userID, conversationID uint,
 	return out, nil
 }
 
-func (s *AIService) Chat(ctx context.Context, userID, conversationID uint, userMessage string) (string, error) {
+func (s *AIService) Chat(ctx context.Context, userID, workspaceID, conversationID uint, userMessage string) (string, error) {
 	client, err := s.getActiveClient(ctx, userID)
 	if err != nil {
 		return "", err
@@ -305,7 +295,6 @@ func (s *AIService) Chat(ctx context.Context, userID, conversationID uint, userM
 		return "", err
 	}
 
-	// Save user message
 	if err := s.aiRepo.CreateMessage(ctx, &model.AIMessage{
 		ConversationID: conversationID,
 		Role:           model.AIMessageUser,
@@ -314,13 +303,12 @@ func (s *AIService) Chat(ctx context.Context, userID, conversationID uint, userM
 		return "", err
 	}
 
-	// Load history
 	messages, err := s.aiRepo.ListMessagesByConversation(ctx, conversationID)
 	if err != nil {
 		return "", err
 	}
 
-	systemPrompt, err := s.buildSystemPrompt(ctx, userID)
+	systemPrompt, err := s.buildSystemPrompt(ctx, userID, workspaceID)
 	if err != nil {
 		return "", fmt.Errorf("build system prompt: %w", err)
 	}
@@ -335,7 +323,6 @@ func (s *AIService) Chat(ctx context.Context, userID, conversationID uint, userM
 		return "", err
 	}
 
-	// Save assistant response
 	if err := s.aiRepo.CreateMessage(ctx, &model.AIMessage{
 		ConversationID: conversationID,
 		Role:           model.AIMessageAssistant,
@@ -349,29 +336,29 @@ func (s *AIService) Chat(ctx context.Context, userID, conversationID uint, userM
 
 // --- Analysis ---
 
-func (s *AIService) AnalyzeRelationship(ctx context.Context, userID, contactID uint) (string, error) {
+func (s *AIService) AnalyzeRelationship(ctx context.Context, userID, workspaceID, contactID uint) (string, error) {
 	client, err := s.getActiveClient(ctx, userID)
 	if err != nil {
 		return "", err
 	}
 
-	contact, err := s.contactRepo.GetByID(ctx, userID, contactID)
+	contact, err := s.contactRepo.GetByID(ctx, workspaceID, contactID)
 	if err != nil {
 		return "", fmt.Errorf("get contact: %w", err)
 	}
 
-	interactions, _, err := s.interactionRepo.ListByContact(ctx, userID, contactID, 1, 20)
+	interactions, _, err := s.interactionRepo.ListByContact(ctx, workspaceID, contactID, 1, 20)
 	if err != nil {
 		return "", fmt.Errorf("get interactions: %w", err)
 	}
 
-	relations, err := s.relationRepo.ListByContact(ctx, userID, contactID)
+	relations, err := s.relationRepo.ListByContact(ctx, workspaceID, contactID)
 	if err != nil {
 		return "", fmt.Errorf("get relations: %w", err)
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Analyze the following personal relationship and provide insights on relationship quality, communication patterns, and suggestions for improvement.\n\n"))
+	sb.WriteString("Analyze the following personal relationship and provide insights on relationship quality, communication patterns, and suggestions for improvement.\n\n")
 	sb.WriteString(fmt.Sprintf("## Contact: %s\n", contact.Name))
 	if len(contact.RelationshipLabels) > 0 {
 		sb.WriteString(fmt.Sprintf("Labels: %s\n", strings.Join(contact.RelationshipLabels, ", ")))
@@ -405,13 +392,13 @@ func (s *AIService) AnalyzeRelationship(ctx context.Context, userID, contactID u
 	return client.Chat(ctx, messages)
 }
 
-func (s *AIService) AnalyzeEvent(ctx context.Context, userID, eventID uint) (string, error) {
+func (s *AIService) AnalyzeEvent(ctx context.Context, userID, workspaceID, eventID uint) (string, error) {
 	client, err := s.getActiveClient(ctx, userID)
 	if err != nil {
 		return "", err
 	}
 
-	event, err := s.eventRepo.GetByID(ctx, userID, eventID)
+	event, err := s.eventRepo.GetByID(ctx, workspaceID, eventID)
 	if err != nil {
 		return "", fmt.Errorf("get event: %w", err)
 	}
@@ -434,7 +421,7 @@ func (s *AIService) AnalyzeEvent(ctx context.Context, userID, eventID uint) (str
 	if len(event.ContactIDs) > 0 {
 		sb.WriteString("\n### Related Contacts\n")
 		for _, cid := range event.ContactIDs {
-			contact, err := s.contactRepo.GetByID(ctx, userID, cid)
+			contact, err := s.contactRepo.GetByID(ctx, workspaceID, cid)
 			if err == nil {
 				sb.WriteString(fmt.Sprintf("- %s (%s)\n", contact.Name, strings.Join(contact.RelationshipLabels, ", ")))
 			}
@@ -451,12 +438,11 @@ func (s *AIService) AnalyzeEvent(ctx context.Context, userID, eventID uint) (str
 
 // --- System prompt building ---
 
-func (s *AIService) buildSystemPrompt(ctx context.Context, userID uint) (string, error) {
+func (s *AIService) buildSystemPrompt(ctx context.Context, userID, workspaceID uint) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("You are CuddleGecko AI, a personal CRM assistant. You help the user manage and understand their relationships. Answer questions about their data or provide relationship advice.\n\n")
 
-	// Contacts
-	contacts, _, err := s.contactRepo.List(ctx, userID, 1, 50, "", nil)
+	contacts, _, err := s.contactRepo.List(ctx, workspaceID, 1, 50, "", nil)
 	if err == nil && len(contacts) > 0 {
 		sb.WriteString(fmt.Sprintf("## Contacts (%d shown)\n", len(contacts)))
 		for _, c := range contacts {
@@ -473,8 +459,7 @@ func (s *AIService) buildSystemPrompt(ctx context.Context, userID uint) (string,
 		sb.WriteString("\n")
 	}
 
-	// Recent events
-	events, _, err := s.eventRepo.List(ctx, userID, 1, 10, nil, nil)
+	events, _, err := s.eventRepo.List(ctx, workspaceID, 1, 10, nil, nil)
 	if err == nil && len(events) > 0 {
 		sb.WriteString("## Recent Events\n")
 		for _, e := range events {
@@ -483,8 +468,7 @@ func (s *AIService) buildSystemPrompt(ctx context.Context, userID uint) (string,
 		sb.WriteString("\n")
 	}
 
-	// Financial summary
-	income, expense, err := s.transactionRepo.Summary(ctx, userID)
+	income, expense, err := s.transactionRepo.Summary(ctx, workspaceID)
 	if err == nil {
 		sb.WriteString(fmt.Sprintf("## Financial Summary\n- Income: %.2f\n- Expense: %.2f\n- Balance: %.2f\n\n", income, expense, income-expense))
 	}
@@ -501,7 +485,7 @@ type AnalyzeRequest struct {
 	Question   string `json:"question"`
 }
 
-func (s *AIService) AnalyzeComprehensive(ctx context.Context, userID uint, req AnalyzeRequest) (string, error) {
+func (s *AIService) AnalyzeComprehensive(ctx context.Context, userID, workspaceID uint, req AnalyzeRequest) (string, error) {
 	client, err := s.getActiveClient(ctx, userID)
 	if err != nil {
 		return "", err
@@ -511,15 +495,15 @@ func (s *AIService) AnalyzeComprehensive(ctx context.Context, userID uint, req A
 
 	switch req.Type {
 	case "contact", "comprehensive":
-		s.buildContactAnalysis(ctx, userID, req.ContactIDs, &sb)
+		s.buildContactAnalysis(ctx, userID, workspaceID, req.ContactIDs, &sb)
 	case "event":
-		s.buildEventAnalysis(ctx, userID, req.EventIDs, &sb)
+		s.buildEventAnalysis(ctx, userID, workspaceID, req.EventIDs, &sb)
 	case "financial":
 		// financial only below
 	}
 
 	if req.Type == "financial" || req.Type == "comprehensive" {
-		s.buildFinancialAnalysis(ctx, userID, &sb)
+		s.buildFinancialAnalysis(ctx, userID, workspaceID, &sb)
 	}
 
 	if req.Question != "" {
@@ -531,11 +515,12 @@ func (s *AIService) AnalyzeComprehensive(ctx context.Context, userID uint, req A
 	}
 
 	systemPrompt := "You are CuddleGecko AI, a comprehensive personal CRM analyst. Analyze the provided data and give structured, actionable insights. Include relationship quality assessment, patterns, risks, and concrete suggestions. Respond in the user's language (Chinese for zh, English for en). Use markdown formatting."
-	if req.Type == "contact" {
+	switch req.Type {
+	case "contact":
 		systemPrompt = "You are a personal relationship analyst. Analyze the contacts and their associated data deeply. Cover: relationship health score (1-10), communication frequency, interaction quality, suggestions for improvement, potential risks. Respond in the user's language. Use markdown."
-	} else if req.Type == "event" {
+	case "event":
 		systemPrompt = "You are a personal event analyst. Analyze the events and provide: importance assessment, preparation suggestions, timeline recommendations, related contact insights. Respond in the user's language. Use markdown."
-	} else if req.Type == "financial" {
+	case "financial":
 		systemPrompt = "You are a personal finance analyst. Analyze the financial data and provide: spending patterns, savings rate, category breakdown, budget recommendations, trends. Respond in the user's language. Use markdown."
 	}
 
@@ -547,14 +532,14 @@ func (s *AIService) AnalyzeComprehensive(ctx context.Context, userID uint, req A
 	return client.Chat(ctx, messages)
 }
 
-func (s *AIService) buildContactAnalysis(ctx context.Context, userID uint, contactIDs []uint, sb *strings.Builder) {
+func (s *AIService) buildContactAnalysis(ctx context.Context, userID, workspaceID uint, contactIDs []uint, sb *strings.Builder) {
 	if len(contactIDs) == 0 {
 		return
 	}
 	sb.WriteString("## Contact Analysis Request\n\n")
 
 	for _, cid := range contactIDs {
-		contact, err := s.contactRepo.GetByID(ctx, userID, cid)
+		contact, err := s.contactRepo.GetByID(ctx, workspaceID, cid)
 		if err != nil {
 			continue
 		}
@@ -567,7 +552,7 @@ func (s *AIService) buildContactAnalysis(ctx context.Context, userID uint, conta
 			sb.WriteString(fmt.Sprintf("- Notes: %s\n", contact.Notes))
 		}
 
-		interactions, _, err := s.interactionRepo.ListByContact(ctx, userID, cid, 1, 20)
+		interactions, _, err := s.interactionRepo.ListByContact(ctx, workspaceID, cid, 1, 20)
 		if err == nil && len(interactions) > 0 {
 			sb.WriteString("- Interactions:\n")
 			for _, i := range interactions {
@@ -575,7 +560,7 @@ func (s *AIService) buildContactAnalysis(ctx context.Context, userID uint, conta
 			}
 		}
 
-		relations, err := s.relationRepo.ListByContact(ctx, userID, cid)
+		relations, err := s.relationRepo.ListByContact(ctx, workspaceID, cid)
 		if err == nil && len(relations) > 0 {
 			sb.WriteString("- Relations:\n")
 			for _, r := range relations {
@@ -583,7 +568,7 @@ func (s *AIService) buildContactAnalysis(ctx context.Context, userID uint, conta
 			}
 		}
 
-		txs, _, err := s.transactionRepo.List(ctx, userID, 1, 20, nil, &cid)
+		txs, _, err := s.transactionRepo.List(ctx, workspaceID, 1, 20, nil, &cid)
 		if err == nil && len(txs) > 0 {
 			sb.WriteString("- Financial transactions:\n")
 			for _, tx := range txs {
@@ -595,14 +580,14 @@ func (s *AIService) buildContactAnalysis(ctx context.Context, userID uint, conta
 	}
 }
 
-func (s *AIService) buildEventAnalysis(ctx context.Context, userID uint, eventIDs []uint, sb *strings.Builder) {
+func (s *AIService) buildEventAnalysis(ctx context.Context, userID, workspaceID uint, eventIDs []uint, sb *strings.Builder) {
 	if len(eventIDs) == 0 {
 		return
 	}
 	sb.WriteString("## Event Analysis Request\n\n")
 
 	for _, eid := range eventIDs {
-		event, err := s.eventRepo.GetByID(ctx, userID, eid)
+		event, err := s.eventRepo.GetByID(ctx, workspaceID, eid)
 		if err != nil {
 			continue
 		}
@@ -623,7 +608,7 @@ func (s *AIService) buildEventAnalysis(ctx context.Context, userID uint, eventID
 		if len(event.ContactIDs) > 0 {
 			sb.WriteString("- Participants:\n")
 			for _, cid := range event.ContactIDs {
-				contact, err := s.contactRepo.GetByID(ctx, userID, cid)
+				contact, err := s.contactRepo.GetByID(ctx, workspaceID, cid)
 				if err == nil {
 					labels := strings.Join(contact.RelationshipLabels, ", ")
 					sb.WriteString(fmt.Sprintf("  - %s", contact.Name))
@@ -639,8 +624,8 @@ func (s *AIService) buildEventAnalysis(ctx context.Context, userID uint, eventID
 	}
 }
 
-func (s *AIService) buildFinancialAnalysis(ctx context.Context, userID uint, sb *strings.Builder) {
-	income, expense, err := s.transactionRepo.Summary(ctx, userID)
+func (s *AIService) buildFinancialAnalysis(ctx context.Context, userID, workspaceID uint, sb *strings.Builder) {
+	income, expense, err := s.transactionRepo.Summary(ctx, workspaceID)
 	if err != nil {
 		return
 	}
@@ -650,7 +635,7 @@ func (s *AIService) buildFinancialAnalysis(ctx context.Context, userID uint, sb 
 	sb.WriteString(fmt.Sprintf("- Total Expense: %.2f\n", expense))
 	sb.WriteString(fmt.Sprintf("- Balance: %.2f\n\n", income-expense))
 
-	txs, _, err := s.transactionRepo.List(ctx, userID, 1, 30, nil, nil)
+	txs, _, err := s.transactionRepo.List(ctx, workspaceID, 1, 30, nil, nil)
 	if err == nil && len(txs) > 0 {
 		sb.WriteString("### Recent Transactions\n")
 		for _, tx := range txs {

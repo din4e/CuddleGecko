@@ -33,6 +33,7 @@ import GeckoIcon from '../components/GeckoIcon'
 import { BrandWordmark } from '../components/BrandWordmark'
 import DesktopMenuListener from '../components/DesktopMenuListener'
 import WindowTitleBar from '../components/WindowTitleBar'
+import WorkspaceSwitcher from '../components/WorkspaceSwitcher'
 import { cn } from '@/lib/utils'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed'
@@ -118,6 +119,7 @@ export default function AppLayout() {
               />
             )}
           </h1>
+          {!sidebarCollapsed && <WorkspaceSwitcher />}
         </header>
 
         <nav className={cn('flex-1 space-y-1', sidebarCollapsed && 'flex w-full flex-col items-center')}>

@@ -39,6 +39,8 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	if err := db.AutoMigrate(
 		&model.User{},
 		&model.RefreshToken{},
+		&model.Workspace{},
+		&model.WorkspaceMember{},
 		&model.Contact{},
 		&model.Tag{},
 		&model.Interaction{},

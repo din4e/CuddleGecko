@@ -61,7 +61,7 @@ func testJWTConfig() *config.JWTConfig {
 
 func TestAuthService_Register_Success(t *testing.T) {
 	repo := new(mockUserRepo)
-	svc := NewAuthService(repo, testJWTConfig())
+	svc := NewAuthService(repo, testJWTConfig(), nil)
 
 	repo.On("GetUserByUsername", mock.Anything, "alice").Return(nil, gorm.ErrRecordNotFound)
 	repo.On("CreateUser", mock.Anything, mock.AnythingOfType("*model.User")).Return(nil)
@@ -77,7 +77,7 @@ func TestAuthService_Register_Success(t *testing.T) {
 
 func TestAuthService_Register_DuplicateUsername(t *testing.T) {
 	repo := new(mockUserRepo)
-	svc := NewAuthService(repo, testJWTConfig())
+	svc := NewAuthService(repo, testJWTConfig(), nil)
 
 	repo.On("GetUserByUsername", mock.Anything, "alice").Return(&model.User{Username: "alice"}, nil)
 
@@ -87,7 +87,7 @@ func TestAuthService_Register_DuplicateUsername(t *testing.T) {
 
 func TestAuthService_Login_Success(t *testing.T) {
 	repo := new(mockUserRepo)
-	svc := NewAuthService(repo, testJWTConfig())
+	svc := NewAuthService(repo, testJWTConfig(), nil)
 
 	hashed, _ := HashPassword("password123")
 	repo.On("GetUserByUsername", mock.Anything, "alice").Return(&model.User{
@@ -103,7 +103,7 @@ func TestAuthService_Login_Success(t *testing.T) {
 
 func TestAuthService_Login_WrongPassword(t *testing.T) {
 	repo := new(mockUserRepo)
-	svc := NewAuthService(repo, testJWTConfig())
+	svc := NewAuthService(repo, testJWTConfig(), nil)
 
 	hashed, _ := HashPassword("password123")
 	repo.On("GetUserByUsername", mock.Anything, "alice").Return(&model.User{
@@ -116,7 +116,7 @@ func TestAuthService_Login_WrongPassword(t *testing.T) {
 
 func TestAuthService_Login_UserNotFound(t *testing.T) {
 	repo := new(mockUserRepo)
-	svc := NewAuthService(repo, testJWTConfig())
+	svc := NewAuthService(repo, testJWTConfig(), nil)
 
 	repo.On("GetUserByUsername", mock.Anything, "alice").Return(nil, gorm.ErrRecordNotFound)
 

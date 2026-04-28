@@ -34,6 +34,7 @@ type updateInteractionRequest struct {
 
 func (h *InteractionHandler) ListByContact(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	contactID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid contact id")
@@ -43,7 +44,7 @@ func (h *InteractionHandler) ListByContact(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
-	interactions, total, err := h.svc.ListByContact(c.Request.Context(), userID, uint(contactID), page, pageSize)
+	interactions, total, err := h.svc.ListByContact(c.Request.Context(), userID, workspaceID, uint(contactID), page, pageSize)
 	if err != nil {
 		response.InternalError(c, "failed to list interactions")
 		return
@@ -54,6 +55,7 @@ func (h *InteractionHandler) ListByContact(c *gin.Context) {
 
 func (h *InteractionHandler) Create(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	contactID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid contact id")
@@ -72,7 +74,7 @@ func (h *InteractionHandler) Create(c *gin.Context) {
 		Content: req.Content,
 	}
 
-	result, err := h.svc.Create(c.Request.Context(), userID, uint(contactID), interaction)
+	result, err := h.svc.Create(c.Request.Context(), userID, workspaceID, uint(contactID), interaction)
 	if err != nil {
 		response.InternalError(c, "failed to create interaction")
 		return
@@ -83,6 +85,7 @@ func (h *InteractionHandler) Create(c *gin.Context) {
 
 func (h *InteractionHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid interaction id")
@@ -101,7 +104,7 @@ func (h *InteractionHandler) Update(c *gin.Context) {
 		Content: req.Content,
 	}
 
-	result, err := h.svc.Update(c.Request.Context(), userID, uint(id), interaction)
+	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), interaction)
 	if err != nil {
 		if err == service.ErrInteractionNotFound {
 			response.NotFound(c, "interaction not found")
@@ -116,13 +119,14 @@ func (h *InteractionHandler) Update(c *gin.Context) {
 
 func (h *InteractionHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid interaction id")
 		return
 	}
 
-	if err := h.svc.Delete(c.Request.Context(), userID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
 		response.NotFound(c, "interaction not found")
 		return
 	}

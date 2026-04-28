@@ -222,6 +222,18 @@ export default {
     emojiSize: 'Emoji 大小',
     resetDefaults: '恢复默认',
   },
+  workspace: {
+    default: '默认空间',
+    switch: '切换空间',
+    create: '新建空间',
+    name: '名称',
+    namePlaceholder: '例如：工作、个人',
+    icon: '图标',
+  },
+  common: {
+    cancel: '取消',
+    create: '创建',
+  },
   ai: {
     title: 'AI 助手',
     newChat: '新对话',

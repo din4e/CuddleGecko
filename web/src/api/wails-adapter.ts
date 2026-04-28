@@ -2,7 +2,7 @@ import type { AppAdapters } from './adapter'
 import type {
   Contact, Interaction, Reminder, ContactRelation,
   GraphData, AuthResponse, User, Tag, Event, Transaction, TransactionSummary,
-  AIProvider, AIConversation, AIMessage, AIProviderPreset,
+  AIProvider, AIConversation, AIMessage, AIProviderPreset, Workspace,
 } from '@/types'
 
 // Wails bindings are generated at build time by `wails dev` or `wails build`.
@@ -349,6 +349,38 @@ async function createWailsAdapters(): Promise<AppAdapters> {
       dataDir: () => DesktopDataDir(),
       databasePath: () => DesktopDatabasePath(),
       openDataDir: () => DesktopOpenDataDir().then(() => {}),
+    },
+
+    workspace: {
+      list: async () => {
+        const { List: WSList } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
+        const r = await WSList()
+        return r as any as Workspace[]
+      },
+      create: async (data) => {
+        const { Create: WSCreate } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
+        const r = await WSCreate(data.name, data.description || '', data.icon || '')
+        return r as any as Workspace
+      },
+      update: async (id, data) => {
+        const { Update: WSUpdate } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
+        const r = await WSUpdate(id, data.name || '', data.description || '', data.icon || '')
+        return r as any as Workspace
+      },
+      delete: async (id) => {
+        const { Delete: WSDelete } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
+        await WSDelete(id)
+      },
+      switch: async (id) => {
+        const { Switch: WSSwitch } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
+        const r = await WSSwitch(id)
+        return r as any as Workspace
+      },
+      getDefault: async () => {
+        const { GetDefault: WSGetDefault } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
+        const r = await WSGetDefault()
+        return r as any as Workspace
+      },
     },
   }
 }

@@ -23,19 +23,19 @@ func (r *TransactionRepo) Create(ctx context.Context, tx *model.Transaction) err
 	return nil
 }
 
-func (r *TransactionRepo) GetByID(ctx context.Context, userID, id uint) (*model.Transaction, error) {
+func (r *TransactionRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Transaction, error) {
 	var tx model.Transaction
-	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).First(&tx).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&tx).Error; err != nil {
 		return nil, err
 	}
 	return &tx, nil
 }
 
-func (r *TransactionRepo) List(ctx context.Context, userID uint, page, pageSize int, txType *string, contactID *uint) ([]model.Transaction, int64, error) {
+func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint) ([]model.Transaction, int64, error) {
 	var txs []model.Transaction
 	var total int64
 
-	query := r.db.WithContext(ctx).Where("user_id = ?", userID)
+	query := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID)
 
 	if txType != nil && *txType != "" {
 		query = query.Where("type = ?", *txType)
@@ -59,15 +59,15 @@ func (r *TransactionRepo) List(ctx context.Context, userID uint, page, pageSize 
 	return txs, total, nil
 }
 
-func (r *TransactionRepo) Summary(ctx context.Context, userID uint) (income float64, expense float64, err error) {
+func (r *TransactionRepo) Summary(ctx context.Context, workspaceID uint) (income float64, expense float64, err error) {
 	var result []struct {
-		Type   string
-		Total  float64
+		Type  string
+		Total float64
 	}
 
 	err = r.db.WithContext(ctx).Model(&model.Transaction{}).
 		Select("type, SUM(amount) as total").
-		Where("user_id = ?", userID).
+		Where("workspace_id = ?", workspaceID).
 		Group("type").
 		Find(&result).Error
 	if err != nil {
@@ -91,8 +91,8 @@ func (r *TransactionRepo) Update(ctx context.Context, tx *model.Transaction) err
 	return nil
 }
 
-func (r *TransactionRepo) Delete(ctx context.Context, userID, id uint) error {
-	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&model.Transaction{}).Error; err != nil {
+func (r *TransactionRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Transaction{}).Error; err != nil {
 		return fmt.Errorf("delete transaction: %w", err)
 	}
 	return nil

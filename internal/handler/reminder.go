@@ -33,9 +33,10 @@ type updateReminderRequest struct {
 
 func (h *ReminderHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	status := model.ReminderStatus(c.Query("status"))
 
-	reminders, err := h.svc.List(c.Request.Context(), userID, status)
+	reminders, err := h.svc.List(c.Request.Context(), userID, workspaceID, status)
 	if err != nil {
 		response.InternalError(c, "failed to list reminders")
 		return
@@ -46,6 +47,7 @@ func (h *ReminderHandler) List(c *gin.Context) {
 
 func (h *ReminderHandler) Create(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	contactID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid contact id")
@@ -63,7 +65,7 @@ func (h *ReminderHandler) Create(c *gin.Context) {
 		Description: req.Description,
 	}
 
-	result, err := h.svc.Create(c.Request.Context(), userID, uint(contactID), reminder)
+	result, err := h.svc.Create(c.Request.Context(), userID, workspaceID, uint(contactID), reminder)
 	if err != nil {
 		response.InternalError(c, "failed to create reminder")
 		return
@@ -74,6 +76,7 @@ func (h *ReminderHandler) Create(c *gin.Context) {
 
 func (h *ReminderHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid reminder id")
@@ -92,7 +95,7 @@ func (h *ReminderHandler) Update(c *gin.Context) {
 		Status:      model.ReminderStatus(req.Status),
 	}
 
-	result, err := h.svc.Update(c.Request.Context(), userID, uint(id), updates)
+	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), updates)
 	if err != nil {
 		if err == service.ErrReminderNotFound {
 			response.NotFound(c, "reminder not found")
@@ -107,13 +110,14 @@ func (h *ReminderHandler) Update(c *gin.Context) {
 
 func (h *ReminderHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid reminder id")
 		return
 	}
 
-	if err := h.svc.Delete(c.Request.Context(), userID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
 		response.NotFound(c, "reminder not found")
 		return
 	}

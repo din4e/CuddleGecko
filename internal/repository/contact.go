@@ -23,10 +23,10 @@ func (r *ContactRepo) Create(ctx context.Context, contact *model.Contact) error 
 	return nil
 }
 
-func (r *ContactRepo) GetByID(ctx context.Context, userID, id uint) (*model.Contact, error) {
+func (r *ContactRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Contact, error) {
 	var contact model.Contact
 	err := r.db.WithContext(ctx).Preload("Tags").
-		Where("id = ? AND user_id = ?", id, userID).
+		Where("id = ? AND workspace_id = ?", id, workspaceID).
 		First(&contact).Error
 	if err != nil {
 		return nil, err
@@ -34,11 +34,11 @@ func (r *ContactRepo) GetByID(ctx context.Context, userID, id uint) (*model.Cont
 	return &contact, nil
 }
 
-func (r *ContactRepo) List(ctx context.Context, userID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error) {
+func (r *ContactRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error) {
 	var contacts []model.Contact
 	var total int64
 
-	query := r.db.WithContext(ctx).Where("user_id = ?", userID)
+	query := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID)
 
 	if search != "" {
 		query = query.Where("name LIKE ? OR nickname LIKE ? OR email LIKE ? OR phone LIKE ?",
@@ -72,8 +72,8 @@ func (r *ContactRepo) Update(ctx context.Context, contact *model.Contact) error 
 	return nil
 }
 
-func (r *ContactRepo) Delete(ctx context.Context, userID, id uint) error {
-	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&model.Contact{}).Error; err != nil {
+func (r *ContactRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Contact{}).Error; err != nil {
 		return fmt.Errorf("delete contact: %w", err)
 	}
 	return nil

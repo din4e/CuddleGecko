@@ -56,9 +56,11 @@ func (a *App) startup(ctx context.Context) {
 	eventRepo := repository.NewEventRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
 	aiRepo := repository.NewAIRepo(db)
+	workspaceRepo := repository.NewWorkspaceRepo(db)
 
 	// Services
-	authSvc := service.NewAuthService(userRepo, &cfg.JWT)
+	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
+	authSvc := service.NewAuthService(userRepo, &cfg.JWT, workspaceSvc)
 	captchaSvc := service.NewCaptchaService(cfg.Captcha)
 	contactSvc := service.NewContactService(contactRepo)
 	tagSvc := service.NewTagService(tagRepo)
@@ -73,7 +75,7 @@ func (a *App) startup(ctx context.Context) {
 	bindings.InitBindings(
 		authSvc, captchaSvc, contactSvc, tagSvc,
 		interactionSvc, reminderSvc, relationSvc,
-		eventSvc, transactionSvc, aiSvc,
+		eventSvc, transactionSvc, aiSvc, workspaceSvc,
 		contactRepo, tagRepo, interactionRepo,
 		reminderRepo, relationRepo,
 	)

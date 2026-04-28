@@ -25,7 +25,8 @@ type createRelationRequest struct {
 
 func (h *GraphHandler) GetGraph(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	data, err := h.relationSvc.GetGraphData(c.Request.Context(), userID)
+	workspaceID := middleware.GetWorkspaceID(c)
+	data, err := h.relationSvc.GetGraphData(c.Request.Context(), userID, workspaceID)
 	if err != nil {
 		response.InternalError(c, "failed to get graph data")
 		return
@@ -35,13 +36,14 @@ func (h *GraphHandler) GetGraph(c *gin.Context) {
 
 func (h *GraphHandler) GetRelations(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	contactID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid contact id")
 		return
 	}
 
-	relations, err := h.relationSvc.ListByContact(c.Request.Context(), userID, uint(contactID))
+	relations, err := h.relationSvc.ListByContact(c.Request.Context(), userID, workspaceID, uint(contactID))
 	if err != nil {
 		response.InternalError(c, "failed to list relations")
 		return
@@ -52,6 +54,7 @@ func (h *GraphHandler) GetRelations(c *gin.Context) {
 
 func (h *GraphHandler) CreateRelation(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	contactIDA, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid contact id")
@@ -69,7 +72,7 @@ func (h *GraphHandler) CreateRelation(c *gin.Context) {
 		RelationType: req.RelationType,
 	}
 
-	result, err := h.relationSvc.Create(c.Request.Context(), userID, uint(contactIDA), relation)
+	result, err := h.relationSvc.Create(c.Request.Context(), userID, workspaceID, uint(contactIDA), relation)
 	if err != nil {
 		response.InternalError(c, "failed to create relation")
 		return
@@ -80,13 +83,14 @@ func (h *GraphHandler) CreateRelation(c *gin.Context) {
 
 func (h *GraphHandler) DeleteRelation(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid relation id")
 		return
 	}
 
-	if err := h.relationSvc.Delete(c.Request.Context(), userID, uint(id)); err != nil {
+	if err := h.relationSvc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
 		response.NotFound(c, "relation not found")
 		return
 	}

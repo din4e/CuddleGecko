@@ -168,13 +168,14 @@ type chatRequest struct {
 
 func (h *AIHandler) StreamChat(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	var req chatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	stream, err := h.svc.StreamChat(c.Request.Context(), userID, req.ConversationID, req.Message)
+	stream, err := h.svc.StreamChat(c.Request.Context(), userID, workspaceID, req.ConversationID, req.Message)
 	if err != nil {
 		if err == service.ErrNoActiveProvider {
 			response.BadRequest(c, err.Error())
@@ -219,13 +220,14 @@ func (h *AIHandler) StreamChat(c *gin.Context) {
 
 func (h *AIHandler) Chat(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	var req chatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	resp, err := h.svc.Chat(c.Request.Context(), userID, req.ConversationID, req.Message)
+	resp, err := h.svc.Chat(c.Request.Context(), userID, workspaceID, req.ConversationID, req.Message)
 	if err != nil {
 		if err == service.ErrNoActiveProvider {
 			response.BadRequest(c, err.Error())
@@ -241,13 +243,14 @@ func (h *AIHandler) Chat(c *gin.Context) {
 
 func (h *AIHandler) AnalyzeRelationship(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	contactID, err := strconv.ParseUint(c.Param("contactId"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid contact id")
 		return
 	}
 
-	result, err := h.svc.AnalyzeRelationship(c.Request.Context(), userID, uint(contactID))
+	result, err := h.svc.AnalyzeRelationship(c.Request.Context(), userID, workspaceID, uint(contactID))
 	if err != nil {
 		if err == service.ErrNoActiveProvider {
 			response.BadRequest(c, err.Error())
@@ -261,13 +264,14 @@ func (h *AIHandler) AnalyzeRelationship(c *gin.Context) {
 
 func (h *AIHandler) AnalyzeEvent(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	eventID, err := strconv.ParseUint(c.Param("eventId"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid event id")
 		return
 	}
 
-	result, err := h.svc.AnalyzeEvent(c.Request.Context(), userID, uint(eventID))
+	result, err := h.svc.AnalyzeEvent(c.Request.Context(), userID, workspaceID, uint(eventID))
 	if err != nil {
 		if err == service.ErrNoActiveProvider {
 			response.BadRequest(c, err.Error())
@@ -290,13 +294,14 @@ type analyzeComprehensiveRequest struct {
 
 func (h *AIHandler) AnalyzeComprehensive(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	var req analyzeComprehensiveRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	result, err := h.svc.AnalyzeComprehensive(c.Request.Context(), userID, service.AnalyzeRequest{
+	result, err := h.svc.AnalyzeComprehensive(c.Request.Context(), userID, workspaceID, service.AnalyzeRequest{
 		Type:       req.Type,
 		ContactIDs: req.ContactIDs,
 		EventIDs:   req.EventIDs,

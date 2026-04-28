@@ -30,7 +30,8 @@ type updateTagRequest struct {
 
 func (h *TagHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	tags, err := h.svc.List(c.Request.Context(), userID)
+	workspaceID := middleware.GetWorkspaceID(c)
+	tags, err := h.svc.List(c.Request.Context(), userID, workspaceID)
 	if err != nil {
 		response.InternalError(c, "failed to list tags")
 		return
@@ -40,13 +41,14 @@ func (h *TagHandler) List(c *gin.Context) {
 
 func (h *TagHandler) Create(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	var req createTagRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	tag, err := h.svc.Create(c.Request.Context(), userID, &model.Tag{
+	tag, err := h.svc.Create(c.Request.Context(), userID, workspaceID, &model.Tag{
 		Name:  req.Name,
 		Color: req.Color,
 	})
@@ -60,6 +62,7 @@ func (h *TagHandler) Create(c *gin.Context) {
 
 func (h *TagHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid tag id")
@@ -72,7 +75,7 @@ func (h *TagHandler) Update(c *gin.Context) {
 		return
 	}
 
-	tag, err := h.svc.Update(c.Request.Context(), userID, uint(id), &model.Tag{
+	tag, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), &model.Tag{
 		Name:  req.Name,
 		Color: req.Color,
 	})
@@ -86,13 +89,14 @@ func (h *TagHandler) Update(c *gin.Context) {
 
 func (h *TagHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid tag id")
 		return
 	}
 
-	if err := h.svc.Delete(c.Request.Context(), userID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
 		response.NotFound(c, "tag not found")
 		return
 	}

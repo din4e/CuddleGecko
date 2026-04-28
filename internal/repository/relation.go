@@ -23,34 +23,34 @@ func (r *RelationRepo) Create(ctx context.Context, relation *model.ContactRelati
 	return nil
 }
 
-func (r *RelationRepo) GetByID(ctx context.Context, userID, id uint) (*model.ContactRelation, error) {
+func (r *RelationRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.ContactRelation, error) {
 	var relation model.ContactRelation
-	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).First(&relation).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&relation).Error; err != nil {
 		return nil, err
 	}
 	return &relation, nil
 }
 
-func (r *RelationRepo) ListByContact(ctx context.Context, userID, contactID uint) ([]model.ContactRelation, error) {
+func (r *RelationRepo) ListByContact(ctx context.Context, workspaceID, contactID uint) ([]model.ContactRelation, error) {
 	var relations []model.ContactRelation
 	if err := r.db.WithContext(ctx).
-		Where("user_id = ? AND (contact_id_a = ? OR contact_id_b = ?)", userID, contactID, contactID).
+		Where("workspace_id = ? AND (contact_id_a = ? OR contact_id_b = ?)", workspaceID, contactID, contactID).
 		Find(&relations).Error; err != nil {
 		return nil, fmt.Errorf("list relations: %w", err)
 	}
 	return relations, nil
 }
 
-func (r *RelationRepo) Delete(ctx context.Context, userID, id uint) error {
-	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&model.ContactRelation{}).Error; err != nil {
+func (r *RelationRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.ContactRelation{}).Error; err != nil {
 		return fmt.Errorf("delete relation: %w", err)
 	}
 	return nil
 }
 
-func (r *RelationRepo) GetAllByUser(ctx context.Context, userID uint) ([]model.ContactRelation, error) {
+func (r *RelationRepo) GetAllByWorkspace(ctx context.Context, workspaceID uint) ([]model.ContactRelation, error) {
 	var relations []model.ContactRelation
-	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).Find(&relations).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID).Find(&relations).Error; err != nil {
 		return nil, fmt.Errorf("get all relations: %w", err)
 	}
 	return relations, nil

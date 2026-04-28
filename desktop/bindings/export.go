@@ -20,35 +20,36 @@ type ExportBinding struct {
 func (b *ExportBinding) ExportJSON() (string, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return "", ErrNotAuthenticated
 	}
 
-	contacts, _, err := b.contactRepo.List(ctx, userID, 1, 10000, "", nil)
+	contacts, _, err := b.contactRepo.List(ctx, workspaceID, 1, 10000, "", nil)
 	if err != nil {
 		return "", err
 	}
 
-	tags, err := b.tagRepo.List(ctx, userID)
+	tags, err := b.tagRepo.List(ctx, workspaceID)
 	if err != nil {
 		return "", err
 	}
 
-	relations, err := b.relationRepo.GetAllByUser(ctx, userID)
+	relations, err := b.relationRepo.GetAllByWorkspace(ctx, workspaceID)
 	if err != nil {
 		return "", err
 	}
 
 	var allInteractions []model.Interaction
 	for _, c := range contacts {
-		ints, _, err := b.interactionRepo.ListByContact(ctx, userID, c.ID, 1, 10000)
+		ints, _, err := b.interactionRepo.ListByContact(ctx, workspaceID, c.ID, 1, 10000)
 		if err != nil {
 			return "", err
 		}
 		allInteractions = append(allInteractions, ints...)
 	}
 
-	reminders, err := b.reminderRepo.List(ctx, userID, "")
+	reminders, err := b.reminderRepo.List(ctx, workspaceID, "")
 	if err != nil {
 		return "", err
 	}
@@ -75,6 +76,7 @@ func (b *ExportBinding) ExportJSON() (string, error) {
 func (b *ExportBinding) ImportJSON(jsonData string) error {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return ErrNotAuthenticated
 	}
@@ -99,7 +101,7 @@ func (b *ExportBinding) ImportJSON(jsonData string) error {
 		return err
 	}
 	for _, t := range tags {
-		newTag := &model.Tag{UserID: userID, Name: t.Name, Color: t.Color}
+		newTag := &model.Tag{UserID: userID, WorkspaceID: workspaceID, Name: t.Name, Color: t.Color}
 		if err := b.tagRepo.Create(ctx, newTag); err != nil {
 			continue
 		}
@@ -132,6 +134,7 @@ func (b *ExportBinding) ImportJSON(jsonData string) error {
 		}
 		newContact := &model.Contact{
 			UserID:             userID,
+			WorkspaceID:        workspaceID,
 			Name:               c.Name,
 			Nickname:           c.Nickname,
 			AvatarURL:          c.AvatarURL,
@@ -166,8 +169,9 @@ func (b *ExportBinding) ImportJSON(jsonData string) error {
 		}
 		occurredAt, _ := time.Parse(time.RFC3339, i.OccurredAt)
 		newInt := &model.Interaction{
-			UserID:     userID,
-			ContactID:  newContactID,
+			UserID:       userID,
+			WorkspaceID:  workspaceID,
+			ContactID:    newContactID,
 			Type:       model.InteractionType(i.Type),
 			Title:      i.Title,
 			Content:    i.Content,
@@ -197,8 +201,9 @@ func (b *ExportBinding) ImportJSON(jsonData string) error {
 		}
 		remindAt, _ := time.Parse(time.RFC3339, r.RemindAt)
 		newRem := &model.Reminder{
-			UserID:      userID,
-			ContactID:   newContactID,
+			UserID:       userID,
+			WorkspaceID:  workspaceID,
+			ContactID:    newContactID,
 			Title:       r.Title,
 			Description: r.Description,
 			RemindAt:    remindAt,
@@ -227,6 +232,7 @@ func (b *ExportBinding) ImportJSON(jsonData string) error {
 		}
 		newRel := &model.ContactRelation{
 			UserID:        userID,
+			WorkspaceID:   workspaceID,
 			ContactIDA:    newA,
 			ContactIDB:    newB,
 			RelationType:  r.RelationType,

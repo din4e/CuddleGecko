@@ -222,6 +222,18 @@ export default {
     emojiSize: 'Emoji Size',
     resetDefaults: 'Reset Defaults',
   },
+  workspace: {
+    default: 'Default Space',
+    switch: 'Switch Workspace',
+    create: 'New Workspace',
+    name: 'Name',
+    namePlaceholder: 'e.g. Work, Personal',
+    icon: 'Icon',
+  },
+  common: {
+    cancel: 'Cancel',
+    create: 'Create',
+  },
   ai: {
     title: 'AI Assistant',
     newChat: 'New Chat',

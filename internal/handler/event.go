@@ -81,6 +81,7 @@ func parseEventFromReq(req interface{}) (*model.Event, error) {
 
 func (h *EventHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
@@ -92,7 +93,7 @@ func (h *EventHandler) List(c *gin.Context) {
 		endBefore = &v
 	}
 
-	events, total, err := h.svc.List(c.Request.Context(), userID, page, pageSize, startAfter, endBefore)
+	events, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, startAfter, endBefore)
 	if err != nil {
 		response.InternalError(c, "failed to list events")
 		return
@@ -103,6 +104,7 @@ func (h *EventHandler) List(c *gin.Context) {
 
 func (h *EventHandler) Create(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 
 	var req createEventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -116,7 +118,7 @@ func (h *EventHandler) Create(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.Create(c.Request.Context(), userID, event)
+	result, err := h.svc.Create(c.Request.Context(), userID, workspaceID, event)
 	if err != nil {
 		response.InternalError(c, "failed to create event")
 		return
@@ -127,6 +129,7 @@ func (h *EventHandler) Create(c *gin.Context) {
 
 func (h *EventHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid event id")
@@ -145,7 +148,7 @@ func (h *EventHandler) Update(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.Update(c.Request.Context(), userID, uint(id), event)
+	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), event)
 	if err != nil {
 		if err == service.ErrEventNotFound {
 			response.NotFound(c, "event not found")
@@ -160,13 +163,14 @@ func (h *EventHandler) Update(c *gin.Context) {
 
 func (h *EventHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		response.BadRequest(c, "invalid event id")
 		return
 	}
 
-	if err := h.svc.Delete(c.Request.Context(), userID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
 		response.NotFound(c, "event not found")
 		return
 	}

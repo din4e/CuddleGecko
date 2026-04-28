@@ -9,6 +9,7 @@ import (
 type Event struct {
 	ID          uint           `gorm:"primaryKey" json:"id"`
 	UserID      uint           `gorm:"index;not null" json:"user_id"`
+	WorkspaceID uint           `gorm:"index;not null;default:0" json:"workspace_id"`
 	Title       string         `gorm:"size:200;not null" json:"title"`
 	Description string         `gorm:"type:text" json:"description"`
 	StartTime   time.Time      `gorm:"not null" json:"start_time"`

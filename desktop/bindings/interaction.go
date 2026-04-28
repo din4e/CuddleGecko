@@ -15,10 +15,11 @@ type InteractionBinding struct {
 func (b *InteractionBinding) ListByContact(contactID uint, page, pageSize int) (*PaginatedInteractions, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
-	items, total, err := b.svc.ListByContact(ctx, userID, contactID, page, pageSize)
+	items, total, err := b.svc.ListByContact(ctx, userID, workspaceID, contactID, page, pageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -28,6 +29,7 @@ func (b *InteractionBinding) ListByContact(contactID uint, page, pageSize int) (
 func (b *InteractionBinding) Create(contactID uint, input CreateInteractionInput) (*model.Interaction, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
@@ -38,12 +40,13 @@ func (b *InteractionBinding) Create(contactID uint, input CreateInteractionInput
 		Content:    input.Content,
 		OccurredAt: occurredAt,
 	}
-	return b.svc.Create(ctx, userID, contactID, interaction)
+	return b.svc.Create(ctx, userID, workspaceID, contactID, interaction)
 }
 
 func (b *InteractionBinding) Update(id uint, input UpdateInteractionInput) (*model.Interaction, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
@@ -54,14 +57,15 @@ func (b *InteractionBinding) Update(id uint, input UpdateInteractionInput) (*mod
 		Content:    input.Content,
 		OccurredAt: occurredAt,
 	}
-	return b.svc.Update(ctx, userID, id, updates)
+	return b.svc.Update(ctx, userID, workspaceID, id, updates)
 }
 
 func (b *InteractionBinding) Delete(id uint) error {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return ErrNotAuthenticated
 	}
-	return b.svc.Delete(ctx, userID, id)
+	return b.svc.Delete(ctx, userID, workspaceID, id)
 }

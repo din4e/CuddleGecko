@@ -5,7 +5,7 @@ import type { AIConversation, AIMessage, Contact, Event, Tag } from '../types'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import AvatarDisplay from '../components/AvatarDisplay'
-import { Send, Plus, Trash2, Bot, Users, Calendar, Wallet, Sparkles, Loader2, X, Tag as TagIcon, MessageSquare } from 'lucide-react'
+import { Send, Plus, Trash2, Bot, Users, Calendar, Wallet, Sparkles, Loader2, X, Tag as TagIcon, MessageSquare, PanelLeftClose, PanelLeft } from 'lucide-react'
 
 type MentionTab = 'contact' | 'event' | 'tag'
 
@@ -45,6 +45,7 @@ export default function AIChatPage() {
   const [tags, setTags] = useState<Tag[]>([])
   const [analyzing, setAnalyzing] = useState(false)
   const mentionRef = useRef<HTMLDivElement>(null)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const loadConversations = useCallback(async () => {
     if (!adapters?.ai) return
@@ -277,42 +278,79 @@ export default function AIChatPage() {
   const hasActiveConv = activeConvId !== null || messages.length > 0
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-[calc(100%+3rem)] -m-6 min-h-0">
       {/* Conversation sidebar */}
-      <div className="w-56 shrink-0 flex flex-col border-r bg-card">
-        <div className="p-3 border-b">
-          <Button onClick={handleNewChat} className="w-full justify-center gap-2" size="sm">
-            <Plus className="h-3.5 w-3.5" /> {t('ai.newChat')}
+      <div className={`shrink-0 flex flex-col border-r bg-card transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-12' : 'w-52'}`}>
+        <div className={`flex items-center gap-1 border-b ${sidebarCollapsed ? 'justify-center px-1 py-1.5' : 'px-2 py-2'}`}>
+          {!sidebarCollapsed && (
+            <Button onClick={handleNewChat} className="flex-1 justify-center gap-1.5 h-7 text-xs" size="sm">
+              <Plus className="h-3 w-3" /> {t('ai.newChat')}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            onClick={() => setSidebarCollapsed((v) => !v)}
+            aria-label={sidebarCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse')}
+          >
+            {sidebarCollapsed ? <PanelLeft className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
           </Button>
         </div>
-        <div className="flex-1 overflow-auto p-1.5 space-y-0.5">
-          {conversations.map((conv) => (
-            <div
-              key={conv.id}
-              className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer text-sm transition-all duration-150 ${
-                activeConvId === conv.id
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
-              onClick={() => loadMessages(conv.id)}
-            >
-              <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-              <span className="flex-1 truncate text-xs">{conv.title || t('ai.newChat')}</span>
-              <button
-                className={`shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive ${
-                  activeConvId === conv.id ? 'opacity-100' : ''
+        {!sidebarCollapsed ? (
+          <div className="flex-1 overflow-auto p-1 space-y-px">
+            {conversations.map((conv) => (
+              <div
+                key={conv.id}
+                className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-sm transition-all duration-150 ${
+                  activeConvId === conv.id
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
-                onClick={(e) => { e.stopPropagation(); handleDeleteConv(conv.id) }}
-                aria-label={t('ai.deleteChat')}
+                onClick={() => loadMessages(conv.id)}
               >
-                <Trash2 className="h-3 w-3" />
+                <MessageSquare className="h-3 w-3 shrink-0" />
+                <span className="flex-1 truncate text-xs">{conv.title || t('ai.newChat')}</span>
+                <button
+                  className={`shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive ${
+                    activeConvId === conv.id ? 'opacity-100' : ''
+                  }`}
+                  onClick={(e) => { e.stopPropagation(); handleDeleteConv(conv.id) }}
+                  aria-label={t('ai.deleteChat')}
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            ))}
+            {conversations.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-6">{t('ai.noConversations')}</p>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto p-1 space-y-px">
+            <button
+              className="flex w-full items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              onClick={handleNewChat}
+              aria-label={t('ai.newChat')}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+            {conversations.map((conv) => (
+              <button
+                key={conv.id}
+                className={`flex w-full items-center justify-center rounded-md p-1.5 transition-colors ${
+                  activeConvId === conv.id
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+                onClick={() => loadMessages(conv.id)}
+                title={conv.title || t('ai.newChat')}
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
               </button>
-            </div>
-          ))}
-          {conversations.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-8">{t('ai.noConversations')}</p>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Chat area */}
@@ -320,9 +358,9 @@ export default function AIChatPage() {
         {/* Messages */}
         <div className="flex-1 overflow-auto">
           {!hasActiveConv ? (
-            <div className="flex flex-col items-center justify-center h-full gap-4 px-6">
-              <div className="rounded-2xl bg-primary/10 p-4">
-                <Bot className="h-8 w-8 text-primary" />
+            <div className="flex flex-col items-center justify-center h-full gap-3 px-6">
+              <div className="rounded-2xl bg-primary/10 p-3">
+                <Bot className="h-7 w-7 text-primary" />
               </div>
               <div className="text-center space-y-1.5">
                 <h2 className="text-lg font-semibold">{t('ai.title')}</h2>
@@ -330,12 +368,12 @@ export default function AIChatPage() {
               </div>
             </div>
           ) : (
-            <div className="p-4 space-y-4">
+            <div className="p-3 space-y-3">
               {messages
                 .filter((m) => m.role !== 'system')
                 .map((m) => (
                   <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                    <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                       m.role === 'user'
                         ? 'bg-primary text-primary-foreground rounded-br-md'
                         : 'bg-muted rounded-bl-md'
@@ -346,22 +384,22 @@ export default function AIChatPage() {
                 ))}
               {analyzing && (
                 <div className="flex justify-start">
-                  <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
                     {t('ai.analyzing')}
                   </div>
                 </div>
               )}
               {streaming && streamContent && (
                 <div className="flex justify-start">
-                  <div className="max-w-[75%] rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm">
+                  <div className="max-w-[75%] rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm">
                     <div className="whitespace-pre-wrap">{streamContent}</div>
                   </div>
                 </div>
               )}
               {streaming && !streamContent && (
                 <div className="flex justify-start">
-                  <div className="rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm text-muted-foreground">
+                  <div className="rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-xs text-muted-foreground">
                     {t('ai.thinking')}
                   </div>
                 </div>
@@ -374,56 +412,56 @@ export default function AIChatPage() {
         {/* Mention badges + quick actions + input — always visible */}
         <div className="border-t">
           {mentions.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5 px-4 pt-2.5 pb-1.5">
+            <div className="flex flex-wrap items-center gap-1 px-3 pt-2 pb-1">
               {mentions.map((m) => (
-                <Badge key={`${m.type}-${m.id}`} variant="secondary" className="gap-1 pr-1 h-6 text-xs">
+                <Badge key={`${m.type}-${m.id}`} variant="secondary" className="gap-1 pr-1 h-5 text-[10px]">
                   {m.type === 'contact' ? (
                     <AvatarDisplay emoji={m.avatar_emoji} imageUrl={m.avatar_url} name={m.name} size="sm" />
                   ) : m.type === 'event' ? (
-                    <Calendar className="h-3 w-3" />
+                    <Calendar className="h-2.5 w-2.5" />
                   ) : m.type === 'tag' ? (
-                    <TagIcon className="h-3 w-3" />
+                    <TagIcon className="h-2.5 w-2.5" />
                   ) : (
-                    <Wallet className="h-3 w-3" />
+                    <Wallet className="h-2.5 w-2.5" />
                   )}
                   <span>{m.name}</span>
                   <button type="button" onClick={() => removeMention(m)} className="ml-0.5 rounded-full hover:bg-foreground/10 p-0.5">
-                    <X className="h-2.5 w-2.5" />
+                    <X className="h-2 w-2" />
                   </button>
                 </Badge>
               ))}
-              <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-primary font-medium" onClick={() => handleAnalysis('')} disabled={analyzing}>
-                <Sparkles className="h-3 w-3" />
+              <Button variant="ghost" size="sm" className="h-5 gap-1 text-[10px] text-primary font-medium" onClick={() => handleAnalysis('')} disabled={analyzing}>
+                <Sparkles className="h-2.5 w-2.5" />
                 {t('ai.comprehensiveAnalysis')}
               </Button>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-1 px-4 pt-2 pb-1.5">
+            <div className="flex flex-wrap gap-1 px-3 pt-1.5 pb-1">
               {(['contact', 'event', 'tag'] as const).map((tab) => {
                 const Icon = TAB_ICONS[tab]
                 return (
                   <button
                     key={tab}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     onClick={() => { setMentionTab(tab); inputRef.current?.focus(); setInput('@'); setMentionPopup(true); setMentionFilter('') }}
                   >
-                    <Icon className="h-3 w-3" />
+                    <Icon className="h-2.5 w-2.5" />
                     @{t(`ai.${TAB_I18N[tab]}`)}
                   </button>
                 )
               })}
               <button
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                 onClick={() => { setMentions((prev) => [...prev, { type: 'finance', id: 0, name: t('ai.financialInsight') }]); inputRef.current?.focus() }}
               >
-                <Wallet className="h-3 w-3" />
+                <Wallet className="h-2.5 w-2.5" />
                 {t('ai.financialInsight')}
               </button>
             </div>
           )}
 
           {/* Input + mention popup */}
-          <div className="relative px-3 pb-3" ref={mentionRef}>
+          <div className="relative px-2 pb-2" ref={mentionRef}>
             {/* @ mention popup */}
             {mentionPopup && (
               <div className="absolute bottom-full left-3 right-3 mb-2 rounded-xl border bg-popover shadow-lg z-50 overflow-hidden">
@@ -495,7 +533,7 @@ export default function AIChatPage() {
             <div className="flex gap-2">
               <input
                 ref={inputRef}
-                className="flex-1 rounded-xl border bg-muted/50 px-4 py-2.5 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-ring transition-colors outline-none"
+                className="flex-1 rounded-xl border bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-ring transition-colors outline-none"
                 aria-label={t('ai.placeholder')}
                 placeholder={t('ai.placeholder')}
                 value={input}
@@ -503,7 +541,7 @@ export default function AIChatPage() {
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
                 disabled={streaming || analyzing}
               />
-              <Button onClick={handleSend} disabled={streaming || analyzing || (!input.trim() && mentions.length === 0)} size="icon" className="shrink-0 rounded-xl h-10 w-10">
+              <Button onClick={handleSend} disabled={streaming || analyzing || (!input.trim() && mentions.length === 0)} size="icon" className="shrink-0 rounded-xl h-9 w-9">
                 <Send className="h-4 w-4" />
               </Button>
             </div>

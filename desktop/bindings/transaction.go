@@ -21,6 +21,7 @@ type TransactionSummaryResult struct {
 func (b *TransactionBinding) List(input ListTransactionsInput) (*PaginatedTransactions, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
@@ -30,7 +31,7 @@ func (b *TransactionBinding) List(input ListTransactionsInput) (*PaginatedTransa
 		txType = &input.Type
 	}
 
-	txs, total, err := b.svc.List(ctx, userID, input.Page, input.PageSize, txType, nil)
+	txs, total, err := b.svc.List(ctx, userID, workspaceID, input.Page, input.PageSize, txType, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -46,11 +47,12 @@ func (b *TransactionBinding) List(input ListTransactionsInput) (*PaginatedTransa
 func (b *TransactionBinding) Summary() (*TransactionSummaryResult, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
 
-	income, expense, err := b.svc.Summary(ctx, userID)
+	income, expense, err := b.svc.Summary(ctx, userID, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +67,7 @@ func (b *TransactionBinding) Summary() (*TransactionSummaryResult, error) {
 func (b *TransactionBinding) Create(input CreateTransactionInput) (*model.Transaction, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
@@ -81,12 +84,13 @@ func (b *TransactionBinding) Create(input CreateTransactionInput) (*model.Transa
 		Notes:      input.Notes,
 	}
 
-	return b.svc.Create(ctx, userID, tx)
+	return b.svc.Create(ctx, userID, workspaceID, tx)
 }
 
 func (b *TransactionBinding) Update(id uint, input UpdateTransactionInput) (*model.Transaction, error) {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
@@ -103,14 +107,15 @@ func (b *TransactionBinding) Update(id uint, input UpdateTransactionInput) (*mod
 		Notes:      input.Notes,
 	}
 
-	return b.svc.Update(ctx, userID, id, updates)
+	return b.svc.Update(ctx, userID, workspaceID, id, updates)
 }
 
 func (b *TransactionBinding) Delete(id uint) error {
 	ctx := context.Background()
 	userID := GetCurrentUserID()
+	workspaceID := GetCurrentWorkspaceID()
 	if userID == 0 {
 		return ErrNotAuthenticated
 	}
-	return b.svc.Delete(ctx, userID, id)
+	return b.svc.Delete(ctx, userID, workspaceID, id)
 }

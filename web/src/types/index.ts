@@ -174,3 +174,13 @@ export interface AIProviderPreset {
   BaseURL: string
   DefaultModel: string
 }
+
+export interface Workspace {
+  id: number
+  name: string
+  description: string
+  icon: string
+  owner_id: number
+  created_at: string
+  updated_at: string
+}
