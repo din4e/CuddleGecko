@@ -69,6 +69,7 @@ export default {
     interactionsTab: '互动记录',
     remindersTab: '提醒',
     relationsTab: '关联关系',
+    graphTab: '关系图',
     relatedTo: '关联小伙伴',
     connected: '已关联',
     addLabel: '添加标签',
