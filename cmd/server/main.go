@@ -31,6 +31,7 @@ func main() {
 	reminderRepo := repository.NewReminderRepo(db)
 	relationRepo := repository.NewRelationRepo(db)
 	eventRepo := repository.NewEventRepo(db)
+	todoRepo := repository.NewTodoRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
 	aiRepo := repository.NewAIRepo(db)
 	workspaceRepo := repository.NewWorkspaceRepo(db)
@@ -45,11 +46,12 @@ func main() {
 	reminderSvc := service.NewReminderService(reminderRepo)
 	relationSvc := service.NewRelationService(relationRepo, contactRepo)
 	eventSvc := service.NewEventService(eventRepo)
+	todoSvc := service.NewTodoService(todoRepo, eventRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo)
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, transactionSvc, aiSvc, workspaceSvc, "./data/avatars")
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc, "./data/avatars")
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)

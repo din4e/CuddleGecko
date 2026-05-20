@@ -8,6 +8,7 @@ A local-first, self-hosted personal CRM with network graph visualization.
 - **Interaction Timeline** — Record meetings, calls, messages per contact
 - **Smart Reminders** — Schedule follow-ups with status tracking (pending/done/snoozed)
 - **Events** — Calendar events with color coding, buddy linking, and time filters
+- **Todos** — Task management with status tracking, priority levels, three views (timeline/grouped/kanban), and sync-to-event
 - **Finance Tracking** — Income/expense records with category, buddy linking, and summary
 - **Network Graph** — Force-directed visualization of your relationship network
 - **AI Assistant** — Multi-provider LLM chat (DeepSeek, GLM, MiniMax, Kimi, Qwen, OpenAI, custom) with CRM data context, relationship analysis, and event insights
@@ -21,7 +22,9 @@ A local-first, self-hosted personal CRM with network graph visualization.
 | Layer | Technology |
 |-------|-----------|
 | Backend | Go 1.24, Gin, GORM, SQLite/MySQL |
-| Frontend | Vite, React 18, TypeScript, Tailwind CSS v4, shadcn/ui |
+| Frontend | Vite, React 19, TypeScript, Tailwind CSS v4, shadcn/ui |
+| Testing (Go) | testify, httptest |
+| Testing (JS) | Vitest, @testing-library/react, jsdom |
 | State | Zustand |
 | i18n | react-i18next |
 | Graph | react-force-graph-2d |
@@ -90,6 +93,11 @@ All endpoints at `/api`:
 | GET | /graph | Network graph data |
 | GET/POST | /events | List/Create events |
 | PUT/DELETE | /events/:id | Event update/delete |
+| GET/POST | /todos | List/Create todos (status filter) |
+| PUT | /todos/:id | Update todo |
+| PATCH | /todos/:id/toggle | Toggle todo status |
+| POST | /todos/:id/sync-event | Sync todo to event |
+| DELETE | /todos/:id | Delete todo |
 | GET/POST | /transactions | List/Create transactions |
 | GET | /transactions/summary | Transaction summary |
 | PUT/DELETE | /transactions/:id | Transaction update/delete |
@@ -134,6 +142,7 @@ go test ./...
 # Frontend
 cd web && npm run build    # production build
 cd web && npm run lint     # ESLint
+cd web && npm test         # Vitest unit tests
 ```
 
 ## License

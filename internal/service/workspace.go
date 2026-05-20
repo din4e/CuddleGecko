@@ -85,9 +85,7 @@ func (s *WorkspaceService) Update(ctx context.Context, userID, id uint, name, de
 		ws.Name = name
 	}
 	ws.Description = description
-	if icon != "" {
-		ws.Icon = icon
-	}
+	ws.Icon = icon
 
 	if err := s.repo.Update(ctx, ws); err != nil {
 		return nil, err

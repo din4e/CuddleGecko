@@ -184,3 +184,25 @@ export interface Workspace {
   created_at: string
   updated_at: string
 }
+
+export type TodoStatus = 'pending' | 'done'
+export type TodoPriority = 'low' | 'normal' | 'high'
+export type AmountType = '' | 'income' | 'expense'
+
+export interface Todo {
+  id: number
+  user_id: number
+  workspace_id: number
+  title: string
+  description: string
+  status: TodoStatus
+  priority: TodoPriority
+  due_time: string | null
+  amount: number | null
+  amount_type: AmountType
+  contact_ids: number[]
+  color: string
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}

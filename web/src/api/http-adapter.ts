@@ -1,6 +1,6 @@
 import client from './client'
 import type { AppAdapters } from './adapter'
-import type { AuthResponse, User, Contact, Tag, Interaction, Reminder, ContactRelation, GraphData, Event, Transaction, TransactionSummary, AIProvider, AIConversation, AIMessage, Workspace } from '@/types'
+import type { AuthResponse, User, Contact, Tag, Interaction, Reminder, ContactRelation, GraphData, Event, Transaction, TransactionSummary, AIProvider, AIConversation, AIMessage, Workspace, Todo } from '@/types'
 
 function createHTTPAdapters(): AppAdapters {
   return {
@@ -70,6 +70,15 @@ function createHTTPAdapters(): AppAdapters {
       create: (data) => client.post<Event>('/events', data).then(r => r.data),
       update: (id, data) => client.put<Event>(`/events/${id}`, data).then(r => r.data),
       delete: (id) => client.delete(`/events/${id}`).then(() => {}),
+    },
+
+    todo: {
+      list: (status) => client.get<Todo[]>('/todos', { params: { status } }).then(r => r.data),
+      create: (data) => client.post<Todo>('/todos', data).then(r => r.data),
+      update: (id, data) => client.put<Todo>(`/todos/${id}`, data).then(r => r.data),
+      toggleStatus: (id) => client.patch<Todo>(`/todos/${id}/toggle`).then(r => r.data),
+      syncToEvent: (id) => client.post<Event>(`/todos/${id}/sync-event`).then(r => r.data),
+      delete: (id) => client.delete(`/todos/${id}`).then(() => {}),
     },
 
     transaction: {

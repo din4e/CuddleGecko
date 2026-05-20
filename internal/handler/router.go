@@ -17,6 +17,7 @@ type Handlers struct {
 	Graph       *GraphHandler
 	Upload      *UploadHandler
 	Event       *EventHandler
+	Todo        *TodoHandler
 	Transaction *TransactionHandler
 	AI          *AIHandler
 	Workspace   *WorkspaceHandler
@@ -31,6 +32,7 @@ func NewHandlers(
 	reminderSvc *service.ReminderService,
 	relationSvc *service.RelationService,
 	eventSvc *service.EventService,
+	todoSvc *service.TodoService,
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
 	workspaceSvc *service.WorkspaceService,
@@ -46,6 +48,7 @@ func NewHandlers(
 		Graph:       NewGraphHandler(relationSvc),
 		Upload:      NewUploadHandler(uploadDir),
 		Event:       NewEventHandler(eventSvc),
+		Todo:        NewTodoHandler(todoSvc),
 		Transaction: NewTransactionHandler(transactionSvc),
 		AI:          NewAIHandler(aiSvc),
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
@@ -126,6 +129,13 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig, worksp
 			wsProtected.POST("/events", h.Event.Create)
 			wsProtected.PUT("/events/:id", h.Event.Update)
 			wsProtected.DELETE("/events/:id", h.Event.Delete)
+
+			wsProtected.GET("/todos", h.Todo.List)
+			wsProtected.POST("/todos", h.Todo.Create)
+			wsProtected.PUT("/todos/:id", h.Todo.Update)
+			wsProtected.PATCH("/todos/:id/toggle", h.Todo.ToggleStatus)
+			wsProtected.POST("/todos/:id/sync-event", h.Todo.SyncToEvent)
+			wsProtected.DELETE("/todos/:id", h.Todo.Delete)
 
 			wsProtected.GET("/transactions", h.Transaction.List)
 			wsProtected.GET("/transactions/summary", h.Transaction.Summary)

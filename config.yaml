@@ -15,3 +15,6 @@ jwt:
 log:
   level: info
   format: json
+
+captcha:
+  enabled: false

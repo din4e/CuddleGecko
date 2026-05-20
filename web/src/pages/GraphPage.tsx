@@ -11,6 +11,8 @@ import { ZoomIn, ZoomOut, Maximize, Minimize, RotateCcw, Crosshair } from 'lucid
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d'))
 
+type LayoutMode = 'force' | 'cluster' | 'random'
+
 const avatarImageCache = new Map<string, HTMLImageElement>()
 
 function loadAvatarImages(nodes: { avatar_url?: string }[]) {
@@ -48,7 +50,13 @@ function isDarkMode(): boolean {
   return document.documentElement.classList.contains('dark')
 }
 
+function pseudoRandom(seed: number): number {
+  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453
+  return x - Math.floor(x)
+}
+
 const SELF_NODE_ID = -1
+const LARGE_GRAPH_THRESHOLD = 300
 
 export default function GraphPage() {
   const { t } = useTranslation()
@@ -62,6 +70,7 @@ export default function GraphPage() {
   const [showSelf, setShowSelf] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('force')
   const nodeRadius = useGraphSettings((s) => s.nodeRadius)
   const emojiSizeSetting = useGraphSettings((s) => s.emojiSize)
 
@@ -99,6 +108,13 @@ export default function GraphPage() {
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen((prev) => !prev)
   }, [])
+
+  // Reheat simulation when switching layout
+  useEffect(() => {
+    if (fgRef.current) {
+      fgRef.current.d3ReheatSimulation()
+    }
+  }, [layoutMode])
 
   useEffect(() => {
     graphApi.get()
@@ -160,9 +176,9 @@ export default function GraphPage() {
     return { usedLabels: labels, usedRelationTypes: relTypes }
   }, [graphData])
 
-  // Build filtered data
+  // Build filtered data with layout positioning
   const fgData = useMemo(() => {
-    if (!graphData) return { nodes: [], links: [], linkCounts: new Map() }
+    if (!graphData) return { nodes: [], links: [], linkCounts: new Map(), isLarge: false }
 
     let nodes = [...graphData.nodes]
     let edges = [...graphData.edges]
@@ -182,29 +198,94 @@ export default function GraphPage() {
     const nodeIds = new Set(nodes.map((n) => n.id))
     edges = edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
 
-    // Add self node — only connect to nodes that have edges (less clutter)
-    if (showSelf && nodes.length > 0) {
-      nodes.push({ id: SELF_NODE_ID, name: t('graph.me'), relationship_labels: [], avatar_emoji: '', avatar_url: '' })
-      nodes.forEach((n) => {
-        if (n.id !== SELF_NODE_ID) {
-          edges.push({ source: SELF_NODE_ID, target: n.id, relation_type: '' })
-        }
-      })
-    }
-
-    // Precompute link counts per node
+    // Precompute link counts before adding self node
     const linkCounts = new Map<number, number>()
     for (const e of edges) {
       linkCounts.set(e.source, (linkCounts.get(e.source) || 0) + 1)
       linkCounts.set(e.target, (linkCounts.get(e.target) || 0) + 1)
     }
 
+    const isLarge = nodes.length > LARGE_GRAPH_THRESHOLD
+
+    // Add self node — for large graphs only connect to nodes with edges
+    if (showSelf && nodes.length > 0) {
+      const targets = isLarge
+        ? nodes.filter((n) => (linkCounts.get(n.id) || 0) > 0).slice(0, 50)
+        : nodes
+      if (targets.length > 0) {
+        nodes.push({ id: SELF_NODE_ID, name: t('graph.me'), relationship_labels: [], avatar_emoji: '', avatar_url: '' })
+        targets.forEach((n) => {
+          if (n.id !== SELF_NODE_ID) {
+            edges.push({ source: SELF_NODE_ID, target: n.id, relation_type: '' })
+          }
+        })
+      }
+    }
+
+    // Apply layout positions
+    const layoutNodes = nodes.map((n, idx) => {
+      const base: any = { ...n, id: n.id }
+
+      if (layoutMode === 'cluster' && n.id !== SELF_NODE_ID) {
+        const label = n.relationship_labels?.[0] || '_none'
+        return { ...base, __cluster: label }
+      }
+
+      if (layoutMode === 'random' && n.id !== SELF_NODE_ID) {
+        const spread = Math.sqrt(nodes.length) * 25
+        return {
+          ...base,
+          x: (pseudoRandom(n.id) - 0.5) * spread * 2,
+          y: (pseudoRandom(n.id + 10000) - 0.5) * spread * 2,
+        }
+      }
+
+      return base
+    })
+
+    // For cluster mode, compute cluster center positions and assign
+    if (layoutMode === 'cluster') {
+      const clusterMap = new Map<string, number[]>()
+      layoutNodes.forEach((n: any) => {
+        if (n.id === SELF_NODE_ID) return
+        const key = n.__cluster || '_none'
+        if (!clusterMap.has(key)) clusterMap.set(key, [])
+        clusterMap.get(key)!.push(n.id)
+      })
+
+      const clusters = [...clusterMap.entries()]
+      const clusterRadius = Math.sqrt(nodes.length) * 20
+
+      clusters.forEach(([_, memberIds], ci) => {
+        const angle = (2 * Math.PI * ci) / clusters.length - Math.PI / 2
+        const cx = Math.cos(angle) * clusterRadius
+        const cy = Math.sin(angle) * clusterRadius
+        const innerSpread = Math.sqrt(memberIds.length) * 10
+
+        memberIds.forEach((id) => {
+          const node = layoutNodes.find((n: any) => n.id === id)
+          if (node) {
+            node.x = cx + (pseudoRandom(id + 20000) - 0.5) * innerSpread * 2
+            node.y = cy + (pseudoRandom(id + 30000) - 0.5) * innerSpread * 2
+          }
+        })
+      })
+
+      // Position self node at center
+      const selfNode = layoutNodes.find((n: any) => n.id === SELF_NODE_ID)
+      if (selfNode) {
+        selfNode.x = 0
+        selfNode.y = 0
+      }
+    }
+
     return {
-      nodes: nodes.map((n) => ({ ...n, id: n.id })),
+      nodes: layoutNodes,
       links: edges.map((e) => ({ source: e.source, target: e.target, relation_type: e.relation_type })),
       linkCounts,
+      isLarge,
     }
-  }, [graphData, activeFilters, filterMode, showSelf, t])
+  }, [graphData, activeFilters, filterMode, showSelf, t, layoutMode])
 
   if (loading) return <div>{t('graph.loading')}</div>
   if (!graphData || graphData.nodes.length === 0) {
@@ -226,6 +307,14 @@ export default function GraphPage() {
   }
 
   const dark = isDarkMode()
+  const isLarge = fgData.isLarge
+  const cooldownTicks = layoutMode === 'random' ? 0 : (isLarge ? 200 : 100)
+
+  const layoutModes: { key: LayoutMode; label: string }[] = [
+    { key: 'force', label: t('graph.layoutForce') },
+    { key: 'cluster', label: t('graph.layoutCluster') },
+    { key: 'random', label: t('graph.layoutRandom') },
+  ]
 
   return (
     <div className={isFullscreen ? 'fixed inset-0 z-50 bg-background' : 'space-y-4'}>
@@ -262,6 +351,26 @@ export default function GraphPage() {
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Layout mode selector */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">{t('graph.layout')}:</span>
+        {layoutModes.map(({ key, label }) => (
+          <Badge
+            key={key}
+            variant={layoutMode === key ? 'default' : 'outline'}
+            className="cursor-pointer select-none"
+            onClick={() => setLayoutMode(key)}
+          >
+            {label}
+          </Badge>
+        ))}
+        {isLarge && layoutMode !== 'random' && (
+          <span className="text-xs text-muted-foreground ml-2">
+            {t('graph.largeGraphHint')}
+          </span>
+        )}
       </div>
 
       {/* Filter mode tabs */}
@@ -341,6 +450,7 @@ export default function GraphPage() {
               if (link.relation_type) return getLabelColor(link.relation_type)
               return dark ? '#374151' : '#d1d5db'
             }}
+            linkWidth={(link: any) => link.relation_type ? 1.5 : 0.5}
             linkDirectionalArrowLength={4}
             linkDirectionalArrowRelPos={1}
             linkLineDash={(link: any) => link.relation_type ? null : [4, 4]}
@@ -350,7 +460,6 @@ export default function GraphPage() {
               const emoji = node.avatar_emoji as string | undefined
               const hasEmoji = emoji && emoji.length > 0
 
-              // Scale sizes inversely with zoom
               const baseRadius = isSelf ? nodeRadius + 4 : nodeRadius
               const r = baseRadius / Math.sqrt(globalScale)
               const fontSize = (isSelf ? 12 : 11) / globalScale
@@ -359,13 +468,12 @@ export default function GraphPage() {
               const color = isSelf ? '#10b981' : getNodeColor(node.relationship_labels)
               const bgColor = dark ? '#1f2937' : '#ffffff'
               const textColor = dark ? '#e5e7eb' : '#1f2937'
-              // Glow for self node
+
               if (isSelf) {
                 ctx.shadowColor = '#10b981'
                 ctx.shadowBlur = 12 / globalScale
               }
 
-              // Circle background
               ctx.beginPath()
               ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI)
               ctx.fillStyle = bgColor
@@ -377,7 +485,6 @@ export default function GraphPage() {
               ctx.shadowColor = 'transparent'
               ctx.shadowBlur = 0
 
-              // Draw avatar content
               const avatarUrl = node.avatar_url as string | undefined
               const avatarImg = avatarUrl ? avatarImageCache.get(avatarUrl) : null
               if (avatarImg) {
@@ -393,7 +500,6 @@ export default function GraphPage() {
                 ctx.textBaseline = 'middle'
                 ctx.fillText(emoji, node.x!, node.y!)
               } else {
-                // First letter or name initial
                 ctx.font = `bold ${r * 1.2}px Sans-Serif`
                 ctx.textAlign = 'center'
                 ctx.textBaseline = 'middle'
@@ -401,12 +507,14 @@ export default function GraphPage() {
                 ctx.fillText(node.name?.[0] || '?', node.x!, node.y!)
               }
 
-              // Name label below
-              ctx.font = `${fontSize}px Sans-Serif`
-              ctx.textAlign = 'center'
-              ctx.textBaseline = 'top'
-              ctx.fillStyle = isSelf ? '#10b981' : textColor
-              ctx.fillText(node.name, node.x!, node.y! + r + 2 / globalScale)
+              // Skip name labels when zoomed out on large graphs
+              if (!isLarge || globalScale > 0.6) {
+                ctx.font = `${fontSize}px Sans-Serif`
+                ctx.textAlign = 'center'
+                ctx.textBaseline = 'top'
+                ctx.fillStyle = isSelf ? '#10b981' : textColor
+                ctx.fillText(node.name, node.x!, node.y! + r + 2 / globalScale)
+              }
             }}
             nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
               const r = nodeRadius
@@ -418,7 +526,21 @@ export default function GraphPage() {
             width={dimensions.width}
             height={dimensions.height}
             backgroundColor={dark ? '#111827' : 'transparent'}
-            cooldownTicks={100}
+            cooldownTicks={cooldownTicks}
+            onEngineInit={(fg: any) => {
+              if (layoutMode === 'cluster') {
+                const charge = fg.d3Force('charge')
+                if (charge) charge.strength(-20)
+                const link = fg.d3Force('link')
+                if (link) link.distance(20)
+              }
+              if (isLarge) {
+                const charge = fg.d3Force('charge')
+                if (charge) charge.strength(-40)
+                const link = fg.d3Force('link')
+                if (link) link.distance(15)
+              }
+            }}
             onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
           />
           </Suspense>

@@ -1,7 +1,7 @@
 import type {
   User, Contact, Tag, Interaction, Reminder,
   ContactRelation, GraphData, AuthResponse, Event, Transaction, TransactionSummary,
-  AIProvider, AIConversation, AIMessage, AIProviderPreset, Workspace
+  AIProvider, AIConversation, AIMessage, AIProviderPreset, Workspace, Todo
 } from '@/types'
 
 export interface AuthAdapter {
@@ -112,6 +112,15 @@ export interface WorkspaceAdapter {
   getDefault(): Promise<Workspace>
 }
 
+export interface TodoAdapter {
+  list(status?: string): Promise<Todo[]>
+  create(data: Partial<Todo>): Promise<Todo>
+  update(id: number, data: Partial<Todo>): Promise<Todo>
+  toggleStatus(id: number): Promise<Todo>
+  syncToEvent(id: number): Promise<Event>
+  delete(id: number): Promise<void>
+}
+
 export interface AppAdapters {
   auth: AuthAdapter
   captcha: CaptchaAdapter
@@ -122,6 +131,7 @@ export interface AppAdapters {
   graph: GraphAdapter
   export: ExportAdapter
   event: EventAdapter
+  todo: TodoAdapter
   transaction: TransactionAdapter
   ai: AIAdapter
   desktop?: DesktopAdapter
