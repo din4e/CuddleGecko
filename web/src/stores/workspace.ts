@@ -15,6 +15,7 @@ interface WorkspaceState {
   loadWorkspaces: () => Promise<void>
   switchWorkspace: (id: number) => Promise<void>
   createWorkspace: (name: string, description?: string, icon?: string) => Promise<Workspace>
+  updateWorkspace: (id: number, data: { name?: string; description?: string; icon?: string }) => Promise<Workspace>
   deleteWorkspace: (id: number) => Promise<void>
   initDefault: () => Promise<void>
 }
@@ -51,6 +52,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const workspace = getWorkspaceAdapter()
     const ws = await workspace.create({ name, description: description || '', icon: icon || '' })
     set((state) => ({ workspaces: [...state.workspaces, ws] }))
+    return ws
+  },
+
+  updateWorkspace: async (id, data) => {
+    const workspace = getWorkspaceAdapter()
+    const ws = await workspace.update(id, data)
+    set((state) => ({
+      workspaces: state.workspaces.map((w) => (w.id === id ? ws : w)),
+      currentWorkspace: state.currentWorkspace?.id === id ? ws : state.currentWorkspace,
+    }))
     return ws
   },
 

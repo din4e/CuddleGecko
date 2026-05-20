@@ -1,11 +1,14 @@
 import { useState } from 'react'
+import { Input } from './ui/input'
 
 const emojiGroups = [
+  { label: '常用', emojis: ['🏠', '💼', '🏢', '📚', '🎯', '⭐', '📌', '🔑', '💡', '🔧', '⚙️', '🛠️', '📊', '📈', '🗂️', '📁'] },
   { label: '表情', emojis: ['😊', '😄', '😎', '🥰', '😌', '🙃', '😇', '🤗', '😋', '🤩', '😃', '😁'] },
   { label: '动物', emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦜', '🐤', '🐢', '🐍', '🦎', '🐙', '🐠', '🐟', '🐬', '🐳', '🦋', '🐛', '🐝', '🐞'] },
   { label: '自然', emojis: ['🌸', '🌺', '🌻', '🌹', '🌷', '🍀', '🌿', '🌲', '🌴', '🌵', '🍁', '🍂'] },
   { label: '食物', emojis: ['🍎', '🍊', '🍋', '🍇', '🍓', '🍑', '🍒', '🥝', '🍌', '🍰', '🎂', '🍪'] },
-  { label: '物品', emojis: ['⭐', '🌟', '💫', '❤️', '💕', '🎵', '🎨', '📱', '💻', '🏠', '🚗', '✈️'] },
+  { label: '物品', emojis: ['⭐', '🌟', '💫', '❤️', '💕', '🎵', '🎨', '📱', '💻', '🚗', '✈️'] },
+  { label: '符号', emojis: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚪', '⚫', '🔶', '🔷', '♈', '♉', '♊', '♋', '♌', '♍'] },
 ]
 
 interface EmojiPickerProps {
@@ -22,15 +25,22 @@ export default function EmojiPicker({ value, onChange }: EmojiPickerProps) {
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="h-10 w-10 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-xl hover:border-primary transition-colors"
+          className="h-10 w-10 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-xl hover:border-primary transition-colors shrink-0"
         >
           {value || '😊'}
         </button>
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="选择或输入"
+          maxLength={4}
+          className="w-24 h-10"
+        />
         {value && (
           <button
             type="button"
             onClick={() => onChange('')}
-            className="text-xs text-muted-foreground hover:text-destructive"
+            className="text-xs text-muted-foreground hover:text-destructive shrink-0"
           >
             清除
           </button>

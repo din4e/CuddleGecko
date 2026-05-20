@@ -23,6 +23,7 @@ cd web && npm install
 cd web && npm run dev       # dev server (127.0.0.1:3001)
 cd web && npm run build     # production build
 cd web && npm run lint      # ESLint
+cd web && npm test          # Vitest unit tests
 
 # Desktop (Wails v2)
 wails dev                    # dev mode with hot reload
@@ -40,7 +41,7 @@ cmd/server/main.go    → wires all dependencies (web mode entry point)
 internal/handler/     → Gin HTTP handlers, thin layer calling services
 internal/service/     → business logic, no HTTP awareness
 internal/repository/  → GORM database access, interfaces defined in service package
-internal/model/       → domain types (User, Contact, Tag, Interaction, Reminder, Relation, Event, Transaction, AIProvider, AIConversation, AIMessage)
+internal/model/       → domain types (User, Contact, Tag, Interaction, Reminder, Relation, Event, Todo, Transaction, AIProvider, AIConversation, AIMessage)
 pkg/config/           → Viper config with CG_ env prefix
 pkg/database/         → GORM init, SQLite WAL mode / MySQL switch
 pkg/llm/              → OpenAI-compatible LLM streaming client (pure net/http, no SDK)
@@ -101,6 +102,13 @@ web/src/pages/             → Route-level views
 
 **Auth flow:** Login/register stores tokens in localStorage → `checkAuth()` on app mount calls `/auth/me` → 401 triggers automatic refresh token retry → redirect to `/login` on failure.
 
+**Graph optimization (large datasets):** `GraphPage.tsx` supports three layout modes with performance tuning for 1000+ nodes:
+- **Force** — Default d3-force-directed. For large graphs: charge strength -40, link distance 15, cooldown 200 ticks.
+- **Cluster** — Nodes pre-positioned by primary relationship label into circular groups (pseudo-random offset within cluster). Reduced charge (-20) and link distance (20) to keep clusters compact. Simulation settles clusters while preserving group structure.
+- **Random** — Deterministic scatter via `pseudoRandom(id)` (sin-based). `cooldownTicks=0` skips simulation entirely for instant render.
+- **Large graph auto-tuning** (>300 nodes): self-node capped to 50 connections (high-degree nodes only); name labels hidden when `globalScale < 0.6` to reduce canvas text overhead; `onEngineInit` overrides d3 force parameters for faster convergence.
+- **Self node**: `id=-1`, connects user to contacts. For large graphs only connects to nodes with existing edges (≤50).
+
 ## Key Domain Types
 
 - **Contact** — name, email, phone, birthday, notes, relationship_labels (multi-select), avatar_emoji, avatar_url, tags[]
@@ -109,6 +117,7 @@ web/src/pages/             → Route-level views
 - **Reminder** — title, description, remind_at, status (pending/done/snoozed)
 - **ContactRelation** — contact_id_a, contact_id_b, relation_type
 - **Event** — title, description, start_time, end_time, location, color, contact_ids[]
+- **Todo** — title, description, status (pending/done), priority (low/normal/high), due_time, amount, amount_type, contact_ids[], color, completed_at
 - **Transaction** — title, amount, type (income/expense), category, contact_ids[], date, notes
 - **AIProvider** — provider_type, name, base_url, api_key, model, is_active
 - **AIConversation** — user_id, title, messages[]
@@ -135,6 +144,7 @@ All at `/api`, JWT-protected except auth endpoints:
 | Relations | GET/POST /buddies/:id/relations, DELETE /:id |
 | Graph | GET /graph (nodes + edges) |
 | Events | GET/POST list/create, PUT/DELETE /:id |
+| Todos | GET/POST list/create, PUT /:id, PATCH /:id/toggle, POST /:id/sync-event, DELETE /:id |
 | Transactions | GET/POST list/create, GET /summary, PUT/DELETE /:id |
 | AI | GET/PUT providers, POST activate/test, GET/POST conversations, POST chat (SSE), POST analyze |
 

@@ -47,6 +47,7 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		&model.Reminder{},
 		&model.ContactRelation{},
 		&model.Event{},
+		&model.Todo{},
 		&model.Transaction{},
 		&model.AIProvider{},
 		&model.AIConversation{},

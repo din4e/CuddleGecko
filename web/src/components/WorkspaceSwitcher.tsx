@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWorkspaceStore } from '../stores/workspace'
+import type { Workspace } from '../types'
 import { Button } from './ui/button'
 import {
   DropdownMenu,
@@ -18,12 +19,18 @@ import {
 } from './ui/dialog'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
-import { ChevronDown, Plus, Check } from 'lucide-react'
+import { ChevronDown, Plus, Check, Pencil } from 'lucide-react'
+import EmojiPicker from './EmojiPicker'
 
 export default function WorkspaceSwitcher() {
   const { t } = useTranslation()
-  const { workspaces, currentWorkspace, loadWorkspaces, switchWorkspace, createWorkspace } = useWorkspaceStore()
+  const { workspaces, currentWorkspace, loadWorkspaces, switchWorkspace, createWorkspace, updateWorkspace } = useWorkspaceStore()
   const [createOpen, setCreateOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<Workspace | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editIcon, setEditIcon] = useState('')
+  const [saving, setSaving] = useState(false)
   const [newName, setNewName] = useState('')
   const [newIcon, setNewIcon] = useState('')
   const [creating, setCreating] = useState(false)
@@ -52,7 +59,30 @@ export default function WorkspaceSwitcher() {
     }
   }
 
-  const icon = currentWorkspace?.icon || '🏠'
+  const openEdit = (ws: Workspace) => {
+    setEditTarget(ws)
+    setEditName(ws.name)
+    setEditIcon(ws.icon || '')
+    setEditOpen(true)
+  }
+
+  const handleEditSave = async () => {
+    if (!editTarget || !editName.trim()) return
+    setSaving(true)
+    try {
+      await updateWorkspace(editTarget.id, {
+        name: editName.trim(),
+        icon: editIcon.trim(),
+      })
+      setEditOpen(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const getWsIcon = (name: string, icon?: string) => icon || name.charAt(0).toUpperCase()
+
+  const icon = currentWorkspace ? getWsIcon(currentWorkspace.name, currentWorkspace.icon) : ''
   const name = currentWorkspace?.name || t('workspace.default', '默认空间')
 
   return (
@@ -69,19 +99,27 @@ export default function WorkspaceSwitcher() {
             <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuContent align="start" className="w-60 p-1">
           {workspaces.map((ws) => (
-            <DropdownMenuItem
-              key={ws.id}
-              onClick={() => handleSwitch(ws.id)}
-              className="flex items-center gap-2 cursor-pointer"
-            >
-              <span className="text-base">{ws.icon || '🏠'}</span>
-              <span className="flex-1 truncate">{ws.name}</span>
-              {currentWorkspace?.id === ws.id && (
-                <Check className="h-3.5 w-3.5 text-primary" />
-              )}
-            </DropdownMenuItem>
+            <div key={ws.id} className="group flex items-center rounded-sm hover:bg-accent">
+              <button
+                className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm text-left cursor-pointer bg-transparent border-none"
+                onClick={() => handleSwitch(ws.id)}
+              >
+                <span className="text-base">{getWsIcon(ws.name, ws.icon)}</span>
+                <span className="flex-1 truncate">{ws.name}</span>
+                {currentWorkspace?.id === ws.id && (
+                  <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                )}
+              </button>
+              <button
+                className="p-1 mr-1 rounded opacity-40 hover:opacity-100 cursor-pointer bg-transparent border-none"
+                onClick={() => openEdit(ws)}
+                aria-label={t('workspace.rename', '重命名')}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
           ))}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setCreateOpen(true)} className="cursor-pointer">
@@ -99,13 +137,7 @@ export default function WorkspaceSwitcher() {
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label>{t('workspace.icon', '图标')}</Label>
-              <Input
-                value={newIcon}
-                onChange={(e) => setNewIcon(e.target.value)}
-                placeholder="🏠"
-                maxLength={2}
-                className="w-20"
-              />
+              <EmojiPicker value={newIcon} onChange={setNewIcon} />
             </div>
             <div className="space-y-1.5">
               <Label>{t('workspace.name', '名称')}</Label>
@@ -123,6 +155,36 @@ export default function WorkspaceSwitcher() {
             </Button>
             <Button onClick={handleCreate} disabled={!newName.trim() || creating}>
               {t('common.create', '创建')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('workspace.rename', '重命名')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>{t('workspace.icon', '图标')}</Label>
+              <EmojiPicker value={editIcon} onChange={setEditIcon} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t('workspace.name', '名称')}</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                maxLength={50}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              {t('common.cancel', '取消')}
+            </Button>
+            <Button onClick={handleEditSave} disabled={!editName.trim() || saving}>
+              {t('common.save', '保存')}
             </Button>
           </DialogFooter>
         </DialogContent>

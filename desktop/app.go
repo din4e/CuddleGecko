@@ -54,6 +54,7 @@ func (a *App) startup(ctx context.Context) {
 	reminderRepo := repository.NewReminderRepo(db)
 	relationRepo := repository.NewRelationRepo(db)
 	eventRepo := repository.NewEventRepo(db)
+	todoRepo := repository.NewTodoRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
 	aiRepo := repository.NewAIRepo(db)
 	workspaceRepo := repository.NewWorkspaceRepo(db)
@@ -68,6 +69,8 @@ func (a *App) startup(ctx context.Context) {
 	reminderSvc := service.NewReminderService(reminderRepo)
 	relationSvc := service.NewRelationService(relationRepo, contactRepo)
 	eventSvc := service.NewEventService(eventRepo)
+	todoSvc := service.NewTodoService(todoRepo, eventRepo)
+		_ = todoSvc
 	transactionSvc := service.NewTransactionService(transactionRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo)
 
