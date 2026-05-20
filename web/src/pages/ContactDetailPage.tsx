@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useModeStore } from '../stores/mode'
@@ -24,6 +24,8 @@ import AvatarDisplay from '../components/AvatarDisplay'
 import EmojiPicker from '../components/EmojiPicker'
 import BuddyPicker from '../components/BuddyPicker'
 
+const ForceGraph2D = lazy(() => import('react-force-graph-2d'))
+
 const labelColors: Record<string, string> = {
   family: 'bg-pink-100 text-pink-800',
   friend: 'bg-green-100 text-green-800',
@@ -33,6 +35,11 @@ const labelColors: Record<string, string> = {
   other: 'bg-gray-100 text-gray-800',
 }
 const presetLabelKeys = ['family', 'friend', 'colleague', 'client', 'pet', 'other'] as const
+
+const nodeLabelColors: Record<string, string> = {
+  family: '#ec4899', friend: '#22c55e', colleague: '#3b82f6', client: '#a855f7', pet: '#f59e0b', other: '#6b7280',
+}
+function labelNodeColor(label: string) { return nodeLabelColors[label] || '#6b7280' }
 
 const interactionTypes: InteractionType[] = ['meeting', 'call', 'message', 'email', 'other']
 
@@ -68,6 +75,44 @@ export default function ContactDetailPage() {
       setAnalyzing(false)
     }
   }
+
+  // Mini relationship graph data
+  const graphContainerRef = useRef<HTMLDivElement>(null)
+  const [graphDims, setGraphDims] = useState({ width: 600, height: 400 })
+  const miniGraphData = useMemo(() => {
+    if (!contact) return { nodes: [], links: [] }
+    const connectedIds = new Set<number>()
+    const links: { source: number; target: number; relation_type: string }[] = []
+    for (const r of relations) {
+      const otherId = r.contact_id_a === contact.id ? r.contact_id_b : r.contact_id_a
+      connectedIds.add(otherId)
+      links.push({ source: r.contact_id_a, target: r.contact_id_b, relation_type: r.relation_type })
+    }
+    const contactMap = new Map<number, Contact>()
+    for (const c of allContacts) contactMap.set(c.id, c)
+    const nodes = [
+      { id: contact.id, name: contact.name, relationship_labels: contact.relationship_labels || [], avatar_emoji: contact.avatar_emoji || '', __isCenter: true },
+      ...[...connectedIds].map((cid) => {
+        const c = contactMap.get(cid)
+        return { id: cid, name: c?.name || `#${cid}`, relationship_labels: c?.relationship_labels || [], avatar_emoji: c?.avatar_emoji || '', __isCenter: false }
+      }),
+    ]
+    return { nodes, links }
+  }, [contact, relations, allContacts])
+
+  // Resize observer for graph container
+  useEffect(() => {
+    const el = graphContainerRef.current
+    if (!el) return
+    const update = () => {
+      const rect = el.getBoundingClientRect()
+      setGraphDims({ width: Math.floor(rect.width), height: Math.max(300, Math.floor(rect.width * 0.6)) })
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Edit contact dialog
   const [editOpen, setEditOpen] = useState(false)
@@ -291,6 +336,7 @@ export default function ContactDetailPage() {
           <TabsTrigger value="interactions">{t('contacts.interactionsTab')} ({interactions.length})</TabsTrigger>
           <TabsTrigger value="reminders">{t('contacts.remindersTab')} ({reminders.length})</TabsTrigger>
           <TabsTrigger value="relations">{t('contacts.relationsTab')} ({relations.length})</TabsTrigger>
+          <TabsTrigger value="graph">{t('contacts.graphTab')}</TabsTrigger>
         </TabsList>
 
         {/* Interactions */}
@@ -378,6 +424,77 @@ export default function ContactDetailPage() {
                 </Card>
               ))}
             </div>
+          )}
+        </TabsContent>
+
+        {/* Mini Relationship Graph */}
+        <TabsContent value="graph" className="mt-4">
+          {miniGraphData.nodes.length <= 1 ? (
+            <p className="text-muted-foreground text-center py-8">{t('contacts.noRelations')}</p>
+          ) : (
+            <Card>
+              <CardContent className="p-2" ref={graphContainerRef}>
+                <Suspense fallback={<div className="flex items-center justify-center h-[300px]"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                <ForceGraph2D
+                  graphData={miniGraphData}
+                  nodeLabel="name"
+                  nodeColor={(node: any) => node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? labelNodeColor(node.relationship_labels[0]) : '#6b7280')}
+                  nodeVal={(node: any) => node.__isCenter ? 4 : 2}
+                  linkColor={() => '#94a3b8'}
+                  linkWidth={1.5}
+                  linkDirectionalArrowLength={3}
+                  linkLabel="relation_type"
+                  onNodeClick={(node: any) => { if (!node.__isCenter) navigate(`/buddies/${node.id}`) }}
+                  nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+                    const r = (node.__isCenter ? 10 : 7) / Math.sqrt(globalScale)
+                    const color = node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? labelNodeColor(node.relationship_labels[0]) : '#6b7280')
+                    const bgColor = document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff'
+
+                    ctx.beginPath()
+                    ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI)
+                    ctx.fillStyle = bgColor
+                    ctx.fill()
+                    ctx.strokeStyle = color
+                    ctx.lineWidth = 2 / globalScale
+                    ctx.stroke()
+
+                    const emoji = node.avatar_emoji
+                    if (emoji) {
+                      ctx.font = `${r * 1.2}px Sans-Serif`
+                      ctx.textAlign = 'center'
+                      ctx.textBaseline = 'middle'
+                      ctx.fillText(emoji, node.x!, node.y!)
+                    } else {
+                      ctx.font = `bold ${r}px Sans-Serif`
+                      ctx.textAlign = 'center'
+                      ctx.textBaseline = 'middle'
+                      ctx.fillStyle = color
+                      ctx.fillText(node.name?.[0] || '?', node.x!, node.y!)
+                    }
+
+                    const fontSize = (node.__isCenter ? 10 : 9) / globalScale
+                    ctx.font = `${fontSize}px Sans-Serif`
+                    ctx.textAlign = 'center'
+                    ctx.textBaseline = 'top'
+                    ctx.fillStyle = document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#1f2937'
+                    ctx.fillText(node.name, node.x!, node.y! + r + 2 / globalScale)
+                  }}
+                  nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
+                    const r = node.__isCenter ? 14 : 10
+                    ctx.beginPath()
+                    ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI)
+                    ctx.fillStyle = color
+                    ctx.fill()
+                  }}
+                  width={graphDims.width}
+                  height={graphDims.height}
+                  backgroundColor={document.documentElement.classList.contains('dark') ? '#111827' : 'transparent'}
+                  cooldownTicks={100}
+                  onEngineStop={(fg: any) => fg.zoomToFit(40, 20)}
+                />
+                </Suspense>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>

@@ -69,6 +69,7 @@ export default {
     interactionsTab: 'Interactions',
     remindersTab: 'Reminders',
     relationsTab: 'Relations',
+    graphTab: 'Graph',
     relatedTo: 'Related to buddy',
     connected: 'connected',
     addLabel: 'Add label',
