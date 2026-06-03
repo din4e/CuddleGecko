@@ -280,6 +280,9 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     },
 
     ai: {
+      envProviderStatus: async () => {
+        return { configured: false, provider_type: '', model: '', base_url: '' }
+      },
       listPresets: async () => {
         const r = await AIListPresets()
         return r as any as AIProviderPreset[]

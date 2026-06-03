@@ -7,7 +7,7 @@ import { Label } from '../components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { setBaseURL } from '../api/client'
-import { Download, Upload, Monitor, Globe, Network, Bot, CheckCircle, Loader2, Settings2 } from 'lucide-react'
+import { Download, Upload, Monitor, Globe, Network, Bot, CheckCircle, Loader2, Settings2, Cable, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { useGraphSettings } from '../stores/graphSettings'
 import type { AIProvider, AIProviderPreset } from '../types'
@@ -65,13 +65,20 @@ export default function SettingsPage() {
   const [modelName, setModelName] = useState('')
   const [customBaseUrl, setCustomBaseUrl] = useState('')
   const [testingId, setTestingId] = useState<number | null>(null)
+  const [envAI, setEnvAI] = useState<{ configured: boolean; provider_type: string; model: string; base_url: string } | null>(null)
+  const [mcpCopied, setMcpCopied] = useState(false)
 
   const loadAIProviders = useCallback(async () => {
     if (!adapters?.ai) return
     try {
-      const [p, prov] = await Promise.all([adapters.ai.listPresets(), adapters.ai.listProviders()])
+      const [p, prov, env] = await Promise.all([
+        adapters.ai.listPresets(),
+        adapters.ai.listProviders(),
+        adapters.ai.envProviderStatus(),
+      ])
       setPresets(p || [])
       setProviders(prov || [])
+      setEnvAI(env || null)
     } catch {}
   }, [adapters?.ai])
 
@@ -374,6 +381,112 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* MCP Server */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Cable className="h-5 w-5" />
+            {t('settings.mcpTitle')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">{t('settings.mcpDesc')}</p>
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">{t('settings.mcpEndpoint')}</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <code className="flex-1 rounded bg-background px-3 py-2 text-sm font-mono border">
+                  {window.location.origin}/api/mcp
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/api/mcp`)
+                    setMcpCopied(true)
+                    setTimeout(() => setMcpCopied(false), 2000)
+                  }}
+                >
+                  {mcpCopied ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                  <span className="ml-1">{mcpCopied ? t('settings.mcpCopied') : t('settings.mcpCopyEndpoint')}</span>
+                </Button>
+              </div>
+            </div>
+            <details className="group">
+              <summary className="cursor-pointer text-sm font-medium text-primary hover:underline">
+                {t('settings.mcpHowToConnect')}
+              </summary>
+              <div className="mt-2 rounded-lg border bg-background p-3 text-xs text-muted-foreground space-y-2">
+                <p>{t('settings.mcpHowToDesc')}</p>
+                <pre className="rounded bg-muted p-2 overflow-x-auto">
+{`# Example: Claude Code MCP config
+# Add to .claude/settings.json:
+
+{
+  "mcpServers": {
+    "cuddlegecko": {
+      "url": "${window.location.origin}/api/mcp",
+      "headers": {
+        "Authorization": "Bearer <YOUR_JWT_TOKEN>",
+        "X-Workspace-ID": "2"
+      }
+    }
+  }
+}`}
+                </pre>
+              </div>
+            </details>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Environment AI Config */}
+      {envAI && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5" />
+              {t('settings.aiEnvTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2">
+              {envAI.configured ? (
+                <>
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="text-sm text-green-600 dark:text-green-400">{t('settings.aiEnvConfigured')}</span>
+                </>
+              ) : (
+                <span className="text-sm text-muted-foreground">{t('settings.aiEnvNotConfigured')}</span>
+              )}
+            </div>
+            {envAI.configured && (
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-1 text-sm">
+                {envAI.provider_type && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t('settings.aiEnvProviderType')}</span>
+                    <span>{envAI.provider_type}</span>
+                  </div>
+                )}
+                {envAI.model && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t('settings.aiEnvModel')}</span>
+                    <span>{envAI.model}</span>
+                  </div>
+                )}
+                {envAI.base_url && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t('settings.aiEnvBaseUrl')}</span>
+                    <span className="text-xs truncate max-w-[250px]">{envAI.base_url}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">{t('settings.aiEnvHint')}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Graph Settings */}
       <Card>

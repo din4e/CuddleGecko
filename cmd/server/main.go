@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/din4e/cuddlegecko/internal/handler"
+	"github.com/din4e/cuddlegecko/internal/mcp"
 	"github.com/din4e/cuddlegecko/internal/repository"
 	"github.com/din4e/cuddlegecko/internal/service"
 	"github.com/din4e/cuddlegecko/pkg/config"
@@ -48,15 +49,18 @@ func main() {
 	eventSvc := service.NewEventService(eventRepo)
 	todoSvc := service.NewTodoService(todoRepo, eventRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo)
-	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo)
+	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
+
+	// MCP Server
+	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc)
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc, "./data/avatars")
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc, "./data/avatars", cfg.AI)
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)
 	r := gin.Default()
-	handler.RegisterRoutes(r, handlers, &cfg.JWT, workspaceSvc)
+	handler.RegisterRoutes(r, handlers, &cfg.JWT, workspaceSvc, mcpServer)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("CuddleGecko server starting on %s", addr)

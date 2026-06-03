@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/din4e/cuddlegecko/internal/mcp"
 	"github.com/din4e/cuddlegecko/internal/service"
 	"github.com/din4e/cuddlegecko/pkg/config"
 	"github.com/din4e/cuddlegecko/pkg/middleware"
@@ -37,6 +38,7 @@ func NewHandlers(
 	aiSvc *service.AIService,
 	workspaceSvc *service.WorkspaceService,
 	uploadDir string,
+	aiCfg config.AIConfig,
 ) *Handlers {
 	return &Handlers{
 		Auth:        NewAuthHandler(authSvc, captchaSvc),
@@ -50,12 +52,12 @@ func NewHandlers(
 		Event:       NewEventHandler(eventSvc),
 		Todo:        NewTodoHandler(todoSvc),
 		Transaction: NewTransactionHandler(transactionSvc),
-		AI:          NewAIHandler(aiSvc),
+		AI:          NewAIHandler(aiSvc, aiCfg),
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
 	}
 }
 
-func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig, workspaceSvc *service.WorkspaceService) {
+func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig, workspaceSvc *service.WorkspaceService, mcpServer *mcp.MCPServer) {
 	r.Use(middleware.CORS())
 
 	// Serve uploaded avatar images
@@ -92,6 +94,9 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig, worksp
 		wsProtected.Use(middleware.WorkspaceAuth(workspaceSvc))
 		{
 			wsProtected.POST("/upload/avatar", h.Upload.UploadAvatar)
+
+			// MCP endpoint
+			wsProtected.POST("/mcp", mcpServer.HandlePost)
 
 			buddies := wsProtected.Group("/buddies")
 			{
@@ -146,6 +151,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig, worksp
 			ai := wsProtected.Group("/ai")
 			{
 				ai.GET("/presets", h.AI.ListPresets)
+				ai.GET("/env-status", h.AI.EnvProviderStatus)
 				ai.GET("/providers", h.AI.ListProviders)
 				ai.PUT("/providers", h.AI.SaveProvider)
 				ai.POST("/providers/:id/activate", h.AI.ActivateProvider)

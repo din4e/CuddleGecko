@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/din4e/cuddlegecko/internal/model"
+	"github.com/din4e/cuddlegecko/pkg/config"
 	"github.com/din4e/cuddlegecko/pkg/llm"
 	"gorm.io/gorm"
 )
@@ -40,6 +41,7 @@ type AIService struct {
 	interactionRepo InteractionRepository
 	transactionRepo TransactionRepository
 	relationRepo    RelationRepository
+	aiCfg           config.AIConfig
 }
 
 func NewAIService(
@@ -49,6 +51,7 @@ func NewAIService(
 	interactionRepo InteractionRepository,
 	transactionRepo TransactionRepository,
 	relationRepo RelationRepository,
+	aiCfg config.AIConfig,
 ) *AIService {
 	return &AIService{
 		aiRepo:          aiRepo,
@@ -57,6 +60,7 @@ func NewAIService(
 		interactionRepo: interactionRepo,
 		transactionRepo: transactionRepo,
 		relationRepo:    relationRepo,
+		aiCfg:           aiCfg,
 	}
 }
 
@@ -156,13 +160,19 @@ func (s *AIService) TestConnection(ctx context.Context, userID, providerID uint)
 
 func (s *AIService) getActiveClient(ctx context.Context, userID uint) (*llm.Client, error) {
 	provider, err := s.aiRepo.GetActiveProvider(ctx, userID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNoActiveProvider
-		}
-		return nil, err
+	if err == nil {
+		return llm.NewClient(provider.BaseURL, provider.APIKey, provider.Model), nil
 	}
-	return llm.NewClient(provider.BaseURL, provider.APIKey, provider.Model), nil
+
+	// Fallback to config-based provider (from env / config.yaml)
+	if s.aiCfg.APIKey != "" && s.aiCfg.BaseURL != "" {
+		return llm.NewClient(s.aiCfg.BaseURL, s.aiCfg.APIKey, s.aiCfg.Model), nil
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNoActiveProvider
+	}
+	return nil, err
 }
 
 // --- Conversation management ---

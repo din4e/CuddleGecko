@@ -17,6 +17,15 @@ type Config struct {
 	JWT      JWTConfig
 	Log      LogConfig
 	Captcha  CaptchaConfig
+	AI       AIConfig
+}
+
+// AIConfig holds default AI provider settings (optional, can be overridden per-user in DB).
+type AIConfig struct {
+	ProviderType string
+	APIKey       string
+	Model        string
+	BaseURL      string
 }
 
 // CaptchaConfig holds image captcha settings.
@@ -125,6 +134,12 @@ func Load() (*Config, error) {
 		Captcha: CaptchaConfig{
 			Enabled: v.GetBool("captcha.enabled"),
 			Length:  v.GetInt("captcha.length"),
+		},
+		AI: AIConfig{
+			ProviderType: v.GetString("ai.provider_type"),
+			APIKey:       v.GetString("ai.api_key"),
+			Model:        v.GetString("ai.model"),
+			BaseURL:      v.GetString("ai.base_url"),
 		},
 	}
 
