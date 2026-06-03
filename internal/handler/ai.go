@@ -6,17 +6,19 @@ import (
 	"strconv"
 
 	"github.com/din4e/cuddlegecko/internal/service"
+	"github.com/din4e/cuddlegecko/pkg/config"
 	"github.com/din4e/cuddlegecko/pkg/middleware"
 	"github.com/din4e/cuddlegecko/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
 type AIHandler struct {
-	svc *service.AIService
+	svc   *service.AIService
+	aiCfg config.AIConfig
 }
 
-func NewAIHandler(svc *service.AIService) *AIHandler {
-	return &AIHandler{svc: svc}
+func NewAIHandler(svc *service.AIService, aiCfg config.AIConfig) *AIHandler {
+	return &AIHandler{svc: svc, aiCfg: aiCfg}
 }
 
 // --- Providers ---
@@ -322,4 +324,14 @@ func (h *AIHandler) AnalyzeComprehensive(c *gin.Context) {
 
 func (h *AIHandler) ListPresets(c *gin.Context) {
 	response.OK(c, service.ProviderPresets)
+}
+
+func (h *AIHandler) EnvProviderStatus(c *gin.Context) {
+	configured := h.aiCfg.APIKey != "" && h.aiCfg.BaseURL != ""
+	response.OK(c, gin.H{
+		"configured":     configured,
+		"provider_type":  h.aiCfg.ProviderType,
+		"model":          h.aiCfg.Model,
+		"base_url":       h.aiCfg.BaseURL,
+	})
 }

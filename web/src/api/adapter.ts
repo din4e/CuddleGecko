@@ -74,6 +74,7 @@ export interface TransactionAdapter {
 }
 
 export interface AIAdapter {
+  envProviderStatus(): Promise<{ configured: boolean; provider_type: string; model: string; base_url: string }>
   listPresets(): Promise<AIProviderPreset[]>
   listProviders(): Promise<AIProvider[]>
   saveProvider(data: { provider_type: string; api_key: string; model?: string; base_url?: string }): Promise<AIProvider>

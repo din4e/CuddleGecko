@@ -17,6 +17,7 @@ const RemindersPage = lazy(() => import('./pages/RemindersPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const AIChatPage = lazy(() => import('./pages/AIChatPage'))
 const TodosPage = lazy(() => import('./pages/TodosPage'))
+const TerminalPage = lazy(() => import('./pages/TerminalPage'))
 
 function PageLoader() {
   return (
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="tags" element={<Suspense fallback={<PageLoader />}><TagsPage /></Suspense>} />
           <Route path="reminders" element={<Suspense fallback={<PageLoader />}><RemindersPage /></Suspense>} />
           <Route path="ai" element={<Suspense fallback={<PageLoader />}><AIChatPage /></Suspense>} />
+          <Route path="terminal" element={<Suspense fallback={<PageLoader />}><TerminalPage /></Suspense>} />
           <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
         </Route>
       </Routes>

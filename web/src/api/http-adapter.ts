@@ -90,6 +90,7 @@ function createHTTPAdapters(): AppAdapters {
     },
 
     ai: {
+      envProviderStatus: () => client.get('/ai/env-status').then(r => r.data),
       listPresets: () => client.get('/ai/presets').then(r => r.data),
       listProviders: () => client.get<AIProvider[]>('/ai/providers').then(r => r.data),
       saveProvider: (data) => client.put<AIProvider>('/ai/providers', data).then(r => r.data),

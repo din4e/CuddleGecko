@@ -78,6 +78,7 @@ export default function ContactDetailPage() {
 
   // Mini relationship graph data
   const graphContainerRef = useRef<HTMLDivElement>(null)
+  const fgRef = useRef<any>(null)
   const [graphDims, setGraphDims] = useState({ width: 600, height: 400 })
   const miniGraphData = useMemo(() => {
     if (!contact) return { nodes: [], links: [] }
@@ -436,6 +437,7 @@ export default function ContactDetailPage() {
               <CardContent className="p-2" ref={graphContainerRef}>
                 <Suspense fallback={<div className="flex items-center justify-center h-[300px]"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
                 <ForceGraph2D
+                  ref={fgRef}
                   graphData={miniGraphData}
                   nodeLabel="name"
                   nodeColor={(node: any) => node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? labelNodeColor(node.relationship_labels[0]) : '#6b7280')}
@@ -460,12 +462,12 @@ export default function ContactDetailPage() {
 
                     const emoji = node.avatar_emoji
                     if (emoji) {
-                      ctx.font = `${r * 1.2}px Sans-Serif`
+                      ctx.font = `${r * 1.2}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
                       ctx.textAlign = 'center'
                       ctx.textBaseline = 'middle'
                       ctx.fillText(emoji, node.x!, node.y!)
                     } else {
-                      ctx.font = `bold ${r}px Sans-Serif`
+                      ctx.font = `bold ${r}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
                       ctx.textAlign = 'center'
                       ctx.textBaseline = 'middle'
                       ctx.fillStyle = color
@@ -473,7 +475,7 @@ export default function ContactDetailPage() {
                     }
 
                     const fontSize = (node.__isCenter ? 10 : 9) / globalScale
-                    ctx.font = `${fontSize}px Sans-Serif`
+                    ctx.font = `${fontSize}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
                     ctx.textAlign = 'center'
                     ctx.textBaseline = 'top'
                     ctx.fillStyle = document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#1f2937'
@@ -490,7 +492,7 @@ export default function ContactDetailPage() {
                   height={graphDims.height}
                   backgroundColor={document.documentElement.classList.contains('dark') ? '#111827' : 'transparent'}
                   cooldownTicks={100}
-                  onEngineStop={(fg: any) => fg.zoomToFit(40, 20)}
+                  onEngineStop={() => { if (fgRef.current) fgRef.current.zoomToFit(40, 20) }}
                 />
                 </Suspense>
               </CardContent>

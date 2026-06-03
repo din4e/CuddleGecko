@@ -72,7 +72,7 @@ func (a *App) startup(ctx context.Context) {
 	todoSvc := service.NewTodoService(todoRepo, eventRepo)
 		_ = todoSvc
 	transactionSvc := service.NewTransactionService(transactionRepo)
-	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo)
+	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
 
 	// Bindings
 	bindings.InitBindings(

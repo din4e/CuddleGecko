@@ -235,7 +235,7 @@ export default function AppLayout() {
 
         {/* Content */}
         <main className="flex-1 overflow-auto min-h-0">
-          <div className="h-full flex flex-col p-6">
+          <div className="min-h-full p-6">
             <Outlet />
           </div>
         </main>
