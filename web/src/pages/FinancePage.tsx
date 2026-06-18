@@ -153,27 +153,27 @@ export default function FinancePage() {
 
       {summary && (
         <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="pt-4 flex items-center gap-3">
-              <TrendingUp className="h-8 w-8 text-green-500" aria-hidden="true" />
+          <Card className="flex flex-col">
+            <CardContent className="flex-1 pt-4 flex items-center gap-3">
+              <TrendingUp className="h-8 w-8 text-green-500 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-xs text-muted-foreground">{t('finance.totalIncome')}</p>
                 <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(summary.income)}</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-4 flex items-center gap-3">
-              <TrendingDown className="h-8 w-8 text-red-500" aria-hidden="true" />
+          <Card className="flex flex-col">
+            <CardContent className="flex-1 pt-4 flex items-center gap-3">
+              <TrendingDown className="h-8 w-8 text-red-500 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-xs text-muted-foreground">{t('finance.totalExpense')}</p>
                 <p className="text-xl font-bold text-red-600 tabular-nums">{fmt(summary.expense)}</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-4 flex items-center gap-3">
-              <Wallet className="h-8 w-8 text-blue-500" aria-hidden="true" />
+          <Card className="flex flex-col">
+            <CardContent className="flex-1 pt-4 flex items-center gap-3">
+              <Wallet className="h-8 w-8 text-blue-500 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-xs text-muted-foreground">{t('finance.balance')}</p>
                 <p className={`text-xl font-bold tabular-nums ${summary.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -255,8 +255,8 @@ export default function FinancePage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {transactions.map((tx) => (
-            <Card key={tx.id}>
-              <CardContent className="pt-4 space-y-3">
+            <Card key={tx.id} className="flex flex-col">
+              <CardContent className="flex-1 pt-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className={`flex h-8 w-8 items-center justify-center rounded-full ${

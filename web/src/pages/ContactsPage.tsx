@@ -15,22 +15,12 @@ import EmojiPicker from '../components/EmojiPicker'
 import type { Contact } from '../types'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
+import { labelColors, presetLabelKeys } from '../lib/constants'
 import { Plus, Search, X, Upload } from 'lucide-react'
 import { useContactsList, useCreateContact } from '../hooks/api/useContacts'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
 import ListPageHeader from '../components/ListPageHeader'
-
-const presetLabelKeys = ['family', 'friend', 'colleague', 'client', 'pet', 'other'] as const
-
-const labelColors: Record<string, string> = {
-  family: 'bg-pink-100 text-pink-800',
-  friend: 'bg-green-100 text-green-800',
-  colleague: 'bg-blue-100 text-blue-800',
-  client: 'bg-purple-100 text-purple-800',
-  pet: 'bg-amber-100 text-amber-800',
-  other: 'bg-gray-100 text-gray-800',
-}
 
 function LabelPicker({ selected, onChange, t }: {
   selected: string[]
@@ -122,7 +112,6 @@ function ContactFormDialog({ open, onOpenChange, t }: ContactFormDialogProps) {
   const resetForm = () => {
     setNewContact({ name: '', emails: [] as string[], phones: [] as string[], avatar_emoji: '', avatar_url: '', relationship_labels: [] })
   }
-
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -343,6 +332,7 @@ export default function ContactsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" aria-busy={isFetching}>
           {contacts.map((contact) => (
             <Link key={contact.id} to={`/buddies/${contact.id}`}>
+              <ContactGridCard contact={contact} labelRenderer={labelRenderer} />
               <ContactGridCard contact={contact} labelRenderer={labelRenderer} />
             </Link>
           ))}

@@ -315,11 +315,11 @@ export default function EventsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {events.map((e) => (
-            <Card key={e.id} className="overflow-hidden">
+            <Card key={e.id} className="flex flex-col overflow-hidden">
               {e.color && (
-                <div className="h-1" style={{ backgroundColor: e.color }} />
+                <div className="h-1 shrink-0" style={{ backgroundColor: e.color }} />
               )}
-              <CardContent className="pt-4 space-y-2">
+              <CardContent className="flex-1 pt-4 space-y-2">
                 <div className="font-medium">{e.title}</div>
                 {e.description && (
                   <p className="text-sm text-muted-foreground line-clamp-2">{e.description}</p>

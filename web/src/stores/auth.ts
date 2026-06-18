@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { authApi } from '../api/auth'
+import { setCachedToken } from '../api/client'
 import type { User } from '../types'
 
 interface AuthState {
@@ -25,6 +26,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { data } = await authApi.login(username, password, captcha)
       localStorage.setItem('access_token', data.access_token)
       localStorage.setItem('refresh_token', data.refresh_token)
+      setCachedToken(data.access_token)
       set({ user: data.user, accessToken: data.access_token, isAuthenticated: true })
     } finally {
       set({ isLoading: false })
@@ -37,6 +39,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { data } = await authApi.register(username, email, password, captcha)
       localStorage.setItem('access_token', data.access_token)
       localStorage.setItem('refresh_token', data.refresh_token)
+      setCachedToken(data.access_token)
       set({ user: data.user, accessToken: data.access_token, isAuthenticated: true })
     } finally {
       set({ isLoading: false })
@@ -46,6 +49,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: () => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
+    setCachedToken(null)
     set({ user: null, accessToken: null, isAuthenticated: false })
   },
 

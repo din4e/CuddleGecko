@@ -9,6 +9,7 @@ import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { useGraphSettings } from '../stores/graphSettings'
+import { getNodeLabelColor } from '../lib/constants'
 import { ZoomIn, ZoomOut, Maximize, Minimize, RotateCcw, Crosshair, Loader2, Network } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import EmptyState from '../components/EmptyState'
@@ -30,23 +31,8 @@ function loadAvatarImages(nodes: { avatar_url?: string }[]) {
   }
 }
 
-const labelColors: Record<string, string> = {
-  family: '#ec4899',
-  friend: '#22c55e',
-  colleague: '#3b82f6',
-  client: '#a855f7',
-  pet: '#f59e0b',
-  other: '#6b7280',
-}
-
-const edgeColorPool = ['#6366f1', '#14b8a6', '#f97316', '#ec4899', '#8b5cf6', '#06b6d4', '#84cc16', '#ef4444']
-
-function getLabelColor(label: string): string {
-  return labelColors[label] || edgeColorPool[(label.charCodeAt(0) + (label.length > 1 ? label.charCodeAt(1) : 0)) % edgeColorPool.length]
-}
-
 function getNodeColor(labels: string[]): string {
-  if (labels && labels.length > 0) return getLabelColor(labels[0])
+  if (labels && labels.length > 0) return getNodeLabelColor(labels[0])
   return '#6b7280'
 }
 
@@ -620,7 +606,7 @@ export default function GraphPage() {
           <div className="flex flex-wrap gap-1.5">
             {filterMode === 'label' ? (
               [...usedLabels].map((key) => {
-                const color = getLabelColor(key)
+                const color = getNodeLabelColor(key)
                 const active = activeFilters.has(key)
                 return (
                   <button
@@ -642,7 +628,7 @@ export default function GraphPage() {
               })
             ) : (
               [...usedRelationTypes].sort().map((rt) => {
-                const color = getLabelColor(rt)
+                const color = getNodeLabelColor(rt)
                 const active = activeFilters.has(rt)
                 return (
                   <button
@@ -693,7 +679,7 @@ export default function GraphPage() {
             }}
             linkLabel="relation_type"
             linkColor={(link: GraphLink) => {
-              if (link.relation_type) return getLabelColor(link.relation_type)
+              if (link.relation_type) return getNodeLabelColor(link.relation_type)
               return dark ? '#374151' : '#d1d5db'
             }}
             linkWidth={(link: GraphLink) => link.relation_type ? 1.5 : 0.5}
