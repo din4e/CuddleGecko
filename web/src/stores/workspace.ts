@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useModeStore } from './mode'
+import { setCachedWorkspaceId } from '../api/client'
 import type { Workspace } from '../types'
 
 function getWorkspaceAdapter() {
@@ -37,6 +38,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const current = workspaces.find((ws) => ws.id === savedId) || workspaces[0] || null
           if (current) {
             localStorage.setItem('current_workspace_id', String(current.id))
+            setCachedWorkspaceId(String(current.id))
           }
           set({ workspaces, currentWorkspace: current })
         } finally {
@@ -48,6 +50,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const workspace = getWorkspaceAdapter()
         const ws = await workspace.switch(id)
         localStorage.setItem('current_workspace_id', String(ws.id))
+        setCachedWorkspaceId(String(ws.id))
         set({ currentWorkspace: ws })
       },
 
@@ -81,6 +84,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const workspace = getWorkspaceAdapter()
           const ws = await workspace.getDefault()
           localStorage.setItem('current_workspace_id', String(ws.id))
+          setCachedWorkspaceId(String(ws.id))
           set({ currentWorkspace: ws })
         } catch {
           // no default workspace yet

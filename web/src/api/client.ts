@@ -1,6 +1,17 @@
 import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios'
 import type { AuthResponse, ApiResponse } from '@/types'
 
+let cachedToken = localStorage.getItem('access_token')
+let cachedWorkspaceId = localStorage.getItem('current_workspace_id')
+
+export function setCachedToken(token: string | null) {
+  cachedToken = token
+}
+
+export function setCachedWorkspaceId(id: string | null) {
+  cachedWorkspaceId = id
+}
+
 const client = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
@@ -13,14 +24,12 @@ export function setBaseURL(url: string) {
 client.interceptors.request.use((config) => {
   // Refresh requests carry the refresh token in the body; skip the stale access token.
   if (config.url !== '/auth/refresh') {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+    if (cachedToken) {
+      config.headers.Authorization = `Bearer ${cachedToken}`
     }
   }
-  const workspaceId = localStorage.getItem('current_workspace_id')
-  if (workspaceId) {
-    config.headers['X-Workspace-ID'] = workspaceId
+  if (cachedWorkspaceId) {
+    config.headers['X-Workspace-ID'] = cachedWorkspaceId
   }
   return config
 })
@@ -78,10 +87,12 @@ client.interceptors.response.use(
             ...originalRequest.headers,
             Authorization: `Bearer ${tokens.access_token}`,
           }
+          cachedToken = tokens.access_token
           return client(originalRequest)
         } catch {
           localStorage.removeItem('access_token')
           localStorage.removeItem('refresh_token')
+          cachedToken = null
           window.location.href = '/login'
         }
       } else {

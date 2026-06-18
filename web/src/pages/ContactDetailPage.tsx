@@ -26,23 +26,10 @@ import AvatarDisplay from '../components/AvatarDisplay'
 import EmojiPicker from '../components/EmojiPicker'
 import BuddyPicker from '../components/BuddyPicker'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { labelColors, presetLabelKeys, getNodeLabelColor } from '../lib/constants'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof ForceGraph2DType
-
-const labelColors: Record<string, string> = {
-  family: 'bg-pink-100 text-pink-800',
-  friend: 'bg-green-100 text-green-800',
-  colleague: 'bg-blue-100 text-blue-800',
-  client: 'bg-purple-100 text-purple-800',
-  pet: 'bg-amber-100 text-amber-800',
-  other: 'bg-gray-100 text-gray-800',
-}
-const presetLabelKeys = ['family', 'friend', 'colleague', 'client', 'pet', 'other'] as const
-
-const nodeLabelColors: Record<string, string> = {
-  family: '#ec4899', friend: '#22c55e', colleague: '#3b82f6', client: '#a855f7', pet: '#f59e0b', other: '#6b7280',
-}
-function labelNodeColor(label: string) { return nodeLabelColors[label] || '#6b7280' }
 
 const interactionTypes: InteractionType[] = ['meeting', 'call', 'message', 'email', 'other']
 
@@ -480,8 +467,8 @@ export default function ContactDetailPage() {
                   ref={fgRef}
                   graphData={miniGraphData}
                   nodeLabel="name"
-                  nodeColor={(node: MiniGraphNode) => node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? labelNodeColor(node.relationship_labels[0]) : '#6b7280')}
-                  nodeVal={(node: MiniGraphNode) => node.__isCenter ? 4 : 2}
+                  nodeColor={(node: any) => node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? getNodeLabelColor(node.relationship_labels[0]) : '#6b7280')}
+                  nodeVal={(node: any) => node.__isCenter ? 4 : 2}
                   linkColor={() => '#94a3b8'}
                   linkWidth={1.5}
                   linkDirectionalArrowLength={3}
@@ -492,7 +479,7 @@ export default function ContactDetailPage() {
                     const y = node.y
                     if (x == null || y == null) return
                     const r = (node.__isCenter ? 10 : 7) / Math.sqrt(globalScale)
-                    const color = node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? labelNodeColor(node.relationship_labels[0]) : '#6b7280')
+                    const color = node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? getNodeLabelColor(node.relationship_labels[0]) : '#6b7280')
                     const bgColor = document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff'
 
                     ctx.beginPath()

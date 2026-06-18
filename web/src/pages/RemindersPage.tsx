@@ -159,8 +159,8 @@ export default function RemindersPage() {
             const cfg = statusConfig[r.status] || statusConfig.pending
             const Icon = cfg.icon
             return (
-              <Card key={r.id}>
-                <CardContent className="pt-4 space-y-2">
+              <Card key={r.id} className="flex flex-col">
+                <CardContent className="flex-1 pt-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <Icon className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium truncate">{r.title}</span>
