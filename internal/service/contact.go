@@ -12,6 +12,7 @@ var ErrContactNotFound = errors.New("contact not found")
 type ContactRepository interface {
 	Create(ctx context.Context, contact *model.Contact) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Contact, error)
+	GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Contact, error)
 	List(ctx context.Context, workspaceID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error)
 	Update(ctx context.Context, contact *model.Contact) error
 	Delete(ctx context.Context, workspaceID, id uint) error

@@ -34,6 +34,17 @@ func (r *ContactRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model
 	return &contact, nil
 }
 
+func (r *ContactRepo) GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Contact, error) {
+	var contacts []model.Contact
+	err := r.db.WithContext(ctx).Preload("Tags").
+		Where("id IN ? AND workspace_id = ?", ids, workspaceID).
+		Find(&contacts).Error
+	if err != nil {
+		return nil, fmt.Errorf("get contacts by ids: %w", err)
+	}
+	return contacts, nil
+}
+
 func (r *ContactRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error) {
 	var contacts []model.Contact
 	var total int64
@@ -66,7 +77,9 @@ func (r *ContactRepo) List(ctx context.Context, workspaceID uint, page, pageSize
 }
 
 func (r *ContactRepo) Update(ctx context.Context, contact *model.Contact) error {
-	if err := r.db.WithContext(ctx).Save(contact).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&model.Contact{ID: contact.ID}).
+		Select("name", "nickname", "avatar_emoji", "avatar_url", "phone", "email", "birthday", "notes", "relationship_labels").
+		Updates(contact).Error; err != nil {
 		return fmt.Errorf("update contact: %w", err)
 	}
 	return nil

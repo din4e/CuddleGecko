@@ -1,5 +1,7 @@
 import type { AppAdapters } from '@/api/adapter'
 import { formatTable, formatSuccess, formatError } from '../formatters'
+import type { CommandArgs } from '../types'
+import { getErrorMessage } from '../types'
 
 export async function executeListWorkspaces(adapters: AppAdapters): Promise<string> {
   try {
@@ -13,13 +15,13 @@ export async function executeListWorkspaces(adapters: AppAdapters): Promise<stri
       Description: w.description || '-',
     }))
     return formatTable(rows)
-  } catch (e: any) {
-    return formatError(`Failed to list workspaces: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to list workspaces: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeSwitchWorkspace(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -28,7 +30,7 @@ export async function executeSwitchWorkspace(
 
     const ws = await adapters.workspace.switch(id)
     return formatSuccess(`Switched to workspace: ${ws.name}`)
-  } catch (e: any) {
-    return formatError(`Failed to switch workspace: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to switch workspace: ${getErrorMessage(e)}`)
   }
 }

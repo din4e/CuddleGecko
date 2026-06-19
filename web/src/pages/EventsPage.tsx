@@ -115,6 +115,9 @@ export default function EventsPage() {
   const [form, setForm] = useState<EventFormData>(emptyForm)
   const [view, setView] = useViewMode('events')
   const adapters = useModeStore((s) => s.adapters)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 50
   const [analysisResult, setAnalysisResult] = useState<string | null>(null)
   const [analyzingId, setAnalyzingId] = useState<number | null>(null)
   const [aiAvailable, setAiAvailable] = useState(false)
@@ -146,9 +149,10 @@ export default function EventsPage() {
     setLoading(true)
     try {
       const range = getDateRange(filter)
-      const res = await eventApi.list({ page: 1, page_size: 100, ...range })
+      const res = await eventApi.list({ page, page_size: pageSize, ...range })
       const data = res.data
       setEvents(Array.isArray(data?.items) ? data.items : [])
+      setTotal(data?.total ?? 0)
     } finally {
       setLoading(false)
     }
@@ -159,12 +163,18 @@ export default function EventsPage() {
     adapters?.ai?.listProviders().then((providers) => {
       setAiAvailable(providers?.some((p) => p.is_active) ?? false)
     }).catch(() => setAiAvailable(false))
-  }, [])
+  }, [adapters?.ai])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadEvents()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter])
+  }, [filter, page])
+
+  const changeFilter = (f: TimeFilter) => {
+    setFilter(f)
+    setPage(1)
+  }
 
   const openCreate = () => {
     setEditing(null)
@@ -233,7 +243,7 @@ export default function EventsPage() {
             key={key}
             variant={filter === key ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setFilter(key)}
+            onClick={() => changeFilter(key)}
           >
             {label}
           </Button>
@@ -350,6 +360,20 @@ export default function EventsPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {total > pageSize && (
+        <div className="flex justify-center items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            {t('contacts.previous')}
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {t('contacts.page')} {page} / {Math.ceil(total / pageSize)} ({total})
+          </span>
+          <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(page + 1)}>
+            {t('contacts.next')}
+          </Button>
         </div>
       )}
 

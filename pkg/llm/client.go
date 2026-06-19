@@ -48,8 +48,16 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func NewClient(baseURL, apiKey, model string) *Client {
-	return &Client{
+type ClientOption func(*Client)
+
+func WithHTTPClient(httpClient *http.Client) ClientOption {
+	return func(c *Client) {
+		c.httpClient = httpClient
+	}
+}
+
+func NewClient(baseURL, apiKey, model string, opts ...ClientOption) *Client {
+	c := &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		apiKey:  apiKey,
 		model:   model,
@@ -57,6 +65,10 @@ func NewClient(baseURL, apiKey, model string) *Client {
 			Timeout: 120 * time.Second,
 		},
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 func (c *Client) StreamChat(ctx context.Context, messages []Message) (<-chan StreamChunk, error) {

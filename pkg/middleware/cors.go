@@ -1,14 +1,33 @@
 package middleware
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
+	"slices"
 
-func CORS() gin.HandlerFunc {
+	"github.com/din4e/cuddlegecko/pkg/config"
+	"github.com/gin-gonic/gin"
+)
+
+func CORS(cfg *config.CORSConfig, mode string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		origin := c.Request.Header.Get("Origin")
+		allowOrigin := ""
+
+		if mode == gin.ReleaseMode {
+			if slices.Contains(cfg.AllowOrigins, origin) {
+				allowOrigin = origin
+			}
+		} else {
+			allowOrigin = "*"
+		}
+
+		if allowOrigin != "" {
+			c.Header("Access-Control-Allow-Origin", allowOrigin)
+		}
 		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type,Authorization,Mcp-Session-Id")
 		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
+			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
 		c.Next()

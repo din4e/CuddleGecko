@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"time"
+
 	"github.com/din4e/cuddlegecko/internal/mcp"
 	"github.com/din4e/cuddlegecko/internal/service"
 	"github.com/din4e/cuddlegecko/pkg/config"
@@ -22,6 +24,7 @@ type Handlers struct {
 	Transaction *TransactionHandler
 	AI          *AIHandler
 	Workspace   *WorkspaceHandler
+	Export      *ExportHandler
 }
 
 func NewHandlers(
@@ -37,6 +40,7 @@ func NewHandlers(
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
 	workspaceSvc *service.WorkspaceService,
+	exportSvc *service.ExportService,
 	uploadDir string,
 	aiCfg config.AIConfig,
 ) *Handlers {
@@ -54,20 +58,24 @@ func NewHandlers(
 		Transaction: NewTransactionHandler(transactionSvc),
 		AI:          NewAIHandler(aiSvc, aiCfg),
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
+		Export:      NewExportHandler(exportSvc),
 	}
 }
 
-func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig, workspaceSvc *service.WorkspaceService, mcpServer *mcp.MCPServer) {
-	r.Use(middleware.CORS())
+func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc *service.WorkspaceService, mcpServer *mcp.MCPServer) {
+	r.Use(middleware.CORS(&cfg.CORS, cfg.Server.Mode))
 
-	// Serve uploaded avatar images
-	r.Static("/avatars", "./data/avatars")
+	// Serve uploaded avatar images with path traversal protection
+	avatars := r.Group("/avatars")
+	avatars.Use(middleware.StaticPathCheck())
+	avatars.Static("/", "./data/avatars")
 
 	api := r.Group("/api")
 	{
 		api.GET("/captcha", h.Captcha.Get)
 
 		auth := api.Group("/auth")
+		auth.Use(middleware.NewIPRateLimiter(10, time.Minute).Middleware())
 		{
 			auth.POST("/register", h.Auth.Register)
 			auth.POST("/login", h.Auth.Login)
@@ -75,7 +83,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig, worksp
 		}
 
 		protected := api.Group("")
-		protected.Use(middleware.JWTAuth(jwtCfg))
+		protected.Use(middleware.JWTAuth(&cfg.JWT))
 		{
 			protected.GET("/auth/me", h.Auth.Me)
 
@@ -90,7 +98,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig, worksp
 
 		// Workspace-scoped routes
 		wsProtected := api.Group("")
-		wsProtected.Use(middleware.JWTAuth(jwtCfg))
+		wsProtected.Use(middleware.JWTAuth(&cfg.JWT))
 		wsProtected.Use(middleware.WorkspaceAuth(workspaceSvc))
 		{
 			wsProtected.POST("/upload/avatar", h.Upload.UploadAvatar)
@@ -166,6 +174,9 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, jwtCfg *config.JWTConfig, worksp
 				ai.POST("/analyze/event/:eventId", h.AI.AnalyzeEvent)
 				ai.POST("/analyze", h.AI.AnalyzeComprehensive)
 			}
+
+			wsProtected.POST("/export", h.Export.Export)
+			wsProtected.POST("/import", h.Export.Import)
 		}
 	}
 }

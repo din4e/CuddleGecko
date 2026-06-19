@@ -59,6 +59,34 @@ func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, page
 	return txs, total, nil
 }
 
+func (r *TransactionRepo) ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Transaction, error) {
+	var txs []model.Transaction
+	query := r.db.WithContext(ctx).
+		Where("workspace_id = ?", workspaceID).
+		Order("date DESC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Find(&txs).Error; err != nil {
+		return nil, fmt.Errorf("list transactions by contact ids: %w", err)
+	}
+
+	idSet := make(map[uint]struct{}, len(contactIDs))
+	for _, id := range contactIDs {
+		idSet[id] = struct{}{}
+	}
+	filtered := make([]model.Transaction, 0, len(txs))
+	for _, tx := range txs {
+		for _, cid := range tx.ContactIDs {
+			if _, ok := idSet[cid]; ok {
+				filtered = append(filtered, tx)
+				break
+			}
+		}
+	}
+	return filtered, nil
+}
+
 func (r *TransactionRepo) Summary(ctx context.Context, workspaceID uint) (income float64, expense float64, err error) {
 	var result []struct {
 		Type  string
@@ -85,7 +113,9 @@ func (r *TransactionRepo) Summary(ctx context.Context, workspaceID uint) (income
 }
 
 func (r *TransactionRepo) Update(ctx context.Context, tx *model.Transaction) error {
-	if err := r.db.WithContext(ctx).Save(tx).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&model.Transaction{ID: tx.ID}).
+		Select("title", "amount", "type", "category", "contact_ids", "date", "notes").
+		Updates(tx).Error; err != nil {
 		return fmt.Errorf("update transaction: %w", err)
 	}
 	return nil

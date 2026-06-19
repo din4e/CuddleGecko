@@ -1,8 +1,10 @@
 import type { AppAdapters } from '@/api/adapter'
 import { formatTable, formatSuccess, formatError } from '../formatters'
+import type { CommandArgs } from '../types'
+import { getErrorMessage } from '../types'
 
 export async function executeListTodos(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -20,40 +22,40 @@ export async function executeListTodos(
     }))
 
     return formatTable(rows)
-  } catch (e: any) {
-    return formatError(`Failed to list todos: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to list todos: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeCreateTodo(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
     const title = args.title as string
     if (!title) return formatError('--title is required')
 
-    const data: Record<string, any> = { title }
+    const data: Record<string, unknown> = { title }
     if (args.description) data.description = args.description
     if (args.priority) data.priority = args.priority
     if (args.due) data.due_time = args.due
 
     const todo = await adapters.todo.create(data)
     return formatSuccess(`Created todo (ID: ${todo.id})`)
-  } catch (e: any) {
-    return formatError(`Failed to create todo: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to create todo: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeUpdateTodo(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
     const id = Number(args.id)
     if (!id) return formatError('Usage: update todo <id>')
 
-    const data: Record<string, any> = {}
+    const data: Record<string, unknown> = {}
     if (args.title) data.title = args.title
     if (args.description) data.description = args.description
     if (args.priority) data.priority = args.priority
@@ -63,13 +65,13 @@ export async function executeUpdateTodo(
 
     await adapters.todo.update(id, data)
     return formatSuccess('Todo updated successfully')
-  } catch (e: any) {
-    return formatError(`Failed to update todo: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to update todo: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeToggleTodo(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -78,13 +80,13 @@ export async function executeToggleTodo(
 
     const todo = await adapters.todo.toggleStatus(id)
     return formatSuccess(`Todo toggled to: ${todo.status}`)
-  } catch (e: any) {
-    return formatError(`Failed to toggle todo: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to toggle todo: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeSyncTodo(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -93,13 +95,13 @@ export async function executeSyncTodo(
 
     const event = await adapters.todo.syncToEvent(id)
     return formatSuccess(`Todo synced to event (ID: ${event.id})`)
-  } catch (e: any) {
-    return formatError(`Failed to sync todo: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to sync todo: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeDeleteTodo(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -108,7 +110,7 @@ export async function executeDeleteTodo(
 
     await adapters.todo.delete(id)
     return formatSuccess('Todo deleted successfully')
-  } catch (e: any) {
-    return formatError(`Failed to delete todo: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to delete todo: ${getErrorMessage(e)}`)
   }
 }

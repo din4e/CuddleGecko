@@ -1,22 +1,22 @@
-import client from './client'
-import type { Todo, Event } from '../types'
+import { request } from './client'
+import type { Todo, Event, PaginatedData } from '../types'
 
 export const todoApi = {
-  list: (status?: string) =>
-    client.get<Todo[]>('/todos', { params: { status } }),
+  list: (status?: string, page = 1, pageSize = 50) =>
+    request.get<PaginatedData<Todo>>('/todos', { params: { status, page, page_size: pageSize } }).then((data) => ({ data })),
 
   create: (data: Partial<Todo>) =>
-    client.post<Todo>('/todos', data),
+    request.post<Todo>('/todos', data).then((d) => ({ data: d })),
 
   update: (id: number, data: Partial<Todo>) =>
-    client.put<Todo>(`/todos/${id}`, data),
+    request.put<Todo>(`/todos/${id}`, data).then((d) => ({ data: d })),
 
   toggleStatus: (id: number) =>
-    client.patch<Todo>(`/todos/${id}/toggle`),
+    request.patch<Todo>(`/todos/${id}/toggle`).then((data) => ({ data })),
 
   syncToEvent: (id: number) =>
-    client.post<Event>(`/todos/${id}/sync-event`),
+    request.post<Event>(`/todos/${id}/sync-event`).then((data) => ({ data })),
 
   delete: (id: number) =>
-    client.delete(`/todos/${id}`),
+    request.delete<void>(`/todos/${id}`).then(() => {}),
 }

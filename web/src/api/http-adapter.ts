@@ -1,4 +1,4 @@
-import client from './client'
+import { request } from './client'
 import type { AppAdapters } from './adapter'
 import type { AuthResponse, User, Contact, Tag, Interaction, Reminder, ContactRelation, GraphData, Event, Transaction, TransactionSummary, AIProvider, AIConversation, AIMessage, Workspace, Todo } from '@/types'
 
@@ -6,113 +6,110 @@ function createHTTPAdapters(): AppAdapters {
   return {
     auth: {
       register: (username, email, password, captcha) =>
-        client.post<AuthResponse>('/auth/register', { username, email, password, ...captcha }).then(r => r.data),
+        request.post<AuthResponse>('/auth/register', { username, email, password, ...captcha }),
       login: (username, password, captcha) =>
-        client.post<AuthResponse>('/auth/login', { username, password, ...captcha }).then(r => r.data),
+        request.post<AuthResponse>('/auth/login', { username, password, ...captcha }),
       refresh: (refreshToken) =>
-        client.post<AuthResponse>('/auth/refresh', { refresh_token: refreshToken }).then(r => r.data),
-      me: () => client.get<User>('/auth/me').then(r => r.data),
+        request.post<AuthResponse>('/auth/refresh', { refresh_token: refreshToken }),
+      me: () => request.get<User>('/auth/me'),
     },
 
     captcha: {
-      get: () => client.get('/captcha').then(r => r.data),
+      get: () => request.get<{ enabled: boolean; captcha_id?: string; captcha_image?: string }>('/captcha'),
     },
 
     contact: {
-      list: (params) => client.get('/buddies', { params }).then(r => r.data),
-      create: (data) => client.post('/buddies', data).then(r => r.data),
-      getByID: (id) => client.get<Contact>(`/buddies/${id}`).then(r => r.data),
-      update: (id, data) => client.put<Contact>(`/buddies/${id}`, data).then(r => r.data),
-      delete: (id) => client.delete(`/buddies/${id}`).then(() => {}),
-      getTags: (id) => client.get<Tag[]>(`/buddies/${id}/tags`).then(r => r.data),
-      replaceTags: (id, tagIDs) => client.put(`/buddies/${id}/tags`, { tag_ids: tagIDs }).then(() => {}),
+      list: (params) => request.get<{ items: Contact[]; total: number; page: number; page_size: number }>('/buddies', { params }),
+      create: (data) => request.post<Contact>('/buddies', data),
+      getByID: (id) => request.get<Contact>(`/buddies/${id}`),
+      update: (id, data) => request.put<Contact>(`/buddies/${id}`, data),
+      delete: (id) => request.delete<void>(`/buddies/${id}`).then(() => {}),
+      getTags: (id) => request.get<Tag[]>(`/buddies/${id}/tags`),
+      replaceTags: (id, tagIDs) => request.put<void>(`/buddies/${id}/tags`, { tag_ids: tagIDs }).then(() => {}),
     },
 
     tag: {
-      list: () => client.get<Tag[]>('/tags').then(r => r.data),
-      create: (data) => client.post<Tag>('/tags', data).then(r => r.data),
-      update: (id, data) => client.put<Tag>(`/tags/${id}`, data).then(r => r.data),
-      delete: (id) => client.delete(`/tags/${id}`).then(() => {}),
+      list: () => request.get<{ items: Tag[]; total: number }>('/tags', { params: { page: 1, page_size: 200 } }).then((r) => r.items || []),
+      create: (data) => request.post<Tag>('/tags', data),
+      update: (id, data) => request.put<Tag>(`/tags/${id}`, data),
+      delete: (id) => request.delete<void>(`/tags/${id}`).then(() => {}),
     },
 
     interaction: {
       listByContact: (contactID, page, pageSize) =>
-        client.get(`/buddies/${contactID}/interactions`, { params: { page, page_size: pageSize } }).then(r => r.data),
-      create: (contactID, data) =>
-        client.post<Interaction>(`/buddies/${contactID}/interactions`, data).then(r => r.data),
-      update: (id, data) => client.put<Interaction>(`/interactions/${id}`, data).then(r => r.data),
-      delete: (id) => client.delete(`/interactions/${id}`).then(() => {}),
+        request.get<{ items: Interaction[]; total: number }>(`/buddies/${contactID}/interactions`, { params: { page, page_size: pageSize } }),
+      create: (contactID, data) => request.post<Interaction>(`/buddies/${contactID}/interactions`, data),
+      update: (id, data) => request.put<Interaction>(`/interactions/${id}`, data),
+      delete: (id) => request.delete<void>(`/interactions/${id}`).then(() => {}),
     },
 
     reminder: {
-      list: (status) => client.get<Reminder[]>('/reminders', { params: { status } }).then(r => r.data),
-      create: (contactID, data) =>
-        client.post<Reminder>(`/buddies/${contactID}/reminders`, data).then(r => r.data),
-      update: (id, data) => client.put<Reminder>(`/reminders/${id}`, data).then(r => r.data),
-      delete: (id) => client.delete(`/reminders/${id}`).then(() => {}),
+      list: (status) => request.get<{ items: Reminder[]; total: number }>('/reminders', { params: { status, page: 1, page_size: 200 } }).then((r) => r.items || []),
+      create: (contactID, data) => request.post<Reminder>(`/buddies/${contactID}/reminders`, data),
+      update: (id, data) => request.put<Reminder>(`/reminders/${id}`, data),
+      delete: (id) => request.delete<void>(`/reminders/${id}`).then(() => {}),
     },
 
     graph: {
-      getGraph: () => client.get<GraphData>('/graph').then(r => r.data),
-      getRelations: (contactID) => client.get<ContactRelation[]>(`/buddies/${contactID}/relations`).then(r => r.data),
-      createRelation: (contactIDA, data) =>
-        client.post<ContactRelation>(`/buddies/${contactIDA}/relations`, data).then(r => r.data),
-      deleteRelation: (id) => client.delete(`/relations/${id}`).then(() => {}),
+      getGraph: () => request.get<GraphData>('/graph'),
+      getRelations: (contactID) => request.get<ContactRelation[]>(`/buddies/${contactID}/relations`),
+      createRelation: (contactIDA, data) => request.post<ContactRelation>(`/buddies/${contactIDA}/relations`, data),
+      deleteRelation: (id) => request.delete<void>(`/relations/${id}`).then(() => {}),
     },
 
     export: {
-      exportJSON: () => client.post('/export').then(r => r.data),
-      importJSON: (data) => client.post('/import', { data }).then(() => {}),
+      exportJSON: () => request.post<string>('/export'),
+      importJSON: (data) => request.post<void>('/import', { data }).then(() => {}),
     },
 
     event: {
-      list: (params) => client.get('/events', { params }).then(r => r.data),
-      create: (data) => client.post<Event>('/events', data).then(r => r.data),
-      update: (id, data) => client.put<Event>(`/events/${id}`, data).then(r => r.data),
-      delete: (id) => client.delete(`/events/${id}`).then(() => {}),
+      list: (params) => request.get<{ items: Event[]; total: number; page: number; page_size: number }>('/events', { params }),
+      create: (data) => request.post<Event>('/events', data),
+      update: (id, data) => request.put<Event>(`/events/${id}`, data),
+      delete: (id) => request.delete<void>(`/events/${id}`).then(() => {}),
     },
 
     todo: {
-      list: (status) => client.get<Todo[]>('/todos', { params: { status } }).then(r => r.data),
-      create: (data) => client.post<Todo>('/todos', data).then(r => r.data),
-      update: (id, data) => client.put<Todo>(`/todos/${id}`, data).then(r => r.data),
-      toggleStatus: (id) => client.patch<Todo>(`/todos/${id}/toggle`).then(r => r.data),
-      syncToEvent: (id) => client.post<Event>(`/todos/${id}/sync-event`).then(r => r.data),
-      delete: (id) => client.delete(`/todos/${id}`).then(() => {}),
+      list: (status) => request.get<Todo[]>('/todos', { params: { status } }),
+      create: (data) => request.post<Todo>('/todos', data),
+      update: (id, data) => request.put<Todo>(`/todos/${id}`, data),
+      toggleStatus: (id) => request.patch<Todo>(`/todos/${id}/toggle`),
+      syncToEvent: (id) => request.post<Event>(`/todos/${id}/sync-event`),
+      delete: (id) => request.delete<void>(`/todos/${id}`).then(() => {}),
     },
 
     transaction: {
-      list: (params) => client.get('/transactions', { params }).then(r => r.data),
-      summary: () => client.get<TransactionSummary>('/transactions/summary').then(r => r.data),
-      create: (data) => client.post<Transaction>('/transactions', data).then(r => r.data),
-      update: (id, data) => client.put<Transaction>(`/transactions/${id}`, data).then(r => r.data),
-      delete: (id) => client.delete(`/transactions/${id}`).then(() => {}),
+      list: (params) => request.get<{ items: Transaction[]; total: number; page: number; page_size: number }>('/transactions', { params }),
+      summary: () => request.get<TransactionSummary>('/transactions/summary'),
+      create: (data) => request.post<Transaction>('/transactions', data),
+      update: (id, data) => request.put<Transaction>(`/transactions/${id}`, data),
+      delete: (id) => request.delete<void>(`/transactions/${id}`).then(() => {}),
     },
 
     ai: {
-      envProviderStatus: () => client.get('/ai/env-status').then(r => r.data),
-      listPresets: () => client.get('/ai/presets').then(r => r.data),
-      listProviders: () => client.get<AIProvider[]>('/ai/providers').then(r => r.data),
-      saveProvider: (data) => client.put<AIProvider>('/ai/providers', data).then(r => r.data),
-      activateProvider: (id) => client.post(`/ai/providers/${id}/activate`).then(() => {}),
-      testConnection: (id) => client.post(`/ai/providers/${id}/test`).then(r => r.data),
-      listConversations: (params) => client.get('/ai/conversations', { params }).then(r => r.data),
-      createConversation: (data) => client.post<AIConversation>('/ai/conversations', data).then(r => r.data),
-      getMessages: (conversationId) => client.get<AIMessage[]>(`/ai/conversations/${conversationId}/messages`).then(r => r.data),
-      deleteConversation: (id) => client.delete(`/ai/conversations/${id}`).then(() => {}),
-      analyzeRelationship: (contactId) => client.post(`/ai/analyze/relationship/${contactId}`).then(r => r.data),
-      analyzeEvent: (eventId) => client.post(`/ai/analyze/event/${eventId}`).then(r => r.data),
-      analyzeComprehensive: (data) => client.post('/ai/analyze', data).then(r => r.data),
-      chat: (conversationId, message) => client.post<{ content: string }>('/ai/chat/sync', { conversation_id: conversationId, message }).then(r => r.data.content),
+      envProviderStatus: () => request.get<{ configured: boolean; provider_type: string; model: string; base_url: string }>('/ai/env-status'),
+      listPresets: () => request.get<import('@/types').AIProviderPreset[]>('/ai/presets'),
+      listProviders: () => request.get<AIProvider[]>('/ai/providers'),
+      saveProvider: (data) => request.put<AIProvider>('/ai/providers', data),
+      activateProvider: (id) => request.post<void>(`/ai/providers/${id}/activate`).then(() => {}),
+      testConnection: (id) => request.post<{ success: boolean; error?: string }>(`/ai/providers/${id}/test`),
+      listConversations: (params) => request.get<{ items: AIConversation[]; total: number; page: number; page_size: number }>('/ai/conversations', { params }),
+      createConversation: (data) => request.post<AIConversation>('/ai/conversations', data),
+      getMessages: (conversationId) => request.get<AIMessage[]>(`/ai/conversations/${conversationId}/messages`),
+      deleteConversation: (id) => request.delete<void>(`/ai/conversations/${id}`).then(() => {}),
+      analyzeRelationship: (contactId) => request.post<{ analysis: string }>(`/ai/analyze/relationship/${contactId}`),
+      analyzeEvent: (eventId) => request.post<{ analysis: string }>(`/ai/analyze/event/${eventId}`),
+      analyzeComprehensive: (data) => request.post<{ analysis: string }>('/ai/analyze', data),
+      chat: (conversationId, message) => request.post<{ content: string }>('/ai/chat/sync', { conversation_id: conversationId, message }).then((r) => r.content),
     },
 
     workspace: {
-      list: () => client.get<Workspace[]>('/workspaces').then(r => r.data),
-      create: (data) => client.post<Workspace>('/workspaces', data).then(r => r.data),
-      update: (id, data) => client.put<Workspace>(`/workspaces/${id}`, data).then(r => r.data),
-      delete: (id) => client.delete(`/workspaces/${id}`).then(() => {}),
-      switch: (id) => client.post<Workspace>(`/workspaces/${id}/switch`).then(r => r.data),
-      getDefault: () => client.get<Workspace>('/workspaces/default').then(r => r.data),
+      list: () => request.get<Workspace[]>('/workspaces'),
+      create: (data) => request.post<Workspace>('/workspaces', data),
+      update: (id, data) => request.put<Workspace>(`/workspaces/${id}`, data),
+      delete: (id) => request.delete<void>(`/workspaces/${id}`).then(() => {}),
+      switch: (id) => request.post<Workspace>(`/workspaces/${id}/switch`),
+      getDefault: () => request.get<Workspace>('/workspaces/default'),
     },
   }
 }

@@ -8,7 +8,7 @@ database:
   mysql_dsn: ""
 
 jwt:
-  secret: "change-me-in-production"
+  secret: "change-me-in-production-please-use-at-least-32-chars"
   access_ttl: 15m
   refresh_ttl: 168h
 
@@ -18,3 +18,8 @@ log:
 
 captcha:
   enabled: false
+
+cors:
+  allow_origins:
+    - "http://localhost:5173"
+    - "http://localhost:3000"

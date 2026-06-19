@@ -1,8 +1,10 @@
 import type { AppAdapters } from '@/api/adapter'
-import { formatTable, formatDetail, formatSuccess, formatError, formatCount } from '../formatters'
+import { formatTable, formatDetail, formatSuccess, formatError } from '../formatters'
+import type { CommandArgs } from '../types'
+import { getErrorMessage } from '../types'
 
 export async function executeListBuddies(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -32,13 +34,13 @@ export async function executeListBuddies(
 
     const table = formatTable(rows)
     return `${table}\r\n\r\nTotal: ${result.total} (Page ${result.page}/${Math.ceil(result.total / result.page_size)})`
-  } catch (e: any) {
-    return formatError(`Failed to list buddies: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to list buddies: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeGetBuddy(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -59,20 +61,20 @@ export async function executeGetBuddy(
       Created: contact.created_at,
       Updated: contact.updated_at,
     })
-  } catch (e: any) {
-    return formatError(`Failed to get buddy: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to get buddy: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeCreateBuddy(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
     const name = args.name as string
     if (!name) return formatError('--name is required')
 
-    const data: Record<string, any> = { name }
+    const data: Record<string, unknown> = { name }
     if (args.nickname) data.nickname = args.nickname
     if (args.birthday) data.birthday = args.birthday
     if (args.notes) data.notes = args.notes
@@ -82,20 +84,20 @@ export async function executeCreateBuddy(
 
     const contact = await adapters.contact.create(data)
     return formatSuccess(`Created buddy (ID: ${contact.id})`)
-  } catch (e: any) {
-    return formatError(`Failed to create buddy: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to create buddy: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeUpdateBuddy(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
     const id = Number(args.id)
     if (!id) return formatError('Usage: update buddy <id>')
 
-    const data: Record<string, any> = {}
+    const data: Record<string, unknown> = {}
     if (args.name) data.name = args.name
     if (args.nickname) data.nickname = args.nickname
     if (args.birthday) data.birthday = args.birthday
@@ -108,13 +110,13 @@ export async function executeUpdateBuddy(
 
     await adapters.contact.update(id, data)
     return formatSuccess('Buddy updated successfully')
-  } catch (e: any) {
-    return formatError(`Failed to update buddy: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to update buddy: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeDeleteBuddy(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -123,13 +125,13 @@ export async function executeDeleteBuddy(
 
     await adapters.contact.delete(id)
     return formatSuccess('Buddy deleted successfully')
-  } catch (e: any) {
-    return formatError(`Failed to delete buddy: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to delete buddy: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeTagBuddy(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -141,7 +143,7 @@ export async function executeTagBuddy(
     const tagIds = tagIdsStr.split(',').map(Number).filter((n) => !isNaN(n))
     await adapters.contact.replaceTags(id, tagIds)
     return formatSuccess('Tags updated successfully')
-  } catch (e: any) {
-    return formatError(`Failed to tag buddy: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to tag buddy: ${getErrorMessage(e)}`)
   }
 }

@@ -52,6 +52,10 @@ const navKeys = [
   { to: '/settings', label: 'nav.settings', icon: Settings },
 ]
 
+function isMobileViewport() {
+  return typeof window !== 'undefined' && window.innerWidth < 1024
+}
+
 export default function AppLayout() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
@@ -61,14 +65,21 @@ export default function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1',
   )
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   const toggleSidebar = () => {
+    if (isMobileViewport()) {
+      setMobileOpen((prev) => !prev)
+      return
+    }
     setSidebarCollapsed((prev) => {
       const next = !prev
       localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0')
       return next
     })
   }
+
+  const closeMobileSidebar = () => setMobileOpen(false)
 
   const toggleTheme = () => {
     const next = !dark
@@ -80,6 +91,16 @@ export default function AppLayout() {
 
   useEffect(() => {
     document.documentElement.style.colorScheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  }, [])
+
+  useEffect(() => {
+    const onResize = () => {
+      if (!isMobileViewport()) {
+        setMobileOpen(false)
+      }
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
   const toggleLang = () => {
@@ -102,11 +123,22 @@ export default function AppLayout() {
       <WindowTitleBar />
       <div className="flex flex-1 min-h-0">
 
+      {/* Backdrop for mobile sidebar */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar */}
       <aside
         className={cn(
           'flex shrink-0 flex-col border-r bg-card transition-[width] duration-200 ease-out',
           sidebarCollapsed ? 'w-[4.5rem] items-center overflow-x-hidden px-2 py-4' : 'w-64 p-4',
+          'hidden lg:flex',
+          mobileOpen && 'fixed inset-y-0 left-0 z-50 flex lg:static lg:z-auto',
         )}
       >
         <header className={cn('mb-4 w-full min-w-0', sidebarCollapsed && 'flex justify-center')}>
@@ -132,6 +164,7 @@ export default function AppLayout() {
               end={to === '/'}
               title={sidebarCollapsed ? t(label) : undefined}
               aria-label={t(label)}
+              onClick={closeMobileSidebar}
               className={({ isActive }) =>
                 cn(
                   'flex items-center rounded-md text-sm transition-colors',
@@ -234,8 +267,8 @@ export default function AppLayout() {
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-auto min-h-0">
-          <div className="min-h-full p-6">
+        <main className="flex-1 overflow-hidden min-h-0">
+          <div className="h-full overflow-auto p-6">
             <Outlet />
           </div>
         </main>

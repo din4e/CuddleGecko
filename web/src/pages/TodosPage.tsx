@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, memo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { todoApi } from '../api/todo'
 import { contactsApi } from '../api/contacts'
@@ -37,6 +37,97 @@ const priorityConfig: Record<string, { color: string; bg: string }> = {
   low: { color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-800' },
 }
 
+interface TodoCardProps {
+  todo: Todo
+  compact?: boolean
+  contactNames: string
+  onToggle: (id: number) => void
+  onSync: (todo: Todo) => void
+  onEdit: (todo: Todo) => void
+  onDelete: (todo: Todo) => void
+  formatDate: (dateStr: string | null) => string
+  priorityLabel: string
+  syncLabel: string
+}
+
+const TodoCard = memo(function TodoCard({
+  todo,
+  compact = false,
+  contactNames,
+  onToggle,
+  onSync,
+  onEdit,
+  onDelete,
+  formatDate,
+  priorityLabel,
+  syncLabel,
+}: TodoCardProps) {
+  return (
+    <Card
+      className={`${todo.status === 'done' ? 'opacity-60' : ''} ${compact ? 'p-2' : ''}`}
+      style={todo.color ? { borderLeftColor: todo.color, borderLeftWidth: '3px' } : undefined}
+    >
+      <CardContent className={`${compact ? 'p-2 space-y-1' : 'p-3 space-y-2'}`}>
+        <div className="flex items-start gap-2">
+          <button
+            onClick={() => onToggle(todo.id)}
+            className="mt-0.5 shrink-0 cursor-pointer bg-transparent border-none"
+          >
+            {todo.status === 'done'
+              ? <CheckCircle2 className="h-5 w-5 text-green-500" />
+              : <Circle className="h-5 w-5 text-muted-foreground hover:text-primary" />}
+          </button>
+          <div className="flex-1 min-w-0">
+            <span className={`text-sm font-medium ${todo.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
+              {todo.title}
+            </span>
+            {todo.description && !compact && (
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{todo.description}</p>
+            )}
+          </div>
+          <Badge variant="secondary" className={`text-xs shrink-0 ${priorityConfig[todo.priority]?.bg || ''}`}>
+            <span className={priorityConfig[todo.priority]?.color}>{priorityLabel}</span>
+          </Badge>
+        </div>
+
+        {!compact && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            {todo.due_time && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {formatDate(todo.due_time)}
+              </span>
+            )}
+            {todo.amount != null && todo.amount > 0 && (
+              <Badge variant="outline" className={todo.amount_type === 'income' ? 'text-green-600' : 'text-red-600'}>
+                {todo.amount_type === 'income' ? '+' : '-'}{todo.amount}
+              </Badge>
+            )}
+            {todo.contact_ids?.length > 0 && contactNames && (
+              <span>{contactNames}</span>
+            )}
+          </div>
+        )}
+
+        {!compact && (
+          <div className="flex items-center gap-1 pt-1">
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onSync(todo)}>
+              <ArrowRight className="h-3 w-3 mr-1" />
+              {syncLabel}
+            </Button>
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onEdit(todo)}>
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-destructive" onClick={() => onDelete(todo)}>
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+})
+
 export default function TodosPage() {
   const { t } = useTranslation()
   const [todos, setTodos] = useState<Todo[]>([])
@@ -45,7 +136,10 @@ export default function TodosPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'done'>('all')
   const [view, setView] = useState<TodoView>('grouped')
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [editing, setEditing] = useState<Todo | null>(null)
+  const pageSize = 50
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Todo | null>(null)
 
@@ -59,17 +153,18 @@ export default function TodosPage() {
   const [formContactIds, setFormContactIds] = useState<number[]>([])
   const [formColor, setFormColor] = useState('')
 
-  const loadTodos = async () => {
+  const loadTodos = useCallback(async () => {
     try {
       const status = statusFilter === 'all' ? undefined : statusFilter
-      const res = await todoApi.list(status)
-      setTodos(res.data ?? [])
+      const res = await todoApi.list(status, page, pageSize)
+      setTodos(res.data?.items ?? [])
+      setTotal(res.data?.total ?? 0)
     } catch {
       // ignore
     } finally {
       setLoading(false)
     }
-  }
+  }, [statusFilter, page])
 
   const loadContacts = async () => {
     try {
@@ -80,7 +175,9 @@ export default function TodosPage() {
     }
   }
 
-  useEffect(() => { loadTodos() }, [statusFilter])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { loadTodos() }, [loadTodos])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadContacts() }, [])
 
   const resetForm = () => {
@@ -90,7 +187,7 @@ export default function TodosPage() {
   }
 
   const openCreate = () => { resetForm(); setDialogOpen(true) }
-  const openEdit = (todo: Todo) => {
+  const openEdit = useCallback((todo: Todo) => {
     setEditing(todo)
     setFormTitle(todo.title)
     setFormDesc(todo.description)
@@ -101,7 +198,7 @@ export default function TodosPage() {
     setFormContactIds(todo.contact_ids || [])
     setFormColor(todo.color || '')
     setDialogOpen(true)
-  }
+  }, [])
 
   const handleSave = async () => {
     if (!formTitle.trim()) return
@@ -130,25 +227,25 @@ export default function TodosPage() {
     }
   }
 
-  const handleToggle = async (id: number) => {
+  const handleToggle = useCallback(async (id: number) => {
     try {
       await todoApi.toggleStatus(id)
       loadTodos()
     } catch {
       // ignore
     }
-  }
+  }, [loadTodos])
 
-  const handleSync = async (todo: Todo) => {
+  const handleSync = useCallback(async (todo: Todo) => {
     try {
       await todoApi.syncToEvent(todo.id)
       alert(t('todos.syncSuccess'))
     } catch {
       alert(t('todos.syncFailed'))
     }
-  }
+  }, [t])
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = useCallback(async (id: number) => {
     try {
       await todoApi.delete(id)
       setConfirmDelete(null)
@@ -156,16 +253,23 @@ export default function TodosPage() {
     } catch {
       // ignore
     }
-  }
+  }, [loadTodos])
 
-  const getContactNames = (ids: number[]) =>
-    ids.map((id) => contacts.find((c) => c.id === id)?.name).filter(Boolean).join(', ')
+  const contactNameMap = useMemo(() => {
+    const m = new Map<number, string>()
+    for (const c of contacts) m.set(c.id, c.name)
+    return m
+  }, [contacts])
 
-  const formatDate = (dateStr: string | null) => {
+  const getContactNames = useCallback((ids: number[]) =>
+    ids.map((id) => contactNameMap.get(id)).filter(Boolean).join(', '),
+    [contactNameMap])
+
+  const formatDate = useCallback((dateStr: string | null) => {
     if (!dateStr) return ''
     const d = new Date(dateStr)
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-  }
+  }, [])
 
   const formatDay = (dateStr: string) => {
     const d = new Date(dateStr)
@@ -232,70 +336,22 @@ export default function TodosPage() {
     { key: 'kanban', icon: Columns, label: t('todos.viewKanban') },
   ]
 
+  const syncLabel = t('todos.syncToEvent')
+
   const renderTodoCard = (todo: Todo, compact = false) => (
-    <Card
+    <TodoCard
       key={todo.id}
-      className={`${todo.status === 'done' ? 'opacity-60' : ''} ${compact ? 'p-2' : ''}`}
-      style={todo.color ? { borderLeftColor: todo.color, borderLeftWidth: '3px' } : undefined}
-    >
-      <CardContent className={`${compact ? 'p-2 space-y-1' : 'p-3 space-y-2'}`}>
-        <div className="flex items-start gap-2">
-          <button
-            onClick={() => handleToggle(todo.id)}
-            className="mt-0.5 shrink-0 cursor-pointer bg-transparent border-none"
-          >
-            {todo.status === 'done'
-              ? <CheckCircle2 className="h-5 w-5 text-green-500" />
-              : <Circle className="h-5 w-5 text-muted-foreground hover:text-primary" />}
-          </button>
-          <div className="flex-1 min-w-0">
-            <span className={`text-sm font-medium ${todo.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
-              {todo.title}
-            </span>
-            {todo.description && !compact && (
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{todo.description}</p>
-            )}
-          </div>
-          <Badge variant="secondary" className={`text-xs shrink-0 ${priorityConfig[todo.priority]?.bg || ''}`}>
-            <span className={priorityConfig[todo.priority]?.color}>{t(`todos.${todo.priority}`)}</span>
-          </Badge>
-        </div>
-
-        {!compact && (
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {todo.due_time && (
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {formatDate(todo.due_time)}
-              </span>
-            )}
-            {todo.amount != null && todo.amount > 0 && (
-              <Badge variant="outline" className={todo.amount_type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                {todo.amount_type === 'income' ? '+' : '-'}{todo.amount}
-              </Badge>
-            )}
-            {todo.contact_ids?.length > 0 && (
-              <span>{getContactNames(todo.contact_ids)}</span>
-            )}
-          </div>
-        )}
-
-        {!compact && (
-          <div className="flex items-center gap-1 pt-1">
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => handleSync(todo)}>
-              <ArrowRight className="h-3 w-3 mr-1" />
-              {t('todos.syncToEvent')}
-            </Button>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openEdit(todo)}>
-              <Pencil className="h-3 w-3" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-destructive" onClick={() => setConfirmDelete(todo)}>
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      todo={todo}
+      compact={compact}
+      contactNames={getContactNames(todo.contact_ids || [])}
+      priorityLabel={t(`todos.${todo.priority}`)}
+      syncLabel={syncLabel}
+      onToggle={handleToggle}
+      onSync={handleSync}
+      onEdit={openEdit}
+      onDelete={setConfirmDelete}
+      formatDate={formatDate}
+    />
   )
 
   return (
@@ -312,7 +368,7 @@ export default function TodosPage() {
                 variant={statusFilter === s ? 'default' : 'ghost'}
                 size="sm"
                 className="h-7 px-2.5 text-xs rounded-none"
-                onClick={() => setStatusFilter(s)}
+                onClick={() => { setStatusFilter(s); setPage(1) }}
               >
                 {t(`todos.${s}`)}
               </Button>
@@ -414,6 +470,20 @@ export default function TodosPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {total > pageSize && (
+        <div className="flex justify-center items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            {t('contacts.previous')}
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {t('contacts.page')} {page} / {Math.ceil(total / pageSize)} ({total})
+          </span>
+          <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(page + 1)}>
+            {t('contacts.next')}
+          </Button>
         </div>
       )}
 

@@ -10,6 +10,7 @@ import { setBaseURL } from '../api/client'
 import { Download, Upload, Monitor, Globe, Network, Bot, CheckCircle, Loader2, Settings2, Cable, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { useGraphSettings } from '../stores/graphSettings'
+import { isWailsRuntime } from '../lib/wails'
 import type { AIProvider, AIProviderPreset } from '../types'
 
 const PROVIDER_ICONS: Record<string, string> = {
@@ -44,7 +45,7 @@ export default function SettingsPage() {
   const setMode = useModeStore((s) => s.setMode)
   const setRemoteUrl = useModeStore((s) => s.setRemoteUrl)
   const [urlInput, setUrlInput] = useState(remoteUrl)
-  const isWails = typeof window !== 'undefined' && !!(window as any).__WAILS__
+  const isWails = isWailsRuntime()
   const nodeRadius = useGraphSettings((s) => s.nodeRadius)
   const emojiSize = useGraphSettings((s) => s.emojiSize)
   const setNodeRadius = useGraphSettings((s) => s.setNodeRadius)
@@ -79,10 +80,13 @@ export default function SettingsPage() {
       setPresets(p || [])
       setProviders(prov || [])
       setEnvAI(env || null)
-    } catch {}
-  }, [adapters?.ai])
+    } catch {
+      /* ignore */
+    }
+  }, [adapters])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAIProviders()
   }, [loadAIProviders])
 
@@ -151,8 +155,9 @@ export default function SettingsPage() {
       toast.success(t('ai.save'))
       setApiKey('')
       loadAIProviders()
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to save provider')
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e)
+      toast.error(message || 'Failed to save provider')
     }
   }
 
@@ -161,7 +166,9 @@ export default function SettingsPage() {
     try {
       await adapters.ai.activateProvider(id)
       loadAIProviders()
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   }
 
   const handleTestAI = async (id: number) => {

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import TodosPage from '../TodosPage'
+import type { Todo, Contact, PaginatedData } from '../../types'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -52,9 +53,24 @@ vi.mock('../../api/contacts', () => ({
 
 import { todoApi } from '../../api/todo'
 import { contactsApi } from '../../api/contacts'
+import type { AxiosResponse } from 'axios'
 
 const mockedList = vi.mocked(todoApi.list)
 const mockedContactsList = vi.mocked(contactsApi.list)
+
+function mockPage<T>(items: T[], total?: number): { data: PaginatedData<T> } {
+  return { data: { items, total: total ?? items.length, page: 1, page_size: 50 } }
+}
+
+function mockAxios<T>(data: T): AxiosResponse<T> {
+  return {
+    data,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    config: {} as AxiosResponse['config'],
+  }
+}
 
 function renderPage() {
   return render(
@@ -67,8 +83,8 @@ function renderPage() {
 describe('TodosPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockedList.mockResolvedValue({ data: [] })
-    mockedContactsList.mockResolvedValue({ data: { items: [], total: 0, page: 1, page_size: 100 } })
+    mockedList.mockResolvedValue(mockPage<Todo>([]))
+    mockedContactsList.mockResolvedValue(mockAxios<PaginatedData<Contact>>({ items: [], total: 0, page: 1, page_size: 100 }))
   })
 
   it('renders empty state', async () => {
@@ -88,11 +104,9 @@ describe('TodosPage', () => {
   })
 
   it('renders todo items from API', async () => {
-    mockedList.mockResolvedValue({
-      data: [
-        { id: 1, title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
-      ],
-    })
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 1, title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+    ]))
     renderPage()
     await waitFor(() => {
       expect(screen.getByText('Buy milk')).toBeInTheDocument()
@@ -101,11 +115,9 @@ describe('TodosPage', () => {
   })
 
   it('renders done todo with completed section', async () => {
-    mockedList.mockResolvedValue({
-      data: [
-        { id: 2, title: 'Done task', status: 'done', priority: 'low', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
-      ],
-    })
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 2, title: 'Done task', status: 'done', priority: 'low', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+    ]))
     renderPage()
     await waitFor(() => {
       expect(screen.getByText('Done task')).toBeInTheDocument()
@@ -114,11 +126,9 @@ describe('TodosPage', () => {
   })
 
   it('renders todo with amount and priority', async () => {
-    mockedList.mockResolvedValue({
-      data: [
-        { id: 3, title: 'Team lunch', status: 'pending', priority: 'high', due_time: '2026-05-22T14:00:00+08:00', amount: 200, amount_type: 'expense', contact_ids: [], color: '#ff0000', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
-      ],
-    })
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 3, title: 'Team lunch', status: 'pending', priority: 'high', due_time: '2026-05-22T14:00:00+08:00', amount: 200, amount_type: 'expense', contact_ids: [], color: '#ff0000', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+    ]))
     renderPage()
     await waitFor(() => {
       expect(screen.getByText('Team lunch')).toBeInTheDocument()
@@ -136,16 +146,14 @@ describe('TodosPage', () => {
     // Click the "pending" status filter button (translates to '待办状态')
     await user.click(screen.getByText('待办状态'))
     // The API should be called with the raw value 'pending', not the translated text
-    expect(mockedList).toHaveBeenCalledWith('pending')
+    expect(mockedList).toHaveBeenCalledWith('pending', 1, 50)
   })
 
   it('switches to kanban view showing columns', async () => {
-    mockedList.mockResolvedValue({
-      data: [
-        { id: 1, title: 'Task A', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
-        { id: 2, title: 'Task B', status: 'done', priority: 'low', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
-      ],
-    })
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 1, title: 'Task A', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      { id: 2, title: 'Task B', status: 'done', priority: 'low', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+    ]))
     const user = userEvent.setup()
     renderPage()
     await waitFor(() => {

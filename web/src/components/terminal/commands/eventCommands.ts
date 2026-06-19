@@ -1,8 +1,10 @@
 import type { AppAdapters } from '@/api/adapter'
-import { formatTable, formatDetail, formatSuccess, formatError } from '../formatters'
+import { formatTable, formatSuccess, formatError } from '../formatters'
+import type { CommandArgs } from '../types'
+import { getErrorMessage } from '../types'
 
 export async function executeListEvents(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -23,13 +25,13 @@ export async function executeListEvents(
 
     const table = formatTable(rows)
     return `${table}\r\n\r\nTotal: ${result.total} (Page ${result.page}/${Math.ceil(result.total / result.page_size)})`
-  } catch (e: any) {
-    return formatError(`Failed to list events: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to list events: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeCreateEvent(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -37,7 +39,7 @@ export async function executeCreateEvent(
     const start = args.start as string
     if (!title || !start) return formatError('--title and --start are required')
 
-    const data: Record<string, any> = { title, start_time: start }
+    const data: Record<string, unknown> = { title, start_time: start }
     if (args.end) data.end_time = args.end
     if (args.location) data.location = args.location
     if (args.description) data.description = args.description
@@ -45,20 +47,20 @@ export async function executeCreateEvent(
 
     const event = await adapters.event.create(data)
     return formatSuccess(`Created event (ID: ${event.id})`)
-  } catch (e: any) {
-    return formatError(`Failed to create event: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to create event: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeUpdateEvent(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
     const id = Number(args.id)
     if (!id) return formatError('Usage: update event <id>')
 
-    const data: Record<string, any> = {}
+    const data: Record<string, unknown> = {}
     if (args.title) data.title = args.title
     if (args.start) data.start_time = args.start
     if (args.end) data.end_time = args.end
@@ -69,13 +71,13 @@ export async function executeUpdateEvent(
 
     await adapters.event.update(id, data)
     return formatSuccess('Event updated successfully')
-  } catch (e: any) {
-    return formatError(`Failed to update event: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to update event: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeDeleteEvent(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -84,7 +86,7 @@ export async function executeDeleteEvent(
 
     await adapters.event.delete(id)
     return formatSuccess('Event deleted successfully')
-  } catch (e: any) {
-    return formatError(`Failed to delete event: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to delete event: ${getErrorMessage(e)}`)
   }
 }

@@ -23,6 +23,9 @@ export default function RemindersPage() {
   const [statusFilter, setStatusFilter] = useState<ReminderStatus | ''>('')
   const [loading, setLoading] = useState(true)
   const [view, setView] = useViewMode('reminders')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 50
 
   // Edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -35,18 +38,33 @@ export default function RemindersPage() {
   const loadReminders = async () => {
     setLoading(true)
     try {
-      const res = await remindersApi.list(statusFilter || undefined)
-      const remindersData = res.data
-      setReminders(Array.isArray(remindersData) ? remindersData : [])
+      const res = await remindersApi.list(statusFilter || undefined, page, pageSize)
+      const payload = res.data
+      if (Array.isArray(payload)) {
+        setReminders(payload)
+        setTotal(payload.length)
+      } else if (payload && Array.isArray(payload.items)) {
+        setReminders(payload.items)
+        setTotal(payload.total ?? payload.items.length)
+      } else {
+        setReminders([])
+        setTotal(0)
+      }
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadReminders()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter])
+  }, [statusFilter, page])
+
+  const changeStatusFilter = (s: ReminderStatus | '') => {
+    setStatusFilter(s)
+    setPage(1)
+  }
 
   const openEdit = (r: Reminder) => {
     setEditing(r)
@@ -100,7 +118,7 @@ export default function RemindersPage() {
       </div>
       <div className="flex gap-2">
         {['', 'pending', 'done', 'snoozed'].map((s) => (
-          <Button key={s} variant={statusFilter === s ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter(s as ReminderStatus | '')}>
+          <Button key={s} variant={statusFilter === s ? 'default' : 'outline'} size="sm" onClick={() => changeStatusFilter(s as ReminderStatus | '')}>
             {s === '' ? t('reminders.all') : statusLabels[s as keyof typeof statusLabels] || s}
           </Button>
         ))}
@@ -182,6 +200,20 @@ export default function RemindersPage() {
               </Card>
             )
           })}
+        </div>
+      )}
+
+      {total > pageSize && (
+        <div className="flex justify-center items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            {t('contacts.previous')}
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {t('contacts.page')} {page} / {Math.ceil(total / pageSize)} ({total})
+          </span>
+          <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(page + 1)}>
+            {t('contacts.next')}
+          </Button>
         </div>
       )}
 

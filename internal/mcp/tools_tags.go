@@ -11,7 +11,8 @@ func (s *MCPServer) registerTagTools() {
 		"type": "object",
 		"properties": map[string]interface{}{},
 	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		return s.tagSvc.List(ctx, userID, workspaceID)
+		tags, _, err := s.tagSvc.List(ctx, userID, workspaceID, 1, 200)
+		return tags, err
 	})
 
 	s.registerTool("create_tag", "Create a new tag.", map[string]interface{}{

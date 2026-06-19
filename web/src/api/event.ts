@@ -1,16 +1,16 @@
-import client from './client'
+import { request } from './client'
 import type { Event, PaginatedData } from '../types'
 
 export const eventApi = {
   list: (params?: { page?: number; page_size?: number; start_after?: string; end_before?: string }) =>
-    client.get<PaginatedData<Event>>('/events', { params }),
+    request.get<PaginatedData<Event>>('/events', { params }).then((data) => ({ data })),
 
   create: (data: Partial<Event>) =>
-    client.post<Event>('/events', data),
+    request.post<Event>('/events', data).then((d) => ({ data: d })),
 
   update: (id: number, data: Partial<Event>) =>
-    client.put<Event>(`/events/${id}`, data),
+    request.put<Event>(`/events/${id}`, data).then((d) => ({ data: d })),
 
   delete: (id: number) =>
-    client.delete(`/events/${id}`),
+    request.delete<void>(`/events/${id}`).then(() => {}),
 }

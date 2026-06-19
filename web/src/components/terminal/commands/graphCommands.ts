@@ -1,8 +1,9 @@
 import type { AppAdapters } from '@/api/adapter'
 import { formatTable, formatSuccess, formatError } from '../formatters'
+import type { CommandArgs } from '../types'
+import { getErrorMessage } from '../types'
 
 const BOLD = '\x1b[1m'
-const CYAN = '\x1b[36m'
 const RESET = '\x1b[0m'
 
 export async function executeGraph(adapters: AppAdapters): Promise<string> {
@@ -33,13 +34,13 @@ export async function executeGraph(adapters: AppAdapters): Promise<string> {
     }
 
     return lines.join('\r\n')
-  } catch (e: any) {
-    return formatError(`Failed to get graph: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to get graph: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeListRelations(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -57,13 +58,13 @@ export async function executeListRelations(
     }))
 
     return formatTable(rows)
-  } catch (e: any) {
-    return formatError(`Failed to list relations: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to list relations: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeCreateRelation(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -78,13 +79,13 @@ export async function executeCreateRelation(
       relation_type: type,
     })
     return formatSuccess(`Created relation (ID: ${relation.id})`)
-  } catch (e: any) {
-    return formatError(`Failed to create relation: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to create relation: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeDeleteRelation(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -93,7 +94,7 @@ export async function executeDeleteRelation(
 
     await adapters.graph.deleteRelation(id)
     return formatSuccess('Relation deleted successfully')
-  } catch (e: any) {
-    return formatError(`Failed to delete relation: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to delete relation: ${getErrorMessage(e)}`)
   }
 }

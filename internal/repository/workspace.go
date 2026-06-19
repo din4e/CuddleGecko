@@ -46,7 +46,9 @@ func (r *WorkspaceRepo) ListByUserID(ctx context.Context, userID uint) ([]model.
 }
 
 func (r *WorkspaceRepo) Update(ctx context.Context, ws *model.Workspace) error {
-	if err := r.db.WithContext(ctx).Save(ws).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&model.Workspace{ID: ws.ID}).
+		Select("name", "description", "icon").
+		Updates(ws).Error; err != nil {
 		return fmt.Errorf("update workspace: %w", err)
 	}
 	return nil

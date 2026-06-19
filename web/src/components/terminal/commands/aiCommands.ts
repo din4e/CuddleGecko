@@ -1,8 +1,10 @@
 import type { AppAdapters } from '@/api/adapter'
-import { formatError, formatSuccess } from '../formatters'
+import { formatError } from '../formatters'
+import type { CommandArgs } from '../types'
+import { getErrorMessage } from '../types'
 
 export async function executeAnalyzeRelationship(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -11,13 +13,13 @@ export async function executeAnalyzeRelationship(
 
     const result = await adapters.ai.analyzeRelationship(id)
     return result.analysis
-  } catch (e: any) {
-    return formatError(`AI analysis failed: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`AI analysis failed: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeAnalyzeEvent(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -26,13 +28,13 @@ export async function executeAnalyzeEvent(
 
     const result = await adapters.ai.analyzeEvent(id)
     return result.analysis
-  } catch (e: any) {
-    return formatError(`AI analysis failed: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`AI analysis failed: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeAnalyzeComprehensive(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -54,7 +56,7 @@ export async function executeAnalyzeComprehensive(
       question,
     })
     return result.analysis
-  } catch (e: any) {
-    return formatError(`AI analysis failed: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`AI analysis failed: ${getErrorMessage(e)}`)
   }
 }

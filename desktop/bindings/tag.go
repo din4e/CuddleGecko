@@ -18,7 +18,8 @@ func (b *TagBinding) List() ([]model.Tag, error) {
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
-	return b.svc.List(ctx, userID, workspaceID)
+	tags, _, err := b.svc.List(ctx, userID, workspaceID, 1, 200)
+	return tags, err
 }
 
 func (b *TagBinding) Create(input CreateTagInput) (*model.Tag, error) {

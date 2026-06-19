@@ -31,12 +31,14 @@ type updateTagRequest struct {
 func (h *TagHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	tags, err := h.svc.List(c.Request.Context(), userID, workspaceID)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	tags, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize)
 	if err != nil {
 		response.InternalError(c, "failed to list tags")
 		return
 	}
-	response.OK(c, tags)
+	response.OKPaginated(c, tags, total, page, pageSize)
 }
 
 func (h *TagHandler) Create(c *gin.Context) {

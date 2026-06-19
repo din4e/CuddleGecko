@@ -1,5 +1,7 @@
-import { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import type { ForceGraphMethods, NodeObject, LinkObject } from 'react-force-graph-2d'
+import ForceGraph2D from 'react-force-graph-2d'
 import { useTranslation } from 'react-i18next'
 import { useModeStore } from '../stores/mode'
 import { contactsApi } from '../api/contacts'
@@ -24,8 +26,6 @@ import AvatarDisplay from '../components/AvatarDisplay'
 import EmojiPicker from '../components/EmojiPicker'
 import BuddyPicker from '../components/BuddyPicker'
 
-const ForceGraph2D = lazy(() => import('react-force-graph-2d'))
-
 const labelColors: Record<string, string> = {
   family: 'bg-pink-100 text-pink-800',
   friend: 'bg-green-100 text-green-800',
@@ -42,6 +42,16 @@ const nodeLabelColors: Record<string, string> = {
 function labelNodeColor(label: string) { return nodeLabelColors[label] || '#6b7280' }
 
 const interactionTypes: InteractionType[] = ['meeting', 'call', 'message', 'email', 'other']
+
+type MiniGraphNodeData = {
+  id: number
+  name: string
+  relationship_labels: string[]
+  avatar_emoji: string
+  __isCenter: boolean
+}
+type MiniGraphNode = NodeObject<MiniGraphNodeData>
+type MiniGraphLink = LinkObject<MiniGraphNodeData, { relation_type: string }>
 
 export default function ContactDetailPage() {
   const { t } = useTranslation()
@@ -78,7 +88,7 @@ export default function ContactDetailPage() {
 
   // Mini relationship graph data
   const graphContainerRef = useRef<HTMLDivElement>(null)
-  const fgRef = useRef<any>(null)
+  const fgRef = useRef<ForceGraphMethods<MiniGraphNode, MiniGraphLink> | undefined>(undefined)
   const [graphDims, setGraphDims] = useState({ width: 600, height: 400 })
   const miniGraphData = useMemo(() => {
     if (!contact) return { nodes: [], links: [] }
@@ -140,22 +150,26 @@ export default function ContactDetailPage() {
       const [cRes, iRes, rRes, relRes, allRes, tagsRes] = await Promise.all([
         contactsApi.get(contactId),
         interactionsApi.list(contactId, { page: 1, page_size: 50 }),
-        remindersApi.list(),
+        remindersApi.list(undefined, 1, 200),
         relationsApi.list(contactId),
         contactsApi.list({ page: 1, page_size: 200 }),
-        tagsApi.list(),
+        tagsApi.list(1, 200),
       ])
       setContact(cRes.data)
       setInteractions(iRes.data.items || [])
-      setReminders((Array.isArray(rRes.data) ? rRes.data : []).filter((r: Reminder) => r.contact_id === contactId))
+      const rData = rRes.data
+      const rItems: Reminder[] = Array.isArray(rData) ? rData : (rData?.items ?? [])
+      setReminders(rItems.filter((r: Reminder) => r.contact_id === contactId))
       setRelations(Array.isArray(relRes.data) ? relRes.data : [])
       setAllContacts((allRes.data.items || []).filter((c: Contact) => c.id !== contactId))
-      setAllTags(Array.isArray(tagsRes.data) ? tagsRes.data : [])
+      const tData = tagsRes.data
+      setAllTags(Array.isArray(tData) ? tData : (tData?.items ?? []))
     } finally {
       setLoading(false)
     }
   }, [contactId])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadData() }, [loadData])
 
   if (loading) return <div>{t('dashboard.loading')}</div>
@@ -435,19 +449,18 @@ export default function ContactDetailPage() {
           ) : (
             <Card>
               <CardContent className="p-2" ref={graphContainerRef}>
-                <Suspense fallback={<div className="flex items-center justify-center h-[300px]"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
-                <ForceGraph2D
+                <ForceGraph2D<MiniGraphNodeData, { relation_type: string }>
                   ref={fgRef}
                   graphData={miniGraphData}
                   nodeLabel="name"
-                  nodeColor={(node: any) => node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? labelNodeColor(node.relationship_labels[0]) : '#6b7280')}
-                  nodeVal={(node: any) => node.__isCenter ? 4 : 2}
+                  nodeColor={(node: MiniGraphNode) => node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? labelNodeColor(node.relationship_labels[0]) : '#6b7280')}
+                  nodeVal={(node: MiniGraphNode) => node.__isCenter ? 4 : 2}
                   linkColor={() => '#94a3b8'}
                   linkWidth={1.5}
                   linkDirectionalArrowLength={3}
                   linkLabel="relation_type"
-                  onNodeClick={(node: any) => { if (!node.__isCenter) navigate(`/buddies/${node.id}`) }}
-                  nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+                  onNodeClick={(node: MiniGraphNode) => { if (!node.__isCenter) navigate(`/buddies/${node.id}`) }}
+                  nodeCanvasObject={(node: MiniGraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
                     const r = (node.__isCenter ? 10 : 7) / Math.sqrt(globalScale)
                     const color = node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? labelNodeColor(node.relationship_labels[0]) : '#6b7280')
                     const bgColor = document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff'
@@ -481,7 +494,7 @@ export default function ContactDetailPage() {
                     ctx.fillStyle = document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#1f2937'
                     ctx.fillText(node.name, node.x!, node.y! + r + 2 / globalScale)
                   }}
-                  nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
+                  nodePointerAreaPaint={(node: MiniGraphNode, color: string, ctx: CanvasRenderingContext2D) => {
                     const r = node.__isCenter ? 14 : 10
                     ctx.beginPath()
                     ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI)
@@ -494,7 +507,6 @@ export default function ContactDetailPage() {
                   cooldownTicks={100}
                   onEngineStop={() => { if (fgRef.current) fgRef.current.zoomToFit(40, 20) }}
                 />
-                </Suspense>
               </CardContent>
             </Card>
           )}

@@ -1,4 +1,4 @@
-import client from './client'
+import { request } from './client'
 
 export interface CaptchaResponse {
   enabled: boolean
@@ -7,5 +7,5 @@ export interface CaptchaResponse {
 }
 
 export const captchaApi = {
-  get: () => client.get<CaptchaResponse>('/captcha'),
+  get: () => request.get<CaptchaResponse>('/captcha').then((data) => ({ data })),
 }

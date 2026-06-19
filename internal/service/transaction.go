@@ -13,6 +13,7 @@ type TransactionRepository interface {
 	Create(ctx context.Context, tx *model.Transaction) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Transaction, error)
 	List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint) ([]model.Transaction, int64, error)
+	ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Transaction, error)
 	Summary(ctx context.Context, workspaceID uint) (income float64, expense float64, err error)
 	Update(ctx context.Context, tx *model.Transaction) error
 	Delete(ctx context.Context, workspaceID, id uint) error

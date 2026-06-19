@@ -1,12 +1,13 @@
 import { useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useModeStore } from '@/stores/mode'
+import { isWailsRuntime } from '@/lib/wails'
 import { toast } from 'sonner'
 
 export default function DesktopMenuListener() {
   const navigate = useNavigate()
   const adapters = useModeStore((s) => s.adapters)
-  const isWails = typeof window !== 'undefined' && !!(window as any).__WAILS__
+  const isWails = isWailsRuntime()
 
   const handleExport = useCallback(async () => {
     if (!adapters?.export) return
@@ -22,7 +23,7 @@ export default function DesktopMenuListener() {
     } catch {
       toast.error('Export failed')
     }
-  }, [adapters?.export])
+  }, [adapters])
 
   const handleImport = useCallback(async () => {
     if (!adapters?.export) return
@@ -41,12 +42,12 @@ export default function DesktopMenuListener() {
       }
     }
     input.click()
-  }, [adapters?.export])
+  }, [adapters])
 
   useEffect(() => {
     if (!isWails) return
 
-    let offFns: (() => void)[] = []
+    const offFns: (() => void)[] = []
 
     ;(async () => {
       const { EventsOn } = await import('@/wailsjs/runtime/runtime')

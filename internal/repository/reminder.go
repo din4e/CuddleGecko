@@ -31,20 +31,36 @@ func (r *ReminderRepo) GetByID(ctx context.Context, workspaceID, id uint) (*mode
 	return &reminder, nil
 }
 
-func (r *ReminderRepo) List(ctx context.Context, workspaceID uint, status model.ReminderStatus) ([]model.Reminder, error) {
+func (r *ReminderRepo) List(ctx context.Context, workspaceID uint, status model.ReminderStatus, page, pageSize int) ([]model.Reminder, int64, error) {
 	var reminders []model.Reminder
-	query := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID)
+	query := r.db.WithContext(ctx).Model(&model.Reminder{}).Where("workspace_id = ?", workspaceID)
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
-	if err := query.Order("remind_at ASC").Find(&reminders).Error; err != nil {
-		return nil, fmt.Errorf("list reminders: %w", err)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("count reminders: %w", err)
 	}
-	return reminders, nil
+
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	offset := (page - 1) * pageSize
+
+	if err := query.Order("remind_at ASC").Limit(pageSize).Offset(offset).Find(&reminders).Error; err != nil {
+		return nil, 0, fmt.Errorf("list reminders: %w", err)
+	}
+	return reminders, total, nil
 }
 
 func (r *ReminderRepo) Update(ctx context.Context, reminder *model.Reminder) error {
-	if err := r.db.WithContext(ctx).Save(reminder).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&model.Reminder{ID: reminder.ID}).
+		Select("title", "description", "remind_at", "status").
+		Updates(reminder).Error; err != nil {
 		return fmt.Errorf("update reminder: %w", err)
 	}
 	return nil

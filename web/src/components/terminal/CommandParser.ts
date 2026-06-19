@@ -1,8 +1,9 @@
 import { findCommand } from './CommandRegistry'
+import type { CommandArgs } from './types'
 
 export interface ParsedCommand {
   command: string
-  args: Record<string, any>
+  args: CommandArgs
   pipe?: string
   raw: string
 }
@@ -68,7 +69,7 @@ export function parseCommand(input: string): ParsedCommand | null {
     argStartIdx = 1
   }
 
-  const args: Record<string, any> = {}
+  const args: CommandArgs = {}
   const remaining = tokens.slice(argStartIdx)
 
   // Parse flags and positional args

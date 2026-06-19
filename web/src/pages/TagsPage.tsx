@@ -20,13 +20,27 @@ export default function TagsPage() {
   const [name, setName] = useState('')
   const [color, setColor] = useState('#6366f1')
   const [view, setView] = useViewMode('tags')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 50
 
   const loadTags = async () => {
-    const res = await tagsApi.list()
-    setTags(res.data)
+    const res = await tagsApi.list(page, pageSize)
+    const payload = res.data
+    if (Array.isArray(payload)) {
+      setTags(payload)
+      setTotal(payload.length)
+    } else if (payload && Array.isArray(payload.items)) {
+      setTags(payload.items)
+      setTotal(payload.total ?? payload.items.length)
+    } else {
+      setTags([])
+      setTotal(0)
+    }
   }
 
-  useEffect(() => { loadTags() }, [])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { loadTags() }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -134,6 +148,20 @@ export default function TagsPage() {
             </TableBody>
           </Table>
         </Card>
+      )}
+
+      {total > pageSize && (
+        <div className="flex justify-center items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            {t('contacts.previous')}
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {t('contacts.page')} {page} / {Math.ceil(total / pageSize)} ({total})
+          </span>
+          <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(page + 1)}>
+            {t('contacts.next')}
+          </Button>
+        </div>
       )}
     </div>
   )

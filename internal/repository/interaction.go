@@ -52,8 +52,24 @@ func (r *InteractionRepo) ListByContact(ctx context.Context, workspaceID, contac
 	return interactions, total, nil
 }
 
+func (r *InteractionRepo) ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Interaction, error) {
+	var interactions []model.Interaction
+	query := r.db.WithContext(ctx).
+		Where("workspace_id = ? AND contact_id IN ?", workspaceID, contactIDs).
+		Order("occurred_at DESC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Find(&interactions).Error; err != nil {
+		return nil, fmt.Errorf("list interactions by contact ids: %w", err)
+	}
+	return interactions, nil
+}
+
 func (r *InteractionRepo) Update(ctx context.Context, interaction *model.Interaction) error {
-	if err := r.db.WithContext(ctx).Save(interaction).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&model.Interaction{ID: interaction.ID}).
+		Select("title", "type", "content", "occurred_at").
+		Updates(interaction).Error; err != nil {
 		return fmt.Errorf("update interaction: %w", err)
 	}
 	return nil

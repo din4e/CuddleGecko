@@ -39,6 +39,7 @@ export default function LoginPage() {
     }
   }, [])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadCaptcha() }, [loadCaptcha])
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -1,15 +1,27 @@
 "use client"
 
-import { useTheme } from "next-themes"
+import { useSyncExternalStore } from 'react'
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
+function useHtmlTheme(): ToasterProps["theme"] {
+  return useSyncExternalStore(
+    (callback) => {
+      const observer = new MutationObserver(callback)
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
+      return () => observer.disconnect()
+    },
+    () => (document.documentElement.classList.contains("dark") ? "dark" : "light"),
+    () => "light",
+  )
+}
+
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  const theme = useHtmlTheme()
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={theme}
       className="toaster group"
       icons={{
         success: (

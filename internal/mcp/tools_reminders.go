@@ -17,7 +17,8 @@ func (s *MCPServer) registerReminderTools() {
 		if status == "" {
 			status = model.ReminderPending
 		}
-		return s.reminderSvc.List(ctx, userID, workspaceID, status)
+		reminders, _, err := s.reminderSvc.List(ctx, userID, workspaceID, status, 1, 200)
+		return reminders, err
 	})
 
 	s.registerTool("create_reminder", "Create a new reminder for a contact.", map[string]interface{}{

@@ -55,11 +55,14 @@ export default function FinancePage() {
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [form, setForm] = useState<TxFormData>(emptyForm)
   const [view, setView] = useViewMode('finance')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 50
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const params: Record<string, unknown> = { page: 1, page_size: 50 }
+      const params: Record<string, unknown> = { page, page_size: pageSize }
       if (typeFilter) params.type = typeFilter
       const [txRes, sumRes] = await Promise.all([
         transactionApi.list(params),
@@ -67,6 +70,7 @@ export default function FinancePage() {
       ])
       const data = txRes.data
       setTransactions(Array.isArray(data?.items) ? data.items : [])
+      setTotal(data?.total ?? 0)
       setSummary(sumRes.data)
     } finally {
       setLoading(false)
@@ -75,9 +79,15 @@ export default function FinancePage() {
 
   useEffect(() => {
     contactsApi.list({ page: 1, page_size: 200 }).then((res) => setBuddies(res.data.items || []))
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typeFilter])
+  }, [typeFilter, page])
+
+  const changeTypeFilter = (ty: TxType) => {
+    setTypeFilter(ty)
+    setPage(1)
+  }
 
   const openCreate = () => {
     setEditing(null)
@@ -184,7 +194,7 @@ export default function FinancePage() {
             key={ty}
             variant={typeFilter === ty ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setTypeFilter(ty)}
+            onClick={() => changeTypeFilter(ty)}
           >
             {ty === '' ? t('finance.all') : t(`finance.${ty}`)}
           </Button>
@@ -287,6 +297,20 @@ export default function FinancePage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {total > pageSize && (
+        <div className="flex justify-center items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            {t('contacts.previous')}
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {t('contacts.page')} {page} / {Math.ceil(total / pageSize)} ({total})
+          </span>
+          <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(page + 1)}>
+            {t('contacts.next')}
+          </Button>
         </div>
       )}
 

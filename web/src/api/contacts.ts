@@ -1,13 +1,15 @@
-import client from './client'
+import { request } from './client'
 import type { Contact, Tag, PaginatedData } from '../types'
 
 export const contactsApi = {
   list: (params?: { page?: number; page_size?: number; search?: string; tag_ids?: number[] }) =>
-    client.get<PaginatedData<Contact>>('/buddies', { params }),
-  create: (data: Partial<Contact>) => client.post<Contact>('/buddies', data),
-  get: (id: number) => client.get<Contact>(`/buddies/${id}`),
-  update: (id: number, data: Partial<Contact>) => client.put<Contact>(`/buddies/${id}`, data),
-  delete: (id: number) => client.delete(`/buddies/${id}`),
-  getTags: (id: number) => client.get<Tag[]>(`/buddies/${id}/tags`),
-  replaceTags: (id: number, tagIds: number[]) => client.put(`/buddies/${id}/tags`, { tag_ids: tagIds }),
+    request.get<PaginatedData<Contact>>('/buddies', { params }).then((data) => ({ data })),
+  create: (data: Partial<Contact>) => request.post<Contact>('/buddies', data).then((d) => ({ data: d })),
+  get: (id: number) => request.get<Contact>(`/buddies/${id}`).then((data) => ({ data })),
+  update: (id: number, data: Partial<Contact>) =>
+    request.put<Contact>(`/buddies/${id}`, data).then((d) => ({ data: d })),
+  delete: (id: number) => request.delete<void>(`/buddies/${id}`).then(() => {}),
+  getTags: (id: number) => request.get<Tag[]>(`/buddies/${id}/tags`).then((data) => ({ data })),
+  replaceTags: (id: number, tagIds: number[]) =>
+    request.put<void>(`/buddies/${id}/tags`, { tag_ids: tagIds }).then(() => {}),
 }

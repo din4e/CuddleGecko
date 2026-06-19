@@ -13,6 +13,7 @@ type RelationRepository interface {
 	Create(ctx context.Context, relation *model.ContactRelation) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.ContactRelation, error)
 	ListByContact(ctx context.Context, workspaceID, contactID uint) ([]model.ContactRelation, error)
+	ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint) ([]model.ContactRelation, error)
 	Delete(ctx context.Context, workspaceID, id uint) error
 	GetAllByWorkspace(ctx context.Context, workspaceID uint) ([]model.ContactRelation, error)
 }

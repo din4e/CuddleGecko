@@ -1,6 +1,8 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useModeStore } from '../stores/mode'
+import { isWailsRuntime } from '../lib/wails'
+import { nextMessageId } from '../lib/id'
 import type { AIConversation, AIMessage, Contact, Event, Tag } from '../types'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -33,7 +35,7 @@ export default function AIChatPage() {
   const [streamContent, setStreamContent] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const isWails = typeof window !== 'undefined' && !!(window as any).__WAILS__
+  const isWails = isWailsRuntime()
 
   // @ mention state
   const [mentions, setMentions] = useState<MentionItem[]>([])
@@ -52,8 +54,10 @@ export default function AIChatPage() {
     try {
       const res = await adapters.ai.listConversations({ page: 1, page_size: 50 })
       setConversations(res.items || [])
-    } catch {}
-  }, [adapters?.ai])
+    } catch {
+      /* ignore */
+    }
+  }, [adapters])
 
   useEffect(() => {
     if (!adapters) return
@@ -62,6 +66,7 @@ export default function AIChatPage() {
     adapters.tag.list().then((res: Tag[]) => setTags(Array.isArray(res) ? res : []))
   }, [adapters])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadConversations() }, [loadConversations])
 
   // Close mention popup on outside click
@@ -81,8 +86,10 @@ export default function AIChatPage() {
       const msgs = await adapters.ai.getMessages(convId)
       setMessages(msgs || [])
       setActiveConvId(convId)
-    } catch {}
-  }, [adapters?.ai])
+    } catch {
+      /* ignore */
+    }
+  }, [adapters])
 
   const handleNewChat = async () => {
     if (!adapters?.ai) return
@@ -91,7 +98,9 @@ export default function AIChatPage() {
       setActiveConvId(conv.id)
       setMessages([])
       loadConversations()
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   }
 
   const handleDeleteConv = async (id: number) => {
@@ -100,7 +109,9 @@ export default function AIChatPage() {
       await adapters.ai.deleteConversation(id)
       if (activeConvId === id) { setActiveConvId(null); setMessages([]) }
       loadConversations()
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   }
 
   const ensureConversation = async (): Promise<number> => {
@@ -172,7 +183,7 @@ export default function AIChatPage() {
     setInput('')
 
     const convId = await ensureConversation()
-    const userMsg: AIMessage = { id: Date.now(), conversation_id: convId, role: 'user', content: text, created_at: new Date().toISOString() }
+    const userMsg: AIMessage = { id: nextMessageId(), conversation_id: convId, role: 'user', content: text, created_at: new Date().toISOString() }
     setMessages((prev) => [...prev, userMsg])
     setStreaming(true)
     setStreamContent('')
@@ -180,7 +191,7 @@ export default function AIChatPage() {
     try {
       if (isWails) {
         const result = await adapters.ai.chat(convId, text)
-        setMessages((prev) => [...prev, { id: Date.now() + 1, conversation_id: convId!, role: 'assistant', content: result, created_at: new Date().toISOString() }])
+        setMessages((prev) => [...prev, { id: nextMessageId() + 1, conversation_id: convId!, role: 'assistant', content: result, created_at: new Date().toISOString() }])
       } else {
         const token = localStorage.getItem('access_token')
         const resp = await fetch('/api/ai/chat', {
@@ -206,10 +217,10 @@ export default function AIChatPage() {
             }
           }
         }
-        setMessages((prev) => [...prev, { id: Date.now() + 1, conversation_id: convId!, role: 'assistant', content: fullContent, created_at: new Date().toISOString() }])
+        setMessages((prev) => [...prev, { id: nextMessageId() + 1, conversation_id: convId!, role: 'assistant', content: fullContent, created_at: new Date().toISOString() }])
       }
     } catch {
-      setMessages((prev) => [...prev, { id: Date.now() + 1, conversation_id: convId!, role: 'assistant', content: t('ai.sendFailed'), created_at: new Date().toISOString() }])
+      setMessages((prev) => [...prev, { id: nextMessageId() + 1, conversation_id: convId!, role: 'assistant', content: t('ai.sendFailed'), created_at: new Date().toISOString() }])
     } finally {
       setStreaming(false)
       setStreamContent('')
@@ -234,7 +245,7 @@ export default function AIChatPage() {
     setInput('')
 
     setMessages((prev) => [...prev,
-      { id: Date.now(), conversation_id: convId, role: 'user', content: question || `${t('ai.comprehensiveAnalysis')}: ${label}`, created_at: new Date().toISOString() },
+      { id: nextMessageId(), conversation_id: convId, role: 'user', content: question || `${t('ai.comprehensiveAnalysis')}: ${label}`, created_at: new Date().toISOString() },
     ])
     setAnalyzing(true)
 
@@ -245,9 +256,9 @@ export default function AIChatPage() {
         event_ids: eventIds.length > 0 ? eventIds : undefined,
         question: question || undefined,
       })
-      setMessages((prev) => [...prev, { id: Date.now() + 1, conversation_id: convId, role: 'assistant', content: result.analysis, created_at: new Date().toISOString() }])
+      setMessages((prev) => [...prev, { id: nextMessageId() + 1, conversation_id: convId, role: 'assistant', content: result.analysis, created_at: new Date().toISOString() }])
     } catch {
-      setMessages((prev) => [...prev, { id: Date.now() + 1, conversation_id: convId, role: 'assistant', content: t('ai.sendFailed'), created_at: new Date().toISOString() }])
+      setMessages((prev) => [...prev, { id: nextMessageId() + 1, conversation_id: convId, role: 'assistant', content: t('ai.sendFailed'), created_at: new Date().toISOString() }])
     } finally {
       setAnalyzing(false)
       loadConversations()
@@ -260,20 +271,20 @@ export default function AIChatPage() {
 
   // Filtered items per tab
   const filter = mentionFilter.toLowerCase()
-  const filteredContacts = contacts
+  const filteredContacts = useMemo(() => contacts
     .filter((c) => c.name.toLowerCase().includes(filter))
     .filter((c) => !mentions.some((m) => m.type === 'contact' && m.id === c.id))
-    .slice(0, 8)
+    .slice(0, 8), [contacts, filter, mentions])
 
-  const filteredEvents = events
+  const filteredEvents = useMemo(() => events
     .filter((e) => e.title.toLowerCase().includes(filter))
     .filter((e) => !mentions.some((m) => m.type === 'event' && m.id === e.id))
-    .slice(0, 8)
+    .slice(0, 8), [events, filter, mentions])
 
-  const filteredTags = tags
+  const filteredTags = useMemo(() => tags
     .filter((tg) => tg.name.toLowerCase().includes(filter))
     .filter((tg) => !mentions.some((m) => m.type === 'tag' && m.id === tg.id))
-    .slice(0, 8)
+    .slice(0, 8), [tags, filter, mentions])
 
   const hasActiveConv = activeConvId !== null || messages.length > 0
 
