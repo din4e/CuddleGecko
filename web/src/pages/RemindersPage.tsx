@@ -10,6 +10,7 @@ import type { Reminder, ReminderStatus } from '../types'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import { CheckCircle, Clock, AlertCircle, Trash2, Pencil } from 'lucide-react'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 export default function RemindersPage() {
   const { t } = useTranslation()
@@ -22,6 +23,7 @@ export default function RemindersPage() {
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [statusFilter, setStatusFilter] = useState<ReminderStatus | ''>('')
   const [loading, setLoading] = useState(true)
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [view, setView] = useViewMode('reminders')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
@@ -92,11 +94,12 @@ export default function RemindersPage() {
     loadReminders()
   }
 
-  const handleDelete = async (id: number) => {
-    if (confirm(t('reminders.deleteConfirm'))) {
-      await remindersApi.delete(id)
-      loadReminders()
-    }
+  const handleDelete = (id: number) => setDeleteTarget(id)
+
+  const handleConfirmDelete = async () => {
+    if (deleteTarget === null) return
+    await remindersApi.delete(deleteTarget)
+    loadReminders()
   }
 
   const renderActions = (r: Reminder) => (
@@ -252,6 +255,15 @@ export default function RemindersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}
+        title={t('reminders.delete')}
+        message={t('reminders.deleteConfirm')}
+        confirmText={t('reminders.delete')}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   )
 }

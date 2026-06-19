@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import type { ForceGraphMethods, NodeObject, LinkObject } from 'react-force-graph-2d'
-import ForceGraph2D from 'react-force-graph-2d'
+import type ForceGraph2DType from 'react-force-graph-2d'
 import { useTranslation } from 'react-i18next'
 import { useModeStore } from '../stores/mode'
 import { contactsApi } from '../api/contacts'
@@ -25,6 +25,9 @@ import { ArrowLeft, Mail, Phone, Calendar, Pencil, Plus, Trash2, X, Upload, Spar
 import AvatarDisplay from '../components/AvatarDisplay'
 import EmojiPicker from '../components/EmojiPicker'
 import BuddyPicker from '../components/BuddyPicker'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+
+const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof ForceGraph2DType
 
 const labelColors: Record<string, string> = {
   family: 'bg-pink-100 text-pink-800',
@@ -57,7 +60,8 @@ export default function ContactDetailPage() {
   const { t } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
-  const contactId = id ? parseInt(id) : 0
+  const numericId = id ? Number(id) : NaN
+  const contactId = Number.isInteger(numericId) && numericId > 0 ? numericId : 0
 
   const [contact, setContact] = useState<Contact | null>(null)
   const [interactions, setInteractions] = useState<Interaction[]>([])
@@ -204,11 +208,11 @@ export default function ContactDetailPage() {
     loadData()
   }
 
-  const handleDeleteContact = async () => {
-    if (confirm(t('contacts.deleteConfirm'))) {
-      await contactsApi.delete(contact.id)
-      navigate('/buddies')
-    }
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const handleDeleteContact = () => setDeleteOpen(true)
+  const handleConfirmDeleteContact = async () => {
+    await contactsApi.delete(contact.id)
+    navigate('/buddies')
   }
 
   // --- Interaction CRUD ---
@@ -449,6 +453,7 @@ export default function ContactDetailPage() {
           ) : (
             <Card>
               <CardContent className="p-2" ref={graphContainerRef}>
+                <Suspense fallback={<div className="h-48 flex items-center justify-center text-sm text-muted-foreground">{t('graph.loading')}</div>}>
                 <ForceGraph2D<MiniGraphNodeData, { relation_type: string }>
                   ref={fgRef}
                   graphData={miniGraphData}
@@ -461,12 +466,15 @@ export default function ContactDetailPage() {
                   linkLabel="relation_type"
                   onNodeClick={(node: MiniGraphNode) => { if (!node.__isCenter) navigate(`/buddies/${node.id}`) }}
                   nodeCanvasObject={(node: MiniGraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
+                    const x = node.x
+                    const y = node.y
+                    if (x == null || y == null) return
                     const r = (node.__isCenter ? 10 : 7) / Math.sqrt(globalScale)
                     const color = node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? labelNodeColor(node.relationship_labels[0]) : '#6b7280')
                     const bgColor = document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff'
 
                     ctx.beginPath()
-                    ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI)
+                    ctx.arc(x, y, r, 0, 2 * Math.PI)
                     ctx.fillStyle = bgColor
                     ctx.fill()
                     ctx.strokeStyle = color
@@ -478,13 +486,13 @@ export default function ContactDetailPage() {
                       ctx.font = `${r * 1.2}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
                       ctx.textAlign = 'center'
                       ctx.textBaseline = 'middle'
-                      ctx.fillText(emoji, node.x!, node.y!)
+                      ctx.fillText(emoji, x, y)
                     } else {
                       ctx.font = `bold ${r}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
                       ctx.textAlign = 'center'
                       ctx.textBaseline = 'middle'
                       ctx.fillStyle = color
-                      ctx.fillText(node.name?.[0] || '?', node.x!, node.y!)
+                      ctx.fillText(node.name?.[0] || '?', x, y)
                     }
 
                     const fontSize = (node.__isCenter ? 10 : 9) / globalScale
@@ -492,12 +500,15 @@ export default function ContactDetailPage() {
                     ctx.textAlign = 'center'
                     ctx.textBaseline = 'top'
                     ctx.fillStyle = document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#1f2937'
-                    ctx.fillText(node.name, node.x!, node.y! + r + 2 / globalScale)
+                    ctx.fillText(node.name, x, y + r + 2 / globalScale)
                   }}
                   nodePointerAreaPaint={(node: MiniGraphNode, color: string, ctx: CanvasRenderingContext2D) => {
+                    const x = node.x
+                    const y = node.y
+                    if (x == null || y == null) return
                     const r = node.__isCenter ? 14 : 10
                     ctx.beginPath()
-                    ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI)
+                    ctx.arc(x, y, r, 0, 2 * Math.PI)
                     ctx.fillStyle = color
                     ctx.fill()
                   }}
@@ -507,6 +518,7 @@ export default function ContactDetailPage() {
                   cooldownTicks={100}
                   onEngineStop={() => { if (fgRef.current) fgRef.current.zoomToFit(40, 20) }}
                 />
+                </Suspense>
               </CardContent>
             </Card>
           )}
@@ -560,44 +572,56 @@ export default function ContactDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t('contacts.name')}</Label>
-                <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                <Label htmlFor="edit-name">{t('contacts.name')}</Label>
+                <Input id="edit-name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>{t('contacts.nickname')}</Label>
-                <Input value={editForm.nickname} onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })} />
+                <Label htmlFor="edit-nickname">{t('contacts.nickname')}</Label>
+                <Input id="edit-nickname" value={editForm.nickname} onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t('auth.email')}</Label>
-                <Input placeholder="email@example.com" spellCheck={false} value={editForm.emails.join(', ')} onChange={(e) => setEditForm({ ...editForm, emails: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
+                <Label htmlFor="edit-email">{t('auth.email')}</Label>
+                <Input id="edit-email" placeholder="email@example.com" spellCheck={false} value={editForm.emails.join(', ')} onChange={(e) => setEditForm({ ...editForm, emails: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
               </div>
               <div className="space-y-2">
-                <Label>{t('contacts.phone')}</Label>
-                <Input type="tel" value={editForm.phones.join(', ')} onChange={(e) => setEditForm({ ...editForm, phones: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
+                <Label htmlFor="edit-phone">{t('contacts.phone')}</Label>
+                <Input id="edit-phone" type="tel" value={editForm.phones.join(', ')} onChange={(e) => setEditForm({ ...editForm, phones: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })} />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>{t('contacts.birthday')}</Label>
-              <Input type="date" value={editForm.birthday} onChange={(e) => setEditForm({ ...editForm, birthday: e.target.value })} />
+              <Label htmlFor="edit-birthday">{t('contacts.birthday')}</Label>
+              <Input id="edit-birthday" type="date" value={editForm.birthday} onChange={(e) => setEditForm({ ...editForm, birthday: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>{t('contacts.notes')}</Label>
-              <Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+              <Label htmlFor="edit-notes">{t('contacts.notes')}</Label>
+              <Textarea id="edit-notes" value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>{t('contacts.relationship')}</Label>
+              <Label id="edit-relationship-label">{t('contacts.relationship')}</Label>
               <div className="flex flex-wrap gap-1.5">
                 {presetLabelKeys.map((key) => {
                   const active = editForm.relationship_labels.includes(key)
                   return (
-                    <Badge key={key} variant={active ? 'default' : 'outline'} className="cursor-pointer select-none" onClick={() => {
-                      setEditForm({
-                        ...editForm,
-                        relationship_labels: active ? editForm.relationship_labels.filter((l) => l !== key) : [...editForm.relationship_labels, key],
-                      })
-                    }}>
+                    <Badge
+                      key={key}
+                      variant={active ? 'default' : 'outline'}
+                      className="cursor-pointer select-none"
+                      aria-pressed={active}
+                      render={
+                        <button
+                          type="button"
+                          aria-labelledby="edit-relationship-label"
+                          onClick={() => {
+                            setEditForm({
+                              ...editForm,
+                              relationship_labels: active ? editForm.relationship_labels.filter((l) => l !== key) : [...editForm.relationship_labels, key],
+                            })
+                          }}
+                        />
+                      }
+                    >
                       {t(`relationships.${key}`)}
                     </Badge>
                   )
@@ -606,7 +630,7 @@ export default function ContactDetailPage() {
             </div>
             {allTags.length > 0 && (
               <div className="space-y-2">
-                <Label>{t('tags.title')}</Label>
+                <Label id="edit-tags-label">{t('tags.title')}</Label>
                 <div className="flex flex-wrap gap-1.5">
                   {allTags.map((tag) => {
                     const active = selectedTagIds.includes(tag.id)
@@ -616,9 +640,16 @@ export default function ContactDetailPage() {
                         variant={active ? 'default' : 'outline'}
                         className="cursor-pointer select-none"
                         style={active ? { backgroundColor: tag.color } : { borderColor: tag.color, color: tag.color }}
-                        onClick={() => {
-                          setSelectedTagIds(active ? selectedTagIds.filter((id) => id !== tag.id) : [...selectedTagIds, tag.id])
-                        }}
+                        aria-pressed={active}
+                        render={
+                          <button
+                            type="button"
+                            aria-labelledby="edit-tags-label"
+                            onClick={() => {
+                              setSelectedTagIds(active ? selectedTagIds.filter((id) => id !== tag.id) : [...selectedTagIds, tag.id])
+                            }}
+                          />
+                        }
                       >
                         {tag.name}
                       </Badge>
@@ -642,12 +673,12 @@ export default function ContactDetailPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t('contacts.title_field') || 'Title'}</Label>
-                <Input value={intForm.title} onChange={(e) => setIntForm({ ...intForm, title: e.target.value })} />
+                <Label htmlFor="int-title">{t('contacts.title_field') || 'Title'}</Label>
+                <Input id="int-title" value={intForm.title} onChange={(e) => setIntForm({ ...intForm, title: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Type</Label>
-                <div className="flex flex-wrap gap-1.5">
+                <Label id="int-type-label">Type</Label>
+                <div role="group" aria-labelledby="int-type-label" className="flex flex-wrap gap-1.5">
                   {interactionTypes.map((ty) => (
                     <Badge key={ty} variant={intForm.type === ty ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setIntForm({ ...intForm, type: ty })}>
                       {ty}
@@ -657,12 +688,12 @@ export default function ContactDetailPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Content</Label>
-              <Textarea value={intForm.content} onChange={(e) => setIntForm({ ...intForm, content: e.target.value })} />
+              <Label htmlFor="int-content">Content</Label>
+              <Textarea id="int-content" value={intForm.content} onChange={(e) => setIntForm({ ...intForm, content: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>Date</Label>
-              <Input type="datetime-local" value={intForm.occurred_at} onChange={(e) => setIntForm({ ...intForm, occurred_at: e.target.value })} />
+              <Label htmlFor="int-date">Date</Label>
+              <Input id="int-date" type="datetime-local" value={intForm.occurred_at} onChange={(e) => setIntForm({ ...intForm, occurred_at: e.target.value })} />
             </div>
           </div>
           <DialogFooter>
@@ -678,16 +709,16 @@ export default function ContactDetailPage() {
           <DialogHeader><DialogTitle>{remDialog.editing ? t('contacts.editReminder') : t('contacts.newReminder')}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>{t('contacts.title_field') || 'Title'}</Label>
-              <Input value={remForm.title} onChange={(e) => setRemForm({ ...remForm, title: e.target.value })} />
+              <Label htmlFor="rem-title">{t('contacts.title_field') || 'Title'}</Label>
+              <Input id="rem-title" value={remForm.title} onChange={(e) => setRemForm({ ...remForm, title: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea value={remForm.description} onChange={(e) => setRemForm({ ...remForm, description: e.target.value })} />
+              <Label htmlFor="rem-description">Description</Label>
+              <Textarea id="rem-description" value={remForm.description} onChange={(e) => setRemForm({ ...remForm, description: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>Remind At</Label>
-              <Input type="datetime-local" value={remForm.remind_at} onChange={(e) => setRemForm({ ...remForm, remind_at: e.target.value })} />
+              <Label htmlFor="rem-remind-at">Remind At</Label>
+              <Input id="rem-remind-at" type="datetime-local" value={remForm.remind_at} onChange={(e) => setRemForm({ ...remForm, remind_at: e.target.value })} />
             </div>
           </div>
           <DialogFooter>
@@ -712,8 +743,8 @@ export default function ContactDetailPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>{t('contacts.relationType')}</Label>
-              <Input value={relForm.relation_type} onChange={(e) => setRelForm({ ...relForm, relation_type: e.target.value })} placeholder={t('contacts.relationType')} />
+              <Label htmlFor="rel-type">{t('contacts.relationType')}</Label>
+              <Input id="rel-type" value={relForm.relation_type} onChange={(e) => setRelForm({ ...relForm, relation_type: e.target.value })} placeholder={t('contacts.relationType')} />
             </div>
           </div>
           <DialogFooter>
@@ -722,6 +753,15 @@ export default function ContactDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={t('contacts.delete')}
+        message={t('contacts.deleteConfirm')}
+        confirmText={t('contacts.delete')}
+        onConfirm={handleConfirmDeleteContact}
+      />
     </div>
   )
 }

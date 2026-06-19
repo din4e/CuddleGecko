@@ -11,6 +11,7 @@ import type { Tag } from '../types'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import { Plus, Trash2, Pencil } from 'lucide-react'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 export default function TagsPage() {
   const { t } = useTranslation()
@@ -21,6 +22,7 @@ export default function TagsPage() {
   const [color, setColor] = useState('#6366f1')
   const [view, setView] = useViewMode('tags')
   const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [total, setTotal] = useState(0)
   const pageSize = 50
 
@@ -63,11 +65,12 @@ export default function TagsPage() {
     setDialogOpen(true)
   }
 
-  const handleDelete = async (id: number) => {
-    if (confirm(t('tags.deleteConfirm'))) {
-      await tagsApi.delete(id)
-      loadTags()
-    }
+  const handleDelete = (id: number) => setDeleteTarget(id)
+
+  const handleConfirmDelete = async () => {
+    if (deleteTarget === null) return
+    await tagsApi.delete(deleteTarget)
+    loadTags()
   }
 
   return (
@@ -163,6 +166,15 @@ export default function TagsPage() {
           </Button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}
+        title={t('tags.delete')}
+        message={t('tags.deleteConfirm')}
+        confirmText={t('tags.delete')}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   )
 }

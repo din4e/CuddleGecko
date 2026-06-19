@@ -24,7 +24,12 @@ import EmojiPicker from './EmojiPicker'
 
 export default function WorkspaceSwitcher() {
   const { t } = useTranslation()
-  const { workspaces, currentWorkspace, loadWorkspaces, switchWorkspace, createWorkspace, updateWorkspace } = useWorkspaceStore()
+  const workspaces = useWorkspaceStore((s) => s.workspaces)
+  const currentWorkspace = useWorkspaceStore((s) => s.currentWorkspace)
+  const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces)
+  const switchWorkspace = useWorkspaceStore((s) => s.switchWorkspace)
+  const createWorkspace = useWorkspaceStore((s) => s.createWorkspace)
+  const updateWorkspace = useWorkspaceStore((s) => s.updateWorkspace)
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Workspace | null>(null)

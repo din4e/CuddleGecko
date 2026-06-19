@@ -17,6 +17,7 @@ import {
 } from '../components/ui/dialog'
 import { CalendarDays, Clock, MapPin, Plus, Pencil, Trash2, Heart, Sparkles, Loader2 } from 'lucide-react'
 import BuddyPicker from '../components/BuddyPicker'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import { useModeStore } from '../stores/mode'
@@ -119,6 +120,7 @@ export default function EventsPage() {
   const [total, setTotal] = useState(0)
   const pageSize = 50
   const [analysisResult, setAnalysisResult] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [analyzingId, setAnalyzingId] = useState<number | null>(null)
   const [aiAvailable, setAiAvailable] = useState(false)
 
@@ -217,11 +219,12 @@ export default function EventsPage() {
     loadEvents()
   }
 
-  const handleDelete = async (id: number) => {
-    if (confirm(t('events.deleteConfirm'))) {
-      await eventApi.delete(id)
-      loadEvents()
-    }
+  const handleDelete = (id: number) => setDeleteTarget(id)
+
+  const handleConfirmDelete = async () => {
+    if (deleteTarget === null) return
+    await eventApi.delete(deleteTarget)
+    loadEvents()
   }
 
   return (
@@ -462,6 +465,15 @@ export default function EventsPage() {
           <div className="whitespace-pre-wrap text-sm max-h-[60vh] overflow-auto">{analysisResult}</div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}
+        title={t('events.deleteEvent')}
+        message={t('events.deleteConfirm')}
+        confirmText={t('events.deleteEvent')}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, memo, useCallback } from 'react'
+import { useEffect, useState, useRef, memo, useCallback, useDeferredValue } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { contactsApi } from '../api/contacts'
@@ -62,7 +62,14 @@ function LabelPicker({ selected, onChange, t }: {
               key={key}
               variant={active ? 'default' : 'outline'}
               className="cursor-pointer select-none"
-              onClick={() => togglePreset(key)}
+              aria-pressed={active}
+              render={
+                <button
+                  type="button"
+                  onClick={() => togglePreset(key)}
+                  aria-label={t(`relationships.${key}`)}
+                />
+              }
             >
               {t(`relationships.${key}`)}
             </Badge>
@@ -283,27 +290,39 @@ export default function ContactsPage() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const deferredSearch = useDeferredValue(search)
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
 
   const [view, setView] = useViewMode('contacts')
 
   const pageSize = 12
 
   const loadContacts = useCallback(async () => {
+    abortRef.current?.abort()
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
     setLoading(true)
     try {
-      const res = await contactsApi.list({ page, page_size: pageSize, search: search || undefined })
+      const res = await contactsApi.list({ page, page_size: pageSize, search: deferredSearch || undefined }, ctrl.signal)
+      if (ctrl.signal.aborted) return
       const data = res.data
       setContacts(data.items || [])
       setTotal(data.total || 0)
+    } catch (e) {
+      if (ctrl.signal.aborted) return
+      throw e
     } finally {
-      setLoading(false)
+      if (!ctrl.signal.aborted) setLoading(false)
     }
-  }, [page, search])
+  }, [page, deferredSearch])
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { loadContacts() }, [loadContacts])
+  useEffect(() => {
+    loadContacts()
+    return () => abortRef.current?.abort()
+  }, [loadContacts])
 
   const labelRenderer = useCallback((label: string) => label in labelColors ? t(`relationships.${label}`) : label, [t])
 
