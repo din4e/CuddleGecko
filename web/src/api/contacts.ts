@@ -2,8 +2,8 @@ import { request } from './client'
 import type { Contact, Tag, PaginatedData } from '../types'
 
 export const contactsApi = {
-  list: (params?: { page?: number; page_size?: number; search?: string; tag_ids?: number[] }) =>
-    request.get<PaginatedData<Contact>>('/buddies', { params }).then((data) => ({ data })),
+  list: (params?: { page?: number; page_size?: number; search?: string; tag_ids?: number[] }, signal?: AbortSignal) =>
+    request.get<PaginatedData<Contact>>('/buddies', { params, signal }).then((data) => ({ data })),
   create: (data: Partial<Contact>) => request.post<Contact>('/buddies', data).then((d) => ({ data: d })),
   get: (id: number) => request.get<Contact>(`/buddies/${id}`).then((data) => ({ data })),
   update: (id: number, data: Partial<Contact>) =>

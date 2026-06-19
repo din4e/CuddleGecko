@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo, useDeferredValue } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useModeStore } from '../stores/mode'
 import { isWailsRuntime } from '../lib/wails'
@@ -7,6 +7,7 @@ import type { AIConversation, AIMessage, Contact, Event, Tag } from '../types'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import AvatarDisplay from '../components/AvatarDisplay'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Send, Plus, Trash2, Bot, Users, Calendar, Wallet, Sparkles, Loader2, X, Tag as TagIcon, MessageSquare, PanelLeftClose, PanelLeft } from 'lucide-react'
 
 type MentionTab = 'contact' | 'event' | 'tag'
@@ -48,6 +49,7 @@ export default function AIChatPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const mentionRef = useRef<HTMLDivElement>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
 
   const loadConversations = useCallback(async () => {
     if (!adapters?.ai) return
@@ -104,7 +106,7 @@ export default function AIChatPage() {
   }
 
   const handleDeleteConv = async (id: number) => {
-    if (!adapters?.ai || !confirm(t('ai.deleteChatConfirm'))) return
+    if (!adapters?.ai) return
     try {
       await adapters.ai.deleteConversation(id)
       if (activeConvId === id) { setActiveConvId(null); setMessages([]) }
@@ -115,14 +117,12 @@ export default function AIChatPage() {
   }
 
   const ensureConversation = async (): Promise<number> => {
-    let convId = activeConvId
-    if (!convId) {
-      const conv = await adapters!.ai.createConversation({})
-      convId = conv.id
-      setActiveConvId(convId)
-      loadConversations()
-    }
-    return convId
+    if (!adapters?.ai) throw new Error('AI adapter not ready')
+    if (activeConvId) return activeConvId
+    const conv = await adapters.ai.createConversation({})
+    setActiveConvId(conv.id)
+    loadConversations()
+    return conv.id
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,7 +191,7 @@ export default function AIChatPage() {
     try {
       if (isWails) {
         const result = await adapters.ai.chat(convId, text)
-        setMessages((prev) => [...prev, { id: nextMessageId() + 1, conversation_id: convId!, role: 'assistant', content: result, created_at: new Date().toISOString() }])
+        setMessages((prev) => [...prev, { id: nextMessageId() + 1, conversation_id: convId, role: 'assistant', content: result, created_at: new Date().toISOString() }])
       } else {
         const token = localStorage.getItem('access_token')
         const resp = await fetch('/api/ai/chat', {
@@ -217,10 +217,10 @@ export default function AIChatPage() {
             }
           }
         }
-        setMessages((prev) => [...prev, { id: nextMessageId() + 1, conversation_id: convId!, role: 'assistant', content: fullContent, created_at: new Date().toISOString() }])
+        setMessages((prev) => [...prev, { id: nextMessageId() + 1, conversation_id: convId, role: 'assistant', content: fullContent, created_at: new Date().toISOString() }])
       }
     } catch {
-      setMessages((prev) => [...prev, { id: nextMessageId() + 1, conversation_id: convId!, role: 'assistant', content: t('ai.sendFailed'), created_at: new Date().toISOString() }])
+      setMessages((prev) => [...prev, { id: nextMessageId() + 1, conversation_id: convId, role: 'assistant', content: t('ai.sendFailed'), created_at: new Date().toISOString() }])
     } finally {
       setStreaming(false)
       setStreamContent('')
@@ -269,22 +269,44 @@ export default function AIChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamContent])
 
-  // Filtered items per tab
-  const filter = mentionFilter.toLowerCase()
-  const filteredContacts = useMemo(() => contacts
-    .filter((c) => c.name.toLowerCase().includes(filter))
-    .filter((c) => !mentions.some((m) => m.type === 'contact' && m.id === c.id))
-    .slice(0, 8), [contacts, filter, mentions])
+  // Filtered items per tab — deferred so fast typing doesn't recompute on every keystroke
+  const deferredFilter = useDeferredValue(mentionFilter).toLowerCase()
+  const filter = deferredFilter
+  const filteredContacts = useMemo(() => {
+    const mentionContactIds = new Set(mentions.filter((m) => m.type === 'contact').map((m) => m.id))
+    const out: Contact[] = []
+    for (const c of contacts) {
+      if (out.length >= 8) break
+      if (mentionContactIds.has(c.id)) continue
+      if (filter && !c.name.toLowerCase().includes(filter)) continue
+      out.push(c)
+    }
+    return out
+  }, [contacts, filter, mentions])
 
-  const filteredEvents = useMemo(() => events
-    .filter((e) => e.title.toLowerCase().includes(filter))
-    .filter((e) => !mentions.some((m) => m.type === 'event' && m.id === e.id))
-    .slice(0, 8), [events, filter, mentions])
+  const filteredEvents = useMemo(() => {
+    const mentionEventIds = new Set(mentions.filter((m) => m.type === 'event').map((m) => m.id))
+    const out: Event[] = []
+    for (const e of events) {
+      if (out.length >= 8) break
+      if (mentionEventIds.has(e.id)) continue
+      if (filter && !e.title.toLowerCase().includes(filter)) continue
+      out.push(e)
+    }
+    return out
+  }, [events, filter, mentions])
 
-  const filteredTags = useMemo(() => tags
-    .filter((tg) => tg.name.toLowerCase().includes(filter))
-    .filter((tg) => !mentions.some((m) => m.type === 'tag' && m.id === tg.id))
-    .slice(0, 8), [tags, filter, mentions])
+  const filteredTags = useMemo(() => {
+    const mentionTagIds = new Set(mentions.filter((m) => m.type === 'tag').map((m) => m.id))
+    const out: Tag[] = []
+    for (const tg of tags) {
+      if (out.length >= 8) break
+      if (mentionTagIds.has(tg.id)) continue
+      if (filter && !tg.name.toLowerCase().includes(filter)) continue
+      out.push(tg)
+    }
+    return out
+  }, [tags, filter, mentions])
 
   const hasActiveConv = activeConvId !== null || messages.length > 0
 
@@ -313,23 +335,33 @@ export default function AIChatPage() {
             {conversations.map((conv) => (
               <div
                 key={conv.id}
-                className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-sm transition-all duration-150 ${
+                role="button"
+                tabIndex={0}
+                aria-label={conv.title || t('ai.newChat')}
+                className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   activeConvId === conv.id
                     ? 'bg-primary/10 text-primary font-medium'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
                 onClick={() => loadMessages(conv.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    loadMessages(conv.id)
+                  }
+                }}
               >
-                <MessageSquare className="h-3 w-3 shrink-0" />
+                <MessageSquare className="h-3 w-3 shrink-0" aria-hidden />
                 <span className="flex-1 truncate text-xs">{conv.title || t('ai.newChat')}</span>
                 <button
-                  className={`shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive ${
+                  type="button"
+                  className={`shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     activeConvId === conv.id ? 'opacity-100' : ''
                   }`}
-                  onClick={(e) => { e.stopPropagation(); handleDeleteConv(conv.id) }}
+                  onClick={(e) => { e.stopPropagation(); setDeleteTarget(conv.id) }}
                   aria-label={t('ai.deleteChat')}
                 >
-                  <Trash2 className="h-2.5 w-2.5" />
+                  <Trash2 className="h-2.5 w-2.5" aria-hidden />
                 </button>
               </div>
             ))}
@@ -559,6 +591,16 @@ export default function AIChatPage() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}
+        title={t('ai.deleteChat')}
+        message={t('ai.deleteChatConfirm')}
+        confirmText={t('ai.deleteChat')}
+        onConfirm={async () => {
+          if (deleteTarget !== null) await handleDeleteConv(deleteTarget)
+        }}
+      />
     </div>
   )
 }

@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { ForceGraphMethods, LinkObject, NodeObject } from 'react-force-graph-2d'
-import ForceGraph2D from 'react-force-graph-2d'
+import type ForceGraph2DType from 'react-force-graph-2d'
 import { graphApi } from '../api/graph'
 import type { GraphData } from '../types'
 import { Card, CardContent } from '../components/ui/card'
@@ -11,6 +11,8 @@ import { Button } from '../components/ui/button'
 import { useGraphSettings } from '../stores/graphSettings'
 import { ZoomIn, ZoomOut, Maximize, Minimize, RotateCcw, Crosshair, Loader2, Network } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof ForceGraph2DType
 
 type LayoutMode = 'force' | 'cluster' | 'random'
 
@@ -150,7 +152,7 @@ export default function GraphPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  // Responsive canvas sizing
+  // Responsive canvas sizing — ResizeObserver only (window resize is redundant)
   useEffect(() => {
     const updateSize = () => {
       if (isFullscreen) {
@@ -164,8 +166,11 @@ export default function GraphPage() {
     updateSize()
     const ro = new ResizeObserver(updateSize)
     if (containerRef.current) ro.observe(containerRef.current)
-    window.addEventListener('resize', updateSize)
-    return () => { ro.disconnect(); window.removeEventListener('resize', updateSize) }
+    if (isFullscreen) {
+      // In fullscreen mode the container fills the viewport; observe document.documentElement
+      ro.observe(document.documentElement)
+    }
+    return () => ro.disconnect()
   }, [isFullscreen])
 
   // Escape to exit fullscreen
@@ -273,11 +278,14 @@ export default function GraphPage() {
     // For cluster mode, compute cluster center positions and assign
     if (layoutMode === 'cluster') {
       const clusterMap = new Map<string, number[]>()
+      const layoutById = new Map<number, GraphNode>()
       layoutNodes.forEach((n: GraphNode) => {
         if (n.id === SELF_NODE_ID) return
+        layoutById.set(n.id, n)
         const key = n.__cluster || '_none'
-        if (!clusterMap.has(key)) clusterMap.set(key, [])
-        clusterMap.get(key)!.push(n.id)
+        let arr = clusterMap.get(key)
+        if (!arr) { arr = []; clusterMap.set(key, arr) }
+        arr.push(n.id)
       })
 
       const clusters = [...clusterMap.entries()]
@@ -290,7 +298,7 @@ export default function GraphPage() {
         const innerSpread = Math.sqrt(memberIds.length) * 10
 
         memberIds.forEach((id) => {
-          const node = layoutNodes.find((n: GraphNode) => n.id === id)
+          const node = layoutById.get(id)
           if (node) {
             node.x = cx + (pseudoRandom(id + 20000) - 0.5) * innerSpread * 2
             node.y = cy + (pseudoRandom(id + 30000) - 0.5) * innerSpread * 2
@@ -299,7 +307,7 @@ export default function GraphPage() {
       })
 
       // Position self node at center
-      const selfNode = layoutNodes.find((n: GraphNode) => n.id === SELF_NODE_ID)
+      const selfNode = layoutById.get(SELF_NODE_ID) ?? layoutNodes.find((n: GraphNode) => n.id === SELF_NODE_ID)
       if (selfNode) {
         selfNode.x = 0
         selfNode.y = 0
@@ -333,6 +341,9 @@ export default function GraphPage() {
   const isLarge = fgData.isLarge
 
   const nodeCanvasObject = useCallback((node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
+    const x = node.x
+    const y = node.y
+    if (x == null || y == null) return
     const isSelf = node.id === SELF_NODE_ID
     const emoji = node.avatar_emoji as string | undefined
     const hasEmoji = emoji && emoji.length > 0
@@ -352,7 +363,7 @@ export default function GraphPage() {
     }
 
     ctx.beginPath()
-    ctx.arc(node.x!, node.y!, r, 0, 2 * Math.PI)
+    ctx.arc(x, y, r, 0, 2 * Math.PI)
     ctx.fillStyle = bgColor
     ctx.fill()
     ctx.strokeStyle = color
@@ -367,21 +378,21 @@ export default function GraphPage() {
     if (avatarImg) {
       ctx.save()
       ctx.beginPath()
-      ctx.arc(node.x!, node.y!, r - 1 / globalScale, 0, 2 * Math.PI)
+      ctx.arc(x, y, r - 1 / globalScale, 0, 2 * Math.PI)
       ctx.clip()
-      ctx.drawImage(avatarImg, node.x! - r, node.y! - r, r * 2, r * 2)
+      ctx.drawImage(avatarImg, x - r, y - r, r * 2, r * 2)
       ctx.restore()
     } else if (hasEmoji) {
       ctx.font = `${emojiSize}px Sans-Serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText(emoji, node.x!, node.y!)
+      ctx.fillText(emoji, x, y)
     } else {
       ctx.font = `bold ${r * 1.2}px Sans-Serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillStyle = color
-      ctx.fillText(node.name?.[0] || '?', node.x!, node.y!)
+      ctx.fillText(node.name?.[0] || '?', x, y)
     }
 
     // Skip name labels when zoomed out on large graphs
@@ -390,7 +401,7 @@ export default function GraphPage() {
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
       ctx.fillStyle = isSelf ? '#10b981' : textColor
-      ctx.fillText(node.name, node.x!, node.y! + r + 2 / globalScale)
+      ctx.fillText(node.name, x, y + r + 2 / globalScale)
     }
   }, [nodeRadius, emojiSizeSetting, dark, isLarge])
 
@@ -609,6 +620,7 @@ export default function GraphPage() {
 
       <Card className={isFullscreen ? 'h-full rounded-none border-0' : ''}>
         <CardContent className="p-0" ref={containerRef}>
+          <Suspense fallback={<div className="flex h-[60vh] items-center justify-center text-sm text-muted-foreground">{t('graph.loading')}</div>}>
           <ForceGraph2D<GraphNodeData, { relation_type: string }>
             ref={fgRef}
             graphData={fgData}
@@ -633,9 +645,12 @@ export default function GraphPage() {
             onNodeClick={handleNodeClick}
             nodeCanvasObject={nodeCanvasObject}
             nodePointerAreaPaint={(node: GraphNode, color: string, ctx: CanvasRenderingContext2D) => {
+              const x = node.x
+              const y = node.y
+              if (x == null || y == null) return
               const r = nodeRadius
               ctx.beginPath()
-              ctx.arc(node.x!, node.y!, r + 4, 0, 2 * Math.PI)
+              ctx.arc(x, y, r + 4, 0, 2 * Math.PI)
               ctx.fillStyle = color
               ctx.fill()
             }}
@@ -645,6 +660,7 @@ export default function GraphPage() {
             cooldownTicks={cooldownTicks}
             onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
           />
+          </Suspense>
         </CardContent>
       </Card>
     </div>

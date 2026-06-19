@@ -16,7 +16,28 @@ import { bindings } from '@/wailsjs/go/models'
 // identical while avoiding `as any as T` casts in this file.
 
 function bridge<T>(value: unknown): T {
+  if (value == null) {
+    throw new Error('Wails binding returned null/undefined')
+  }
   return value as T
+}
+
+function bridgeArray<T>(value: unknown): T[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`Expected array but got ${value === null ? 'null' : typeof value}`)
+  }
+  return value as T[]
+}
+
+function bridgePaginated<T>(value: unknown): { items: T[]; total: number; page: number; page_size: number } {
+  if (!value || typeof value !== 'object') {
+    throw new Error('Expected paginated object')
+  }
+  const v = value as Record<string, unknown>
+  if (!Array.isArray(v.items)) {
+    throw new Error('Expected items array in paginated response')
+  }
+  return value as { items: T[]; total: number; page: number; page_size: number }
 }
 
 async function createWailsAdapters(): Promise<AppAdapters> {
@@ -88,7 +109,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           search: params.search || '',
           tag_ids: params.tag_ids || [],
         } as unknown as bindings.ListContactsInput)
-        return bridge<{ items: Contact[]; total: number; page: number; page_size: number }>(r)
+        return bridgePaginated<Contact>(r)
       },
       create: async (data) => {
         const r = await CreateContact({
@@ -123,7 +144,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
       delete: (id) => DeleteContact(id).then(() => {}),
       getTags: async (id) => {
         const r = await GetTags(id)
-        return bridge<Tag[]>(r)
+        return bridgeArray<Tag>(r)
       },
       replaceTags: (id, tagIDs) => ReplaceTags(id, tagIDs as unknown as number[]).then(() => {}),
     },
@@ -131,7 +152,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     tag: {
       list: async () => {
         const r = await ListTags()
-        return bridge<Tag[]>(r)
+        return bridgeArray<Tag>(r)
       },
       create: async (data) => {
         const r = await CreateTag(data as unknown as bindings.CreateTagInput)
@@ -147,7 +168,8 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     interaction: {
       listByContact: async (contactID, page, pageSize) => {
         const r = await ListByContact(contactID, page, pageSize)
-        return bridge<{ items: Interaction[]; total: number }>(r)
+        const paginated = bridgePaginated<Interaction>(r)
+        return { items: paginated.items, total: paginated.total }
       },
       create: async (contactID, data) => {
         const r = await CreateInteraction(contactID, {
@@ -173,7 +195,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     reminder: {
       list: async (status) => {
         const r = await ListReminders(status || '')
-        return bridge<Reminder[]>(r)
+        return bridgeArray<Reminder>(r)
       },
       create: async (contactID, data) => {
         const r = await CreateReminder(contactID, {
@@ -202,7 +224,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
       },
       getRelations: async (contactID) => {
         const r = await GetRelations(contactID)
-        return bridge<ContactRelation[]>(r)
+        return bridgeArray<ContactRelation>(r)
       },
       createRelation: async (contactIDA, data) => {
         const r = await CreateRelation(contactIDA, data as unknown as bindings.CreateRelationInput)
@@ -224,7 +246,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           start_after: params?.start_after || '',
           end_before: params?.end_before || '',
         } as unknown as bindings.ListEventsInput)
-        return bridge<{ items: Event[]; total: number; page: number; page_size: number }>(r)
+        return bridgePaginated<Event>(r)
       },
       create: async (data) => {
         const r = await CreateEvent({
@@ -256,7 +278,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     todo: {
       list: async (status) => {
         const r = await TodoList(status || '')
-        return bridge<Todo[]>(r)
+        return bridgeArray<Todo>(r)
       },
       create: async (data) => {
         const r = await TodoCreate({
@@ -298,7 +320,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           page_size: params?.page_size || 50,
           type: params?.type || '',
         } as unknown as bindings.ListTransactionsInput)
-        return bridge<{ items: Transaction[]; total: number; page: number; page_size: number }>(r)
+        return bridgePaginated<Transaction>(r)
       },
       summary: async () => {
         const r = await TransactionSummary()
@@ -337,11 +359,11 @@ async function createWailsAdapters(): Promise<AppAdapters> {
       },
       listPresets: async () => {
         const r = await AIListPresets()
-        return bridge<AIProviderPreset[]>(r)
+        return bridgeArray<AIProviderPreset>(r)
       },
       listProviders: async () => {
         const r = await AIListProviders()
-        return bridge<AIProvider[]>(r)
+        return bridgeArray<AIProvider>(r)
       },
       saveProvider: async (data) => {
         const r = await AISaveProvider({
@@ -364,7 +386,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
       },
       listConversations: async (params) => {
         const r = await AIListConversations(params?.page || 1, params?.page_size || 20)
-        return bridge<{ items: AIConversation[]; total: number; page: number; page_size: number }>(r)
+        return bridgePaginated<AIConversation>(r)
       },
       createConversation: async (data) => {
         const r = await AICreateConversation(data?.title || '')
@@ -372,7 +394,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
       },
       getMessages: async (conversationId) => {
         const r = await AIGetMessages(conversationId)
-        return bridge<AIMessage[]>(r)
+        return bridgeArray<AIMessage>(r)
       },
       deleteConversation: (id) => AIDeleteConversation(id).then(() => {}),
       analyzeRelationship: async (contactId) => {
@@ -411,7 +433,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
       list: async () => {
         const { List: WSList } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
         const r = await WSList()
-        return bridge<Workspace[]>(r)
+        return bridgeArray<Workspace>(r)
       },
       create: async (data) => {
         const { Create: WSCreate } = await import('@/wailsjs/go/bindings/WorkspaceBinding')

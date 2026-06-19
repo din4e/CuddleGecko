@@ -91,10 +91,26 @@ export default function RegisterPage() {
             </div>
             {captchaEnabled && captchaImage && (
               <div className="space-y-2">
-                <Label>{t('auth.captcha')}</Label>
+                <Label htmlFor="captcha-answer">{t('auth.captcha')}</Label>
                 <div className="flex items-center gap-2">
-                  <img src={captchaImage} alt="captcha" className="h-10 rounded border cursor-pointer" onClick={loadCaptcha} title={t('auth.captchaRefresh')} />
-                  <Input value={captchaAnswer} onChange={(e) => setCaptchaAnswer(e.target.value)} required placeholder={t('auth.captchaPlaceholder')} className="flex-1" />
+                  <button
+                    type="button"
+                    onClick={loadCaptcha}
+                    aria-label={t('auth.captchaRefresh')}
+                    title={t('auth.captchaRefresh')}
+                    className="h-10 rounded border cursor-pointer overflow-hidden p-0 bg-transparent"
+                  >
+                    <img src={captchaImage} alt="" className="h-10 block" />
+                  </button>
+                  <Input
+                    id="captcha-answer"
+                    value={captchaAnswer}
+                    onChange={(e) => setCaptchaAnswer(e.target.value)}
+                    required
+                    placeholder={t('auth.captchaPlaceholder')}
+                    className="flex-1"
+                    autoComplete="off"
+                  />
                 </div>
               </div>
             )}

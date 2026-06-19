@@ -17,6 +17,7 @@ import {
 } from '../components/ui/dialog'
 import { Plus, Pencil, Trash2, Clock, CheckCircle2, Circle, ArrowRight, Loader2, ListChecks, AlignJustify, Columns } from 'lucide-react'
 import BuddyPicker from '../components/BuddyPicker'
+import { toast } from 'sonner'
 import type { Todo, Contact } from '../types'
 
 type TodoView = 'timeline' | 'grouped' | 'kanban'
@@ -239,9 +240,9 @@ export default function TodosPage() {
   const handleSync = useCallback(async (todo: Todo) => {
     try {
       await todoApi.syncToEvent(todo.id)
-      alert(t('todos.syncSuccess'))
+      toast.success(t('todos.syncSuccess'))
     } catch {
-      alert(t('todos.syncFailed'))
+      toast.error(t('todos.syncFailed'))
     }
   }, [t])
 

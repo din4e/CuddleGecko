@@ -18,6 +18,7 @@ import {
 } from '../components/ui/dialog'
 import { TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, Heart } from 'lucide-react'
 import BuddyPicker from '../components/BuddyPicker'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import type { Transaction, TransactionSummary, Contact } from '../types'
@@ -51,6 +52,7 @@ export default function FinancePage() {
   const [buddies, setBuddies] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<TxType>('')
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [form, setForm] = useState<TxFormData>(emptyForm)
@@ -130,11 +132,12 @@ export default function FinancePage() {
     loadData()
   }
 
-  const handleDelete = async (id: number) => {
-    if (confirm(t('finance.deleteConfirm'))) {
-      await transactionApi.delete(id)
-      loadData()
-    }
+  const handleDelete = (id: number) => setDeleteTarget(id)
+
+  const handleConfirmDelete = async () => {
+    if (deleteTarget === null) return
+    await transactionApi.delete(deleteTarget)
+    loadData()
   }
 
   const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -396,6 +399,15 @@ export default function FinancePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}
+        title={t('finance.deleteTransaction')}
+        message={t('finance.deleteConfirm')}
+        confirmText={t('finance.deleteTransaction')}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   )
 }

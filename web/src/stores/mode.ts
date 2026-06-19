@@ -17,7 +17,12 @@ interface ModeState {
 
 const isWails = isWailsRuntime()
 
-const savedMode = (localStorage.getItem('app_mode') as AppMode) || (isWails ? 'local' : 'remote')
+function readSavedMode(): AppMode {
+  const raw = localStorage.getItem('app_mode')
+  return raw === 'local' || raw === 'remote' ? raw : (isWails ? 'local' : 'remote')
+}
+
+const savedMode = readSavedMode()
 const savedUrl = localStorage.getItem('remote_url') || 'http://localhost:8080'
 
 let httpAdapters: AppAdapters | null = null
