@@ -18,9 +18,13 @@ type Config struct {
 	Log      LogConfig
 	Captcha  CaptchaConfig
 	AI       AIConfig
+	CORS     CORSConfig
 }
 
-// AIConfig holds default AI provider settings (optional, can be overridden per-user in DB).
+// CORSConfig holds cross-origin settings.
+type CORSConfig struct {
+	AllowOrigins []string
+}
 type AIConfig struct {
 	ProviderType string
 	APIKey       string
@@ -84,7 +88,7 @@ func Load() (*Config, error) {
 	v.SetDefault("database.sqlite_path", "./data/cuddlegecko.db")
 	v.SetDefault("database.mysql_dsn", "")
 
-	v.SetDefault("jwt.secret", "change-me-in-production")
+	v.SetDefault("jwt.secret", "")
 	v.SetDefault("jwt.access_ttl", "15m")
 	v.SetDefault("jwt.refresh_ttl", "168h")
 
@@ -93,6 +97,8 @@ func Load() (*Config, error) {
 
 	v.SetDefault("captcha.enabled", true)
 	v.SetDefault("captcha.length", 4)
+
+	v.SetDefault("cors.allow_origins", []string{})
 
 	// Read config file; not found is acceptable
 	if err := v.ReadInConfig(); err != nil {
@@ -140,6 +146,9 @@ func Load() (*Config, error) {
 			APIKey:       v.GetString("ai.api_key"),
 			Model:        v.GetString("ai.model"),
 			BaseURL:      v.GetString("ai.base_url"),
+		},
+		CORS: CORSConfig{
+			AllowOrigins: v.GetStringSlice("cors.allow_origins"),
 		},
 	}
 

@@ -1,6 +1,8 @@
 import type { AppAdapters } from '@/api/adapter'
 import { commands } from '../CommandRegistry'
-import { formatTable, formatSuccess, formatError } from '../formatters'
+import { formatSuccess, formatError } from '../formatters'
+import type { CommandArgs } from '../types'
+import { getErrorMessage } from '../types'
 
 const BOLD = '\x1b[1m'
 const CYAN = '\x1b[36m'
@@ -8,14 +10,14 @@ const YELLOW = '\x1b[33m'
 const RESET = '\x1b[0m'
 
 export async function executeHelp(
-  args: Record<string, any>,
+  args: CommandArgs,
   _adapters: AppAdapters,
   t: (key: string) => string,
 ): Promise<string> {
   const commandName = args._pos0 || args.command
   if (commandName) {
     const cmd = commands.find(
-      (c) => c.name === commandName || c.aliases.includes(commandName),
+      (c) => c.name === commandName || c.aliases.includes(commandName as string),
     )
     if (!cmd) return formatError(`Command not found: ${commandName}`)
 
@@ -82,8 +84,8 @@ export function executeHistory(history: string[]): string {
   return history.map((cmd, i) => `  ${String(i + 1).padStart(4)}  ${cmd}`).join('\r\n')
 }
 
-export function executeOpen(args: Record<string, any>): { navigate: string } | string {
-  const page = args._pos0 || args.page
+export function executeOpen(args: CommandArgs): { navigate: string } | string {
+  const page = String(args._pos0 || args.page || '')
   if (!page) return formatError('Usage: open <page> | open buddy <id>')
 
   // Resource-specific routes: open buddy 1203 → /buddies/1203
@@ -134,7 +136,7 @@ export async function executeExport(adapters: AppAdapters): Promise<string> {
     a.click()
     URL.revokeObjectURL(url)
     return formatSuccess('Data exported successfully')
-  } catch (e: any) {
-    return formatError(`Export failed: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Export failed: ${getErrorMessage(e)}`)
   }
 }

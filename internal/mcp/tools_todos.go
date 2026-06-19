@@ -18,7 +18,8 @@ func (s *MCPServer) registerTodoTools() {
 			s := toString(v)
 			status = &s
 		}
-		return s.todoSvc.List(ctx, userID, workspaceID, status)
+		todos, _, err := s.todoSvc.List(ctx, userID, workspaceID, status, 1, 200)
+		return todos, err
 	})
 
 	s.registerTool("create_todo", "Create a new todo.", map[string]interface{}{

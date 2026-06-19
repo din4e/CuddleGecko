@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createHTTPAdapters } from '@/api/http-adapter'
 import type { AppAdapters } from '@/api/adapter'
+import { isWailsRuntime } from '@/lib/wails'
 
 type AppMode = 'local' | 'remote'
 
@@ -14,17 +15,25 @@ interface ModeState {
   initAdapters: () => Promise<void>
 }
 
-const isWails = typeof window !== 'undefined' && !!(window as any).__WAILS__
+const isWails = isWailsRuntime()
 
 const savedMode = (localStorage.getItem('app_mode') as AppMode) || (isWails ? 'local' : 'remote')
 const savedUrl = localStorage.getItem('remote_url') || 'http://localhost:8080'
 
-// Synchronous HTTP adapter for immediate use
+let httpAdapters: AppAdapters | null = null
+
+function getHTTPAdapters(): AppAdapters {
+  if (!httpAdapters) {
+    httpAdapters = createHTTPAdapters()
+  }
+  return httpAdapters
+}
+
 function getInitialAdapters(): AppAdapters | null {
   if (savedMode === 'remote' || !isWails) {
-    return createHTTPAdapters()
+    return getHTTPAdapters()
   }
-  return null // Will be loaded async for local mode
+  return null
 }
 
 export const useModeStore = create<ModeState>((set, get) => ({
@@ -36,7 +45,7 @@ export const useModeStore = create<ModeState>((set, get) => ({
   setMode: (mode) => {
     localStorage.setItem('app_mode', mode)
     if (mode === 'remote' || !isWails) {
-      set({ mode, adapters: createHTTPAdapters(), adaptersLoading: false })
+      set({ mode, adapters: getHTTPAdapters(), adaptersLoading: false })
     } else {
       set({ mode, adapters: null, adaptersLoading: false })
       get().initAdapters()
@@ -58,11 +67,10 @@ export const useModeStore = create<ModeState>((set, get) => ({
         const adapters = await createWailsAdapters()
         set({ adapters, adaptersLoading: false })
       } else {
-        set({ adapters: createHTTPAdapters(), adaptersLoading: false })
+        set({ adapters: getHTTPAdapters(), adaptersLoading: false })
       }
     } catch {
-      // Fallback to HTTP if Wails bindings fail to load
-      set({ adapters: createHTTPAdapters(), adaptersLoading: false })
+      set({ adapters: getHTTPAdapters(), adaptersLoading: false })
     }
   },
 }))

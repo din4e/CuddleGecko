@@ -1,9 +1,12 @@
-import client from './client'
-import type { Tag } from '../types'
+import { request } from './client'
+import type { Tag, PaginatedData } from '../types'
 
 export const tagsApi = {
-  list: () => client.get<Tag[]>('/tags'),
-  create: (data: { name: string; color: string }) => client.post<Tag>('/tags', data),
-  update: (id: number, data: Partial<Tag>) => client.put<Tag>(`/tags/${id}`, data),
-  delete: (id: number) => client.delete(`/tags/${id}`),
+  list: (page = 1, pageSize = 50) =>
+    request.get<PaginatedData<Tag>>('/tags', { params: { page, page_size: pageSize } }).then((data) => ({ data })),
+  create: (data: { name: string; color: string }) =>
+    request.post<Tag>('/tags', data).then((d) => ({ data: d })),
+  update: (id: number, data: Partial<Tag>) =>
+    request.put<Tag>(`/tags/${id}`, data).then((d) => ({ data: d })),
+  delete: (id: number) => request.delete<void>(`/tags/${id}`).then(() => {}),
 }

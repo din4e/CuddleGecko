@@ -19,6 +19,10 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	if len(cfg.JWT.Secret) < 32 {
+		log.Fatal("JWT secret must be at least 32 characters. Set jwt.secret in config.yaml or CG_JWT_SECRET env var.")
+	}
+
 	db, err := database.Init(&cfg.Database)
 	if err != nil {
 		log.Fatalf("Failed to init database: %v", err)
@@ -50,17 +54,18 @@ func main() {
 	todoSvc := service.NewTodoService(todoRepo, eventRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
+	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo)
 
 	// MCP Server
 	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc)
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc, "./data/avatars", cfg.AI)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, "./data/avatars", cfg.AI)
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)
 	r := gin.Default()
-	handler.RegisterRoutes(r, handlers, &cfg.JWT, workspaceSvc, mcpServer)
+	handler.RegisterRoutes(r, handlers, cfg, workspaceSvc, mcpServer)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("CuddleGecko server starting on %s", addr)

@@ -1,5 +1,7 @@
 import type { AppAdapters } from '@/api/adapter'
-import { formatTable, formatDetail, formatSuccess, formatError } from '../formatters'
+import { formatTable, formatSuccess, formatError } from '../formatters'
+import type { CommandArgs } from '../types'
+import { getErrorMessage } from '../types'
 
 const CYAN = '\x1b[36m'
 const GREEN = '\x1b[32m'
@@ -8,7 +10,7 @@ const BOLD = '\x1b[1m'
 const RESET = '\x1b[0m'
 
 export async function executeListTransactions(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -31,8 +33,8 @@ export async function executeListTransactions(
 
     const table = formatTable(rows)
     return `${table}\r\n\r\nTotal: ${result.total} (Page ${result.page}/${Math.ceil(result.total / result.page_size)})`
-  } catch (e: any) {
-    return formatError(`Failed to list transactions: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to list transactions: ${getErrorMessage(e)}`)
   }
 }
 
@@ -46,13 +48,13 @@ export async function executeSummary(adapters: AppAdapters): Promise<string> {
       `  ${RED}Expense:${RESET} ${summary.expense.toFixed(2)}`,
       `  ${CYAN}Balance:${RESET} ${summary.balance.toFixed(2)}`,
     ].join('\r\n')
-  } catch (e: any) {
-    return formatError(`Failed to get summary: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to get summary: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeCreateTransaction(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -63,27 +65,27 @@ export async function executeCreateTransaction(
     if (!title || isNaN(amount) || !type) return formatError('--title, --amount, and --type are required')
     if (type !== 'income' && type !== 'expense') return formatError('--type must be income or expense')
 
-    const data: Record<string, any> = { title, amount, type }
+    const data: Record<string, unknown> = { title, amount, type }
     if (args.category) data.category = args.category
     if (args.date) data.date = args.date
     if (args.notes) data.notes = args.notes
 
     const tx = await adapters.transaction.create(data)
     return formatSuccess(`Created transaction (ID: ${tx.id})`)
-  } catch (e: any) {
-    return formatError(`Failed to create transaction: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to create transaction: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeUpdateTransaction(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
     const id = Number(args.id)
     if (!id) return formatError('Usage: update transaction <id>')
 
-    const data: Record<string, any> = {}
+    const data: Record<string, unknown> = {}
     if (args.title) data.title = args.title
     if (args.amount !== undefined) data.amount = Number(args.amount)
     if (args.type) data.type = args.type
@@ -93,13 +95,13 @@ export async function executeUpdateTransaction(
 
     await adapters.transaction.update(id, data)
     return formatSuccess('Transaction updated successfully')
-  } catch (e: any) {
-    return formatError(`Failed to update transaction: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to update transaction: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeDeleteTransaction(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -108,7 +110,7 @@ export async function executeDeleteTransaction(
 
     await adapters.transaction.delete(id)
     return formatSuccess('Transaction deleted successfully')
-  } catch (e: any) {
-    return formatError(`Failed to delete transaction: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to delete transaction: ${getErrorMessage(e)}`)
   }
 }

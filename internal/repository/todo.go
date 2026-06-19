@@ -31,20 +31,38 @@ func (r *TodoRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.To
 	return &todo, nil
 }
 
-func (r *TodoRepo) List(ctx context.Context, workspaceID uint, status *string) ([]model.Todo, error) {
+func (r *TodoRepo) List(ctx context.Context, workspaceID uint, status *string, page, pageSize int) ([]model.Todo, int64, error) {
 	var todos []model.Todo
-	query := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID)
+	query := r.db.WithContext(ctx).Model(&model.Todo{}).Where("workspace_id = ?", workspaceID)
 	if status != nil && *status != "" {
 		query = query.Where("status = ?", *status)
 	}
-	if err := query.Order("due_time ASC NULLS LAST, created_at DESC").Find(&todos).Error; err != nil {
-		return nil, fmt.Errorf("list todos: %w", err)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("count todos: %w", err)
 	}
-	return todos, nil
+
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	offset := (page - 1) * pageSize
+
+	if err := query.Order("due_time ASC NULLS LAST, created_at DESC").
+		Limit(pageSize).Offset(offset).
+		Find(&todos).Error; err != nil {
+		return nil, 0, fmt.Errorf("list todos: %w", err)
+	}
+	return todos, total, nil
 }
 
 func (r *TodoRepo) Update(ctx context.Context, todo *model.Todo) error {
-	if err := r.db.WithContext(ctx).Save(todo).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&model.Todo{ID: todo.ID}).
+		Select("title", "description", "status", "priority", "due_time", "amount", "amount_type", "contact_ids", "color", "completed_at").
+		Updates(todo).Error; err != nil {
 		return fmt.Errorf("update todo: %w", err)
 	}
 	return nil

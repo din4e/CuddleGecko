@@ -2,8 +2,9 @@ import type { AppAdapters } from './adapter'
 import type {
   Contact, Interaction, Reminder, ContactRelation,
   GraphData, AuthResponse, User, Tag, Event, Transaction, TransactionSummary,
-  AIProvider, AIConversation, AIMessage, AIProviderPreset, Workspace,
+  AIProvider, AIConversation, AIMessage, AIProviderPreset, Workspace, Todo,
 } from '@/types'
+import { bindings } from '@/wailsjs/go/models'
 
 // Wails bindings are generated at build time by `wails dev` or `wails build`.
 // Imports reference the generated wailsjs directory which may not exist in web-only builds.
@@ -11,7 +12,12 @@ import type {
 //
 // The generated Wails model types use `string` for enum fields and `any` for time fields,
 // while our frontend types use union types (InteractionType, ReminderStatus) and `string`.
-// We bridge this with `as any` casts — the runtime serialization is identical.
+// We bridge the generated types with a single typed helper so runtime serialization stays
+// identical while avoiding `as any as T` casts in this file.
+
+function bridge<T>(value: unknown): T {
+  return value as T
+}
 
 async function createWailsAdapters(): Promise<AppAdapters> {
   const [
@@ -25,8 +31,15 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     { ExportJSON, ImportJSON },
     { List: ListEvents, Create: CreateEvent, Update: UpdateEvent, Delete: DeleteEvent },
     { List: ListTransactions, Summary: TransactionSummary, Create: CreateTransaction, Update: UpdateTransaction, Delete: DeleteTransaction },
-    { ListProviders: AIListProviders, SaveProvider: AISaveProvider, ActivateProvider: AIActivateProvider, TestConnection: AITestConnection, ListConversations: AIListConversations, CreateConversation: AICreateConversation, GetMessages: AIGetMessages, DeleteConversation: AIDeleteConversation, Chat: AIChatFn, AnalyzeRelationship: AIAnalyzeRelationship, AnalyzeEvent: AIAnalyzeEvent, ListPresets: AIListPresets },
+    {
+      ListProviders: AIListProviders, SaveProvider: AISaveProvider, ActivateProvider: AIActivateProvider,
+      TestConnection: AITestConnection, ListConversations: AIListConversations, CreateConversation: AICreateConversation,
+      GetMessages: AIGetMessages, DeleteConversation: AIDeleteConversation, Chat: AIChatFn,
+      AnalyzeRelationship: AIAnalyzeRelationship, AnalyzeEvent: AIAnalyzeEvent, AnalyzeComprehensive: AIAnalyzeComprehensive,
+      ListPresets: AIListPresets,
+    },
     { Version: DesktopVersion, Platform: DesktopPlatform, Arch: DesktopArch, DataDir: DesktopDataDir, DatabasePath: DesktopDatabasePath, OpenDataDir: DesktopOpenDataDir },
+    { List: TodoList, Create: TodoCreate, Update: TodoUpdate, ToggleStatus: TodoToggleStatus, SyncToEvent: TodoSyncToEvent, Delete: TodoDelete },
   ] = await Promise.all([
     import('@/wailsjs/go/bindings/AuthBinding'),
     import('@/wailsjs/go/bindings/CaptchaBinding'),
@@ -40,25 +53,26 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     import('@/wailsjs/go/bindings/TransactionBinding'),
     import('@/wailsjs/go/bindings/AIBinding'),
     import('@/wailsjs/go/bindings/DesktopBinding'),
+    import('@/wailsjs/go/bindings/TodoBinding'),
   ])
 
   return {
     auth: {
       register: async (username, email, password, captcha) => {
         const r = await Register(username, email, password, captcha?.captcha_id || '', captcha?.captcha_answer || '')
-        return r as any as AuthResponse
+        return bridge<AuthResponse>(r)
       },
       login: async (username, password, captcha) => {
         const r = await Login(username, password, captcha?.captcha_id || '', captcha?.captcha_answer || '')
-        return r as any as AuthResponse
+        return bridge<AuthResponse>(r)
       },
       refresh: async (token) => {
         const r = await Refresh(token)
-        return r as any as AuthResponse
+        return bridge<AuthResponse>(r)
       },
       me: async () => {
         const u = await Me()
-        return u as any as User
+        return bridge<User>(u)
       },
     },
 
@@ -73,8 +87,8 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           page_size: params.page_size,
           search: params.search || '',
           tag_ids: params.tag_ids || [],
-        } as any)
-        return r as any
+        } as unknown as bindings.ListContactsInput)
+        return bridge<{ items: Contact[]; total: number; page: number; page_size: number }>(r)
       },
       create: async (data) => {
         const r = await CreateContact({
@@ -86,12 +100,12 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           birthday: data.birthday || null,
           notes: data.notes || '',
           relationship_labels: data.relationship_labels || [],
-        } as any)
-        return r as any as Contact
+        } as unknown as bindings.CreateContactInput)
+        return bridge<Contact>(r)
       },
       getByID: async (id) => {
         const r = await GetByID(id)
-        return r as any as Contact
+        return bridge<Contact>(r)
       },
       update: async (id, data) => {
         const r = await UpdateContact(id, {
@@ -103,29 +117,29 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           birthday: data.birthday || null,
           notes: data.notes || '',
           relationship_labels: data.relationship_labels || [],
-        } as any)
-        return r as any as Contact
+        } as unknown as bindings.CreateContactInput)
+        return bridge<Contact>(r)
       },
       delete: (id) => DeleteContact(id).then(() => {}),
       getTags: async (id) => {
         const r = await GetTags(id)
-        return r as any as Tag[]
+        return bridge<Tag[]>(r)
       },
-      replaceTags: (id, tagIDs) => ReplaceTags(id, tagIDs as any).then(() => {}),
+      replaceTags: (id, tagIDs) => ReplaceTags(id, tagIDs as unknown as number[]).then(() => {}),
     },
 
     tag: {
       list: async () => {
         const r = await ListTags()
-        return r as any as Tag[]
+        return bridge<Tag[]>(r)
       },
       create: async (data) => {
-        const r = await CreateTag(data as any)
-        return r as any as Tag
+        const r = await CreateTag(data as unknown as bindings.CreateTagInput)
+        return bridge<Tag>(r)
       },
       update: async (id, data) => {
-        const r = await UpdateTag(id, data as any)
-        return r as any as Tag
+        const r = await UpdateTag(id, data as unknown as bindings.UpdateTagInput)
+        return bridge<Tag>(r)
       },
       delete: (id) => DeleteTag(id).then(() => {}),
     },
@@ -133,7 +147,7 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     interaction: {
       listByContact: async (contactID, page, pageSize) => {
         const r = await ListByContact(contactID, page, pageSize)
-        return r as any as { items: Interaction[]; total: number }
+        return bridge<{ items: Interaction[]; total: number }>(r)
       },
       create: async (contactID, data) => {
         const r = await CreateInteraction(contactID, {
@@ -141,8 +155,8 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           title: data.title || '',
           content: data.content || '',
           occurred_at: data.occurred_at || '',
-        } as any)
-        return r as any as Interaction
+        } as unknown as bindings.CreateInteractionInput)
+        return bridge<Interaction>(r)
       },
       update: async (id, data) => {
         const r = await UpdateInteraction(id, {
@@ -150,8 +164,8 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           title: data.title || '',
           content: data.content || '',
           occurred_at: data.occurred_at || '',
-        } as any)
-        return r as any as Interaction
+        } as unknown as bindings.CreateInteractionInput)
+        return bridge<Interaction>(r)
       },
       delete: (id) => DeleteInteraction(id).then(() => {}),
     },
@@ -159,15 +173,15 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     reminder: {
       list: async (status) => {
         const r = await ListReminders(status || '')
-        return r as any as Reminder[]
+        return bridge<Reminder[]>(r)
       },
       create: async (contactID, data) => {
         const r = await CreateReminder(contactID, {
           title: data.title || '',
           description: data.description || '',
           remind_at: data.remind_at || '',
-        } as any)
-        return r as any as Reminder
+        } as unknown as bindings.CreateReminderInput)
+        return bridge<Reminder>(r)
       },
       update: async (id, data) => {
         const r = await UpdateReminder(id, {
@@ -175,8 +189,8 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           description: data.description || '',
           remind_at: data.remind_at || '',
           status: data.status || '',
-        } as any)
-        return r as any as Reminder
+        } as unknown as bindings.UpdateReminderInput)
+        return bridge<Reminder>(r)
       },
       delete: (id) => DeleteReminder(id).then(() => {}),
     },
@@ -184,15 +198,15 @@ async function createWailsAdapters(): Promise<AppAdapters> {
     graph: {
       getGraph: async () => {
         const r = await GetGraph()
-        return r as any as GraphData
+        return bridge<GraphData>(r)
       },
       getRelations: async (contactID) => {
         const r = await GetRelations(contactID)
-        return r as any as ContactRelation[]
+        return bridge<ContactRelation[]>(r)
       },
       createRelation: async (contactIDA, data) => {
-        const r = await CreateRelation(contactIDA, data as any)
-        return r as any as ContactRelation
+        const r = await CreateRelation(contactIDA, data as unknown as bindings.CreateRelationInput)
+        return bridge<ContactRelation>(r)
       },
       deleteRelation: (id) => DeleteRelation(id).then(() => {}),
     },
@@ -209,8 +223,8 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           page_size: params?.page_size || 50,
           start_after: params?.start_after || '',
           end_before: params?.end_before || '',
-        } as any)
-        return r as any
+        } as unknown as bindings.ListEventsInput)
+        return bridge<{ items: Event[]; total: number; page: number; page_size: number }>(r)
       },
       create: async (data) => {
         const r = await CreateEvent({
@@ -221,8 +235,8 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           location: data.location || '',
           contact_ids: data.contact_ids || [],
           color: data.color || '',
-        } as any)
-        return r as any as Event
+        } as unknown as bindings.CreateEventInput)
+        return bridge<Event>(r)
       },
       update: async (id, data) => {
         const r = await UpdateEvent(id, {
@@ -233,10 +247,48 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           location: data.location || '',
           contact_ids: data.contact_ids || [],
           color: data.color || '',
-        } as any)
-        return r as any as Event
+        } as unknown as bindings.CreateEventInput)
+        return bridge<Event>(r)
       },
       delete: (id) => DeleteEvent(id).then(() => {}),
+    },
+
+    todo: {
+      list: async (status) => {
+        const r = await TodoList(status || '')
+        return bridge<Todo[]>(r)
+      },
+      create: async (data) => {
+        const r = await TodoCreate({
+          title: data.title || '',
+          description: data.description || '',
+          status: data.status || '',
+          priority: data.priority || '',
+          due_time: data.due_time || '',
+          amount: data.amount ?? undefined,
+          amount_type: data.amount_type || '',
+          contact_ids: data.contact_ids || [],
+          color: data.color || '',
+        } as unknown as bindings.CreateTodoInput)
+        return bridge<Todo>(r)
+      },
+      update: async (id, data) => {
+        const r = await TodoUpdate(id, {
+          title: data.title || '',
+          description: data.description || '',
+          status: data.status || '',
+          priority: data.priority || '',
+          due_time: data.due_time || '',
+          amount: data.amount ?? undefined,
+          amount_type: data.amount_type || '',
+          contact_ids: data.contact_ids || [],
+          color: data.color || '',
+        } as unknown as bindings.CreateTodoInput)
+        return bridge<Todo>(r)
+      },
+      toggleStatus: (id) => TodoToggleStatus(id).then(r => bridge<Todo>(r)),
+      syncToEvent: (id) => TodoSyncToEvent(id).then(r => bridge<Event>(r)),
+      delete: (id) => TodoDelete(id).then(() => {}),
     },
 
     transaction: {
@@ -245,12 +297,12 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           page: params?.page || 1,
           page_size: params?.page_size || 50,
           type: params?.type || '',
-        } as any)
-        return r as any
+        } as unknown as bindings.ListTransactionsInput)
+        return bridge<{ items: Transaction[]; total: number; page: number; page_size: number }>(r)
       },
       summary: async () => {
         const r = await TransactionSummary()
-        return r as any as TransactionSummary
+        return bridge<TransactionSummary>(r)
       },
       create: async (data) => {
         const r = await CreateTransaction({
@@ -261,8 +313,8 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           contact_ids: data.contact_ids || [],
           date: data.date || '',
           notes: data.notes || '',
-        } as any)
-        return r as any as Transaction
+        } as unknown as bindings.CreateTransactionInput)
+        return bridge<Transaction>(r)
       },
       update: async (id, data) => {
         const r = await UpdateTransaction(id, {
@@ -273,8 +325,8 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           contact_ids: data.contact_ids || [],
           date: data.date || '',
           notes: data.notes || '',
-        } as any)
-        return r as any as Transaction
+        } as unknown as bindings.CreateTransactionInput)
+        return bridge<Transaction>(r)
       },
       delete: (id) => DeleteTransaction(id).then(() => {}),
     },
@@ -285,11 +337,11 @@ async function createWailsAdapters(): Promise<AppAdapters> {
       },
       listPresets: async () => {
         const r = await AIListPresets()
-        return r as any as AIProviderPreset[]
+        return bridge<AIProviderPreset[]>(r)
       },
       listProviders: async () => {
         const r = await AIListProviders()
-        return r as any as AIProvider[]
+        return bridge<AIProvider[]>(r)
       },
       saveProvider: async (data) => {
         const r = await AISaveProvider({
@@ -297,51 +349,52 @@ async function createWailsAdapters(): Promise<AppAdapters> {
           api_key: data.api_key,
           model: data.model || '',
           base_url: data.base_url || '',
-        } as any)
-        return r as any as AIProvider
+        } as unknown as bindings.SaveProviderInput)
+        return bridge<AIProvider>(r)
       },
       activateProvider: (id) => AIActivateProvider(id).then(() => {}),
       testConnection: async (id) => {
         try {
           await AITestConnection(id)
           return { success: true }
-        } catch (e: any) {
-          return { success: false, error: e?.message || String(e) }
+        } catch (e: unknown) {
+          const err = e instanceof Error ? e : new Error(String(e))
+          return { success: false, error: err.message }
         }
       },
       listConversations: async (params) => {
         const r = await AIListConversations(params?.page || 1, params?.page_size || 20)
-        return r as any
+        return bridge<{ items: AIConversation[]; total: number; page: number; page_size: number }>(r)
       },
       createConversation: async (data) => {
         const r = await AICreateConversation(data?.title || '')
-        return r as any as AIConversation
+        return bridge<AIConversation>(r)
       },
       getMessages: async (conversationId) => {
         const r = await AIGetMessages(conversationId)
-        return r as any as AIMessage[]
+        return bridge<AIMessage[]>(r)
       },
       deleteConversation: (id) => AIDeleteConversation(id).then(() => {}),
       analyzeRelationship: async (contactId) => {
         const r = await AIAnalyzeRelationship(contactId)
-        return r as any as { analysis: string }
+        return bridge<{ analysis: string }>({ analysis: r })
       },
       analyzeEvent: async (eventId) => {
         const r = await AIAnalyzeEvent(eventId)
-        return r as any as { analysis: string }
+        return bridge<{ analysis: string }>({ analysis: r })
       },
       analyzeComprehensive: async (data) => {
-        // Fallback to HTTP API until Wails bindings are regenerated
-        const resp = await fetch('/api/ai/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('access_token')}` },
-          body: JSON.stringify(data),
-        })
-        return resp.json().then((r: { data: { analysis: string } }) => r.data)
+        const r = await AIAnalyzeComprehensive({
+          type: data.type,
+          contact_ids: data.contact_ids || [],
+          event_ids: data.event_ids || [],
+          question: data.question || '',
+        } as unknown as bindings.AnalyzeComprehensiveInput)
+        return bridge<{ analysis: string }>(r)
       },
       chat: async (conversationId, message) => {
         const r = await AIChatFn(conversationId, message)
-        return r as any as string
+        return bridge<string>(r)
       },
     },
 
@@ -358,17 +411,17 @@ async function createWailsAdapters(): Promise<AppAdapters> {
       list: async () => {
         const { List: WSList } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
         const r = await WSList()
-        return r as any as Workspace[]
+        return bridge<Workspace[]>(r)
       },
       create: async (data) => {
         const { Create: WSCreate } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
         const r = await WSCreate(data.name, data.description || '', data.icon || '')
-        return r as any as Workspace
+        return bridge<Workspace>(r)
       },
       update: async (id, data) => {
         const { Update: WSUpdate } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
         const r = await WSUpdate(id, data.name || '', data.description || '', data.icon || '')
-        return r as any as Workspace
+        return bridge<Workspace>(r)
       },
       delete: async (id) => {
         const { Delete: WSDelete } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
@@ -377,12 +430,12 @@ async function createWailsAdapters(): Promise<AppAdapters> {
       switch: async (id) => {
         const { Switch: WSSwitch } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
         const r = await WSSwitch(id)
-        return r as any as Workspace
+        return bridge<Workspace>(r)
       },
       getDefault: async () => {
         const { GetDefault: WSGetDefault } = await import('@/wailsjs/go/bindings/WorkspaceBinding')
         const r = await WSGetDefault()
-        return r as any as Workspace
+        return bridge<Workspace>(r)
       },
     },
   }

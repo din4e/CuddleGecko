@@ -40,6 +40,7 @@ export default function RegisterPage() {
     }
   }, [])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadCaptcha() }, [loadCaptcha])
 
   const handleSubmit = async (e: React.FormEvent) => {

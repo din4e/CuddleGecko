@@ -35,12 +35,12 @@ func (m *mockTodoSvcRepo) GetByID(ctx context.Context, workspaceID, id uint) (*m
 	return args.Get(0).(*model.Todo), args.Error(1)
 }
 
-func (m *mockTodoSvcRepo) List(ctx context.Context, workspaceID uint, status *string) ([]model.Todo, error) {
-	args := m.Called(ctx, workspaceID, status)
+func (m *mockTodoSvcRepo) List(ctx context.Context, workspaceID uint, status *string, page, pageSize int) ([]model.Todo, int64, error) {
+	args := m.Called(ctx, workspaceID, status, page, pageSize)
 	if args.Get(0) == nil {
-		return nil, args.Error(1)
+		return nil, 0, args.Error(2)
 	}
-	return args.Get(0).([]model.Todo), args.Error(1)
+	return args.Get(0).([]model.Todo), args.Get(1).(int64), args.Error(2)
 }
 
 func (m *mockTodoSvcRepo) Update(ctx context.Context, todo *model.Todo) error {
@@ -86,7 +86,7 @@ func TestTodoHandler_List(t *testing.T) {
 	svc := service.NewTodoService(repo, eventRepo)
 	router := setupTodoRouter(svc)
 
-	repo.On("List", mock.Anything, uint(1), (*string)(nil)).Return([]model.Todo{}, nil)
+	repo.On("List", mock.Anything, uint(1), (*string)(nil), 1, 50).Return([]model.Todo{}, int64(0), nil)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/api/todos", nil)
@@ -103,7 +103,7 @@ func TestTodoHandler_List_WithStatusFilter(t *testing.T) {
 	router := setupTodoRouter(svc)
 
 	pending := "pending"
-	repo.On("List", mock.Anything, uint(1), &pending).Return([]model.Todo{}, nil)
+	repo.On("List", mock.Anything, uint(1), &pending, 1, 50).Return([]model.Todo{}, int64(0), nil)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/api/todos?status=pending", nil)

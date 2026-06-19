@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"github.com/din4e/cuddlegecko/pkg/config"
@@ -42,6 +45,9 @@ type AIService struct {
 	transactionRepo TransactionRepository
 	relationRepo    RelationRepository
 	aiCfg           config.AIConfig
+	httpClient      *http.Client
+	clientCache     map[string]*llm.Client
+	clientMu        sync.RWMutex
 }
 
 func NewAIService(
@@ -61,6 +67,10 @@ func NewAIService(
 		transactionRepo: transactionRepo,
 		relationRepo:    relationRepo,
 		aiCfg:           aiCfg,
+		httpClient: &http.Client{
+			Timeout: 120 * time.Second,
+		},
+		clientCache: make(map[string]*llm.Client),
 	}
 }
 
@@ -161,18 +171,46 @@ func (s *AIService) TestConnection(ctx context.Context, userID, providerID uint)
 func (s *AIService) getActiveClient(ctx context.Context, userID uint) (*llm.Client, error) {
 	provider, err := s.aiRepo.GetActiveProvider(ctx, userID)
 	if err == nil {
-		return llm.NewClient(provider.BaseURL, provider.APIKey, provider.Model), nil
+		return s.cachedClient(provider.BaseURL, provider.APIKey, provider.Model), nil
 	}
 
 	// Fallback to config-based provider (from env / config.yaml)
 	if s.aiCfg.APIKey != "" && s.aiCfg.BaseURL != "" {
-		return llm.NewClient(s.aiCfg.BaseURL, s.aiCfg.APIKey, s.aiCfg.Model), nil
+		return s.cachedClient(s.aiCfg.BaseURL, s.aiCfg.APIKey, s.aiCfg.Model), nil
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNoActiveProvider
 	}
 	return nil, err
+}
+
+func (s *AIService) cachedClient(baseURL, apiKey, model string) *llm.Client {
+	key := baseURL + "|" + apiKey + "|" + model
+	s.clientMu.RLock()
+	if c, ok := s.clientCache[key]; ok {
+		s.clientMu.RUnlock()
+		return c
+	}
+	s.clientMu.RUnlock()
+
+	s.clientMu.Lock()
+	defer s.clientMu.Unlock()
+	if c, ok := s.clientCache[key]; ok {
+		return c
+	}
+	c := llm.NewClient(baseURL, apiKey, model, llm.WithHTTPClient(s.httpClient))
+	s.clientCache[key] = c
+	return c
+}
+
+const maxHistoryMessages = 50
+
+func truncateMessages(messages []llm.Message) []llm.Message {
+	if len(messages) <= maxHistoryMessages {
+		return messages
+	}
+	return messages[len(messages)-maxHistoryMessages:]
 }
 
 // --- Conversation management ---
@@ -252,6 +290,7 @@ func (s *AIService) StreamChat(ctx context.Context, userID, workspaceID, convers
 	for _, m := range messages {
 		llmMessages = append(llmMessages, llm.Message{Role: string(m.Role), Content: m.Content})
 	}
+	llmMessages = truncateMessages(llmMessages)
 
 	if conv.Title == "" {
 		title := userMessage
@@ -277,7 +316,7 @@ func (s *AIService) StreamChat(ctx context.Context, userID, workspaceID, convers
 				return
 			}
 			if chunk.Done {
-				s.aiRepo.CreateMessage(context.Background(), &model.AIMessage{
+				s.aiRepo.CreateMessage(ctx, &model.AIMessage{
 					ConversationID: conversationID,
 					Role:           model.AIMessageAssistant,
 					Content:        full.String(),
@@ -327,6 +366,7 @@ func (s *AIService) Chat(ctx context.Context, userID, workspaceID, conversationI
 	for _, m := range messages {
 		llmMessages = append(llmMessages, llm.Message{Role: string(m.Role), Content: m.Content})
 	}
+	llmMessages = truncateMessages(llmMessages)
 
 	resp, err := client.Chat(ctx, llmMessages)
 	if err != nil {
@@ -430,9 +470,9 @@ func (s *AIService) AnalyzeEvent(ctx context.Context, userID, workspaceID, event
 
 	if len(event.ContactIDs) > 0 {
 		sb.WriteString("\n### Related Contacts\n")
-		for _, cid := range event.ContactIDs {
-			contact, err := s.contactRepo.GetByID(ctx, workspaceID, cid)
-			if err == nil {
+		contacts, err := s.contactRepo.GetByIDs(ctx, workspaceID, event.ContactIDs)
+		if err == nil {
+			for _, contact := range contacts {
 				sb.WriteString(fmt.Sprintf("- %s (%s)\n", contact.Name, strings.Join(contact.RelationshipLabels, ", ")))
 			}
 		}
@@ -548,9 +588,48 @@ func (s *AIService) buildContactAnalysis(ctx context.Context, userID, workspaceI
 	}
 	sb.WriteString("## Contact Analysis Request\n\n")
 
+	contacts, err := s.contactRepo.GetByIDs(ctx, workspaceID, contactIDs)
+	if err != nil {
+		return
+	}
+	contactByID := make(map[uint]*model.Contact, len(contacts))
+	for i := range contacts {
+		contactByID[contacts[i].ID] = &contacts[i]
+	}
+
+	interactions, err := s.interactionRepo.ListByContactIDs(ctx, workspaceID, contactIDs, 20*len(contactIDs))
+	if err != nil {
+		interactions = nil
+	}
+	interactionsByContact := make(map[uint][]model.Interaction)
+	for _, i := range interactions {
+		interactionsByContact[i.ContactID] = append(interactionsByContact[i.ContactID], i)
+	}
+
+	relations, err := s.relationRepo.ListByContactIDs(ctx, workspaceID, contactIDs)
+	if err != nil {
+		relations = nil
+	}
+	relationsByContact := make(map[uint][]model.ContactRelation)
+	for _, r := range relations {
+		relationsByContact[r.ContactIDA] = append(relationsByContact[r.ContactIDA], r)
+		relationsByContact[r.ContactIDB] = append(relationsByContact[r.ContactIDB], r)
+	}
+
+	txs, err := s.transactionRepo.ListByContactIDs(ctx, workspaceID, contactIDs, 20*len(contactIDs))
+	if err != nil {
+		txs = nil
+	}
+	txsByContact := make(map[uint][]model.Transaction)
+	for _, tx := range txs {
+		for _, cid := range tx.ContactIDs {
+			txsByContact[cid] = append(txsByContact[cid], tx)
+		}
+	}
+
 	for _, cid := range contactIDs {
-		contact, err := s.contactRepo.GetByID(ctx, workspaceID, cid)
-		if err != nil {
+		contact, ok := contactByID[cid]
+		if !ok {
 			continue
 		}
 
@@ -562,26 +641,26 @@ func (s *AIService) buildContactAnalysis(ctx context.Context, userID, workspaceI
 			sb.WriteString(fmt.Sprintf("- Notes: %s\n", contact.Notes))
 		}
 
-		interactions, _, err := s.interactionRepo.ListByContact(ctx, workspaceID, cid, 1, 20)
-		if err == nil && len(interactions) > 0 {
+		cInteractions := interactionsByContact[cid]
+		if len(cInteractions) > 0 {
 			sb.WriteString("- Interactions:\n")
-			for _, i := range interactions {
+			for _, i := range cInteractions {
 				sb.WriteString(fmt.Sprintf("  - [%s] %s (%s): %s\n", i.Type, i.Title, i.OccurredAt.Format("2006-01-02"), truncate(i.Content, 100)))
 			}
 		}
 
-		relations, err := s.relationRepo.ListByContact(ctx, workspaceID, cid)
-		if err == nil && len(relations) > 0 {
+		cRelations := relationsByContact[cid]
+		if len(cRelations) > 0 {
 			sb.WriteString("- Relations:\n")
-			for _, r := range relations {
+			for _, r := range cRelations {
 				sb.WriteString(fmt.Sprintf("  - %s\n", r.RelationType))
 			}
 		}
 
-		txs, _, err := s.transactionRepo.List(ctx, workspaceID, 1, 20, nil, &cid)
-		if err == nil && len(txs) > 0 {
+		cTxs := txsByContact[cid]
+		if len(cTxs) > 0 {
 			sb.WriteString("- Financial transactions:\n")
-			for _, tx := range txs {
+			for _, tx := range cTxs {
 				sb.WriteString(fmt.Sprintf("  - [%s] %s: %.2f (%s)\n", tx.Type, tx.Title, tx.Amount, tx.Date.Format("2006-01-02")))
 			}
 		}
@@ -596,12 +675,32 @@ func (s *AIService) buildEventAnalysis(ctx context.Context, userID, workspaceID 
 	}
 	sb.WriteString("## Event Analysis Request\n\n")
 
-	for _, eid := range eventIDs {
-		event, err := s.eventRepo.GetByID(ctx, workspaceID, eid)
-		if err != nil {
-			continue
-		}
+	events, err := s.eventRepo.GetByIDs(ctx, workspaceID, eventIDs)
+	if err != nil {
+		return
+	}
 
+	allContactIDs := make([]uint, 0, 64)
+	seenContact := make(map[uint]struct{})
+	for _, event := range events {
+		for _, cid := range event.ContactIDs {
+			if _, ok := seenContact[cid]; !ok {
+				seenContact[cid] = struct{}{}
+				allContactIDs = append(allContactIDs, cid)
+			}
+		}
+	}
+
+	contacts, err := s.contactRepo.GetByIDs(ctx, workspaceID, allContactIDs)
+	if err != nil {
+		contacts = nil
+	}
+	contactByID := make(map[uint]*model.Contact, len(contacts))
+	for i := range contacts {
+		contactByID[contacts[i].ID] = &contacts[i]
+	}
+
+	for _, event := range events {
 		sb.WriteString(fmt.Sprintf("### Event: %s\n", event.Title))
 		if event.Description != "" {
 			sb.WriteString(fmt.Sprintf("- Description: %s\n", event.Description))
@@ -618,15 +717,16 @@ func (s *AIService) buildEventAnalysis(ctx context.Context, userID, workspaceID 
 		if len(event.ContactIDs) > 0 {
 			sb.WriteString("- Participants:\n")
 			for _, cid := range event.ContactIDs {
-				contact, err := s.contactRepo.GetByID(ctx, workspaceID, cid)
-				if err == nil {
-					labels := strings.Join(contact.RelationshipLabels, ", ")
-					sb.WriteString(fmt.Sprintf("  - %s", contact.Name))
-					if labels != "" {
-						sb.WriteString(fmt.Sprintf(" (%s)", labels))
-					}
-					sb.WriteString("\n")
+				contact, ok := contactByID[cid]
+				if !ok {
+					continue
 				}
+				labels := strings.Join(contact.RelationshipLabels, ", ")
+				sb.WriteString(fmt.Sprintf("  - %s", contact.Name))
+				if labels != "" {
+					sb.WriteString(fmt.Sprintf(" (%s)", labels))
+				}
+				sb.WriteString("\n")
 			}
 		}
 

@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect } from 'react'
 import { X } from 'lucide-react'
 import GeckoIcon from './GeckoIcon'
+import { isWailsRuntime } from '@/lib/wails'
 
 export default function WindowTitleBar() {
-  const isWails = typeof window !== 'undefined' && !!(window as any).__WAILS__
+  const isWails = isWailsRuntime()
   const [maximised, setMaximised] = useState(false)
 
   useEffect(() => {

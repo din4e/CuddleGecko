@@ -35,8 +35,8 @@ func TestLoadDefaults(t *testing.T) {
 	}
 
 	// JWT defaults
-	if cfg.JWT.Secret != "change-me-in-production" {
-		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "change-me-in-production")
+	if cfg.JWT.Secret != "" {
+		t.Errorf("JWT.Secret = %q, want empty string", cfg.JWT.Secret)
 	}
 	if cfg.JWT.AccessTTL != 15*time.Minute {
 		t.Errorf("JWT.AccessTTL = %v, want %v", cfg.JWT.AccessTTL, 15*time.Minute)

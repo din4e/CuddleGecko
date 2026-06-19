@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { useModeStore } from './mode'
 import type { Workspace } from '../types'
 
@@ -20,68 +21,75 @@ interface WorkspaceState {
   initDefault: () => Promise<void>
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
-  workspaces: [],
-  currentWorkspace: null,
-  isLoading: false,
+export const useWorkspaceStore = create<WorkspaceState>()(
+  persist(
+    (set, get) => ({
+      workspaces: [],
+      currentWorkspace: null,
+      isLoading: false,
 
-  loadWorkspaces: async () => {
-    set({ isLoading: true })
-    try {
-      const workspace = getWorkspaceAdapter()
-      const workspaces = await workspace.list()
-      const savedId = localStorage.getItem('current_workspace_id')
-      const current = workspaces.find((ws) => ws.id === Number(savedId)) || workspaces[0] || null
-      if (current) {
-        localStorage.setItem('current_workspace_id', String(current.id))
-      }
-      set({ workspaces, currentWorkspace: current })
-    } finally {
-      set({ isLoading: false })
-    }
-  },
+      loadWorkspaces: async () => {
+        set({ isLoading: true })
+        try {
+          const workspace = getWorkspaceAdapter()
+          const workspaces = await workspace.list()
+          const savedId = get().currentWorkspace?.id ?? null
+          const current = workspaces.find((ws) => ws.id === savedId) || workspaces[0] || null
+          if (current) {
+            localStorage.setItem('current_workspace_id', String(current.id))
+          }
+          set({ workspaces, currentWorkspace: current })
+        } finally {
+          set({ isLoading: false })
+        }
+      },
 
-  switchWorkspace: async (id) => {
-    const workspace = getWorkspaceAdapter()
-    const ws = await workspace.switch(id)
-    localStorage.setItem('current_workspace_id', String(ws.id))
-    set({ currentWorkspace: ws })
-  },
+      switchWorkspace: async (id) => {
+        const workspace = getWorkspaceAdapter()
+        const ws = await workspace.switch(id)
+        localStorage.setItem('current_workspace_id', String(ws.id))
+        set({ currentWorkspace: ws })
+      },
 
-  createWorkspace: async (name, description, icon) => {
-    const workspace = getWorkspaceAdapter()
-    const ws = await workspace.create({ name, description: description || '', icon: icon || '' })
-    set((state) => ({ workspaces: [...state.workspaces, ws] }))
-    return ws
-  },
+      createWorkspace: async (name, description, icon) => {
+        const workspace = getWorkspaceAdapter()
+        const ws = await workspace.create({ name, description: description || '', icon: icon || '' })
+        set((state) => ({ workspaces: [...state.workspaces, ws] }))
+        return ws
+      },
 
-  updateWorkspace: async (id, data) => {
-    const workspace = getWorkspaceAdapter()
-    const ws = await workspace.update(id, data)
-    set((state) => ({
-      workspaces: state.workspaces.map((w) => (w.id === id ? ws : w)),
-      currentWorkspace: state.currentWorkspace?.id === id ? ws : state.currentWorkspace,
-    }))
-    return ws
-  },
+      updateWorkspace: async (id, data) => {
+        const workspace = getWorkspaceAdapter()
+        const ws = await workspace.update(id, data)
+        set((state) => ({
+          workspaces: state.workspaces.map((w) => (w.id === id ? ws : w)),
+          currentWorkspace: state.currentWorkspace?.id === id ? ws : state.currentWorkspace,
+        }))
+        return ws
+      },
 
-  deleteWorkspace: async (id) => {
-    const workspace = getWorkspaceAdapter()
-    await workspace.delete(id)
-    const { loadWorkspaces } = get()
-    await loadWorkspaces()
-  },
+      deleteWorkspace: async (id) => {
+        const workspace = getWorkspaceAdapter()
+        await workspace.delete(id)
+        const { loadWorkspaces } = get()
+        await loadWorkspaces()
+      },
 
-  initDefault: async () => {
-    const savedId = localStorage.getItem('current_workspace_id')
-    if (savedId) return
-    try {
-      const workspace = getWorkspaceAdapter()
-      const ws = await workspace.getDefault()
-      localStorage.setItem('current_workspace_id', String(ws.id))
-      set({ currentWorkspace: ws })
-    } catch {
-      // no default workspace yet
-    }
-  },
-}))
+      initDefault: async () => {
+        if (get().currentWorkspace) return
+        try {
+          const workspace = getWorkspaceAdapter()
+          const ws = await workspace.getDefault()
+          localStorage.setItem('current_workspace_id', String(ws.id))
+          set({ currentWorkspace: ws })
+        } catch {
+          // no default workspace yet
+        }
+      },
+    }),
+    {
+      name: 'workspace-storage',
+      partialize: (state) => ({ currentWorkspace: state.currentWorkspace }),
+    },
+  ),
+)

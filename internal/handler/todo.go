@@ -46,19 +46,21 @@ type updateTodoRequest struct {
 func (h *TodoHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
 
 	var status *string
 	if v := c.Query("status"); v != "" {
 		status = &v
 	}
 
-	todos, err := h.svc.List(c.Request.Context(), userID, workspaceID, status)
+	todos, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, status, page, pageSize)
 	if err != nil {
 		response.InternalError(c, "failed to list todos")
 		return
 	}
 
-	response.OK(c, todos)
+	response.OKPaginated(c, todos, total, page, pageSize)
 }
 
 func (h *TodoHandler) Create(c *gin.Context) {

@@ -19,7 +19,8 @@ func (b *ReminderBinding) List(status string) ([]model.Reminder, error) {
 	if userID == 0 {
 		return nil, ErrNotAuthenticated
 	}
-	return b.svc.List(ctx, userID, workspaceID, model.ReminderStatus(status))
+	reminders, _, err := b.svc.List(ctx, userID, workspaceID, model.ReminderStatus(status), 1, 200)
+	return reminders, err
 }
 
 func (b *ReminderBinding) Create(contactID uint, input CreateReminderInput) (*model.Reminder, error) {

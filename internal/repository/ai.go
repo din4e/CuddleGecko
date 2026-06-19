@@ -50,7 +50,9 @@ func (r *AIRepo) ListProviders(ctx context.Context, userID uint) ([]model.AIProv
 }
 
 func (r *AIRepo) UpdateProvider(ctx context.Context, p *model.AIProvider) error {
-	if err := r.db.WithContext(ctx).Save(p).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&model.AIProvider{ID: p.ID}).
+		Select("name", "base_url", "api_key", "model", "is_active").
+		Updates(p).Error; err != nil {
 		return fmt.Errorf("update ai provider: %w", err)
 	}
 	return nil

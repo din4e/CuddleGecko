@@ -40,6 +40,8 @@ func Run(assets embed.FS) {
 			bindings.Transaction,
 			bindings.AI,
 			bindings.Desktop,
+			bindings.Workspace,
+			bindings.Todo,
 		},
 	})
 	if err != nil {

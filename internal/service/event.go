@@ -12,6 +12,7 @@ var ErrEventNotFound = errors.New("event not found")
 type EventRepository interface {
 	Create(ctx context.Context, event *model.Event) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Event, error)
+	GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Event, error)
 	List(ctx context.Context, workspaceID uint, page, pageSize int, startAfter, endBefore *string) ([]model.Event, int64, error)
 	Update(ctx context.Context, event *model.Event) error
 	Delete(ctx context.Context, workspaceID, id uint) error

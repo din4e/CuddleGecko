@@ -12,7 +12,7 @@ var ErrTagNotFound = errors.New("tag not found")
 type TagRepository interface {
 	Create(ctx context.Context, tag *model.Tag) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Tag, error)
-	List(ctx context.Context, workspaceID uint) ([]model.Tag, error)
+	List(ctx context.Context, workspaceID uint, page, pageSize int) ([]model.Tag, int64, error)
 	Update(ctx context.Context, tag *model.Tag) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 	GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Tag, error)
@@ -35,8 +35,8 @@ func (s *TagService) Create(ctx context.Context, userID, workspaceID uint, tag *
 	return tag, nil
 }
 
-func (s *TagService) List(ctx context.Context, userID, workspaceID uint) ([]model.Tag, error) {
-	return s.repo.List(ctx, workspaceID)
+func (s *TagService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int) ([]model.Tag, int64, error) {
+	return s.repo.List(ctx, workspaceID, page, pageSize)
 }
 
 func (s *TagService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Tag) (*model.Tag, error) {

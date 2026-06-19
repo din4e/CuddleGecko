@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { X, Plus, ChevronDown } from 'lucide-react'
 import { contactsApi } from '../api/contacts'
 import type { Contact } from '../types'
@@ -16,8 +16,10 @@ export default function BuddyPicker({ buddies, selectedIds, onChange, onBuddiesU
   const [search, setSearch] = useState('')
   const [quickName, setQuickName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -31,11 +33,22 @@ export default function BuddyPicker({ buddies, selectedIds, onChange, onBuddiesU
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const selected = buddies.filter((b) => selectedIds.includes(b.id))
-  const filtered = buddies
+  useEffect(() => {
+    if (!open) return
+    const active = listRef.current?.children[activeIndex] as HTMLElement | undefined
+    active?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex, open])
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setActiveIndex(0)
+  }
+
+  const selected = useMemo(() => buddies.filter((b) => selectedIds.includes(b.id)), [buddies, selectedIds])
+  const filtered = useMemo(() => buddies
     .filter((b) => !selectedIds.includes(b.id))
     .filter((b) => !search || b.name.toLowerCase().includes(search.toLowerCase()))
-    .slice(0, 20)
+    .slice(0, 20), [buddies, selectedIds, search])
 
   const toggle = (id: number) => {
     onChange(selectedIds.includes(id) ? selectedIds.filter((i) => i !== id) : [...selectedIds, id])
@@ -56,10 +69,46 @@ export default function BuddyPicker({ buddies, selectedIds, onChange, onBuddiesU
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setOpen(false)
+      setSearch('')
+      setQuickName('')
+      return
+    }
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
+        e.preventDefault()
+        setOpen(true)
+      }
+      return
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveIndex((i) => Math.min(i + 1, filtered.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveIndex((i) => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const buddy = filtered[activeIndex]
+      if (buddy) {
+        toggle(buddy.id)
+        setSearch('')
+      }
+    } else if (e.key === 'Backspace' && !search && selected.length > 0) {
+      toggle(selected[selected.length - 1].id)
+    }
+  }
+
   return (
     <div ref={containerRef} className="relative">
       {/* Trigger / Selected display */}
       <div
+        role="combobox"
+        aria-expanded={open}
+        aria-haspopup="listbox"
         className="flex min-h-[38px] flex-wrap items-center gap-1 rounded-md border bg-background px-3 py-1.5 text-sm cursor-text"
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0) }}
       >
@@ -83,14 +132,12 @@ export default function BuddyPicker({ buddies, selectedIds, onChange, onBuddiesU
           <input
             ref={inputRef}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="min-w-[80px] flex-1 border-0 bg-transparent p-0 text-sm outline-none placeholder:text-muted-foreground"
             placeholder={selected.length > 0 ? 'Add more...' : placeholder}
-            onKeyDown={(e) => {
-              if (e.key === 'Backspace' && !search && selected.length > 0) {
-                toggle(selected[selected.length - 1].id)
-              }
-            }}
+            onKeyDown={handleKeyDown}
+            aria-controls="buddy-listbox"
+            aria-activedescendant={filtered[activeIndex] ? `buddy-option-${filtered[activeIndex].id}` : undefined}
           />
         )}
         <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
@@ -100,12 +147,21 @@ export default function BuddyPicker({ buddies, selectedIds, onChange, onBuddiesU
       {open && (
         <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
           {filtered.length > 0 ? (
-            <ul className="max-h-48 overflow-y-auto py-1">
-              {filtered.map((b) => (
+            <ul
+              ref={listRef}
+              id="buddy-listbox"
+              role="listbox"
+              className="max-h-48 overflow-y-auto py-1"
+            >
+              {filtered.map((b, index) => (
                 <li
                   key={b.id}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                  id={`buddy-option-${b.id}`}
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer ${index === activeIndex ? 'bg-accent' : 'hover:bg-accent'}`}
                   onClick={() => { toggle(b.id); setSearch('') }}
+                  onMouseEnter={() => setActiveIndex(index)}
                 >
                   <span>{b.avatar_emoji || '👤'}</span>
                   <span>{b.name}</span>

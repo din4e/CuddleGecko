@@ -31,16 +31,33 @@ func (r *TagRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Tag
 	return &tag, nil
 }
 
-func (r *TagRepo) List(ctx context.Context, workspaceID uint) ([]model.Tag, error) {
+func (r *TagRepo) List(ctx context.Context, workspaceID uint, page, pageSize int) ([]model.Tag, int64, error) {
 	var tags []model.Tag
-	if err := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID).Find(&tags).Error; err != nil {
-		return nil, fmt.Errorf("list tags: %w", err)
+	query := r.db.WithContext(ctx).Model(&model.Tag{}).Where("workspace_id = ?", workspaceID)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("count tags: %w", err)
 	}
-	return tags, nil
+
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	offset := (page - 1) * pageSize
+
+	if err := query.Order("id ASC").Limit(pageSize).Offset(offset).Find(&tags).Error; err != nil {
+		return nil, 0, fmt.Errorf("list tags: %w", err)
+	}
+	return tags, total, nil
 }
 
 func (r *TagRepo) Update(ctx context.Context, tag *model.Tag) error {
-	if err := r.db.WithContext(ctx).Save(tag).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&model.Tag{ID: tag.ID}).
+		Select("name", "color").
+		Updates(tag).Error; err != nil {
 		return fmt.Errorf("update tag: %w", err)
 	}
 	return nil

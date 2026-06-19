@@ -1,6 +1,6 @@
-import client from './client'
+import { request } from './client'
 import type { GraphData } from '../types'
 
 export const graphApi = {
-  get: () => client.get<GraphData>('/graph'),
+  get: () => request.get<GraphData>('/graph').then((data) => ({ data })),
 }

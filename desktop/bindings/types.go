@@ -89,21 +89,6 @@ type CreateRelationInput struct {
 	RelationType string `json:"relation_type"`
 }
 
-// Export types
-type ExportData struct {
-	Version    string        `json:"version"`
-	ExportedAt time.Time     `json:"exported_at"`
-	Data       ExportPayload `json:"data"`
-}
-
-type ExportPayload struct {
-	Contacts     any `json:"contacts"`
-	Tags         any `json:"tags"`
-	Interactions any `json:"interactions"`
-	Reminders    any `json:"reminders"`
-	Relations    any `json:"relations"`
-}
-
 // Event types
 type ListEventsInput struct {
 	Page       int    `json:"page"`

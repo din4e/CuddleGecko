@@ -6,7 +6,7 @@ const BOLD = '\x1b[1m'
 const RESET = '\x1b[0m'
 const DIM = '\x1b[2m'
 
-export function formatTable(data: Record<string, any>[], columns?: string[]): string {
+export function formatTable(data: Record<string, unknown>[], columns?: string[]): string {
   if (data.length === 0) return `${YELLOW}No results found${RESET}`
 
   const cols = columns || Object.keys(data[0])
@@ -38,7 +38,7 @@ export function formatTable(data: Record<string, any>[], columns?: string[]): st
   return [header, separator, ...rows].join('\r\n')
 }
 
-export function formatDetail(data: Record<string, any>): string {
+export function formatDetail(data: Record<string, unknown>): string {
   const entries = Object.entries(data)
   const maxKeyLen = Math.max(...entries.map(([k]) => k.length))
   return entries
@@ -53,7 +53,7 @@ export function formatDetail(data: Record<string, any>): string {
     .join('\r\n')
 }
 
-export function formatJSON(data: any): string {
+export function formatJSON(data: unknown): string {
   try {
     return JSON.stringify(data, null, 2)
   } catch {
@@ -69,6 +69,6 @@ export function formatSuccess(message: string): string {
   return `${GREEN}${message}${RESET}`
 }
 
-export function formatCount(data: any[]): string {
+export function formatCount(data: unknown[]): string {
   return `${CYAN}${data.length}${RESET} item(s)`
 }

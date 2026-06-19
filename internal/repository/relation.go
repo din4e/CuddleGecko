@@ -41,6 +41,16 @@ func (r *RelationRepo) ListByContact(ctx context.Context, workspaceID, contactID
 	return relations, nil
 }
 
+func (r *RelationRepo) ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint) ([]model.ContactRelation, error) {
+	var relations []model.ContactRelation
+	if err := r.db.WithContext(ctx).
+		Where("workspace_id = ? AND (contact_id_a IN ? OR contact_id_b IN ?)", workspaceID, contactIDs, contactIDs).
+		Find(&relations).Error; err != nil {
+		return nil, fmt.Errorf("list relations by contact ids: %w", err)
+	}
+	return relations, nil
+}
+
 func (r *RelationRepo) Delete(ctx context.Context, workspaceID, id uint) error {
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.ContactRelation{}).Error; err != nil {
 		return fmt.Errorf("delete relation: %w", err)

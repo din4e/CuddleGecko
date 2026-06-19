@@ -5,8 +5,8 @@ import '@xterm/xterm/css/xterm.css'
 import { useModeStore } from '@/stores/mode'
 import { useTerminalStore } from '@/stores/terminal-store'
 import { parseCommand } from './CommandParser'
-import { findCommand, getAutocompleteCandidates } from './CommandRegistry'
-import { formatJSON, formatCount, formatTable, formatError } from './formatters'
+import { getAutocompleteCandidates } from './CommandRegistry'
+import { formatJSON, formatError, formatCount } from './formatters'
 import {
   executeHelp,
   executeClear,
@@ -77,6 +77,7 @@ import {
   executeSwitchWorkspace,
 } from './commands/workspaceCommands'
 import { useTranslation } from 'react-i18next'
+import type { CommandArgs } from './types'
 
 const PROMPT = '\r\n\x1b[32mgecko\x1b[0m> '
 
@@ -92,12 +93,12 @@ export default function TerminalEmulator({ onNavigate }: TerminalEmulatorProps) 
   const cursorPosRef = useRef(0)
   const { t } = useTranslation()
   const tRef = useRef(t)
-  tRef.current = t
+  useEffect(() => { tRef.current = t }, [t])
 
   const dispatchCommand = useCallback(
     async (
       command: string,
-      args: Record<string, any>,
+      args: CommandArgs,
       adapters: NonNullable<ReturnType<typeof useModeStore.getState>['adapters']>,
     ): Promise<string | { navigate: string }> => {
       switch (command) {
@@ -254,7 +255,7 @@ export default function TerminalEmulator({ onNavigate }: TerminalEmulatorProps) 
     try {
       fitAddon.fit()
     } catch {
-      // ignore fit error on first render
+      /* ignore fit error on first render */
     }
 
     termRef.current = term
@@ -300,7 +301,7 @@ export default function TerminalEmulator({ onNavigate }: TerminalEmulatorProps) 
       try {
         fitAddon.fit()
       } catch {
-        // ignore
+        /* ignore */
       }
     })
     resizeObserver.observe(containerRef.current)
@@ -490,19 +491,21 @@ function applyPipe(output: string, pipe: string): string {
   try {
     if (pipe === 'json') {
       // Try to find JSON-like data in the output
-      const stripped = output.replace(/\x1b\[[0-9;]*m/g, '')
+      const esc = String.fromCharCode(27)
+      const stripped = output.replace(new RegExp(esc + '\\[[0-9;]*m', 'g'), '')
       // Try to parse table rows as objects
       return formatJSON({ raw: stripped })
     }
     if (pipe === 'count') {
-      const stripped = output.replace(/\x1b\[[0-9;]*m/g, '')
+      const esc = String.fromCharCode(27)
+      const stripped = output.replace(new RegExp(esc + '\\[[0-9;]*m', 'g'), '')
       const lines = stripped.split(/\r?\n/).filter((l) => l.trim())
       // Subtract header lines (typically 2: header + separator)
       const dataLines = Math.max(0, lines.length - 2)
       return formatCount(Array.from({ length: dataLines }))
     }
   } catch {
-    // fall through
+    /* fall through */
   }
   return output
 }

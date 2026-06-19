@@ -1,8 +1,10 @@
 import type { AppAdapters } from '@/api/adapter'
 import { formatTable, formatSuccess, formatError } from '../formatters'
+import type { CommandArgs } from '../types'
+import { getErrorMessage } from '../types'
 
 export async function executeListReminders(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -20,13 +22,13 @@ export async function executeListReminders(
     }))
 
     return formatTable(rows)
-  } catch (e: any) {
-    return formatError(`Failed to list reminders: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to list reminders: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeCreateReminder(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -36,25 +38,25 @@ export async function executeCreateReminder(
 
     if (!buddy || !title || !time) return formatError('--buddy, --title, and --time are required')
 
-    const data: Record<string, any> = { title, remind_at: time }
+    const data: Record<string, unknown> = { title, remind_at: time }
     if (args.description) data.description = args.description
 
     const reminder = await adapters.reminder.create(buddy, data)
     return formatSuccess(`Created reminder (ID: ${reminder.id})`)
-  } catch (e: any) {
-    return formatError(`Failed to create reminder: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to create reminder: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeUpdateReminder(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
     const id = Number(args.id)
     if (!id) return formatError('Usage: update reminder <id>')
 
-    const data: Record<string, any> = {}
+    const data: Record<string, unknown> = {}
     if (args.title) data.title = args.title
     if (args.time) data.remind_at = args.time
     if (args.description) data.description = args.description
@@ -64,13 +66,13 @@ export async function executeUpdateReminder(
 
     await adapters.reminder.update(id, data)
     return formatSuccess('Reminder updated successfully')
-  } catch (e: any) {
-    return formatError(`Failed to update reminder: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to update reminder: ${getErrorMessage(e)}`)
   }
 }
 
 export async function executeDeleteReminder(
-  args: Record<string, any>,
+  args: CommandArgs,
   adapters: AppAdapters,
 ): Promise<string> {
   try {
@@ -79,7 +81,7 @@ export async function executeDeleteReminder(
 
     await adapters.reminder.delete(id)
     return formatSuccess('Reminder deleted successfully')
-  } catch (e: any) {
-    return formatError(`Failed to delete reminder: ${e.message}`)
+  } catch (e: unknown) {
+    return formatError(`Failed to delete reminder: ${getErrorMessage(e)}`)
   }
 }

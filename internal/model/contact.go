@@ -9,9 +9,9 @@ import (
 type Contact struct {
 	ID                uint           `gorm:"primaryKey" json:"id"`
 	UserID            uint           `gorm:"index;not null" json:"user_id"`
-	WorkspaceID       uint           `gorm:"index;not null;default:0" json:"workspace_id"`
-	Name              string         `gorm:"size:100;not null" json:"name"`
-	Nickname          string         `gorm:"size:100" json:"nickname"`
+	WorkspaceID       uint           `gorm:"index;not null;default:0;index:idx_contact_search" json:"workspace_id"`
+	Name              string         `gorm:"size:100;not null;index:idx_contact_search" json:"name"`
+	Nickname          string         `gorm:"size:100;index:idx_contact_search" json:"nickname"`
 	AvatarEmoji       string         `gorm:"size:10" json:"avatar_emoji"`
 	AvatarURL         string         `gorm:"size:500" json:"avatar_url"`
 	Phone             []string       `gorm:"type:text;serializer:json" json:"phones"`

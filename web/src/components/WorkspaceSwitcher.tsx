@@ -88,17 +88,19 @@ export default function WorkspaceSwitcher() {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-2 px-2 text-sm font-normal"
-            aria-label={t('workspace.switch', '切换空间')}
-          >
-            <span className="text-base leading-none">{icon}</span>
-            <span className="truncate flex-1 text-left">{name}</span>
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
-          </Button>
-        </DropdownMenuTrigger>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2 px-2 text-sm font-normal"
+              aria-label={t('workspace.switch', '切换空间')}
+            >
+              <span className="text-base leading-none">{icon}</span>
+              <span className="truncate flex-1 text-left">{name}</span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
+            </Button>
+          }
+        />
         <DropdownMenuContent align="start" className="w-60 p-1">
           {workspaces.map((ws) => (
             <div key={ws.id} className="group flex items-center rounded-sm hover:bg-accent">

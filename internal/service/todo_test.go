@@ -26,12 +26,12 @@ func (m *mockTodoRepo) GetByID(ctx context.Context, workspaceID, id uint) (*mode
 	return args.Get(0).(*model.Todo), args.Error(1)
 }
 
-func (m *mockTodoRepo) List(ctx context.Context, workspaceID uint, status *string) ([]model.Todo, error) {
-	args := m.Called(ctx, workspaceID, status)
+func (m *mockTodoRepo) List(ctx context.Context, workspaceID uint, status *string, page, pageSize int) ([]model.Todo, int64, error) {
+	args := m.Called(ctx, workspaceID, status, page, pageSize)
 	if args.Get(0) == nil {
-		return nil, args.Error(1)
+		return nil, 0, args.Error(2)
 	}
-	return args.Get(0).([]model.Todo), args.Error(1)
+	return args.Get(0).([]model.Todo), args.Get(1).(int64), args.Error(2)
 }
 
 func (m *mockTodoRepo) Update(ctx context.Context, todo *model.Todo) error {
@@ -72,11 +72,12 @@ func TestTodoService_List(t *testing.T) {
 	svc := NewTodoService(repo, eventRepo)
 
 	expected := []model.Todo{{ID: 1, Title: "a"}, {ID: 2, Title: "b"}}
-	repo.On("List", mock.Anything, uint(1), (*string)(nil)).Return(expected, nil)
+	repo.On("List", mock.Anything, uint(1), (*string)(nil), 1, 50).Return(expected, int64(2), nil)
 
-	todos, err := svc.List(context.Background(), 1, 1, nil)
+	todos, total, err := svc.List(context.Background(), 1, 1, nil, 1, 50)
 	assert.NoError(t, err)
 	assert.Len(t, todos, 2)
+	assert.Equal(t, int64(2), total)
 	repo.AssertExpectations(t)
 }
 

@@ -31,6 +31,7 @@ var (
 	AI          = &AIBinding{}
 	Desktop     = &DesktopBinding{}
 	Workspace   = &WorkspaceBinding{}
+	Todo        = &TodoBinding{}
 )
 
 func InitBindings(
@@ -42,14 +43,11 @@ func InitBindings(
 	reminderSvc *service.ReminderService,
 	relationSvc *service.RelationService,
 	eventSvc *service.EventService,
+	todoSvc *service.TodoService,
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
 	workspaceSvc *service.WorkspaceService,
-	contactRepo service.ContactRepository,
-	tagRepo service.TagRepository,
-	interactionRepo service.InteractionRepository,
-	reminderRepo service.ReminderRepository,
-	relationRepo service.RelationRepository,
+	exportSvc *service.ExportService,
 ) {
 	Auth = &AuthBinding{svc: authSvc}
 	Captcha = &CaptchaBinding{svc: captchaSvc}
@@ -58,14 +56,9 @@ func InitBindings(
 	Interaction = &InteractionBinding{svc: interactionSvc}
 	Reminder = &ReminderBinding{svc: reminderSvc}
 	Graph = &GraphBinding{svc: relationSvc}
-	Export = &ExportBinding{
-		contactRepo:     contactRepo,
-		tagRepo:         tagRepo,
-		interactionRepo: interactionRepo,
-		reminderRepo:    reminderRepo,
-		relationRepo:    relationRepo,
-	}
+	Export = &ExportBinding{svc: exportSvc}
 	Event = &EventBinding{svc: eventSvc}
+	Todo = &TodoBinding{svc: todoSvc}
 	Transaction = &TransactionBinding{svc: transactionSvc}
 	AI = &AIBinding{svc: aiSvc}
 	Workspace = &WorkspaceBinding{svc: workspaceSvc}

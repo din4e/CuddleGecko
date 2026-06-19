@@ -31,6 +31,16 @@ func (r *EventRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.E
 	return &event, nil
 }
 
+func (r *EventRepo) GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Event, error) {
+	var events []model.Event
+	if err := r.db.WithContext(ctx).
+		Where("id IN ? AND workspace_id = ?", ids, workspaceID).
+		Find(&events).Error; err != nil {
+		return nil, fmt.Errorf("get events by ids: %w", err)
+	}
+	return events, nil
+}
+
 func (r *EventRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, startAfter, endBefore *string) ([]model.Event, int64, error) {
 	var events []model.Event
 	var total int64
@@ -60,7 +70,9 @@ func (r *EventRepo) List(ctx context.Context, workspaceID uint, page, pageSize i
 }
 
 func (r *EventRepo) Update(ctx context.Context, event *model.Event) error {
-	if err := r.db.WithContext(ctx).Save(event).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&model.Event{ID: event.ID}).
+		Select("title", "description", "start_time", "end_time", "location", "contact_ids", "color").
+		Updates(event).Error; err != nil {
 		return fmt.Errorf("update event: %w", err)
 	}
 	return nil

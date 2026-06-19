@@ -1,4 +1,4 @@
-import client from './client'
+import { request } from './client'
 import type { AuthResponse, User } from '../types'
 
 interface CaptchaFields {
@@ -8,10 +8,10 @@ interface CaptchaFields {
 
 export const authApi = {
   register: (username: string, email: string, password: string, captcha?: CaptchaFields) =>
-    client.post<AuthResponse>('/auth/register', { username, email, password, ...captcha }),
+    request.post<AuthResponse>('/auth/register', { username, email, password, ...captcha }).then((data) => ({ data })),
   login: (username: string, password: string, captcha?: CaptchaFields) =>
-    client.post<AuthResponse>('/auth/login', { username, password, ...captcha }),
+    request.post<AuthResponse>('/auth/login', { username, password, ...captcha }).then((data) => ({ data })),
   refresh: (refreshToken: string) =>
-    client.post<AuthResponse>('/auth/refresh', { refresh_token: refreshToken }),
-  me: () => client.get<User>('/auth/me'),
+    request.post<AuthResponse>('/auth/refresh', { refresh_token: refreshToken }).then((data) => ({ data })),
+  me: () => request.get<User>('/auth/me').then((data) => ({ data })),
 }

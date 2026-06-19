@@ -13,7 +13,7 @@ var ErrTodoNotFound = errors.New("todo not found")
 type TodoRepository interface {
 	Create(ctx context.Context, todo *model.Todo) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Todo, error)
-	List(ctx context.Context, workspaceID uint, status *string) ([]model.Todo, error)
+	List(ctx context.Context, workspaceID uint, status *string, page, pageSize int) ([]model.Todo, int64, error)
 	Update(ctx context.Context, todo *model.Todo) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 }
@@ -50,8 +50,8 @@ func (s *TodoService) GetByID(ctx context.Context, userID, workspaceID, id uint)
 	return s.repo.GetByID(ctx, workspaceID, id)
 }
 
-func (s *TodoService) List(ctx context.Context, userID, workspaceID uint, status *string) ([]model.Todo, error) {
-	return s.repo.List(ctx, workspaceID, status)
+func (s *TodoService) List(ctx context.Context, userID, workspaceID uint, status *string, page, pageSize int) ([]model.Todo, int64, error) {
+	return s.repo.List(ctx, workspaceID, status, page, pageSize)
 }
 
 func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Todo) (*model.Todo, error) {

@@ -70,17 +70,16 @@ func (a *App) startup(ctx context.Context) {
 	relationSvc := service.NewRelationService(relationRepo, contactRepo)
 	eventSvc := service.NewEventService(eventRepo)
 	todoSvc := service.NewTodoService(todoRepo, eventRepo)
-		_ = todoSvc
 	transactionSvc := service.NewTransactionService(transactionRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
+	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo)
 
 	// Bindings
 	bindings.InitBindings(
 		authSvc, captchaSvc, contactSvc, tagSvc,
 		interactionSvc, reminderSvc, relationSvc,
-		eventSvc, transactionSvc, aiSvc, workspaceSvc,
-		contactRepo, tagRepo, interactionRepo,
-		reminderRepo, relationRepo,
+		eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc,
+		exportSvc,
 	)
 
 	// Restore window state after a short delay (let Wails finish init)

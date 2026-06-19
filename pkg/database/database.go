@@ -1,9 +1,11 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"github.com/din4e/cuddlegecko/pkg/config"
@@ -32,6 +34,12 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("get sql db: %w", err)
+	}
+	configurePool(cfg.Driver, sqlDB)
+
 	if cfg.Driver == "sqlite" {
 		db.Exec("PRAGMA journal_mode=WAL")
 	}
@@ -57,4 +65,18 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	}
 
 	return db, nil
+}
+
+func configurePool(driver string, sqlDB *sql.DB) {
+	switch driver {
+	case "sqlite":
+		// SQLite with WAL still serializes writes; a single connection avoids "database is locked".
+		sqlDB.SetMaxOpenConns(1)
+		sqlDB.SetMaxIdleConns(1)
+		sqlDB.SetConnMaxLifetime(0)
+	default:
+		sqlDB.SetMaxOpenConns(25)
+		sqlDB.SetMaxIdleConns(5)
+		sqlDB.SetConnMaxLifetime(5 * time.Minute)
+	}
 }
