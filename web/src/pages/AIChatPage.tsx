@@ -8,7 +8,7 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import AvatarDisplay from '../components/AvatarDisplay'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { Send, Plus, Trash2, Bot, Users, Calendar, Wallet, Sparkles, Loader2, X, Tag as TagIcon, MessageSquare, PanelLeftClose, PanelLeft } from 'lucide-react'
+import { Send, Plus, Trash2, Bot, Users, Calendar, Wallet, Sparkles, Loader2, X, Tag as TagIcon, MessageSquare, ChevronDown } from 'lucide-react'
 
 type MentionTab = 'contact' | 'event' | 'tag'
 
@@ -48,7 +48,8 @@ export default function AIChatPage() {
   const [tags, setTags] = useState<Tag[]>([])
   const [analyzing, setAnalyzing] = useState(false)
   const mentionRef = useRef<HTMLDivElement>(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const convPopoverRef = useRef<HTMLDivElement>(null)
+  const [convPopoverOpen, setConvPopoverOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
 
   const loadConversations = useCallback(async () => {
@@ -76,6 +77,9 @@ export default function AIChatPage() {
     const handler = (e: MouseEvent) => {
       if (mentionRef.current && !mentionRef.current.contains(e.target as Node)) {
         setMentionPopup(false)
+      }
+      if (convPopoverRef.current && !convPopoverRef.current.contains(e.target as Node)) {
+        setConvPopoverOpen(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -141,6 +145,17 @@ export default function AIChatPage() {
     setMentionPopup(false)
   }
 
+  const triggerMention = (tab: MentionTab) => {
+    setMentionTab(tab)
+    setMentionPopup(true)
+    setMentionFilter('')
+    setInput((prev) => {
+      const cleaned = prev.replace(/@[^@\s]*$/, '').trimEnd()
+      return cleaned ? `${cleaned} @` : '@'
+    })
+    inputRef.current?.focus()
+  }
+
   const handleSelectMention = (item: MentionItem) => {
     if (!mentions.some((m) => m.type === item.type && m.id === item.id)) {
       setMentions((prev) => [...prev, item])
@@ -149,7 +164,7 @@ export default function AIChatPage() {
     if (lastAt !== -1) {
       setInput(input.slice(0, lastAt))
     }
-    setMentionPopup(false)
+    setMentionFilter('')
     inputRef.current?.focus()
   }
 
@@ -312,92 +327,71 @@ export default function AIChatPage() {
 
   return (
     <div className="flex h-[calc(100%+3rem)] -m-6 min-h-0">
-      {/* Conversation sidebar */}
-      <div className={`shrink-0 flex flex-col border-r bg-card transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-12' : 'w-52'}`}>
-        <div className={`flex items-center gap-1 border-b ${sidebarCollapsed ? 'justify-center px-1 py-1.5' : 'px-2 py-2'}`}>
-          {!sidebarCollapsed && (
-            <Button onClick={handleNewChat} className="flex-1 justify-center gap-1.5 h-7 text-xs" size="sm">
-              <Plus className="h-3 w-3" /> {t('ai.newChat')}
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 shrink-0"
-            onClick={() => setSidebarCollapsed((v) => !v)}
-            aria-label={sidebarCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse')}
-          >
-            {sidebarCollapsed ? <PanelLeft className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
-          </Button>
-        </div>
-        {!sidebarCollapsed ? (
-          <div className="flex-1 overflow-auto p-1 space-y-px">
-            {conversations.map((conv) => (
-              <div
-                key={conv.id}
-                role="button"
-                tabIndex={0}
-                aria-label={conv.title || t('ai.newChat')}
-                className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  activeConvId === conv.id
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-                onClick={() => loadMessages(conv.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    loadMessages(conv.id)
-                  }
-                }}
-              >
-                <MessageSquare className="h-3 w-3 shrink-0" aria-hidden />
-                <span className="flex-1 truncate text-xs">{conv.title || t('ai.newChat')}</span>
-                <button
-                  type="button"
-                  className={`shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    activeConvId === conv.id ? 'opacity-100' : ''
-                  }`}
-                  onClick={(e) => { e.stopPropagation(); setDeleteTarget(conv.id) }}
-                  aria-label={t('ai.deleteChat')}
-                >
-                  <Trash2 className="h-2.5 w-2.5" aria-hidden />
-                </button>
-              </div>
-            ))}
-            {conversations.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-6">{t('ai.noConversations')}</p>
-            )}
-          </div>
-        ) : (
-          <div className="flex-1 overflow-auto p-1 space-y-px">
-            <button
-              className="flex w-full items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              onClick={handleNewChat}
-              aria-label={t('ai.newChat')}
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-            {conversations.map((conv) => (
-              <button
-                key={conv.id}
-                className={`flex w-full items-center justify-center rounded-md p-1.5 transition-colors ${
-                  activeConvId === conv.id
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-                onClick={() => loadMessages(conv.id)}
-                title={conv.title || t('ai.newChat')}
-              >
-                <MessageSquare className="h-3.5 w-3.5" />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Chat area */}
       <div className="flex-1 flex flex-col min-w-0 bg-background">
+        {/* Top bar: new chat + recent conversations popover */}
+        <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+          <Button onClick={handleNewChat} size="sm" variant="outline" className="h-7 gap-1.5 text-xs">
+            <Plus className="h-3 w-3" /> {t('ai.newChat')}
+          </Button>
+          <div className="relative" ref={convPopoverRef}>
+            <Button
+              onClick={() => setConvPopoverOpen((v) => !v)}
+              size="sm"
+              variant="ghost"
+              className="h-7 gap-1 text-xs"
+              aria-expanded={convPopoverOpen}
+            >
+              {t('ai.recentChats')}
+              <ChevronDown className={`h-3 w-3 transition-transform ${convPopoverOpen ? 'rotate-180' : ''}`} />
+            </Button>
+            {convPopoverOpen && (
+              <div className="absolute right-0 top-full mt-1 w-64 rounded-xl border bg-popover shadow-lg z-50 overflow-hidden">
+                {conversations.length === 0 ? (
+                  <p className="px-3 py-4 text-xs text-muted-foreground text-center">{t('ai.noConversations')}</p>
+                ) : (
+                  <div className="max-h-80 overflow-auto p-1">
+                    {conversations.map((conv) => (
+                      <div
+                        key={conv.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={conv.title || t('ai.newChat')}
+                        className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                          activeConvId === conv.id
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        }`}
+                        onClick={() => { loadMessages(conv.id); setConvPopoverOpen(false) }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            loadMessages(conv.id)
+                            setConvPopoverOpen(false)
+                          }
+                        }}
+                      >
+                        <MessageSquare className="h-3 w-3 shrink-0" aria-hidden />
+                        <span className="flex-1 truncate text-xs">{conv.title || t('ai.newChat')}</span>
+                        <button
+                          type="button"
+                          className={`shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                            activeConvId === conv.id ? 'opacity-100' : ''
+                          }`}
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(conv.id) }}
+                          aria-label={t('ai.deleteChat')}
+                        >
+                          <Trash2 className="h-2.5 w-2.5" aria-hidden />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Messages */}
         <div className="flex-1 overflow-auto">
           {!hasActiveConv ? (
@@ -454,7 +448,7 @@ export default function AIChatPage() {
 
         {/* Mention badges + quick actions + input — always visible */}
         <div className="border-t">
-          {mentions.length > 0 ? (
+          {mentions.length > 0 && (
             <div className="flex flex-wrap items-center gap-1 px-3 pt-2 pb-1">
               {mentions.map((m) => (
                 <Badge key={`${m.type}-${m.id}`} variant="secondary" className="gap-1 pr-1 h-5 text-[10px]">
@@ -478,51 +472,61 @@ export default function AIChatPage() {
                 {t('ai.comprehensiveAnalysis')}
               </Button>
             </div>
-          ) : (
-            <div className="flex flex-wrap gap-1 px-3 pt-1.5 pb-1">
-              {(['contact', 'event', 'tag'] as const).map((tab) => {
-                const Icon = TAB_ICONS[tab]
-                return (
-                  <button
-                    key={tab}
-                    className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                    onClick={() => { setMentionTab(tab); inputRef.current?.focus(); setInput('@'); setMentionPopup(true); setMentionFilter('') }}
-                  >
-                    <Icon className="h-2.5 w-2.5" />
-                    @{t(`ai.${TAB_I18N[tab]}`)}
-                  </button>
-                )
-              })}
-              <button
-                className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                onClick={() => { setMentions((prev) => [...prev, { type: 'finance', id: 0, name: t('ai.financialInsight') }]); inputRef.current?.focus() }}
-              >
-                <Wallet className="h-2.5 w-2.5" />
-                {t('ai.financialInsight')}
-              </button>
-            </div>
           )}
+
+          <div className="flex flex-wrap gap-1 px-3 pt-1.5 pb-1">
+            {(['contact', 'event', 'tag'] as const).map((tab) => {
+              const Icon = TAB_ICONS[tab]
+              return (
+                <button
+                  key={tab}
+                  className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  onClick={() => triggerMention(tab)}
+                >
+                  <Icon className="h-2.5 w-2.5" />
+                  @{t(`ai.${TAB_I18N[tab]}`)}
+                </button>
+              )
+            })}
+            <button
+              className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              onClick={() => { setMentions((prev) => [...prev, { type: 'finance', id: 0, name: t('ai.financialInsight') }]); inputRef.current?.focus() }}
+            >
+              <Wallet className="h-2.5 w-2.5" />
+              {t('ai.financialInsight')}
+            </button>
+          </div>
 
           {/* Input + mention popup */}
           <div className="relative px-2 pb-2" ref={mentionRef}>
             {/* @ mention popup */}
             {mentionPopup && (
               <div className="absolute bottom-full left-3 right-3 mb-2 rounded-xl border bg-popover shadow-lg z-50 overflow-hidden">
-                <div className="flex border-b bg-muted/30">
-                  {TAB_KEYS.map((tab) => {
-                    const Icon = TAB_ICONS[tab]
-                    return (
-                      <button
-                        key={tab}
-                        className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-                          mentionTab === tab ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'
-                        }`}
+                <div className="flex items-center justify-between border-b bg-muted/30">
+                  <div className="flex">
+                    {TAB_KEYS.map((tab) => {
+                      const Icon = TAB_ICONS[tab]
+                      return (
+                        <button
+                          key={tab}
+                          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+                            mentionTab === tab ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'
+                          }`}
                         onClick={() => setMentionTab(tab)}
                       >
                         <Icon className="mr-1 inline h-3 w-3" />{t(`ai.${TAB_I18N[tab]}`)}
                       </button>
                     )
                   })}
+                  </div>
+                  <button
+                    type="button"
+                    className="px-2.5 py-1 text-[10px] text-muted-foreground hover:text-foreground shrink-0"
+                    onClick={() => setMentionPopup(false)}
+                    aria-label="Close"
+                  >
+                    Esc
+                  </button>
                 </div>
                 <div className="max-h-52 overflow-auto p-1">
                   {mentionTab === 'contact' ? (
@@ -581,7 +585,10 @@ export default function AIChatPage() {
                 placeholder={t('ai.placeholder')}
                 value={input}
                 onChange={handleInputChange}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+                  if (e.key === 'Escape' && mentionPopup) { setMentionPopup(false) }
+                }}
                 disabled={streaming || analyzing}
               />
               <Button onClick={handleSend} disabled={streaming || analyzing || (!input.trim() && mentions.length === 0)} size="icon" className="shrink-0 rounded-xl h-9 w-9">
