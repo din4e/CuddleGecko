@@ -1,7 +1,6 @@
-import { useEffect, useState, useRef, memo, useCallback, useDeferredValue } from 'react'
+import { useState, useRef, memo, useCallback, useDeferredValue } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { contactsApi } from '../api/contacts'
 import { uploadApi } from '../api/upload'
 
 import { Button } from '../components/ui/button'
@@ -17,6 +16,10 @@ import type { Contact } from '../types'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import { Plus, Search, X, Upload } from 'lucide-react'
+import { useContactsList, useCreateContact } from '../hooks/api/useContacts'
+import Pagination from '../components/Pagination'
+import EmptyState from '../components/EmptyState'
+import ListPageHeader from '../components/ListPageHeader'
 
 const presetLabelKeys = ['family', 'friend', 'colleague', 'client', 'pet', 'other'] as const
 
@@ -105,16 +108,16 @@ function LabelPicker({ selected, onChange, t }: {
 interface ContactFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreated: () => void
   t: (key: string) => string
 }
 
-function ContactFormDialog({ open, onOpenChange, onCreated, t }: ContactFormDialogProps) {
+function ContactFormDialog({ open, onOpenChange, t }: ContactFormDialogProps) {
   const [newContact, setNewContact] = useState({
     name: '', emails: [] as string[], phones: [] as string[], avatar_emoji: '', avatar_url: '', relationship_labels: [] as string[],
   })
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const createContact = useCreateContact()
 
   const resetForm = () => {
     setNewContact({ name: '', emails: [] as string[], phones: [] as string[], avatar_emoji: '', avatar_url: '', relationship_labels: [] })
@@ -134,10 +137,9 @@ function ContactFormDialog({ open, onOpenChange, onCreated, t }: ContactFormDial
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    await contactsApi.create(newContact)
+    await createContact.mutateAsync(newContact)
     onOpenChange(false)
     resetForm()
-    onCreated()
   }
 
   return (
@@ -195,7 +197,7 @@ function ContactFormDialog({ open, onOpenChange, onCreated, t }: ContactFormDial
               t={t}
             />
           </div>
-          <Button type="submit" className="w-full">{t('contacts.createContact')}</Button>
+          <Button type="submit" className="w-full" disabled={createContact.isPending}>{t('contacts.createContact')}</Button>
         </form>
       </DialogContent>
     </Dialog>
@@ -286,63 +288,42 @@ const ContactTableRow = memo(function ContactTableRow({ contact, labelRenderer }
 
 export default function ContactsPage() {
   const { t } = useTranslation()
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search)
-  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const abortRef = useRef<AbortController | null>(null)
 
   const [view, setView] = useViewMode('contacts')
 
   const pageSize = 12
 
-  const loadContacts = useCallback(async () => {
-    abortRef.current?.abort()
-    const ctrl = new AbortController()
-    abortRef.current = ctrl
-    setLoading(true)
-    try {
-      const res = await contactsApi.list({ page, page_size: pageSize, search: deferredSearch || undefined }, ctrl.signal)
-      if (ctrl.signal.aborted) return
-      const data = res.data
-      setContacts(data.items || [])
-      setTotal(data.total || 0)
-    } catch (e) {
-      if (ctrl.signal.aborted) return
-      throw e
-    } finally {
-      if (!ctrl.signal.aborted) setLoading(false)
-    }
-  }, [page, deferredSearch])
+  const { data, isPending, isFetching } = useContactsList({
+    page,
+    page_size: pageSize,
+    search: deferredSearch || undefined,
+  })
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => {
-    loadContacts()
-    return () => abortRef.current?.abort()
-  }, [loadContacts])
+  const contacts = data?.items ?? []
+  const total = data?.total ?? 0
 
   const labelRenderer = useCallback((label: string) => label in labelColors ? t(`relationships.${label}`) : label, [t])
 
-  const totalPages = Math.ceil(total / pageSize)
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{t('contacts.title')}</h1>
-        <div className="flex items-center gap-2">
-          <ViewToggle value={view} onChange={setView} />
-          <Button onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4 mr-2" />{t('contacts.addContact')}</Button>
-          <ContactFormDialog
-            open={dialogOpen}
-            onOpenChange={setDialogOpen}
-            onCreated={loadContacts}
-            t={t}
-          />
-        </div>
-      </div>
+      <ListPageHeader
+        title={t('contacts.title')}
+        actions={
+          <>
+            <ViewToggle value={view} onChange={setView} />
+            <Button onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4 mr-2" />{t('contacts.addContact')}</Button>
+            <ContactFormDialog
+              open={dialogOpen}
+              onOpenChange={setDialogOpen}
+              t={t}
+            />
+          </>
+        }
+      />
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -354,12 +335,12 @@ export default function ContactsPage() {
         />
       </div>
 
-      {loading ? (
+      {isPending ? (
         <div>{t('dashboard.loading')}</div>
       ) : contacts.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">{t('contacts.noContacts')}</div>
+        <EmptyState message={t('contacts.noContacts')} />
       ) : view === 'grid' ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" aria-busy={isFetching}>
           {contacts.map((contact) => (
             <Link key={contact.id} to={`/buddies/${contact.id}`}>
               <ContactGridCard contact={contact} labelRenderer={labelRenderer} />
@@ -367,7 +348,7 @@ export default function ContactsPage() {
           ))}
         </div>
       ) : (
-        <Card>
+        <Card aria-busy={isFetching}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -387,13 +368,7 @@ export default function ContactsPage() {
         </Card>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>{t('contacts.previous')}</Button>
-          <span className="flex items-center text-sm text-muted-foreground">{t('contacts.page')} {page} {t('contacts.of')} {totalPages}</span>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>{t('contacts.next')}</Button>
-        </div>
-      )}
+      <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
     </div>
   )
 }

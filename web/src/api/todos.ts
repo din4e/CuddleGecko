@@ -1,9 +1,9 @@
 import { request } from './client'
 import type { Todo, Event, PaginatedData } from '../types'
 
-export const todoApi = {
-  list: (status?: string, page = 1, pageSize = 50) =>
-    request.get<PaginatedData<Todo>>('/todos', { params: { status, page, page_size: pageSize } }).then((data) => ({ data })),
+export const todosApi = {
+  list: (status?: string, page = 1, pageSize = 50, signal?: AbortSignal) =>
+    request.get<PaginatedData<Todo>>('/todos', { params: { status, page, page_size: pageSize }, signal }).then((data) => ({ data })),
 
   create: (data: Partial<Todo>) =>
     request.post<Todo>('/todos', data).then((d) => ({ data: d })),

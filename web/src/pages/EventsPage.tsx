@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { eventApi } from '../api/event'
 import { contactsApi } from '../api/contacts'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
@@ -18,10 +17,19 @@ import {
 import { CalendarDays, Clock, MapPin, Plus, Pencil, Trash2, Heart, Sparkles, Loader2 } from 'lucide-react'
 import BuddyPicker from '../components/BuddyPicker'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import Pagination from '../components/Pagination'
+import EmptyState from '../components/EmptyState'
+import ListPageHeader from '../components/ListPageHeader'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import { useModeStore } from '../stores/mode'
 import type { Event, Contact } from '../types'
+import {
+  useEventsList,
+  useCreateEvent,
+  useUpdateEvent,
+  useDeleteEvent,
+} from '../hooks/api/useEvents'
 
 type TimeFilter = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'upcoming' | 'past'
 
@@ -36,7 +44,7 @@ const COLORS = [
   { value: '#ec4899', label: 'Pink' },
 ]
 
-function getDateRange(filter: TimeFilter): { startAfter?: string; endBefore?: string } {
+function getDateRange(filter: TimeFilter): { start_after?: string; end_before?: string } {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
@@ -44,24 +52,24 @@ function getDateRange(filter: TimeFilter): { startAfter?: string; endBefore?: st
     case 'today': {
       const end = new Date(today)
       end.setDate(end.getDate() + 1)
-      return { startAfter: today.toISOString(), endBefore: end.toISOString() }
+      return { start_after: today.toISOString(), end_before: end.toISOString() }
     }
     case 'thisWeek': {
       const start = new Date(today)
       start.setDate(start.getDate() - start.getDay())
       const end = new Date(start)
       end.setDate(end.getDate() + 7)
-      return { startAfter: start.toISOString(), endBefore: end.toISOString() }
+      return { start_after: start.toISOString(), end_before: end.toISOString() }
     }
     case 'thisMonth': {
       const start = new Date(now.getFullYear(), now.getMonth(), 1)
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-      return { startAfter: start.toISOString(), endBefore: end.toISOString() }
+      return { start_after: start.toISOString(), end_before: end.toISOString() }
     }
     case 'upcoming':
-      return { startAfter: now.toISOString() }
+      return { start_after: now.toISOString() }
     case 'past':
-      return { endBefore: now.toISOString() }
+      return { end_before: now.toISOString() }
     default:
       return {}
   }
@@ -107,9 +115,7 @@ const emptyForm: EventFormData = {
 
 export default function EventsPage() {
   const { t } = useTranslation()
-  const [events, setEvents] = useState<Event[]>([])
   const [buddies, setBuddies] = useState<Contact[]>([])
-  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<TimeFilter>('all')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Event | null>(null)
@@ -117,12 +123,25 @@ export default function EventsPage() {
   const [view, setView] = useViewMode('events')
   const adapters = useModeStore((s) => s.adapters)
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
   const pageSize = 50
   const [analysisResult, setAnalysisResult] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [analyzingId, setAnalyzingId] = useState<number | null>(null)
   const [aiAvailable, setAiAvailable] = useState(false)
+
+  const range = getDateRange(filter)
+  const { data, isPending } = useEventsList({
+    page,
+    page_size: pageSize,
+    start_after: range.start_after,
+    end_before: range.end_before,
+  })
+  const createEvent = useCreateEvent()
+  const updateEvent = useUpdateEvent()
+  const deleteEvent = useDeleteEvent()
+
+  const events = data?.items ?? []
+  const total = data?.total ?? 0
 
   const handleAnalyzeEvent = async (eventId: number) => {
     if (!adapters?.ai) return
@@ -147,31 +166,12 @@ export default function EventsPage() {
     { key: 'past', label: t('events.past') },
   ]
 
-  const loadEvents = async () => {
-    setLoading(true)
-    try {
-      const range = getDateRange(filter)
-      const res = await eventApi.list({ page, page_size: pageSize, ...range })
-      const data = res.data
-      setEvents(Array.isArray(data?.items) ? data.items : [])
-      setTotal(data?.total ?? 0)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
     contactsApi.list({ page: 1, page_size: 200 }).then((res) => setBuddies(res.data.items || []))
     adapters?.ai?.listProviders().then((providers) => {
       setAiAvailable(providers?.some((p) => p.is_active) ?? false)
     }).catch(() => setAiAvailable(false))
   }, [adapters?.ai])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadEvents()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, page])
 
   const changeFilter = (f: TimeFilter) => {
     setFilter(f)
@@ -210,35 +210,34 @@ export default function EventsPage() {
     }
 
     if (editing) {
-      await eventApi.update(editing.id, payload)
+      await updateEvent.mutateAsync({ id: editing.id, data: payload })
     } else {
-      await eventApi.create(payload)
+      await createEvent.mutateAsync(payload)
     }
 
     setDialogOpen(false)
-    loadEvents()
   }
-
-  const handleDelete = (id: number) => setDeleteTarget(id)
 
   const handleConfirmDelete = async () => {
     if (deleteTarget === null) return
-    await eventApi.delete(deleteTarget)
-    loadEvents()
+    await deleteEvent.mutateAsync(deleteTarget)
+    setDeleteTarget(null)
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{t('events.title')}</h1>
-        <div className="flex items-center gap-2">
-          <ViewToggle value={view} onChange={setView} />
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('events.newEvent')}
-          </Button>
-        </div>
-      </div>
+      <ListPageHeader
+        title={t('events.title')}
+        actions={
+          <>
+            <ViewToggle value={view} onChange={setView} />
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              {t('events.newEvent')}
+            </Button>
+          </>
+        }
+      />
 
       <div className="flex flex-wrap gap-2">
         {filterKeys.map(({ key, label }) => (
@@ -253,10 +252,10 @@ export default function EventsPage() {
         ))}
       </div>
 
-      {loading ? (
+      {isPending ? (
         <div>{t('events.loading')}</div>
       ) : events.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">{t('events.noEvents')}</p>
+        <EmptyState message={t('events.noEvents')} />
       ) : view === 'list' ? (
         <Card>
           <Table>
@@ -305,7 +304,7 @@ export default function EventsPage() {
                       </Button>
                       )}
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)} aria-label={t('events.editEvent')}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(e.id)} aria-label={t('events.deleteEvent')}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteTarget(e.id)} aria-label={t('events.deleteEvent')}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -356,7 +355,7 @@ export default function EventsPage() {
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(e)} aria-label={t('events.editEvent')}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(e.id)} aria-label={t('events.deleteEvent')}>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteTarget(e.id)} aria-label={t('events.deleteEvent')}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -366,19 +365,7 @@ export default function EventsPage() {
         </div>
       )}
 
-      {total > pageSize && (
-        <div className="flex justify-center items-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            {t('contacts.previous')}
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {t('contacts.page')} {page} / {Math.ceil(total / pageSize)} ({total})
-          </span>
-          <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(page + 1)}>
-            {t('contacts.next')}
-          </Button>
-        </div>
-      )}
+      <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -387,25 +374,27 @@ export default function EventsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>{t('events.title_field')}</Label>
-              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              <Label htmlFor="event-title">{t('events.title_field')}</Label>
+              <Input id="event-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>{t('events.description')}</Label>
-              <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              <Label htmlFor="event-description">{t('events.description')}</Label>
+              <Textarea id="event-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t('events.startTime')}</Label>
+                <Label htmlFor="event-start">{t('events.startTime')}</Label>
                 <Input
+                  id="event-start"
                   type="datetime-local"
                   value={form.start_time}
                   onChange={(e) => setForm({ ...form, start_time: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t('events.endTime')}</Label>
+                <Label htmlFor="event-end">{t('events.endTime')}</Label>
                 <Input
+                  id="event-end"
                   type="datetime-local"
                   value={form.end_time}
                   onChange={(e) => setForm({ ...form, end_time: e.target.value })}
@@ -413,8 +402,8 @@ export default function EventsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>{t('events.location')}</Label>
-              <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+              <Label htmlFor="event-location">{t('events.location')}</Label>
+              <Input id="event-location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label>{t('events.color')}</Label>
@@ -446,14 +435,13 @@ export default function EventsPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={!form.title || !form.start_time}>
+            <Button onClick={handleSubmit} disabled={!form.title || !form.start_time || createEvent.isPending || updateEvent.isPending}>
               {editing ? t('events.editEvent') : t('events.newEvent')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* AI Analysis Result */}
       <Dialog open={!!analysisResult} onOpenChange={() => setAnalysisResult(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>

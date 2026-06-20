@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { transactionApi } from '../api/transaction'
 import { contactsApi } from '../api/contacts'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
@@ -19,9 +18,19 @@ import {
 import { TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, Heart } from 'lucide-react'
 import BuddyPicker from '../components/BuddyPicker'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import Pagination from '../components/Pagination'
+import EmptyState from '../components/EmptyState'
+import ListPageHeader from '../components/ListPageHeader'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
-import type { Transaction, TransactionSummary, Contact } from '../types'
+import type { Transaction, Contact } from '../types'
+import {
+  useTransactionsList,
+  useTransactionsSummary,
+  useCreateTransaction,
+  useUpdateTransaction,
+  useDeleteTransaction,
+} from '../hooks/api/useTransactions'
 
 type TxType = '' | 'income' | 'expense'
 
@@ -47,10 +56,7 @@ const emptyForm: TxFormData = {
 
 export default function FinancePage() {
   const { t } = useTranslation()
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [summary, setSummary] = useState<TransactionSummary | null>(null)
   const [buddies, setBuddies] = useState<Contact[]>([])
-  const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<TxType>('')
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -58,33 +64,24 @@ export default function FinancePage() {
   const [form, setForm] = useState<TxFormData>(emptyForm)
   const [view, setView] = useViewMode('finance')
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
   const pageSize = 50
 
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const params: Record<string, unknown> = { page, page_size: pageSize }
-      if (typeFilter) params.type = typeFilter
-      const [txRes, sumRes] = await Promise.all([
-        transactionApi.list(params),
-        transactionApi.summary(),
-      ])
-      const data = txRes.data
-      setTransactions(Array.isArray(data?.items) ? data.items : [])
-      setTotal(data?.total ?? 0)
-      setSummary(sumRes.data)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data, isPending } = useTransactionsList({
+    page,
+    page_size: pageSize,
+    type: typeFilter || undefined,
+  })
+  const { data: summary } = useTransactionsSummary()
+  const createTx = useCreateTransaction()
+  const updateTx = useUpdateTransaction()
+  const deleteTx = useDeleteTransaction()
+
+  const transactions = data?.items ?? []
+  const total = data?.total ?? 0
 
   useEffect(() => {
     contactsApi.list({ page: 1, page_size: 200 }).then((res) => setBuddies(res.data.items || []))
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typeFilter, page])
+  }, [])
 
   const changeTypeFilter = (ty: TxType) => {
     setTypeFilter(ty)
@@ -123,39 +120,37 @@ export default function FinancePage() {
     }
 
     if (editing) {
-      await transactionApi.update(editing.id, payload)
+      await updateTx.mutateAsync({ id: editing.id, data: payload })
     } else {
-      await transactionApi.create(payload)
+      await createTx.mutateAsync(payload)
     }
 
     setDialogOpen(false)
-    loadData()
   }
-
-  const handleDelete = (id: number) => setDeleteTarget(id)
 
   const handleConfirmDelete = async () => {
     if (deleteTarget === null) return
-    await transactionApi.delete(deleteTarget)
-    loadData()
+    await deleteTx.mutateAsync(deleteTarget)
+    setDeleteTarget(null)
   }
 
   const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{t('finance.title')}</h1>
-        <div className="flex items-center gap-2">
-          <ViewToggle value={view} onChange={setView} />
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('finance.newTransaction')}
-          </Button>
-        </div>
-      </div>
+      <ListPageHeader
+        title={t('finance.title')}
+        actions={
+          <>
+            <ViewToggle value={view} onChange={setView} />
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              {t('finance.newTransaction')}
+            </Button>
+          </>
+        }
+      />
 
-      {/* Summary Cards */}
       {summary && (
         <div className="grid grid-cols-3 gap-4">
           <Card>
@@ -190,7 +185,6 @@ export default function FinancePage() {
         </div>
       )}
 
-      {/* Type Filter */}
       <div className="flex gap-2">
         {(['', 'income', 'expense'] as TxType[]).map((ty) => (
           <Button
@@ -204,11 +198,10 @@ export default function FinancePage() {
         ))}
       </div>
 
-      {/* Transaction List/Grid */}
-      {loading ? (
+      {isPending ? (
         <div>{t('finance.loading')}</div>
       ) : transactions.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">{t('finance.noTransactions')}</p>
+        <EmptyState message={t('finance.noTransactions')} />
       ) : view === 'list' ? (
         <Card>
           <Table>
@@ -251,7 +244,7 @@ export default function FinancePage() {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(tx)} aria-label={t('finance.editTransaction')}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(tx.id)} aria-label={t('finance.deleteTransaction')}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteTarget(tx.id)} aria-label={t('finance.deleteTransaction')}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -293,7 +286,7 @@ export default function FinancePage() {
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(tx)} aria-label={t('finance.editTransaction')}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(tx.id)} aria-label={t('finance.deleteTransaction')}>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteTarget(tx.id)} aria-label={t('finance.deleteTransaction')}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -303,21 +296,8 @@ export default function FinancePage() {
         </div>
       )}
 
-      {total > pageSize && (
-        <div className="flex justify-center items-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            {t('contacts.previous')}
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {t('contacts.page')} {page} / {Math.ceil(total / pageSize)} ({total})
-          </span>
-          <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(page + 1)}>
-            {t('contacts.next')}
-          </Button>
-        </div>
-      )}
+      <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
 
-      {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -325,13 +305,14 @@ export default function FinancePage() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>{t('finance.title_field')}</Label>
-              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              <Label htmlFor="tx-title">{t('finance.title_field')}</Label>
+              <Input id="tx-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t('finance.amount')}</Label>
+                <Label htmlFor="tx-amount">{t('finance.amount')}</Label>
                 <Input
+                  id="tx-amount"
                   type="number"
                   step="0.01"
                   min="0"
@@ -363,12 +344,13 @@ export default function FinancePage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t('finance.category')}</Label>
-                <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+                <Label htmlFor="tx-category">{t('finance.category')}</Label>
+                <Input id="tx-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>{t('finance.date')}</Label>
+                <Label htmlFor="tx-date">{t('finance.date')}</Label>
                 <Input
+                  id="tx-date"
                   type="date"
                   value={form.date}
                   onChange={(e) => setForm({ ...form, date: e.target.value })}
@@ -376,8 +358,8 @@ export default function FinancePage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>{t('finance.notes')}</Label>
-              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              <Label htmlFor="tx-notes">{t('finance.notes')}</Label>
+              <Textarea id="tx-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label>Buddies</Label>
@@ -393,7 +375,7 @@ export default function FinancePage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={!form.title || !form.amount || !form.date}>
+            <Button onClick={handleSubmit} disabled={!form.title || !form.amount || !form.date || createTx.isPending || updateTx.isPending}>
               {editing ? t('finance.title') : t('finance.newTransaction')}
             </Button>
           </DialogFooter>

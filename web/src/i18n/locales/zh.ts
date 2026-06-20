@@ -74,10 +74,6 @@ export default {
     phone: '电话',
     relationship: '关系标签',
     createContact: '创建',
-    previous: '上一页',
-    next: '下一页',
-    page: '第',
-    of: '页，共',
     backToContacts: '返回小伙伴列表',
     delete: '删除',
     deleteConfirm: '确定删除此小伙伴？',
@@ -312,6 +308,9 @@ export default {
   common: {
     cancel: '取消',
     create: '创建',
+    previous: '上一页',
+    next: '下一页',
+    page: '第',
   },
   terminal: {
     title: '终端',

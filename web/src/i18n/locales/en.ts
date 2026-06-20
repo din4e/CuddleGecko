@@ -74,10 +74,6 @@ export default {
     phone: 'Phone',
     relationship: 'Labels',
     createContact: 'Create',
-    previous: 'Previous',
-    next: 'Next',
-    page: 'Page',
-    of: 'of',
     backToContacts: 'Back to Buddies',
     delete: 'Delete',
     deleteConfirm: 'Delete this buddy?',
@@ -312,6 +308,9 @@ export default {
   common: {
     cancel: 'Cancel',
     create: 'Create',
+    previous: 'Previous',
+    next: 'Next',
+    page: 'Page',
   },
   terminal: {
     title: 'Terminal',
