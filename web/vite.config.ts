@@ -2,6 +2,13 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
+import http from 'node:http'
+
+// Reuse a single keep-alive agent so Vite's dev proxy maintains persistent
+// connections to the Go backend. Without this, http-proxy opens a fresh TCP
+// connection per request, which on Windows triggers a ~200ms delayed-ACK
+// stall on roughly every other request — turning 3ms API calls into 250ms+.
+const backendAgent = new http.Agent({ keepAlive: true, maxSockets: 16 })
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -17,10 +24,12 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        agent: backendAgent,
       },
       '/avatars': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        agent: backendAgent,
       },
     },
   },
