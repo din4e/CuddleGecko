@@ -346,6 +346,7 @@ export default {
     analyzeRelationship: 'Analyze Relationship',
     analyzeEvent: 'Analyze Event',
     noConversations: 'No conversations yet',
+    recentChats: 'Recent',
     deleteChat: 'Delete',
     deleteChatConfirm: 'Delete this conversation?',
     sendFailed: 'Failed to send message',

@@ -346,6 +346,7 @@ export default {
     analyzeRelationship: '分析关系',
     analyzeEvent: '分析事件',
     noConversations: '暂无对话',
+    recentChats: '最近对话',
     deleteChat: '删除',
     deleteChatConfirm: '确定删除此对话？',
     sendFailed: '消息发送失败',
