@@ -1,9 +1,9 @@
 import { request } from './client'
 import type { Transaction, TransactionSummary, PaginatedData } from '../types'
 
-export const transactionApi = {
-  list: (params?: { page?: number; page_size?: number; type?: string; contact_id?: number }) =>
-    request.get<PaginatedData<Transaction>>('/transactions', { params }).then((data) => ({ data })),
+export const transactionsApi = {
+  list: (params?: { page?: number; page_size?: number; type?: string; contact_id?: number }, signal?: AbortSignal) =>
+    request.get<PaginatedData<Transaction>>('/transactions', { params, signal }).then((data) => ({ data })),
 
   summary: () =>
     request.get<TransactionSummary>('/transactions/summary').then((data) => ({ data })),

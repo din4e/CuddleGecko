@@ -11,6 +11,7 @@ import { Button } from '../components/ui/button'
 import { useGraphSettings } from '../stores/graphSettings'
 import { ZoomIn, ZoomOut, Maximize, Minimize, RotateCcw, Crosshair, Loader2, Network } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import EmptyState from '../components/EmptyState'
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof ForceGraph2DType
 
@@ -450,7 +451,7 @@ export default function GraphPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">{t('graph.title')}</h1>
-        <p className="text-center text-muted-foreground py-12">{t('graph.empty')}</p>
+        <EmptyState message={t('graph.empty')} />
       </div>
     )
   }

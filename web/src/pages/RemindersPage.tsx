@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { remindersApi } from '../api/reminders'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
@@ -11,6 +10,14 @@ import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import { CheckCircle, Clock, AlertCircle, Trash2, Pencil } from 'lucide-react'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import Pagination from '../components/Pagination'
+import EmptyState from '../components/EmptyState'
+import ListPageHeader from '../components/ListPageHeader'
+import {
+  useRemindersList,
+  useUpdateReminder,
+  useDeleteReminder,
+} from '../hooks/api/useReminders'
 
 export default function RemindersPage() {
   const { t } = useTranslation()
@@ -20,48 +27,25 @@ export default function RemindersPage() {
     done: { icon: CheckCircle, label: statusLabels.done, variant: 'secondary' },
     snoozed: { icon: AlertCircle, label: statusLabels.snoozed, variant: 'outline' },
   }
-  const [reminders, setReminders] = useState<Reminder[]>([])
   const [statusFilter, setStatusFilter] = useState<ReminderStatus | ''>('')
-  const [loading, setLoading] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [view, setView] = useViewMode('reminders')
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
   const pageSize = 50
 
-  // Edit dialog state
+  const { data, isPending } = useRemindersList(statusFilter, page, pageSize)
+  const updateReminder = useUpdateReminder()
+  const deleteReminder = useDeleteReminder()
+
+  const reminders = data?.items ?? []
+  const total = data?.total ?? 0
+
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Reminder | null>(null)
   const [formTitle, setFormTitle] = useState('')
   const [formDesc, setFormDesc] = useState('')
   const [formRemindAt, setFormRemindAt] = useState('')
   const [formStatus, setFormStatus] = useState<ReminderStatus>('pending')
-
-  const loadReminders = async () => {
-    setLoading(true)
-    try {
-      const res = await remindersApi.list(statusFilter || undefined, page, pageSize)
-      const payload = res.data
-      if (Array.isArray(payload)) {
-        setReminders(payload)
-        setTotal(payload.length)
-      } else if (payload && Array.isArray(payload.items)) {
-        setReminders(payload.items)
-        setTotal(payload.total ?? payload.items.length)
-      } else {
-        setReminders([])
-        setTotal(0)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadReminders()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, page])
 
   const changeStatusFilter = (s: ReminderStatus | '') => {
     setStatusFilter(s)
@@ -79,27 +63,26 @@ export default function RemindersPage() {
 
   const handleSave = async () => {
     if (!editing) return
-    await remindersApi.update(editing.id, {
-      title: formTitle,
-      description: formDesc,
-      remind_at: formRemindAt,
-      status: formStatus,
+    await updateReminder.mutateAsync({
+      id: editing.id,
+      data: {
+        title: formTitle,
+        description: formDesc,
+        remind_at: formRemindAt,
+        status: formStatus,
+      },
     })
     setDialogOpen(false)
-    loadReminders()
   }
 
   const handleStatusChange = async (id: number, status: ReminderStatus) => {
-    await remindersApi.update(id, { status })
-    loadReminders()
+    await updateReminder.mutateAsync({ id, data: { status } })
   }
-
-  const handleDelete = (id: number) => setDeleteTarget(id)
 
   const handleConfirmDelete = async () => {
     if (deleteTarget === null) return
-    await remindersApi.delete(deleteTarget)
-    loadReminders()
+    await deleteReminder.mutateAsync(deleteTarget)
+    setDeleteTarget(null)
   }
 
   const renderActions = (r: Reminder) => (
@@ -107,7 +90,7 @@ export default function RemindersPage() {
       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(r)} aria-label={t('reminders.edit')}>
         <Pencil className="h-3.5 w-3.5" />
       </Button>
-      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(r.id)} aria-label={t('reminders.delete')}>
+      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteTarget(r.id)} aria-label={t('reminders.delete')}>
         <Trash2 className="h-3.5 w-3.5" />
       </Button>
     </div>
@@ -115,10 +98,10 @@ export default function RemindersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{t('reminders.title')}</h1>
-        <ViewToggle value={view} onChange={setView} />
-      </div>
+      <ListPageHeader
+        title={t('reminders.title')}
+        actions={<ViewToggle value={view} onChange={setView} />}
+      />
       <div className="flex gap-2">
         {['', 'pending', 'done', 'snoozed'].map((s) => (
           <Button key={s} variant={statusFilter === s ? 'default' : 'outline'} size="sm" onClick={() => changeStatusFilter(s as ReminderStatus | '')}>
@@ -126,8 +109,8 @@ export default function RemindersPage() {
           </Button>
         ))}
       </div>
-      {loading ? <div>{t('reminders.loading')}</div> : reminders.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">{t('reminders.noReminders')}</p>
+      {isPending ? <div>{t('reminders.loading')}</div> : reminders.length === 0 ? (
+        <EmptyState message={t('reminders.noReminders')} />
       ) : view === 'list' ? (
         <Card>
           <Table>
@@ -206,19 +189,7 @@ export default function RemindersPage() {
         </div>
       )}
 
-      {total > pageSize && (
-        <div className="flex justify-center items-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            {t('contacts.previous')}
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {t('contacts.page')} {page} / {Math.ceil(total / pageSize)} ({total})
-          </span>
-          <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(page + 1)}>
-            {t('contacts.next')}
-          </Button>
-        </div>
-      )}
+      <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -251,7 +222,7 @@ export default function RemindersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('reminders.cancel')}</Button>
-            <Button onClick={handleSave}>{t('reminders.save')}</Button>
+            <Button onClick={handleSave} disabled={updateReminder.isPending}>{t('reminders.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

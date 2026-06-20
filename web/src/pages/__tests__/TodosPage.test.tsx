@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import TodosPage from '../TodosPage'
 import type { Todo, Contact, PaginatedData } from '../../types'
 
@@ -34,8 +35,8 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-vi.mock('../../api/todo', () => ({
-  todoApi: {
+vi.mock('../../api/todos', () => ({
+  todosApi: {
     list: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -51,11 +52,11 @@ vi.mock('../../api/contacts', () => ({
   },
 }))
 
-import { todoApi } from '../../api/todo'
+import { todosApi } from '../../api/todos'
 import { contactsApi } from '../../api/contacts'
 import type { AxiosResponse } from 'axios'
 
-const mockedList = vi.mocked(todoApi.list)
+const mockedList = vi.mocked(todosApi.list)
 const mockedContactsList = vi.mocked(contactsApi.list)
 
 function mockPage<T>(items: T[], total?: number): { data: PaginatedData<T> } {
@@ -73,10 +74,15 @@ function mockAxios<T>(data: T): AxiosResponse<T> {
 }
 
 function renderPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
+  })
   return render(
-    <BrowserRouter>
-      <TodosPage />
-    </BrowserRouter>,
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <TodosPage />
+      </BrowserRouter>
+    </QueryClientProvider>,
   )
 }
 
@@ -146,7 +152,7 @@ describe('TodosPage', () => {
     // Click the "pending" status filter button (translates to '待办状态')
     await user.click(screen.getByText('待办状态'))
     // The API should be called with the raw value 'pending', not the translated text
-    expect(mockedList).toHaveBeenCalledWith('pending', 1, 50)
+    expect(mockedList).toHaveBeenCalledWith('pending', 1, 50, expect.any(AbortSignal))
   })
 
   it('switches to kanban view showing columns', async () => {

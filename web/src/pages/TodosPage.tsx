@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo, memo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { todoApi } from '../api/todo'
 import { contactsApi } from '../api/contacts'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
@@ -19,6 +18,16 @@ import { Plus, Pencil, Trash2, Clock, CheckCircle2, Circle, ArrowRight, Loader2,
 import BuddyPicker from '../components/BuddyPicker'
 import { toast } from 'sonner'
 import type { Todo, Contact } from '../types'
+import Pagination from '../components/Pagination'
+import EmptyState from '../components/EmptyState'
+import {
+  useTodosList,
+  useCreateTodo,
+  useUpdateTodo,
+  useToggleTodoStatus,
+  useSyncTodoToEvent,
+  useDeleteTodo,
+} from '../hooks/api/useTodos'
 
 type TodoView = 'timeline' | 'grouped' | 'kanban'
 
@@ -131,18 +140,25 @@ const TodoCard = memo(function TodoCard({
 
 export default function TodosPage() {
   const { t } = useTranslation()
-  const [todos, setTodos] = useState<Todo[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
-  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'done'>('all')
   const [view, setView] = useState<TodoView>('grouped')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
   const [editing, setEditing] = useState<Todo | null>(null)
   const pageSize = 50
-  const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Todo | null>(null)
+
+  const statusParam = statusFilter === 'all' ? undefined : statusFilter
+  const { data, isPending: loading } = useTodosList(statusParam, page, pageSize)
+  const createTodo = useCreateTodo()
+  const updateTodo = useUpdateTodo()
+  const toggleTodo = useToggleTodoStatus()
+  const syncTodo = useSyncTodoToEvent()
+  const deleteTodo = useDeleteTodo()
+
+  const todos = data?.items ?? []
+  const total = data?.total ?? 0
 
   // Form state
   const [formTitle, setFormTitle] = useState('')
@@ -154,32 +170,9 @@ export default function TodosPage() {
   const [formContactIds, setFormContactIds] = useState<number[]>([])
   const [formColor, setFormColor] = useState('')
 
-  const loadTodos = useCallback(async () => {
-    try {
-      const status = statusFilter === 'all' ? undefined : statusFilter
-      const res = await todoApi.list(status, page, pageSize)
-      setTodos(res.data?.items ?? [])
-      setTotal(res.data?.total ?? 0)
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false)
-    }
-  }, [statusFilter, page])
-
-  const loadContacts = async () => {
-    try {
-      const res = await contactsApi.list({ page: 1, page_size: 100 })
-      setContacts(res.data?.items ?? [])
-    } catch {
-      // ignore
-    }
-  }
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { loadTodos() }, [loadTodos])
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { loadContacts() }, [])
+  useEffect(() => {
+    contactsApi.list({ page: 1, page_size: 100 }).then((res) => setContacts(res.data?.items ?? [])).catch(() => {})
+  }, [])
 
   const resetForm = () => {
     setFormTitle(''); setFormDesc(''); setFormPriority('normal'); setFormDueTime('')
@@ -203,58 +196,50 @@ export default function TodosPage() {
 
   const handleSave = async () => {
     if (!formTitle.trim()) return
-    setSaving(true)
-    try {
-      const data: Partial<Todo> = {
-        title: formTitle.trim(),
-        description: formDesc,
-        priority: formPriority,
-        due_time: formDueTime ? new Date(formDueTime).toISOString() : undefined,
-        amount: formAmount ? parseFloat(formAmount) : undefined,
-        amount_type: formAmountType,
-        contact_ids: formContactIds,
-        color: formColor,
-      }
-      if (editing) {
-        await todoApi.update(editing.id, data)
-      } else {
-        await todoApi.create(data)
-      }
-      setDialogOpen(false)
-      resetForm()
-      loadTodos()
-    } finally {
-      setSaving(false)
+    const data: Partial<Todo> = {
+      title: formTitle.trim(),
+      description: formDesc,
+      priority: formPriority,
+      due_time: formDueTime ? new Date(formDueTime).toISOString() : undefined,
+      amount: formAmount ? parseFloat(formAmount) : undefined,
+      amount_type: formAmountType,
+      contact_ids: formContactIds,
+      color: formColor,
     }
+    if (editing) {
+      await updateTodo.mutateAsync({ id: editing.id, data })
+    } else {
+      await createTodo.mutateAsync(data)
+    }
+    setDialogOpen(false)
+    resetForm()
   }
 
   const handleToggle = useCallback(async (id: number) => {
     try {
-      await todoApi.toggleStatus(id)
-      loadTodos()
+      await toggleTodo.mutateAsync(id)
     } catch {
       // ignore
     }
-  }, [loadTodos])
+  }, [toggleTodo])
 
   const handleSync = useCallback(async (todo: Todo) => {
     try {
-      await todoApi.syncToEvent(todo.id)
+      await syncTodo.mutateAsync(todo.id)
       toast.success(t('todos.syncSuccess'))
     } catch {
       toast.error(t('todos.syncFailed'))
     }
-  }, [t])
+  }, [t, syncTodo])
 
   const handleDelete = useCallback(async (id: number) => {
     try {
-      await todoApi.delete(id)
+      await deleteTodo.mutateAsync(id)
       setConfirmDelete(null)
-      loadTodos()
     } catch {
       // ignore
     }
-  }, [loadTodos])
+  }, [deleteTodo])
 
   const contactNameMap = useMemo(() => {
     const m = new Map<number, string>()
@@ -403,7 +388,7 @@ export default function TodosPage() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : todos.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">{t('todos.noTodos')}</p>
+        <EmptyState message={t('todos.noTodos')} />
       ) : view === 'timeline' ? (
         /* Timeline View */
         <div className="relative pl-6">
@@ -474,19 +459,7 @@ export default function TodosPage() {
         </div>
       )}
 
-      {total > pageSize && (
-        <div className="flex justify-center items-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            {t('contacts.previous')}
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {t('contacts.page')} {page} / {Math.ceil(total / pageSize)} ({total})
-          </span>
-          <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(page + 1)}>
-            {t('contacts.next')}
-          </Button>
-        </div>
-      )}
+      <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setDialogOpen(open) }}>
@@ -584,8 +557,8 @@ export default function TodosPage() {
             <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm() }}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleSave} disabled={!formTitle.trim() || saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            <Button onClick={handleSave} disabled={!formTitle.trim() || createTodo.isPending || updateTodo.isPending}>
+              {(createTodo.isPending || updateTodo.isPending) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               {t('common.create')}
             </Button>
           </DialogFooter>

@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { contactsApi } from '../api/contacts'
-import { remindersApi } from '../api/reminders'
-import { eventApi } from '../api/event'
-import { todoApi } from '../api/todo'
-import { transactionApi } from '../api/transaction'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { buttonVariants } from '../components/ui/button'
 import type { Reminder, Event, Todo, Transaction } from '../types'
+import { useRemindersList } from '../hooks/api/useReminders'
+import { useEventsList } from '../hooks/api/useEvents'
+import { useTodosList } from '../hooks/api/useTodos'
+import { useTransactionsList } from '../hooks/api/useTransactions'
+import { useContactsList } from '../hooks/api/useContacts'
 import {
   Users,
   CalendarCheck,
@@ -126,49 +126,39 @@ function TrendChart({ buckets }: { buckets: MonthBucket[] }) {
 
 export default function DashboardPage() {
   const { t, i18n } = useTranslation()
-  const [totalContacts, setTotalContacts] = useState(0)
-  const [reminders, setReminders] = useState<Reminder[]>([])
-  const [events, setEvents] = useState<Event[]>([])
-  const [todos, setTodos] = useState<Todo[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [monthIncome, setMonthIncome] = useState(0)
   const [monthExpense, setMonthExpense] = useState(0)
-  const [loading, setLoading] = useState(true)
+
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
+
+  const { data: remindersData, isPending: remindersLoading } = useRemindersList('pending', 1, 50)
+  const { data: eventsData, isPending: eventsLoading } = useEventsList({ page: 1, page_size: 100, start_after: todayStart, end_before: todayEnd })
+  const { data: todosData, isPending: todosLoading } = useTodosList('pending', 1, 100)
+  const { data: txData, isPending: txLoading } = useTransactionsList({ page: 1, page_size: 1000 })
+  const { data: contactsData } = useContactsList({ page: 1, page_size: 1 })
+
+  const reminders: Reminder[] = remindersData?.items ?? []
+  const events: Event[] = eventsData?.items ?? []
+  const todos: Todo[] = todosData?.items ?? []
+  const transactions: Transaction[] = txData?.items ?? []
+  const totalContacts = contactsData?.total ?? 0
+  const loading = remindersLoading || eventsLoading || todosLoading || txLoading
 
   useEffect(() => {
-    const now = new Date()
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
-    Promise.all([
-      contactsApi.list({ page: 1, page_size: 1 }),
-      remindersApi.list('pending', 1, 50),
-      eventApi.list({ page: 1, page_size: 100, start_after: todayStart, end_before: todayEnd }),
-      todoApi.list('pending', 1, 100),
-      transactionApi.list({ page: 1, page_size: 1000 }),
-    ])
-      .then(([contactsRes, remindersRes, eventsRes, todosRes, txRes]) => {
-        setTotalContacts(contactsRes.data.total || 0)
-        const rData = remindersRes.data
-        setReminders(Array.isArray(rData) ? rData : (rData?.items ?? []))
-        setEvents(eventsRes.data.items || [])
-        setTodos(todosRes.data.items || [])
-        const txItems = txRes.data.items || []
-        setTransactions(txItems)
-        let inc = 0
-        let exp = 0
-        for (const tx of txItems) {
-          if (tx.date >= monthStart) {
-            if (tx.type === 'income') inc += tx.amount
-            else exp += tx.amount
-          }
-        }
-        setMonthIncome(inc)
-        setMonthExpense(exp)
-      })
-      .finally(() => setLoading(false))
-  }, [])
+    let inc = 0
+    let exp = 0
+    for (const tx of transactions) {
+      if (tx.date >= monthStart) {
+        if (tx.type === 'income') inc += tx.amount
+        else exp += tx.amount
+      }
+    }
+    setMonthIncome(inc)
+    setMonthExpense(exp)
+  }, [transactions, now])
 
   const trend = useMemo(() => {
     const buckets = buildLast6Months(i18n.language)

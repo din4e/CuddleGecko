@@ -2,8 +2,8 @@ import { request } from './client'
 import type { Tag, PaginatedData } from '../types'
 
 export const tagsApi = {
-  list: (page = 1, pageSize = 50) =>
-    request.get<PaginatedData<Tag>>('/tags', { params: { page, page_size: pageSize } }).then((data) => ({ data })),
+  list: (page = 1, pageSize = 50, signal?: AbortSignal) =>
+    request.get<PaginatedData<Tag>>('/tags', { params: { page, page_size: pageSize }, signal }).then((data) => ({ data })),
   create: (data: { name: string; color: string }) =>
     request.post<Tag>('/tags', data).then((d) => ({ data: d })),
   update: (id: number, data: Partial<Tag>) =>

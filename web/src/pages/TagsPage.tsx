@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { tagsApi } from '../api/tags'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -12,10 +11,18 @@ import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import Pagination from '../components/Pagination'
+import EmptyState from '../components/EmptyState'
+import ListPageHeader from '../components/ListPageHeader'
+import {
+  useTagsList,
+  useCreateTag,
+  useUpdateTag,
+  useDeleteTag,
+} from '../hooks/api/useTags'
 
 export default function TagsPage() {
   const { t } = useTranslation()
-  const [tags, setTags] = useState<Tag[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTag, setEditingTag] = useState<Tag | null>(null)
   const [name, setName] = useState('')
@@ -23,39 +30,27 @@ export default function TagsPage() {
   const [view, setView] = useViewMode('tags')
   const [page, setPage] = useState(1)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
-  const [total, setTotal] = useState(0)
   const pageSize = 50
 
-  const loadTags = async () => {
-    const res = await tagsApi.list(page, pageSize)
-    const payload = res.data
-    if (Array.isArray(payload)) {
-      setTags(payload)
-      setTotal(payload.length)
-    } else if (payload && Array.isArray(payload.items)) {
-      setTags(payload.items)
-      setTotal(payload.total ?? payload.items.length)
-    } else {
-      setTags([])
-      setTotal(0)
-    }
-  }
+  const { data, isLoading } = useTagsList(page, pageSize)
+  const createTag = useCreateTag()
+  const updateTag = useUpdateTag()
+  const deleteTag = useDeleteTag()
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { loadTags() }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
+  const tags = data?.items ?? []
+  const total = data?.total ?? 0
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (editingTag) {
-      await tagsApi.update(editingTag.id, { name, color })
+      await updateTag.mutateAsync({ id: editingTag.id, data: { name, color } })
     } else {
-      await tagsApi.create({ name, color })
+      await createTag.mutateAsync({ name, color })
     }
     setDialogOpen(false)
     setEditingTag(null)
     setName('')
     setColor('#6366f1')
-    loadTags()
   }
 
   const handleEdit = (tag: Tag) => {
@@ -65,21 +60,20 @@ export default function TagsPage() {
     setDialogOpen(true)
   }
 
-  const handleDelete = (id: number) => setDeleteTarget(id)
-
   const handleConfirmDelete = async () => {
     if (deleteTarget === null) return
-    await tagsApi.delete(deleteTarget)
-    loadTags()
+    await deleteTag.mutateAsync(deleteTarget)
+    setDeleteTarget(null)
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{t('tags.title')}</h1>
-        <div className="flex items-center gap-2">
-          <ViewToggle value={view} onChange={setView} />
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingTag(null) }}>
+      <ListPageHeader
+        title={t('tags.title')}
+        actions={
+          <>
+            <ViewToggle value={view} onChange={setView} />
+            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingTag(null) }}>
             <DialogTrigger>
               <Button><Plus className="h-4 w-4 mr-2" />{t('tags.newTag')}</Button>
             </DialogTrigger>
@@ -87,25 +81,30 @@ export default function TagsPage() {
               <DialogHeader><DialogTitle>{editingTag ? t('tags.editTag') : t('tags.newTag')}</DialogTitle></DialogHeader>
               <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>{t('tags.name')}</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} required />
+                  <Label htmlFor="tag-name">{t('tags.name')}</Label>
+                  <Input id="tag-name" value={name} onChange={(e) => setName(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t('tags.color')}</Label>
+                  <Label htmlFor="tag-color">{t('tags.color')}</Label>
                   <div className="flex gap-2 items-center">
-                    <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-10 rounded cursor-pointer" />
+                    <input id="tag-color" type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-10 rounded cursor-pointer" />
                     <Input value={color} onChange={(e) => setColor(e.target.value)} className="flex-1" />
                   </div>
                 </div>
-                <Button type="submit" className="w-full">{editingTag ? t('tags.update') : t('tags.create')}</Button>
+                <Button type="submit" className="w-full" disabled={createTag.isPending || updateTag.isPending}>
+                  {editingTag ? t('tags.update') : t('tags.create')}
+                </Button>
               </form>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {tags.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">{t('tags.noTags')}</p>
+      {isLoading ? (
+        <EmptyState message="…" />
+      ) : tags.length === 0 ? (
+        <EmptyState message={t('tags.noTags')} />
       ) : view === 'grid' ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {tags.map((tag) => (
@@ -117,7 +116,7 @@ export default function TagsPage() {
                 </CardTitle>
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" onClick={() => handleEdit(tag)} aria-label={t('tags.editTag')}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(tag.id)} aria-label={t('tags.delete')}><Trash2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(tag.id)} aria-label={t('tags.delete')}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </CardHeader>
             </Card>
@@ -143,7 +142,7 @@ export default function TagsPage() {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(tag)} aria-label={t('tags.editTag')}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(tag.id)} aria-label={t('tags.delete')}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDeleteTarget(tag.id)} aria-label={t('tags.delete')}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -153,19 +152,7 @@ export default function TagsPage() {
         </Card>
       )}
 
-      {total > pageSize && (
-        <div className="flex justify-center items-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            {t('contacts.previous')}
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {t('contacts.page')} {page} / {Math.ceil(total / pageSize)} ({total})
-          </span>
-          <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage(page + 1)}>
-            {t('contacts.next')}
-          </Button>
-        </div>
-      )}
+      <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
 
       <ConfirmDialog
         open={deleteTarget !== null}

@@ -1,9 +1,9 @@
 import { request } from './client'
 import type { Event, PaginatedData } from '../types'
 
-export const eventApi = {
-  list: (params?: { page?: number; page_size?: number; start_after?: string; end_before?: string }) =>
-    request.get<PaginatedData<Event>>('/events', { params }).then((data) => ({ data })),
+export const eventsApi = {
+  list: (params?: { page?: number; page_size?: number; start_after?: string; end_before?: string }, signal?: AbortSignal) =>
+    request.get<PaginatedData<Event>>('/events', { params, signal }).then((data) => ({ data })),
 
   create: (data: Partial<Event>) =>
     request.post<Event>('/events', data).then((d) => ({ data: d })),
