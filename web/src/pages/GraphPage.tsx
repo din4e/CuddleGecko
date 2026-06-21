@@ -108,7 +108,9 @@ export default function GraphPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const fgRef = useRef<ForceGraphMethods<GraphNode, GraphLink> | undefined>(undefined)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const resizeObserverRef = useRef<ResizeObserver | null>(null)
+  const recenterTimerRef = useRef<number | null>(null)
   const [graphData, setGraphData] = useState<GraphData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set())
@@ -153,26 +155,81 @@ export default function GraphPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  // Responsive canvas sizing — ResizeObserver only (window resize is redundant)
+  // Measure container size from its live rect. Falls back to viewport in
+  // fullscreen. Setting state with the same values is a no-op via the
+  // equality check, so downstream consumers aren't re-rendered needlessly.
+  const measureContainer = useCallback(() => {
+    if (isFullscreen) {
+      setDimensions((prev) =>
+        prev.width === window.innerWidth && prev.height === window.innerHeight
+          ? prev
+          : { width: window.innerWidth, height: window.innerHeight },
+      )
+      return
+    }
+    const el = containerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const width = Math.max(200, Math.floor(rect.width))
+    // Leave 24px under the canvas so the wrapping Card's bottom padding
+    // (py-4 = 16px) plus its ring/shadow stays inside the viewport instead
+    // of leaking below the browser's bottom edge. No min-height clamp:
+    // at very small viewports the header alone eats most of the space,
+    // and clamping would force the card below the viewport.
+    const height = Math.max(80, Math.floor(window.innerHeight - rect.top - 24))
+    setDimensions((prev) => (prev.width === width && prev.height === height ? prev : { width, height }))
+  }, [isFullscreen])
+
+  // After dimensions settle, debounced re-center so the user doesn't lose
+  // their graph in a resized viewport.
+  const scheduleRecenter = useCallback(() => {
+    if (recenterTimerRef.current != null) window.clearTimeout(recenterTimerRef.current)
+    recenterTimerRef.current = window.setTimeout(() => {
+      recenterTimerRef.current = null
+      fgRef.current?.zoomToFit(400, 40)
+    }, 220)
+  }, [])
+
+  // Callback ref: fires when the container mounts/unmounts, so we attach
+  // the ResizeObserver at the right moment even if Suspense delays the
+  // initial mount.
+  const setContainerRef = useCallback((el: HTMLDivElement | null) => {
+    containerRef.current = el
+    resizeObserverRef.current?.disconnect()
+    resizeObserverRef.current = null
+    if (!el) return
+    measureContainer()
+    const ro = new ResizeObserver(measureContainer)
+    ro.observe(el)
+    resizeObserverRef.current = ro
+  }, [measureContainer])
+
   useEffect(() => {
-    const updateSize = () => {
-      if (isFullscreen) {
-        setDimensions({ width: window.innerWidth, height: window.innerHeight })
-      } else if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect()
-        const height = Math.max(400, window.innerHeight - rect.top)
-        setDimensions({ width: Math.floor(rect.width), height: Math.floor(height) })
+    // Catch viewport changes that don't grow the container itself (e.g. body
+    // height shrinks because a sibling collapsed). In fullscreen the
+    // document.documentElement observer already covers this via measureContainer.
+    window.addEventListener('resize', measureContainer)
+    return () => {
+      window.removeEventListener('resize', measureContainer)
+      resizeObserverRef.current?.disconnect()
+      resizeObserverRef.current = null
+      if (recenterTimerRef.current != null) {
+        window.clearTimeout(recenterTimerRef.current)
+        recenterTimerRef.current = null
       }
     }
-    updateSize()
-    const ro = new ResizeObserver(updateSize)
-    if (containerRef.current) ro.observe(containerRef.current)
-    if (isFullscreen) {
-      // In fullscreen mode the container fills the viewport; observe document.documentElement
-      ro.observe(document.documentElement)
-    }
-    return () => ro.disconnect()
-  }, [isFullscreen])
+  }, [measureContainer])
+
+  // Re-measure when toggling fullscreen, then recenter.
+  useEffect(() => {
+    measureContainer()
+    scheduleRecenter()
+  }, [isFullscreen, measureContainer, scheduleRecenter])
+
+  // Debounced recenter on dimension change.
+  useEffect(() => {
+    scheduleRecenter()
+  }, [dimensions, scheduleRecenter])
 
   // Escape to exit fullscreen
   useEffect(() => {
@@ -620,7 +677,7 @@ export default function GraphPage() {
       )}
 
       <Card className={isFullscreen ? 'h-full rounded-none border-0' : ''}>
-        <CardContent className="p-0" ref={containerRef}>
+        <CardContent className="p-0" ref={setContainerRef}>
           <Suspense fallback={<div className="flex h-[60vh] items-center justify-center text-sm text-muted-foreground">{t('graph.loading')}</div>}>
           <ForceGraph2D<GraphNodeData, { relation_type: string }>
             ref={fgRef}
