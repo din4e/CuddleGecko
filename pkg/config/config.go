@@ -40,8 +40,9 @@ type CaptchaConfig struct {
 
 // ServerConfig holds HTTP server settings.
 type ServerConfig struct {
-	Port int
-	Mode string
+	Port      int
+	Mode      string
+	AvatarDir string
 }
 
 // DatabaseConfig holds database connection settings.
@@ -83,6 +84,7 @@ func Load() (*Config, error) {
 	// Defaults
 	v.SetDefault("server.port", 8080)
 	v.SetDefault("server.mode", "debug")
+	v.SetDefault("server.avatar_dir", "./data/avatars")
 
 	v.SetDefault("database.driver", "sqlite")
 	v.SetDefault("database.sqlite_path", "./data/cuddlegecko.db")
@@ -120,8 +122,9 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Server: ServerConfig{
-			Port: v.GetInt("server.port"),
-			Mode: v.GetString("server.mode"),
+			Port:      v.GetInt("server.port"),
+			Mode:      v.GetString("server.mode"),
+			AvatarDir: v.GetString("server.avatar_dir"),
 		},
 		Database: DatabaseConfig{
 			Driver:     v.GetString("database.driver"),
