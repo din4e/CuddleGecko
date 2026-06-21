@@ -91,9 +91,43 @@ export default function ContactDetailPage() {
   }
 
   // Mini relationship graph data
-  const graphContainerRef = useRef<HTMLDivElement>(null)
+  const graphContainerRef = useRef<HTMLDivElement | null>(null)
+  const resizeObserverRef = useRef<ResizeObserver | null>(null)
   const fgRef = useRef<ForceGraphMethods<MiniGraphNode, MiniGraphLink> | undefined>(undefined)
   const [graphDims, setGraphDims] = useState({ width: 600, height: 400 })
+
+  const measureGraph = useCallback(() => {
+    const el = graphContainerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const width = Math.max(200, Math.floor(rect.width))
+    const height = Math.max(300, Math.floor(rect.height))
+    setGraphDims((prev) => (prev.width === width && prev.height === height ? prev : { width, height }))
+  }, [])
+
+  // Callback ref: fires when the graph container mounts/unmounts (i.e. when the
+  // graph tab is activated). Lets us attach ResizeObserver at the right time,
+  // since the container doesn't exist on initial mount when the user is on the
+  // interactions tab.
+  const setGraphContainerRef = useCallback((el: HTMLDivElement | null) => {
+    graphContainerRef.current = el
+    resizeObserverRef.current?.disconnect()
+    resizeObserverRef.current = null
+    if (!el) return
+    measureGraph()
+    const ro = new ResizeObserver(measureGraph)
+    ro.observe(el)
+    resizeObserverRef.current = ro
+  }, [measureGraph])
+
+  useEffect(() => {
+    window.addEventListener('resize', measureGraph)
+    return () => {
+      window.removeEventListener('resize', measureGraph)
+      resizeObserverRef.current?.disconnect()
+      resizeObserverRef.current = null
+    }
+  }, [measureGraph])
   const miniGraphData = useMemo(() => {
     if (!contact) return { nodes: [], links: [] }
     const connectedIds = new Set<number>()
@@ -115,20 +149,6 @@ export default function ContactDetailPage() {
     return { nodes, links }
   }, [contact, relations, allContacts])
 
-  // Resize observer for graph container
-  useEffect(() => {
-    const el = graphContainerRef.current
-    if (!el) return
-    const update = () => {
-      const rect = el.getBoundingClientRect()
-      setGraphDims({ width: Math.floor(rect.width), height: Math.max(300, Math.floor(rect.width * 0.6)) })
-    }
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
   // Edit contact dialog
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', nickname: '', emails: [] as string[], phones: [] as string[], birthday: '', notes: '', relationship_labels: [] as string[], avatar_emoji: '', avatar_url: '' })
@@ -146,6 +166,9 @@ export default function ContactDetailPage() {
   // Relation dialog
   const [relDialog, setRelDialog] = useState(false)
   const [relForm, setRelForm] = useState({ contact_ids: [] as number[], relation_type: '' })
+
+  // Delete confirmation
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!contactId) return
@@ -208,7 +231,6 @@ export default function ContactDetailPage() {
     loadData()
   }
 
-  const [deleteOpen, setDeleteOpen] = useState(false)
   const handleDeleteContact = () => setDeleteOpen(true)
   const handleConfirmDeleteContact = async () => {
     await contactsApi.delete(contact.id)
@@ -452,7 +474,7 @@ export default function ContactDetailPage() {
             <p className="text-muted-foreground text-center py-8">{t('contacts.noRelations')}</p>
           ) : (
             <Card>
-              <CardContent className="p-2" ref={graphContainerRef}>
+              <CardContent className="p-2 h-[60vh] min-h-[300px]" ref={setGraphContainerRef}>
                 <Suspense fallback={<div className="h-48 flex items-center justify-center text-sm text-muted-foreground">{t('graph.loading')}</div>}>
                 <ForceGraph2D<MiniGraphNodeData, { relation_type: string }>
                   ref={fgRef}
