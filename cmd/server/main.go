@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/din4e/cuddlegecko/internal/handler"
 	"github.com/din4e/cuddlegecko/internal/mcp"
@@ -59,8 +61,18 @@ func main() {
 	// MCP Server
 	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc)
 
+	// Ensure avatar directory exists
+	avatarDir := cfg.Server.AvatarDir
+	if err := os.MkdirAll(avatarDir, 0o755); err != nil {
+		log.Fatalf("Failed to create avatar dir %s: %v", avatarDir, err)
+	}
+	avatarAbs, err := filepath.Abs(avatarDir)
+	if err != nil {
+		log.Fatalf("Failed to resolve avatar dir: %v", err)
+	}
+
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, "./data/avatars", cfg.AI)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI)
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)

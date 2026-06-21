@@ -25,6 +25,7 @@ type Handlers struct {
 	AI          *AIHandler
 	Workspace   *WorkspaceHandler
 	Export      *ExportHandler
+	avatarDir   string
 }
 
 func NewHandlers(
@@ -59,6 +60,7 @@ func NewHandlers(
 		AI:          NewAIHandler(aiSvc, aiCfg),
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
 		Export:      NewExportHandler(exportSvc),
+		avatarDir:   uploadDir,
 	}
 }
 
@@ -68,7 +70,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 	// Serve uploaded avatar images with path traversal protection
 	avatars := r.Group("/avatars")
 	avatars.Use(middleware.StaticPathCheck())
-	avatars.Static("/", "./data/avatars")
+	avatars.Static("/", h.avatarDir)
 
 	api := r.Group("/api")
 	{

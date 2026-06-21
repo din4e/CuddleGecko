@@ -9,7 +9,7 @@ import (
 type Workspace struct {
 	ID          uint           `gorm:"primaryKey" json:"id"`
 	Name        string         `gorm:"size:100;not null" json:"name"`
-	Description string         `gorm:"type:text" json:"description"`
+	Description string         `gorm:"type:longtext" json:"description"`
 	Icon        string         `gorm:"size:50" json:"icon"`
 	OwnerID     uint           `gorm:"index;not null" json:"owner_id"`
 	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`

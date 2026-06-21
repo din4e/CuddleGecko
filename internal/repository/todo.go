@@ -51,7 +51,7 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, status *string, p
 	}
 	offset := (page - 1) * pageSize
 
-	if err := query.Order("due_time ASC NULLS LAST, created_at DESC").
+	if err := query.Order("due_time IS NULL, due_time ASC, created_at DESC").
 		Limit(pageSize).Offset(offset).
 		Find(&todos).Error; err != nil {
 		return nil, 0, fmt.Errorf("list todos: %w", err)

@@ -25,7 +25,19 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		}
 		db, err = gorm.Open(sqlite.Open(cfg.SQLitePath), &gorm.Config{})
 	case "mysql":
-		db, err = gorm.Open(mysql.Open(cfg.MySQLDSN), &gorm.Config{})
+		// Retry — MySQL may report healthy via mysqladmin before it fully accepts
+		// connections, and `depends_on: service_healthy` in compose doesn't fully
+		// cover that gap.
+		for attempt := 1; ; attempt++ {
+			db, err = gorm.Open(mysql.Open(cfg.MySQLDSN), &gorm.Config{})
+			if err == nil {
+				break
+			}
+			if attempt >= 10 {
+				return nil, fmt.Errorf("open mysql after %d attempts: %w", attempt, err)
+			}
+			time.Sleep(time.Second)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported database driver: %s", cfg.Driver)
 	}
