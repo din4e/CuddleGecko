@@ -24,7 +24,7 @@ A local-first, self-hosted personal CRM with network graph visualization.
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Go 1.24, Gin, GORM, SQLite/MySQL |
+| Backend | Go 1.25, Gin, GORM, SQLite/MySQL |
 | Frontend | Vite, React 19, TypeScript, Tailwind CSS v4, shadcn/ui |
 | Testing (Go) | testify, httptest |
 | Testing (JS) | Vitest, @testing-library/react, jsdom |
@@ -37,6 +37,8 @@ A local-first, self-hosted personal CRM with network graph visualization.
 
 ## Quick Start
 
+### Dev mode (SQLite, two terminals)
+
 ```bash
 # Backend (port 8080)
 go run ./cmd/server
@@ -46,6 +48,33 @@ cd web && npm install && npm run dev
 ```
 
 Open http://127.0.0.1:5173 and register an account.
+
+### Docker Compose (MySQL + nginx, production-style)
+
+Requires Docker with Compose v2.
+
+```bash
+cp .env.example .env
+# Edit .env: set MYSQL_* passwords and generate CG_JWT_SECRET (>= 32 chars)
+#   openssl rand -hex 32
+
+docker compose build       # ~3-5 min the first time (Go build + npm ci + Vite build)
+docker compose up -d
+```
+
+Services:
+
+| Service | Image | Notes |
+|---------|-------|-------|
+| `mysql` | `mysql:8.0` | Named volume `mysql_data`, healthchecked, not exposed to host |
+| `app` | built from `Dockerfile` | CGO-enabled Go binary, not exposed to host |
+| `web` | built from `web/Dockerfile` | nginx serving baked `dist/` (no bind-mount), exposed on host port `80` |
+
+nginx reverse-proxies `/api/` and `/avatars/` to `app:8080`; all other routes fall back to the SPA. `proxy_buffering off` on `/api/` keeps AI chat streaming token-by-token.
+
+Browse `http://<host>/` and register. Re-deploying the frontend requires `docker compose build web` since `dist/` is baked into the image.
+
+Persisted state lives in the `mysql_data` and `avatar_data` named volumes. `docker compose down -v` wipes both.
 
 ## Project Structure
 
@@ -59,10 +88,13 @@ internal/
   mcp/              # MCP server (JSON-RPC 2.0, Streamable HTTP transport)
 pkg/
   config/           # Viper config loading (YAML + env vars)
-  database/         # GORM init (SQLite/MySQL)
+  database/         # GORM init (SQLite/MySQL, MySQL connect retry)
   llm/              # OpenAI-compatible LLM streaming client
   middleware/        # JWT auth, CORS, workspace auth
   response/         # Unified JSON response helpers
+Dockerfile          # Multi-stage Go build (CGO + debian-slim runtime)
+docker-compose.yml  # mysql + app + web stack
+.env.example        # Template for compose env
 web/src/
   api/              # Axios client + domain modules + dual-mode adapters
   components/       # UI components (shadcn/ui + GeckoIcon)
@@ -171,14 +203,18 @@ The MCP endpoint is protected by JWT auth and requires a workspace context. Conf
 server:
   port: 8080
   mode: debug
+  avatar_dir: ./data/avatars
 database:
-  driver: sqlite
+  driver: sqlite           # sqlite | mysql
   sqlite_path: ./data/cuddlegecko.db
-  mysql_dsn: ""
+  mysql_dsn: ""            # user:pass@tcp(host:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local
 jwt:
-  secret: "your-secret-key"
+  secret: "your-secret-key"   # must be >= 32 chars
   access_ttl: 15m
   refresh_ttl: 168h
+captcha:
+  enabled: true
+  length: 4
 ai:
   provider_type: ""    # e.g. deepseek, openai
   api_key: ""
@@ -186,7 +222,7 @@ ai:
   base_url: ""
 ```
 
-Environment variables with `CG_` prefix: `CG_SERVER_PORT`, `CG_DATABASE_DRIVER`, `CG_AI_API_KEY`, `CG_AI_MODEL`, etc.
+Environment variables with `CG_` prefix (dots become underscores): `CG_SERVER_PORT`, `CG_SERVER_AVATAR_DIR`, `CG_DATABASE_DRIVER`, `CG_DATABASE_MYSQL_DSN`, `CG_CAPTCHA_ENABLED`, `CG_AI_API_KEY`, `CG_AI_MODEL`, etc.
 
 The AI configuration can be set via environment variables and acts as a fallback when no AI provider is activated in the database.
 
