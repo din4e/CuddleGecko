@@ -1,0 +1,39 @@
+# === Build context for the root Dockerfile (Go server) ===
+# The frontend has its own Dockerfile under web/, built via the `web` service
+# in docker-compose.yml with a separate context.
+
+# Frontend directory — not needed to build the Go server binary
+web
+
+# Local data and dev artifacts
+/data
+/build
+/tmp
+*.exe
+*.db
+
+# Local config — keep developer secrets out of images
+config.yaml
+.env
+.env.*
+
+# Other binaries (only cmd/server is built in the Dockerfile)
+cmd/seed
+cmd/seed-stress
+cmd/migrate
+
+# Git
+.git
+.gitignore
+
+# IDE / editor
+.vscode
+.idea
+
+# Plans / scratch
+.claude
+
+# Docker compose files don't belong inside the image
+docker-compose.yml
+Dockerfile
+.dockerignore

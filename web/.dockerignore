@@ -1,0 +1,14 @@
+# Don't leak local node_modules into the build context — the Dockerfile runs
+# `npm ci` itself, so the host's installed deps are both wasteful and risky
+# (platform mismatch between host and container).
+node_modules
+dist
+
+# Local dev-only files
+.env
+.env.*
+
+# Editor / OS noise
+.vscode
+.idea
+.DS_Store
