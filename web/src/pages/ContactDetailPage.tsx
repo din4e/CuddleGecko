@@ -27,7 +27,6 @@ import EmojiPicker from '../components/EmojiPicker'
 import BuddyPicker from '../components/BuddyPicker'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { labelColors, presetLabelKeys, getNodeLabelColor } from '../lib/constants'
-import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof ForceGraph2DType
 

@@ -89,6 +89,12 @@ function renderPage() {
 describe('TodosPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    })
     mockedList.mockResolvedValue(mockPage<Todo>([]))
     mockedContactsList.mockResolvedValue(mockAxios<PaginatedData<Contact>>({ items: [], total: 0, page: 1, page_size: 100 }))
   })

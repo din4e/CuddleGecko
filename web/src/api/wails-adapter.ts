@@ -4,7 +4,6 @@ import type {
   GraphData, AuthResponse, User, Tag, Event, Transaction, TransactionSummary,
   AIProvider, AIConversation, AIMessage, AIProviderPreset, Workspace, Todo,
 } from '@/types'
-import { bindings } from '@/wailsjs/go/models'
 
 // Wails bindings are generated at build time by `wails dev` or `wails build`.
 // Imports reference the generated wailsjs directory which may not exist in web-only builds.
