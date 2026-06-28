@@ -42,6 +42,8 @@ declare module '@/wailsjs/go/bindings/*' {
   export const SyncToEvent: (...args: any[]) => Promise<any>
   export const Switch: (...args: any[]) => Promise<any>
   export const GetDefault: (...args: any[]) => Promise<any>
+  export const Check: (...args: any[]) => Promise<any>
+  export const Apply: (...args: any[]) => Promise<any>
 }
 
 declare namespace bindings {

@@ -95,6 +95,14 @@ export interface AIAdapter {
   chat(conversationId: number, message: string): Promise<string>
 }
 
+export interface UpdateInfo {
+  current: string
+  latest: string
+  has_update: boolean
+  url: string
+  notes?: string
+}
+
 export interface DesktopAdapter {
   version(): Promise<string>
   platform(): Promise<string>
@@ -102,6 +110,8 @@ export interface DesktopAdapter {
   dataDir(): Promise<string>
   databasePath(): Promise<string>
   openDataDir(): Promise<void>
+  checkUpdate(): Promise<UpdateInfo>
+  applyUpdate(): Promise<UpdateInfo>
 }
 
 export interface WorkspaceAdapter {

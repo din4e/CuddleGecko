@@ -426,6 +426,14 @@ async function createWailsAdapters(): Promise<AppAdapters> {
       dataDir: () => DesktopDataDir(),
       databasePath: () => DesktopDatabasePath(),
       openDataDir: () => DesktopOpenDataDir().then(() => {}),
+      checkUpdate: async () => {
+        const { Check } = await import('@/wailsjs/go/bindings/UpdaterBinding')
+        return Check()
+      },
+      applyUpdate: async () => {
+        const { Apply } = await import('@/wailsjs/go/bindings/UpdaterBinding')
+        return Apply()
+      },
     },
 
     workspace: {
