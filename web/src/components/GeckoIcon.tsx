@@ -22,7 +22,7 @@ export default function GeckoIcon({ className = '', size = 32, cute = false }: G
       viewBox="0 0 64 64"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={cn('shrink-0 overflow-visible', className)}
+      className={cn('shrink-0 overflow-visible', cute && 'animate-cg-bob', className)}
       aria-hidden
     >
       <defs>

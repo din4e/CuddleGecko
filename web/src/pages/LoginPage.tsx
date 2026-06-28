@@ -7,15 +7,17 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import { Sparkles } from 'lucide-react'
-import GeckoIcon from '../components/GeckoIcon'
+import { AlertCircle, Loader2, Sparkles } from 'lucide-react'
 import { BrandWordmark } from '../components/BrandWordmark'
 import { AuthScaffold } from '../components/AuthScaffold'
+import { CaptchaField } from '../components/auth/CaptchaField'
+import { PasswordInput } from '../components/auth/PasswordInput'
 
 export default function LoginPage() {
   const { t } = useTranslation()
-  const [username, setUsername] = useState('')
+  const [username, setUsername] = useState(() => localStorage.getItem('remember_username') || '')
   const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(() => !!localStorage.getItem('remember_username'))
   const [error, setError] = useState('')
   const [captchaEnabled, setCaptchaEnabled] = useState(false)
   const [captchaId, setCaptchaId] = useState('')
@@ -45,6 +47,8 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (remember) localStorage.setItem('remember_username', username)
+    else localStorage.removeItem('remember_username')
     try {
       await login(username, password, captchaEnabled ? { captcha_id: captchaId, captcha_answer: captchaAnswer } : undefined)
       navigate('/')
@@ -56,10 +60,10 @@ export default function LoginPage() {
 
   return (
     <AuthScaffold>
-      <Card className="w-full max-w-sm rounded-3xl border border-primary/15 bg-card/95 shadow-xl shadow-primary/10 backdrop-blur-sm dark:border-primary/25 dark:shadow-black/30">
+      <Card className="w-full max-w-sm rounded-3xl border border-primary/15 bg-card/95 shadow-xl shadow-primary/10 backdrop-blur-sm animate-cg-card-in dark:border-primary/25 dark:shadow-black/30">
         <CardHeader className="gap-2.5 pb-2 text-center">
           <div className="mx-auto flex justify-center">
-            <GeckoIcon size={48} cute className="-translate-y-px" />
+            <img src="/icon.png" alt="" width={64} height={64} className="animate-cg-bob" />
           </div>
           <CardTitle className="text-center">
             <BrandWordmark label={t('app.name')} />
@@ -72,8 +76,9 @@ export default function LoginPage() {
         <CardContent className="pt-0">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <p className="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
-                {error}
+              <p role="alert" className="flex items-center justify-center gap-2 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
+                <AlertCircle className="size-4 shrink-0" aria-hidden />
+                <span>{error}</span>
               </p>
             )}
             <div className="space-y-2">
@@ -82,34 +87,39 @@ export default function LoginPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">{t('auth.password')}</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+              <PasswordInput
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                showLabel={t('auth.showPassword')}
+                hideLabel={t('auth.hidePassword')}
+              />
             </div>
+            <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="size-4 rounded border-input accent-primary"
+              />
+              {t('auth.rememberMe')}
+            </label>
             {captchaEnabled && captchaImage && (
-              <div className="space-y-2">
-                <Label htmlFor="captcha-answer">{t('auth.captcha')}</Label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={loadCaptcha}
-                    aria-label={t('auth.captchaRefresh')}
-                    title={t('auth.captchaRefresh')}
-                    className="h-10 rounded border cursor-pointer overflow-hidden p-0 bg-transparent"
-                  >
-                    <img src={captchaImage} alt="" className="h-10 block" />
-                  </button>
-                  <Input
-                    id="captcha-answer"
-                    value={captchaAnswer}
-                    onChange={(e) => setCaptchaAnswer(e.target.value)}
-                    required
-                    placeholder={t('auth.captchaPlaceholder')}
-                    className="flex-1"
-                    autoComplete="off"
-                  />
-                </div>
-              </div>
+              <CaptchaField
+                image={captchaImage}
+                answer={captchaAnswer}
+                onAnswerChange={setCaptchaAnswer}
+                onRefresh={loadCaptcha}
+                labelText={t('auth.captcha')}
+                placeholder={t('auth.captchaPlaceholder')}
+                imageAlt={t('auth.captchaImage')}
+                refreshLabel={t('auth.captchaRefresh')}
+              />
             )}
             <Button type="submit" className="h-10 w-full rounded-2xl shadow-md shadow-primary/25" disabled={isLoading}>
+              {isLoading && <Loader2 className="size-4 animate-spin" />}
               {isLoading ? t('auth.signingIn') : t('auth.signIn')}
             </Button>
             <p className="text-center text-sm text-muted-foreground">

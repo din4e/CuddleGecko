@@ -130,3 +130,31 @@
     @apply font-sans;
     }
 }
+
+/* —— Auth page motion（可爱微动效；prefers-reduced-motion 下关闭）—— */
+@keyframes cg-blob {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -10px, 0) scale(1.05); }
+}
+@keyframes cg-card-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes cg-gecko-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.animate-cg-blob { animation: cg-blob 16s ease-in-out infinite; }
+.animate-cg-blob-slow { animation: cg-blob 22s ease-in-out infinite; }
+.animate-cg-card-in { animation: cg-card-in 0.45s ease-out both; }
+.animate-cg-bob { animation: cg-gecko-bob 3.6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-cg-blob,
+  .animate-cg-blob-slow,
+  .animate-cg-card-in,
+  .animate-cg-bob {
+    animation: none;
+  }
+}
