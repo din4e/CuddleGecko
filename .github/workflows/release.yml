@@ -1,0 +1,90 @@
+# Release pipeline for the Wails desktop app.
+#
+# On a `v*` tag push, builds CuddleGecko for Windows / Linux / macOS and uploads
+# per-platform archives to the matching GitHub Release. Archives follow go-selfupdate's
+# naming convention ({cmd}_{os}_{arch}.{ext}, containing an executable named {cmd}),
+# which the in-app updater (desktop/bindings/updater.go) consumes via DetectLatest /
+# UpdateSelf.
+#
+# NOTE: validate on the first real tag push — cross-platform Wails builds and the
+# macOS .app / Linux webkit deps are the usual sources of tweaks.
+
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (tag without leading v is fine)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows/amd64
+            asset: CuddleGecko_windows_amd64.exe.zip
+          - os: ubuntu-latest
+            platform: linux/amd64
+            asset: CuddleGecko_linux_amd64.tar.gz
+          - os: macos-latest
+            platform: darwin/universal
+            asset: CuddleGecko_darwin_universal.tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      # Wails v2 Linux build needs GTK / WebKit headers.
+      - name: Install Linux deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev pkg-config
+
+      - name: Build frontend
+        run: cd web && npm ci && npm run build
+
+      - name: Build desktop app
+        env:
+          VERSION: ${{ github.event.inputs.version || github.ref_name }}
+        run: wails build -platform ${{ matrix.platform }} -ldflags "-X github.com/din4e/cuddlegecko/internal/version.Version=$VERSION"
+
+      - name: Package (windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: Compress-Archive -Path build/bin/CuddleGecko.exe -DestinationPath ${{ matrix.asset }}
+
+      - name: Package (linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: tar -czf ${{ matrix.asset }} -C build/bin CuddleGecko
+
+      # macOS: archive the bare executable from inside the .app bundle.
+      - name: Package (macos)
+        if: matrix.os == 'macos-latest'
+        run: tar -czf ${{ matrix.asset }} -C build/bin/CuddleGecko.app/Contents/MacOS CuddleGecko
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset }}
+          generate_release_notes: true
