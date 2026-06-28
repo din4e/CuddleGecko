@@ -72,6 +72,7 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		&model.AIProvider{},
 		&model.AIConversation{},
 		&model.AIMessage{},
+		&model.Setting{},
 	); err != nil {
 		return nil, fmt.Errorf("auto migrate: %w", err)
 	}

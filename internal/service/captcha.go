@@ -2,8 +2,10 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"image"
 	"image/color"
@@ -19,31 +21,118 @@ import (
 
 const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
+const captchaSettingKey = "captcha"
+
+// CaptchaSettingsStore persists the captcha configuration (DB-backed).
+// repository.SettingRepo implements it; nil disables persistence.
+type CaptchaSettingsStore interface {
+	Get(ctx context.Context, key string) (value string, found bool, err error)
+	Set(ctx context.Context, key, value string) error
+}
+
 type captchaEntry struct {
 	answer    string
 	expiresAt time.Time
 }
 
 type CaptchaService struct {
-	cfg     config.CaptchaConfig
-	store   sync.Map
+	cfg      config.CaptchaConfig
+	entries  sync.Map
+	settings CaptchaSettingsStore
+	mu       sync.RWMutex
+	enabled  bool
+	length   int
 }
 
-func NewCaptchaService(cfg config.CaptchaConfig) *CaptchaService {
-	cs := &CaptchaService{cfg: cfg}
+func NewCaptchaService(cfg config.CaptchaConfig, store CaptchaSettingsStore) *CaptchaService {
+	cs := &CaptchaService{
+		cfg:      cfg,
+		settings: store,
+		enabled:  cfg.Enabled,
+		length:   sanitizeLength(cfg.Length),
+	}
+	if store != nil {
+		cs.loadOrInit(context.Background())
+	}
 	go cs.cleanup()
 	return cs
 }
 
+// loadOrInit loads captcha config from the store, or seeds it from cfg defaults.
+func (s *CaptchaService) loadOrInit(ctx context.Context) {
+	val, found, err := s.settings.Get(ctx, captchaSettingKey)
+	if err != nil || !found {
+		s.persist(ctx)
+		return
+	}
+	var c struct {
+		Enabled bool `json:"enabled"`
+		Length  int  `json:"length"`
+	}
+	if json.Unmarshal([]byte(val), &c) == nil {
+		s.mu.Lock()
+		s.enabled = c.Enabled
+		s.length = sanitizeLength(c.Length)
+		s.mu.Unlock()
+	}
+}
+
+func (s *CaptchaService) persist(ctx context.Context) {
+	s.mu.RLock()
+	c := struct {
+		Enabled bool `json:"enabled"`
+		Length  int  `json:"length"`
+	}{Enabled: s.enabled, Length: s.length}
+	s.mu.RUnlock()
+	if b, err := json.Marshal(c); err == nil {
+		_ = s.settings.Set(ctx, captchaSettingKey, string(b))
+	}
+}
+
+// GetConfig returns the live captcha configuration.
+func (s *CaptchaService) GetConfig() (enabled bool, length int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.enabled, s.length
+}
+
+// SetConfig updates the live captcha configuration and persists it.
+func (s *CaptchaService) SetConfig(ctx context.Context, enabled bool, length int) error {
+	s.mu.Lock()
+	s.enabled = enabled
+	s.length = sanitizeLength(length)
+	s.mu.Unlock()
+	if s.settings != nil {
+		s.persist(ctx)
+	}
+	return nil
+}
+
+func sanitizeLength(n int) int {
+	if n < 4 {
+		return 4
+	}
+	if n > 8 {
+		return 8
+	}
+	return n
+}
+
 func (s *CaptchaService) Enabled() bool {
-	return s.cfg.Enabled
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.enabled
 }
 
 func (s *CaptchaService) Generate() (id string, imageBase64 string, err error) {
-	answer := s.randomText(s.cfg.Length)
+	s.mu.RLock()
+	length := s.length
+	s.mu.RUnlock()
+
+	answer := s.randomText(length)
 	id = s.randomText(16)
 
-	s.store.Store(strings.ToLower(id), captchaEntry{
+	s.entries.Store(strings.ToLower(id), captchaEntry{
 		answer:    strings.ToLower(answer),
 		expiresAt: time.Now().Add(5 * time.Minute),
 	})
@@ -59,12 +148,15 @@ func (s *CaptchaService) Generate() (id string, imageBase64 string, err error) {
 }
 
 func (s *CaptchaService) Verify(id string, answer string) bool {
-	if !s.cfg.Enabled {
+	s.mu.RLock()
+	enabled := s.enabled
+	s.mu.RUnlock()
+	if !enabled {
 		return true
 	}
 
 	key := strings.ToLower(id)
-	val, ok := s.store.LoadAndDelete(key)
+	val, ok := s.entries.LoadAndDelete(key)
 	if !ok {
 		return false
 	}
@@ -246,10 +338,10 @@ func (s *CaptchaService) cleanup() {
 	defer ticker.Stop()
 	for range ticker.C {
 		now := time.Now()
-		s.store.Range(func(key, value any) bool {
+		s.entries.Range(func(key, value any) bool {
 			entry := value.(captchaEntry)
 			if now.After(entry.expiresAt) {
-				s.store.Delete(key)
+				s.entries.Delete(key)
 			}
 			return true
 		})
