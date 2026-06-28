@@ -30,7 +30,6 @@ import {
   Bot,
   Menu,
 } from 'lucide-react'
-import GeckoIcon from '../components/GeckoIcon'
 import { BrandWordmark } from '../components/BrandWordmark'
 import DesktopMenuListener from '../components/DesktopMenuListener'
 import WindowTitleBar from '../components/WindowTitleBar'
@@ -143,7 +142,7 @@ export default function AppLayout() {
       >
         <header className={cn('mb-4 w-full min-w-0', sidebarCollapsed && 'flex justify-center')}>
           <h1 className={cn('flex min-w-0 items-center gap-2.5', sidebarCollapsed && 'justify-center')}>
-            <GeckoIcon size={28} className="shrink-0" />
+            <img src="/icon.png" alt="" width={28} height={28} className="shrink-0" />
             {!sidebarCollapsed && (
               <BrandWordmark
                 label={t('app.name')}
