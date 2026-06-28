@@ -1,0 +1,7 @@
+# These files are executed or parsed inside Linux containers (shell scripts,
+# nginx configs, Dockerfile). They MUST keep LF line endings. A Windows
+# checkout with core.autocrlf=true would otherwise convert them to CRLF and
+# break `#!/bin/sh` in the container. eol=lf overrides autocrlf for these paths.
+*.sh           text eol=lf
+web/conf/*     text eol=lf
+web/Dockerfile text eol=lf
