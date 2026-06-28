@@ -7,10 +7,11 @@ import { Label } from '../components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { setBaseURL } from '../api/client'
-import { Download, Upload, Monitor, Globe, Network, Bot, CheckCircle, Loader2, Settings2, Cable, Copy } from 'lucide-react'
+import { Download, Upload, Monitor, Globe, Network, Bot, CheckCircle, Loader2, Settings2, Cable, Copy, ShieldCheck, ExternalLink, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { useGraphSettings } from '../stores/graphSettings'
 import { isWailsRuntime } from '../lib/wails'
+import { settingsApi, type CaptchaConfig } from '../api/settings'
 import type { AIProvider, AIProviderPreset } from '../types'
 
 const PROVIDER_ICONS: Record<string, string> = {
@@ -35,6 +36,21 @@ function ProviderIcon({ type, size = 24 }: { type: string; size?: number }) {
       style={{ minWidth: size, minHeight: size }}
     />
   )
+}
+
+// Current app version (web fallback; keep in sync with Git tags / package.json).
+const APP_VERSION = '0.1.0'
+
+// Returns >0 if a>b, <0 if a<b, 0 if equal (simple numeric semver, ignores pre-release).
+function compareVersions(a: string, b: string): number {
+  const pa = a.replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0)
+  const pb = b.replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0)
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0)
+    if (d !== 0) return d
+  }
+  return 0
 }
 
 export default function SettingsPage() {
@@ -68,6 +84,10 @@ export default function SettingsPage() {
   const [testingId, setTestingId] = useState<number | null>(null)
   const [envAI, setEnvAI] = useState<{ configured: boolean; provider_type: string; model: string; base_url: string } | null>(null)
   const [mcpCopied, setMcpCopied] = useState(false)
+  const [captchaCfg, setCaptchaCfg] = useState<CaptchaConfig | null>(null)
+  const [captchaSaving, setCaptchaSaving] = useState(false)
+  const [update, setUpdate] = useState<{ status: 'idle' | 'checking' | 'latest' | 'available' | 'error'; latest?: string; url?: string }>({ status: 'idle' })
+  const [applying, setApplying] = useState(false)
 
   const loadAIProviders = useCallback(async () => {
     if (!adapters?.ai) return
@@ -98,6 +118,66 @@ export default function SettingsPage() {
     adapters.desktop.dataDir().then(d => setDesktopDataDir(d))
     adapters.desktop.databasePath().then(d => setDesktopDbPath(d))
   }, [adapters?.desktop])
+
+  // Load captcha config (web mode only — served by the backend)
+  useEffect(() => {
+    if (isWails) return
+    settingsApi.getCaptcha().then(setCaptchaCfg).catch(() => {})
+  }, [isWails])
+
+  // Check for a newer release (Wails updater binding on desktop, GitHub API on web).
+  const handleCheckUpdate = useCallback(async () => {
+    setUpdate({ status: 'checking' })
+    try {
+      if (isWails && adapters?.desktop) {
+        const info = await adapters.desktop.checkUpdate()
+        if (info.has_update) {
+          setUpdate({ status: 'available', latest: info.latest, url: info.url })
+        } else {
+          setUpdate({ status: 'latest', latest: info.latest })
+        }
+        return
+      }
+      // Web: GitHub releases API
+      const res = await fetch('https://api.github.com/repos/din4e/CuddleGecko/releases/latest')
+      if (res.status === 404) {
+        setUpdate({ status: 'latest' })
+        return
+      }
+      if (!res.ok) throw new Error('GitHub API ' + res.status)
+      const data = await res.json()
+      const latest = String(data.tag_name || '').replace(/^v/, '')
+      const current = (desktopVersion || APP_VERSION).replace(/^v/, '')
+      if (latest && compareVersions(latest, current) > 0) {
+        setUpdate({ status: 'available', latest, url: data.html_url as string })
+      } else {
+        setUpdate({ status: 'latest', latest })
+      }
+    } catch {
+      setUpdate({ status: 'error' })
+    }
+  }, [isWails, adapters?.desktop, desktopVersion])
+
+  // Desktop: download + apply the latest release, replacing the running binary.
+  const handleApplyUpdate = async () => {
+    if (!adapters?.desktop) return
+    setApplying(true)
+    try {
+      await adapters.desktop.applyUpdate()
+      toast.success(t('settings.updateApplied'))
+      setUpdate({ status: 'idle' })
+    } catch {
+      toast.error(t('settings.updateApplyFailed'))
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  // Auto-check once on mount.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    handleCheckUpdate()
+  }, [handleCheckUpdate])
 
   const handleModeChange = (newMode: 'local' | 'remote') => {
     setMode(newMode)
@@ -146,6 +226,20 @@ export default function SettingsPage() {
       }
     }
     input.click()
+  }
+
+  const handleSaveCaptcha = async () => {
+    if (!captchaCfg) return
+    setCaptchaSaving(true)
+    try {
+      const updated = await settingsApi.updateCaptcha({ enabled: captchaCfg.enabled, length: captchaCfg.length })
+      setCaptchaCfg(updated)
+      toast.success(t('settings.captchaSaved'))
+    } catch {
+      toast.error(t('settings.captchaSaveFailed'))
+    } finally {
+      setCaptchaSaving(false)
+    }
   }
 
   const handleSaveAIProvider = async () => {
@@ -283,6 +377,49 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Captcha Settings (web mode only) */}
+      {!isWails && captchaCfg && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5" />
+              {t('settings.captchaTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <label className="flex cursor-pointer select-none items-center justify-between gap-4">
+              <span>
+                <span className="font-medium">{t('settings.captchaEnable')}</span>
+                <p className="text-sm text-muted-foreground">{t('settings.captchaEnableDesc')}</p>
+              </span>
+              <input
+                type="checkbox"
+                checked={captchaCfg.enabled}
+                onChange={(e) => setCaptchaCfg({ ...captchaCfg, enabled: e.target.checked })}
+                className="size-4 rounded border-input accent-primary"
+              />
+            </label>
+            <div className="space-y-2">
+              <Label>{t('settings.captchaLength')} ({captchaCfg.length})</Label>
+              <input
+                type="range"
+                min={4}
+                max={8}
+                step={1}
+                value={captchaCfg.length}
+                onChange={(e) => setCaptchaCfg({ ...captchaCfg, length: Number(e.target.value) })}
+                className="w-full accent-primary"
+              />
+            </div>
+            <Button size="sm" onClick={handleSaveCaptcha} disabled={captchaSaving}>
+              {captchaSaving && <Loader2 className="size-4 animate-spin" />}
+              {t('settings.captchaSave')}
+            </Button>
+            <p className="text-xs text-muted-foreground">{t('settings.captchaHint')}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* AI Provider Settings */}
       <Card>
@@ -540,10 +677,58 @@ export default function SettingsPage() {
           <CardTitle>{t('settings.about')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2 text-sm text-muted-foreground">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex justify-between">
               <span>{t('settings.version')}</span>
-              <span>v{desktopVersion || '0.1.0'}</span>
+              <span>v{desktopVersion || APP_VERSION}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>{t('settings.author')}</span>
+              <a
+                href="https://github.com/din4e"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-foreground transition-colors hover:text-primary"
+              >
+                <ExternalLink className="size-3.5" />
+                din4e
+              </a>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>{t('settings.repository')}</span>
+              <a
+                href="https://github.com/din4e/CuddleGecko"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-foreground transition-colors hover:text-primary"
+              >
+                <ExternalLink className="size-3.5" />
+                GitHub
+              </a>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={handleCheckUpdate} disabled={update.status === 'checking'}>
+                {update.status === 'checking' ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+                {t('settings.checkUpdate')}
+              </Button>
+              {update.status === 'latest' && (
+                <span className="text-xs text-muted-foreground">{t('settings.updateLatest')}</span>
+              )}
+              {update.status === 'available' && update.url && (
+                <a href={update.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                  {t('settings.updateAvailable', { version: update.latest })} →
+                </a>
+              )}
+              {update.status === 'available' && isWails && (
+                <Button variant="outline" size="sm" onClick={handleApplyUpdate} disabled={applying}>
+                  {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+                  {t('settings.applyUpdate')}
+                </Button>
+              )}
+              {update.status === 'error' && (
+                <span className="text-xs text-destructive">{t('settings.updateError')}</span>
+              )}
             </div>
             {isWails && mode === 'local' && desktopPlatform && (
               <div className="flex justify-between">
@@ -570,6 +755,11 @@ export default function SettingsPage() {
                 </Button>
               </div>
             )}
+            </div>
+            <div className="flex shrink-0 flex-col items-center gap-2 self-center sm:self-start">
+              <img src="/wechat-qr.jpg" alt={t('settings.wechatQr')} className="size-32 rounded-lg border bg-white object-contain p-1.5" />
+              <span className="text-xs">{t('settings.wechatQr')}</span>
+            </div>
           </div>
         </CardContent>
       </Card>
