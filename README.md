@@ -35,6 +35,23 @@ A local-first, self-hosted personal CRM with network graph visualization.
 | Terminal | xterm.js |
 | AI Icons | @lobehub/icons-static-svg (CDN) |
 
+## Brand Icon
+
+The app icon is `web/public/icon.png` (a square PNG, ~1254×1254). It's used as:
+
+- the browser **favicon** and **apple-touch-icon** (`web/index.html`),
+- the logo on the **login / register** pages and the **sidebar** (`<img src="/icon.png">` in `AuthScaffold`, `LoginPage`, `RegisterPage`, `AppLayout`).
+
+To replace it: drop a new `icon.png` into `web/public/`, then rebuild the frontend:
+
+```bash
+docker compose build web && docker compose up -d web
+```
+
+The favicon link carries a `?v=` cache-buster in `web/index.html` — bump it when you ship a new icon so browsers refetch. Browsers cache favicons aggressively, so a hard reload (Ctrl+Shift+R) or an incognito window may be needed to see the new one.
+
+> The About card also shows a WeChat official-account QR code (`web/public/wechat-qr.jpg`); replace it the same way.
+
 ## Quick Start
 
 ### Dev mode (SQLite, two terminals)
@@ -156,7 +173,7 @@ pkg/
   llm/              # OpenAI-compatible LLM streaming client
   middleware/        # JWT auth, CORS, workspace auth
   response/         # Unified JSON response helpers
-Dockerfile          # Multi-stage Go build (CGO + debian-slim runtime)
+Dockerfile          # Multi-stage Go build (CGO + alpine runtime)
 docker-compose.yml  # mysql + app + web stack
 .env.example        # Template for compose env
 web/src/
