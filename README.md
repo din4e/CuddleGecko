@@ -76,6 +76,70 @@ Browse `http://<host>/` and register. Re-deploying the frontend requires `docker
 
 Persisted state lives in the `mysql_data` and `avatar_data` named volumes. `docker compose down -v` wipes both.
 
+## 启用 HTTPS（SSL）
+
+TLS 在 `web`（nginx）容器终止，由 `.env` 控制，支持三种证书来源。移动端（iOS/Android）默认只信任公网 CA 签发的证书。
+
+### 1. 自签名（内网 / 无域名，最快）
+```bash
+# .env
+SSL_ENABLED=true
+SSL_MODE=selfsigned
+SSL_DOMAIN=your.host.or.ip
+SSL_EXTRA_DOMAINS=192.168.31.4     # 可选，附加 SAN（多域名/内网IP）
+SSL_USE_CA=false                    # true=生成本地根CA再签发，移动端只需信任一个根证书
+```
+```bash
+docker compose up -d --build
+```
+移动端需手动信任：`SSL_USE_CA=true` 时导出根 CA 再导入一次即可——
+```bash
+docker compose exec web cat /etc/nginx/certs/ca.crt > ca.crt
+# iOS：AirDrop/邮件发送 ca.crt → 设置→已下载描述文件→安装→关于本机→证书信任设置→启用
+# Android：设置→安全→加密与凭据→安装证书→CA 证书
+```
+
+### 2. Let's Encrypt（有公网域名，移动端零配置）
+```bash
+# .env
+SSL_ENABLED=true
+SSL_MODE=letsencrypt
+SSL_DOMAIN=app.example.com
+SSL_EMAIL=you@example.com
+SSL_LE_CHALLENGE=webroot     # 公网服务器，80 可达
+# 内网/NAT/无公网80 → 用 DNS-01（需 DNS 提供商 API）：
+#   SSL_LE_CHALLENGE=dns
+#   SSL_LE_DNS_PROVIDER=dns_cf   # 并设置 CF_Token / CF_Account_Id 等环境变量（见 acme.sh 文档）
+```
+首次签发容器会自动引导（webroot）或直接签发（dns），之后每 12h 自动续期并 reload。
+先用 staging 测试（不消耗正式额度，签发的是不被信任的测试证书）：
+```bash
+SSL_LE_STAGING=true   # 测试成功后改回 false 重新部署
+```
+
+### 3. 自带证书（manual）
+把已有证书放到 `${SSL_CERT_DIR}`（默认 `./data/certs`），命名 `fullchain.pem` 与 `privkey.pem`：
+```bash
+# .env
+SSL_ENABLED=true
+SSL_MODE=manual
+```
+
+### 切换证书模式 / 更换证书
+容器仅在**启动时**读取证书。改了 `.env` 或替换了 `./data/certs` 下的证书后，必须重建 `web` 容器才会生效（仅删除证书文件不会影响正在运行的容器）：
+```bash
+docker compose up -d --force-recreate web
+```
+
+### 关闭 SSL
+```bash
+SSL_ENABLED=false   # 纯 HTTP，行为同未启用 SSL
+```
+
+> HSTS（`SSL_HSTS=true`，默认开）会让浏览器强制 HTTPS，近乎不可逆，仅长期 HTTPS 部署建议开启。
+>
+> 自签名 / manual 证书下 nginx 启动会出现一条 `ssl_stapling ... issuer certificate not found` 警告（OCSP stapling 对无独立颁发者的证书自动禁用），属正常现象，不影响服务。Let's Encrypt / 公网 CA 证书无此警告。
+
 ## Project Structure
 
 ```

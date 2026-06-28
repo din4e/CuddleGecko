@@ -45,7 +45,32 @@ services:
       - app
     ports:
       - "80:80"
+      - "443:443"   # SSL_ENABLED=false → no :443 server block → connection refused (no side effect)
+    environment:
+      SSL_ENABLED: ${SSL_ENABLED:-false}
+      SSL_MODE: ${SSL_MODE:-selfsigned}
+      SSL_DOMAIN: ${SSL_DOMAIN:-}
+      SSL_EXTRA_DOMAINS: ${SSL_EXTRA_DOMAINS:-}
+      SSL_EMAIL: ${SSL_EMAIL:-}
+      SSL_CERT_DIR: /etc/nginx/certs
+      SSL_LE_CHALLENGE: ${SSL_LE_CHALLENGE:-webroot}
+      SSL_LE_DNS_PROVIDER: ${SSL_LE_DNS_PROVIDER:-}
+      SSL_USE_CA: ${SSL_USE_CA:-false}
+      SSL_HSTS: ${SSL_HSTS:-true}
+      SSL_LE_STAGING: ${SSL_LE_STAGING:-false}
+      # DNS-01 provider credentials (only needed when SSL_LE_CHALLENGE=dns).
+      # Cloudflare and Aliyun are pre-wired; for other acme.sh DNS providers, add
+      # their env vars here (e.g. DP_Id/DP_Key, GD_Key/GD_Secret, …) and set them in .env.
+      CF_Token: ${CF_Token:-}
+      CF_Account_Id: ${CF_Account_Id:-}
+      CF_Zone_ID: ${CF_Zone_ID:-}
+      Ali_Key: ${Ali_Key:-}
+      Ali_Secret: ${Ali_Secret:-}
+    volumes:
+      - ${SSL_CERT_DIR:-./data/certs}:/etc/nginx/certs
+      - acme_data:/root/.acme.sh
 
 volumes:
   mysql_data:
   avatar_data:
+  acme_data:
