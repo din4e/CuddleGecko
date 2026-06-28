@@ -32,6 +32,7 @@ var (
 	Desktop     = &DesktopBinding{}
 	Workspace   = &WorkspaceBinding{}
 	Todo        = &TodoBinding{}
+	Updater     = &UpdaterBinding{}
 )
 
 func InitBindings(

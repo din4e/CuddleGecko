@@ -5,12 +5,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/din4e/cuddlegecko/internal/version"
 )
 
 type DesktopBinding struct{}
 
 func (b *DesktopBinding) Version() string {
-	return "0.1.0"
+	return version.Version
 }
 
 func (b *DesktopBinding) Platform() string {

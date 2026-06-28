@@ -42,6 +42,7 @@ func Run(assets embed.FS) {
 			bindings.Desktop,
 			bindings.Workspace,
 			bindings.Todo,
+			bindings.Updater,
 		},
 	})
 	if err != nil {
