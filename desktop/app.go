@@ -58,11 +58,12 @@ func (a *App) startup(ctx context.Context) {
 	transactionRepo := repository.NewTransactionRepo(db)
 	aiRepo := repository.NewAIRepo(db)
 	workspaceRepo := repository.NewWorkspaceRepo(db)
+	settingRepo := repository.NewSettingRepo(db)
 
 	// Services
 	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
 	authSvc := service.NewAuthService(userRepo, &cfg.JWT, workspaceSvc)
-	captchaSvc := service.NewCaptchaService(cfg.Captcha)
+	captchaSvc := service.NewCaptchaService(cfg.Captcha, settingRepo)
 	contactSvc := service.NewContactService(contactRepo)
 	tagSvc := service.NewTagService(tagRepo)
 	interactionSvc := service.NewInteractionService(interactionRepo)
