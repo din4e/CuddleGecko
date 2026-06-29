@@ -37,18 +37,22 @@ A local-first, self-hosted personal CRM with network graph visualization.
 
 ## Brand Icon
 
-The app icon is `web/public/icon.png` (a square PNG, ~1254×1254). It's used as:
+The app ships **two** square PNGs in `web/public/` (~1254×1254):
 
-- the browser **favicon** and **apple-touch-icon** (`web/index.html`),
-- the logo on the **login / register** pages and the **sidebar** (`<img src="/icon.png">` in `AuthScaffold`, `LoginPage`, `RegisterPage`, `AppLayout`).
+- `icon.png` — light background, shown in the **light** theme,
+- `icon_dark.png` — dark background, shown in the **dark** theme.
 
-To replace it: drop a new `icon.png` into `web/public/`, then rebuild the frontend:
+In-app logos (the **sidebar** header and the **login / register** pages in `LoginPage`, `RegisterPage`, `AppLayout`) render through a single `<BrandIcon>` component (`web/src/components/BrandIcon.tsx`). It stacks both images and uses Tailwind's `dark:hidden` / `hidden dark:block` to show exactly one based on the `dark` class on `<html>` — no JS needed, it follows the theme toggle automatically.
+
+The browser-tab **favicon** and **apple-touch-icon** can't be themed with CSS, so `setupBrandFaviconSync()` (`web/src/lib/brandIcon.ts`, wired up in `web/src/main.tsx`) watches the `dark` class via a `MutationObserver` and swaps the `<link rel="icon">` / `<link rel="apple-touch-icon">` `href` between the two files — so the tab icon follows the **app's** theme toggle, not just the OS preference.
+
+To replace the icons: drop new `icon.png` / `icon_dark.png` into `web/public/`, bump the `?v=` cache-buster on the favicon links in `web/index.html`, then rebuild the frontend:
 
 ```bash
 docker compose build web && docker compose up -d web
 ```
 
-The favicon link carries a `?v=` cache-buster in `web/index.html` — bump it when you ship a new icon so browsers refetch. Browsers cache favicons aggressively, so a hard reload (Ctrl+Shift+R) or an incognito window may be needed to see the new one.
+Browsers cache favicons aggressively, so a hard reload (Ctrl+Shift+R) or an incognito window may be needed to see a new one.
 
 > The About card also shows a WeChat official-account QR code (`web/public/wechat-qr.jpg`); replace it the same way.
 

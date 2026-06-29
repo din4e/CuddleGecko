@@ -9,6 +9,7 @@ import { Label } from '../components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { AlertCircle, Loader2, Sparkles } from 'lucide-react'
 import { BrandWordmark } from '../components/BrandWordmark'
+import BrandIcon from '../components/BrandIcon'
 import { AuthScaffold } from '../components/AuthScaffold'
 import { CaptchaField } from '../components/auth/CaptchaField'
 import { PasswordInput } from '../components/auth/PasswordInput'
@@ -61,7 +62,7 @@ export default function RegisterPage() {
       <Card className="w-full max-w-sm rounded-3xl border border-primary/15 bg-card/95 shadow-xl shadow-primary/10 backdrop-blur-sm animate-cg-card-in dark:border-primary/25 dark:shadow-black/30">
         <CardHeader className="gap-2.5 pb-2 text-center">
           <div className="mx-auto flex justify-center">
-            <img src="/icon.png" alt="" width={64} height={64} className="animate-cg-bob" />
+            <BrandIcon size={64} className="animate-cg-bob" />
           </div>
           <CardTitle className="text-center">
             <BrandWordmark label={t('app.name')} />
