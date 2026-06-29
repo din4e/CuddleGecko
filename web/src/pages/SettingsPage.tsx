@@ -7,11 +7,13 @@ import { Label } from '../components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { setBaseURL } from '../api/client'
-import { Download, Upload, Monitor, Globe, Network, Bot, CheckCircle, Loader2, Settings2, Cable, Copy, ShieldCheck, ExternalLink, RefreshCw } from 'lucide-react'
+import { Download, Upload, Monitor, Globe, Network, Bot, CheckCircle, Loader2, Settings2, Cable, Copy, ShieldCheck, ExternalLink, RefreshCw, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { useGraphSettings } from '../stores/graphSettings'
 import { isWailsRuntime } from '../lib/wails'
 import { settingsApi, type CaptchaConfig } from '../api/settings'
+import { CUSTOMIZABLE_NAV } from '../lib/nav'
+import { useNavConfigStore } from '../stores/navConfig'
 import type { AIProvider, AIProviderPreset } from '../types'
 
 const PROVIDER_ICONS: Record<string, string> = {
@@ -88,6 +90,10 @@ export default function SettingsPage() {
   const [captchaSaving, setCaptchaSaving] = useState(false)
   const [update, setUpdate] = useState<{ status: 'idle' | 'checking' | 'latest' | 'available' | 'error'; latest?: string; url?: string }>({ status: 'idle' })
   const [applying, setApplying] = useState(false)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const navOrder = useNavConfigStore((s) => s.order)
+  const navHidden = useNavConfigStore((s) => s.hidden)
+  const setNavConfig = useNavConfigStore((s) => s.setConfig)
 
   const loadAIProviders = useCallback(async () => {
     if (!adapters?.ai) return
@@ -171,6 +177,38 @@ export default function SettingsPage() {
     } finally {
       setApplying(false)
     }
+  }
+
+  const orderedNavItems = [...CUSTOMIZABLE_NAV].sort((a, b) => {
+    const ia = navOrder.indexOf(a.to)
+    const ib = navOrder.indexOf(b.to)
+    return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib)
+  })
+
+  const persistNav = async (cfg: { order: string[]; hidden: string[] }) => {
+    setNavConfig(cfg)
+    try {
+      await settingsApi.updateNav(cfg)
+    } catch {
+      toast.error(t('settings.navSaveFailed'))
+    }
+  }
+
+  const handleNavDrop = async (targetIdx: number) => {
+    if (dragIndex === null || dragIndex === targetIdx) {
+      setDragIndex(null)
+      return
+    }
+    const next = [...navOrder]
+    const [moved] = next.splice(dragIndex, 1)
+    next.splice(targetIdx, 0, moved)
+    setDragIndex(null)
+    await persistNav({ order: next, hidden: navHidden })
+  }
+
+  const toggleNavVisible = async (to: string) => {
+    const hidden = navHidden.includes(to) ? navHidden.filter((x) => x !== to) : [...navHidden, to]
+    await persistNav({ order: navOrder, hidden })
   }
 
   // Auto-check once on mount.
@@ -671,13 +709,78 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Sidebar Navigation (web mode only) */}
+      {!isWails && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <GripVertical className="h-5 w-5" />
+              {t('settings.navTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{t('settings.navHint')}</p>
+            <div className="space-y-1">
+              {orderedNavItems.map((item, idx) => {
+                const Icon = item.icon
+                const visible = !navHidden.includes(item.to)
+                return (
+                  <div
+                    key={item.to}
+                    draggable
+                    onDragStart={() => setDragIndex(idx)}
+                    onDragOver={(e) => { e.preventDefault() }}
+                    onDrop={() => void handleNavDrop(idx)}
+                    className="flex items-center gap-2 rounded-md border bg-card px-2 py-1.5 transition-colors cursor-grab hover:bg-muted/40 active:cursor-grabbing"
+                  >
+                    <GripVertical className="size-4 shrink-0 text-muted-foreground" />
+                    <Icon className="size-4 shrink-0 text-muted-foreground" />
+                    <span className={`flex-1 text-sm ${visible ? '' : 'text-muted-foreground/50 line-through'}`}>{t(item.label)}</span>
+                    <input
+                      type="checkbox"
+                      checked={visible}
+                      onChange={() => void toggleNavVisible(item.to)}
+                      className="size-4 rounded border-input accent-primary"
+                      aria-label={t(item.label)}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* About */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
           <CardTitle>{t('settings.about')}</CardTitle>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={handleCheckUpdate} disabled={update.status === 'checking'}>
+              {update.status === 'checking' ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+              {t('settings.checkUpdate')}
+            </Button>
+            {update.status === 'latest' && (
+              <span className="text-xs text-muted-foreground">{t('settings.updateLatest')}</span>
+            )}
+            {update.status === 'available' && update.url && (
+              <a href={update.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                {t('settings.updateAvailable', { version: update.latest })} →
+              </a>
+            )}
+            {update.status === 'available' && isWails && (
+              <Button variant="outline" size="sm" onClick={handleApplyUpdate} disabled={applying}>
+                {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+                {t('settings.applyUpdate')}
+              </Button>
+            )}
+            {update.status === 'error' && (
+              <span className="text-xs text-destructive">{t('settings.updateError')}</span>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex justify-between">
               <span>{t('settings.version')}</span>
@@ -706,29 +809,6 @@ export default function SettingsPage() {
                 <ExternalLink className="size-3.5" />
                 GitHub
               </a>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Button variant="outline" size="sm" onClick={handleCheckUpdate} disabled={update.status === 'checking'}>
-                {update.status === 'checking' ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-                {t('settings.checkUpdate')}
-              </Button>
-              {update.status === 'latest' && (
-                <span className="text-xs text-muted-foreground">{t('settings.updateLatest')}</span>
-              )}
-              {update.status === 'available' && update.url && (
-                <a href={update.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                  {t('settings.updateAvailable', { version: update.latest })} →
-                </a>
-              )}
-              {update.status === 'available' && isWails && (
-                <Button variant="outline" size="sm" onClick={handleApplyUpdate} disabled={applying}>
-                  {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-                  {t('settings.applyUpdate')}
-                </Button>
-              )}
-              {update.status === 'error' && (
-                <span className="text-xs text-destructive">{t('settings.updateError')}</span>
-              )}
             </div>
             {isWails && mode === 'local' && desktopPlatform && (
               <div className="flex justify-between">
