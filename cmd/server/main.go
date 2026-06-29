@@ -43,6 +43,7 @@ func main() {
 	aiRepo := repository.NewAIRepo(db)
 	workspaceRepo := repository.NewWorkspaceRepo(db)
 	settingRepo := repository.NewSettingRepo(db)
+	userSettingRepo := repository.NewUserSettingRepo(db)
 
 	// Services
 	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
@@ -58,6 +59,7 @@ func main() {
 	transactionSvc := service.NewTransactionService(transactionRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
 	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo)
+	userSettingSvc := service.NewUserSettingService(userSettingRepo)
 
 	// MCP Server
 	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc)
@@ -73,7 +75,7 @@ func main() {
 	}
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc)
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)

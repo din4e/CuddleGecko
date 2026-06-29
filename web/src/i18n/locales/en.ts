@@ -316,6 +316,9 @@ export default {
     applyUpdate: 'Update now',
     updateApplied: 'Updated — restart the app to finish',
     updateApplyFailed: 'Update failed',
+    navTitle: 'Sidebar Navigation',
+    navHint: 'Drag to reorder. Uncheck to hide an item.',
+    navSaveFailed: 'Failed to save nav layout',
   },
   workspace: {
     default: 'Default Space',

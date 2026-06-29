@@ -316,6 +316,9 @@ export default {
     applyUpdate: '立即更新',
     updateApplied: '更新已下载，重启应用后生效',
     updateApplyFailed: '更新失败',
+    navTitle: '侧栏导航',
+    navHint: '拖拽可排序，取消勾选可隐藏。',
+    navSaveFailed: '保存导航布局失败',
   },
   workspace: {
     default: '默认空间',

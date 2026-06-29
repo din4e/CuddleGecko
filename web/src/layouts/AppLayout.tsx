@@ -36,6 +36,9 @@ import DesktopMenuListener from '../components/DesktopMenuListener'
 import WindowTitleBar from '../components/WindowTitleBar'
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher'
 import { cn } from '@/lib/utils'
+import { useNavConfigStore } from '../stores/navConfig'
+import { CUSTOMIZABLE_PATHS } from '../lib/nav'
+import { isWailsRuntime } from '../lib/wails'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed'
 
@@ -66,6 +69,10 @@ export default function AppLayout() {
     () => typeof window !== 'undefined' && localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1',
   )
   const [mobileOpen, setMobileOpen] = useState(false)
+  const isWails = isWailsRuntime()
+  const navOrder = useNavConfigStore((s) => s.order)
+  const navHidden = useNavConfigStore((s) => s.hidden)
+  const loadNav = useNavConfigStore((s) => s.load)
 
   const toggleSidebar = () => {
     if (isMobileViewport()) {
@@ -93,6 +100,11 @@ export default function AppLayout() {
     document.documentElement.style.colorScheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
   }, [])
 
+  // Load per-user nav layout (web mode only).
+  useEffect(() => {
+    if (!isWails) loadNav()
+  }, [loadNav, isWails])
+
   useEffect(() => {
     const onResize = () => {
       if (!isMobileViewport()) {
@@ -116,6 +128,19 @@ export default function AppLayout() {
 
   const username = user?.username?.trim() || ''
   const initial = username ? username[0].toUpperCase() : '?'
+
+  const renderedNav = [
+    ...navKeys.filter((n) => n.to === '/' || n.to === '/buddies'),
+    ...navKeys
+      .filter((n) => CUSTOMIZABLE_PATHS.has(n.to))
+      .sort((a, b) => {
+        const ia = navOrder.indexOf(a.to)
+        const ib = navOrder.indexOf(b.to)
+        return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib)
+      })
+      .filter((n) => !navHidden.includes(n.to)),
+    ...navKeys.filter((n) => n.to === '/settings'),
+  ]
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -157,7 +182,7 @@ export default function AppLayout() {
         </header>
 
         <nav className={cn('flex-1 space-y-1', sidebarCollapsed && 'flex w-full flex-col items-center')}>
-          {navKeys.map(({ to, label, icon: Icon }) => (
+          {renderedNav.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}

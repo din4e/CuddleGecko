@@ -25,6 +25,7 @@ type Handlers struct {
 	AI          *AIHandler
 	Workspace   *WorkspaceHandler
 	Export      *ExportHandler
+	UserSetting *UserSettingHandler
 	avatarDir   string
 }
 
@@ -44,6 +45,7 @@ func NewHandlers(
 	exportSvc *service.ExportService,
 	uploadDir string,
 	aiCfg config.AIConfig,
+	userSettingSvc *service.UserSettingService,
 ) *Handlers {
 	return &Handlers{
 		Auth:        NewAuthHandler(authSvc, captchaSvc),
@@ -61,6 +63,7 @@ func NewHandlers(
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
 		Export:      NewExportHandler(exportSvc),
 		avatarDir:   uploadDir,
+		UserSetting: NewUserSettingHandler(userSettingSvc),
 	}
 }
 
@@ -92,6 +95,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			// Captcha configuration (global, not workspace-scoped)
 			protected.GET("/settings/captcha", h.Captcha.GetConfig)
 			protected.PUT("/settings/captcha", h.Captcha.UpdateConfig)
+			protected.GET("/settings/nav", h.UserSetting.GetNav)
+			protected.PUT("/settings/nav", h.UserSetting.UpdateNav)
 
 			// Workspace management (no workspace context needed)
 			protected.GET("/workspaces", h.Workspace.List)
