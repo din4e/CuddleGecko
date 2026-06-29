@@ -8,7 +8,7 @@
     <title>web</title>
     <script>
       (function () {
-        const saved = localStorage.getItem('app-theme')
+        const saved = localStorage.getItem('theme')
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
         if (saved === 'dark' || (!saved && prefersDark)) {
           document.documentElement.classList.add('dark')
