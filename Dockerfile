@@ -9,6 +9,8 @@ WORKDIR /app
 RUN apk add --no-cache gcc musl-dev
 
 COPY go.mod go.sum ./
+# Use a CN-accessible mirror first; proxy.golang.org can be flaky on some networks.
+ENV GOPROXY=https://goproxy.cn,https://proxy.golang.org,direct
 RUN go mod download
 
 COPY . .
