@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../stores/auth'
 import { Button } from '../components/ui/button'
+import BrandIcon from '../components/BrandIcon'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -142,7 +143,7 @@ export default function AppLayout() {
       >
         <header className={cn('mb-4 w-full min-w-0', sidebarCollapsed && 'flex justify-center')}>
           <h1 className={cn('flex min-w-0 items-center gap-2.5', sidebarCollapsed && 'justify-center')}>
-            <img src="/icon.png" alt="" width={28} height={28} className="shrink-0" />
+            <BrandIcon size={28} />
             {!sidebarCollapsed && (
               <BrandWordmark
                 label={t('app.name')}

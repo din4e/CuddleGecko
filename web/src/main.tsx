@@ -5,11 +5,14 @@ import './index.css'
 import './i18n'
 import App from './App.tsx'
 import { useWorkspaceStore } from './stores/workspace'
+import { setupBrandFaviconSync } from './lib/brandIcon'
 
 const theme = localStorage.getItem('theme')
 if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
   document.documentElement.classList.add('dark')
 }
+
+setupBrandFaviconSync()
 
 const queryClient = new QueryClient({
   defaultOptions: {
