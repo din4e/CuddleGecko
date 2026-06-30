@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo, useDeferredValue } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useModeStore } from '../stores/mode'
-import { isWailsRuntime } from '../lib/wails'
 import { nextMessageId } from '../lib/id'
 import type { AIConversation, AIMessage, Contact, Event, Tag } from '../types'
 import { Button } from '../components/ui/button'
@@ -64,7 +63,6 @@ export default function AIChatPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const mentionRef = useRef<HTMLDivElement>(null)
   const mentionDataLoadedRef = useRef(false)
-  const isWails = isWailsRuntime()
 
   const createLocalMessage = useCallback((conversationId: number, role: AIMessage['role'], content: string): AIMessage => ({
     id: nextMessageId(),
@@ -287,11 +285,7 @@ export default function AIChatPage() {
     setStreamContent('')
 
     try {
-      if (isWails) {
-        const result = await adapters.ai.chat(convId, text)
-        setMessages((prev) => [...prev, createLocalMessage(convId, 'assistant', result)])
-      } else {
-        const token = localStorage.getItem('access_token')
+      const token = localStorage.getItem('access_token')
         const resp = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -317,7 +311,6 @@ export default function AIChatPage() {
         }
 
         setMessages((prev) => [...prev, createLocalMessage(convId, 'assistant', fullContent)])
-      }
     } catch {
       setMessages((prev) => [...prev, createLocalMessage(convId, 'assistant', t('ai.sendFailed'))])
     } finally {
@@ -373,7 +366,7 @@ export default function AIChatPage() {
 
   return (
     <div className="flex flex-1 min-h-0">
-      <div className={`shrink-0 flex flex-col border-r bg-card transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-12' : 'w-52'}`}>
+      <div className={`shrink-0 flex flex-col bg-card transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-12' : 'w-52'}`}>
         <div className={`flex items-center gap-1 border-b ${sidebarCollapsed ? 'justify-center px-1 py-1.5' : 'px-2 py-2'}`}>
           {!sidebarCollapsed && (
             <Button onClick={handleNewChat} className="flex-1 justify-center gap-1.5 h-7 text-xs" size="sm">
@@ -454,7 +447,7 @@ export default function AIChatPage() {
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 bg-background">
-        <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+        <div className="flex items-center justify-between gap-2 px-3 py-2">
           <div className="min-w-0">
             <h1 className="text-sm font-medium">{t('ai.title')}</h1>
             <p className="truncate text-xs text-muted-foreground">{t('ai.placeholder')}</p>
@@ -521,7 +514,7 @@ export default function AIChatPage() {
           )}
         </div>
 
-        <div className="border-t">
+        <div>
           {mentions.length > 0 ? (
             <div className="flex flex-wrap items-center gap-1 px-3 pt-2 pb-1">
               {mentions.map((m) => (
@@ -578,31 +571,6 @@ export default function AIChatPage() {
               </button>
             </div>
           )}
-
-          <div className="flex flex-wrap gap-1 px-3 pt-1.5 pb-1">
-            {(['contact', 'event', 'tag'] as const).map((tab) => {
-              const Icon = TAB_ICONS[tab]
-              return (
-                <button
-                  key={tab}
-                  type="button"
-                  className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  onClick={() => triggerMention(tab)}
-                >
-                  <Icon className="h-2.5 w-2.5" />
-                  @{t(`ai.${TAB_I18N[tab]}`)}
-                </button>
-              )
-            })}
-            <button
-              type="button"
-              className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              onClick={addFinanceMention}
-            >
-              <Wallet className="h-2.5 w-2.5" />
-              {t('ai.financialInsight')}
-            </button>
-          </div>
 
           <div className="relative px-2 pb-2" ref={mentionRef}>
             {mentionPopup && (

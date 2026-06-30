@@ -6,11 +6,9 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
-import { setBaseURL } from '../api/client'
-import { Download, Upload, Monitor, Globe, Network, Bot, CheckCircle, Loader2, Settings2, Cable, Copy, ShieldCheck, ExternalLink, RefreshCw, GripVertical } from 'lucide-react'
+import { Download, Upload, Network, Bot, CheckCircle, Loader2, Settings2, Cable, Copy, ShieldCheck, ExternalLink, RefreshCw, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { useGraphSettings } from '../stores/graphSettings'
-import { isWailsRuntime } from '../lib/wails'
 import { settingsApi, type CaptchaConfig } from '../api/settings'
 import { CUSTOMIZABLE_NAV } from '../lib/nav'
 import { useNavConfigStore } from '../stores/navConfig'
@@ -57,24 +55,12 @@ function compareVersions(a: string, b: string): number {
 
 export default function SettingsPage() {
   const { t } = useTranslation()
-  const mode = useModeStore((s) => s.mode)
-  const remoteUrl = useModeStore((s) => s.remoteUrl)
   const adapters = useModeStore((s) => s.adapters)
-  const setMode = useModeStore((s) => s.setMode)
-  const setRemoteUrl = useModeStore((s) => s.setRemoteUrl)
-  const [urlInput, setUrlInput] = useState(remoteUrl)
-  const isWails = isWailsRuntime()
   const nodeRadius = useGraphSettings((s) => s.nodeRadius)
   const emojiSize = useGraphSettings((s) => s.emojiSize)
   const setNodeRadius = useGraphSettings((s) => s.setNodeRadius)
   const setEmojiSize = useGraphSettings((s) => s.setEmojiSize)
   const resetGraphSettings = useGraphSettings((s) => s.reset)
-
-  // Desktop info
-  const [desktopVersion, setDesktopVersion] = useState('')
-  const [desktopPlatform, setDesktopPlatform] = useState('')
-  const [desktopDataDir, setDesktopDataDir] = useState('')
-  const [desktopDbPath, setDesktopDbPath] = useState('')
 
   // AI provider state
   const [presets, setPresets] = useState<AIProviderPreset[]>([])
@@ -89,7 +75,6 @@ export default function SettingsPage() {
   const [captchaCfg, setCaptchaCfg] = useState<CaptchaConfig | null>(null)
   const [captchaSaving, setCaptchaSaving] = useState(false)
   const [update, setUpdate] = useState<{ status: 'idle' | 'checking' | 'latest' | 'available' | 'error'; latest?: string; url?: string }>({ status: 'idle' })
-  const [applying, setApplying] = useState(false)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const navOrder = useNavConfigStore((s) => s.order)
   const navHidden = useNavConfigStore((s) => s.hidden)
@@ -116,35 +101,15 @@ export default function SettingsPage() {
     loadAIProviders()
   }, [loadAIProviders])
 
-  // Load desktop info
+  // Load captcha config (served by the backend)
   useEffect(() => {
-    if (!adapters?.desktop) return
-    adapters.desktop.version().then(v => setDesktopVersion(v))
-    adapters.desktop.platform().then(p => setDesktopPlatform(p))
-    adapters.desktop.dataDir().then(d => setDesktopDataDir(d))
-    adapters.desktop.databasePath().then(d => setDesktopDbPath(d))
-  }, [adapters?.desktop])
-
-  // Load captcha config (web mode only — served by the backend)
-  useEffect(() => {
-    if (isWails) return
     settingsApi.getCaptcha().then(setCaptchaCfg).catch(() => {})
-  }, [isWails])
+  }, [])
 
-  // Check for a newer release (Wails updater binding on desktop, GitHub API on web).
+  // Check for a newer release via the GitHub releases API.
   const handleCheckUpdate = useCallback(async () => {
     setUpdate({ status: 'checking' })
     try {
-      if (isWails && adapters?.desktop) {
-        const info = await adapters.desktop.checkUpdate()
-        if (info.has_update) {
-          setUpdate({ status: 'available', latest: info.latest, url: info.url })
-        } else {
-          setUpdate({ status: 'latest', latest: info.latest })
-        }
-        return
-      }
-      // Web: GitHub releases API
       const res = await fetch('https://api.github.com/repos/din4e/CuddleGecko/releases/latest')
       if (res.status === 404) {
         setUpdate({ status: 'latest' })
@@ -153,7 +118,7 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error('GitHub API ' + res.status)
       const data = await res.json()
       const latest = String(data.tag_name || '').replace(/^v/, '')
-      const current = (desktopVersion || APP_VERSION).replace(/^v/, '')
+      const current = APP_VERSION.replace(/^v/, '')
       if (latest && compareVersions(latest, current) > 0) {
         setUpdate({ status: 'available', latest, url: data.html_url as string })
       } else {
@@ -162,22 +127,7 @@ export default function SettingsPage() {
     } catch {
       setUpdate({ status: 'error' })
     }
-  }, [isWails, adapters?.desktop, desktopVersion])
-
-  // Desktop: download + apply the latest release, replacing the running binary.
-  const handleApplyUpdate = async () => {
-    if (!adapters?.desktop) return
-    setApplying(true)
-    try {
-      await adapters.desktop.applyUpdate()
-      toast.success(t('settings.updateApplied'))
-      setUpdate({ status: 'idle' })
-    } catch {
-      toast.error(t('settings.updateApplyFailed'))
-    } finally {
-      setApplying(false)
-    }
-  }
+  }, [])
 
   const orderedNavItems = [...CUSTOMIZABLE_NAV].sort((a, b) => {
     const ia = navOrder.indexOf(a.to)
@@ -216,20 +166,6 @@ export default function SettingsPage() {
   useEffect(() => {
     handleCheckUpdate()
   }, [handleCheckUpdate])
-
-  const handleModeChange = (newMode: 'local' | 'remote') => {
-    setMode(newMode)
-    if (newMode === 'remote') {
-      setBaseURL(remoteUrl)
-    }
-  }
-
-  const handleSaveUrl = () => {
-    const url = urlInput.replace(/\/+$/, '')
-    setRemoteUrl(url)
-    setBaseURL(url)
-    toast.success(t('settings.saveUrl'))
-  }
 
   const handleExport = async () => {
     if (!adapters) return
@@ -326,63 +262,6 @@ export default function SettingsPage() {
         <h2 className="text-2xl font-bold">{t('settings.title')}</h2>
       </div>
 
-      {/* Connection Mode */}
-      {isWails && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('settings.connectionMode')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={() => handleModeChange('local')}
-                className={`flex flex-col items-start gap-1 rounded-lg border-2 p-4 text-left transition-colors ${
-                  mode === 'local'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted hover:border-muted-foreground/30'
-                }`}
-              >
-                <div className="flex items-center gap-2 font-medium">
-                  <Monitor className="h-4 w-4" />
-                  {t('settings.localMode')}
-                </div>
-                <p className="text-sm text-muted-foreground">{t('settings.localModeDesc')}</p>
-              </button>
-              <button
-                onClick={() => handleModeChange('remote')}
-                className={`flex flex-col items-start gap-1 rounded-lg border-2 p-4 text-left transition-colors ${
-                  mode === 'remote'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted hover:border-muted-foreground/30'
-                }`}
-              >
-                <div className="flex items-center gap-2 font-medium">
-                  <Globe className="h-4 w-4" />
-                  {t('settings.remoteMode')}
-                </div>
-                <p className="text-sm text-muted-foreground">{t('settings.remoteModeDesc')}</p>
-              </button>
-            </div>
-
-            {mode === 'remote' && (
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Label>{t('settings.serverUrl')}</Label>
-                  <Input
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="http://localhost:8080"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={handleSaveUrl} size="sm">{t('settings.saveUrl')}</Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       {/* Data Management */}
       <Card>
         <CardHeader>
@@ -416,8 +295,8 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Captcha Settings (web mode only) */}
-      {!isWails && captchaCfg && (
+      {/* Captcha Settings */}
+      {captchaCfg && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -709,8 +588,8 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Sidebar Navigation (web mode only) */}
-      {!isWails && (
+      {/* Sidebar Navigation */}
+      {(
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -768,12 +647,6 @@ export default function SettingsPage() {
                 {t('settings.updateAvailable', { version: update.latest })} →
               </a>
             )}
-            {update.status === 'available' && isWails && (
-              <Button variant="outline" size="sm" onClick={handleApplyUpdate} disabled={applying}>
-                {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-                {t('settings.applyUpdate')}
-              </Button>
-            )}
             {update.status === 'error' && (
               <span className="text-xs text-destructive">{t('settings.updateError')}</span>
             )}
@@ -784,7 +657,7 @@ export default function SettingsPage() {
             <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex justify-between">
               <span>{t('settings.version')}</span>
-              <span>v{desktopVersion || APP_VERSION}</span>
+              <span>v{APP_VERSION}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>{t('settings.author')}</span>
@@ -810,31 +683,6 @@ export default function SettingsPage() {
                 GitHub
               </a>
             </div>
-            {isWails && mode === 'local' && desktopPlatform && (
-              <div className="flex justify-between">
-                <span>Platform</span>
-                <span className="text-xs">{desktopPlatform}</span>
-              </div>
-            )}
-            {isWails && mode === 'local' && desktopDataDir && (
-              <div className="flex items-center justify-between gap-4">
-                <span>{t('settings.dataPath')}</span>
-                <span className="max-w-[200px] truncate text-xs" title={desktopDataDir}>{desktopDataDir}</span>
-              </div>
-            )}
-            {isWails && mode === 'local' && desktopDbPath && (
-              <div className="flex items-center justify-between gap-4">
-                <span>Database</span>
-                <span className="max-w-[200px] truncate text-xs" title={desktopDbPath}>{desktopDbPath}</span>
-              </div>
-            )}
-            {isWails && mode === 'local' && adapters?.desktop && (
-              <div className="pt-2">
-                <Button variant="outline" size="sm" onClick={() => adapters.desktop?.openDataDir()}>
-                  Open Data Folder
-                </Button>
-              </div>
-            )}
             </div>
             <div className="flex shrink-0 flex-col items-center gap-2 self-center sm:self-start">
               <img src="/wechat-qr.jpg" alt={t('settings.wechatQr')} className="size-32 rounded-lg border bg-white object-contain p-1.5" />
