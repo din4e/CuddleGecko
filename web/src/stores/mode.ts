@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { createHTTPAdapters } from '@/api/http-adapter'
 import type { AppAdapters } from '@/api/adapter'
-import { isWailsRuntime } from '@/lib/wails'
 
 type AppMode = 'local' | 'remote'
 
@@ -15,67 +14,30 @@ interface ModeState {
   initAdapters: () => Promise<void>
 }
 
-const isWails = isWailsRuntime()
-
-function readSavedMode(): AppMode {
-  const raw = localStorage.getItem('app_mode')
-  return raw === 'local' || raw === 'remote' ? raw : (isWails ? 'local' : 'remote')
-}
-
-const savedMode = readSavedMode()
 const savedUrl = localStorage.getItem('remote_url') || 'http://localhost:8080'
 
 let httpAdapters: AppAdapters | null = null
-
 function getHTTPAdapters(): AppAdapters {
-  if (!httpAdapters) {
-    httpAdapters = createHTTPAdapters()
-  }
+  if (!httpAdapters) httpAdapters = createHTTPAdapters()
   return httpAdapters
 }
 
-function getInitialAdapters(): AppAdapters | null {
-  if (savedMode === 'remote' || !isWails) {
-    return getHTTPAdapters()
-  }
-  return null
-}
-
-export const useModeStore = create<ModeState>((set, get) => ({
-  mode: savedMode,
+// Web-only build: always uses the HTTP adapter (no local Wails mode).
+export const useModeStore = create<ModeState>((set) => ({
+  mode: 'remote',
   remoteUrl: savedUrl,
-  adapters: getInitialAdapters(),
+  adapters: getHTTPAdapters(),
   adaptersLoading: false,
 
   setMode: (mode) => {
     localStorage.setItem('app_mode', mode)
-    if (mode === 'remote' || !isWails) {
-      set({ mode, adapters: getHTTPAdapters(), adaptersLoading: false })
-    } else {
-      set({ mode, adapters: null, adaptersLoading: false })
-      get().initAdapters()
-    }
+    set({ mode, adapters: getHTTPAdapters(), adaptersLoading: false })
   },
-
   setRemoteUrl: (url) => {
     localStorage.setItem('remote_url', url)
     set({ remoteUrl: url })
   },
-
   initAdapters: async () => {
-    const mode = get().mode
-    set({ adaptersLoading: true })
-
-    try {
-      if (mode === 'local' && isWails) {
-        const { createWailsAdapters } = await import('@/api/wails-adapter')
-        const adapters = await createWailsAdapters()
-        set({ adapters, adaptersLoading: false })
-      } else {
-        set({ adapters: getHTTPAdapters(), adaptersLoading: false })
-      }
-    } catch {
-      set({ adapters: getHTTPAdapters(), adaptersLoading: false })
-    }
+    set({ adapters: getHTTPAdapters(), adaptersLoading: false })
   },
 }))

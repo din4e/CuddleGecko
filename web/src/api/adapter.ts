@@ -95,25 +95,6 @@ export interface AIAdapter {
   chat(conversationId: number, message: string): Promise<string>
 }
 
-export interface UpdateInfo {
-  current: string
-  latest: string
-  has_update: boolean
-  url: string
-  notes?: string
-}
-
-export interface DesktopAdapter {
-  version(): Promise<string>
-  platform(): Promise<string>
-  arch(): Promise<string>
-  dataDir(): Promise<string>
-  databasePath(): Promise<string>
-  openDataDir(): Promise<void>
-  checkUpdate(): Promise<UpdateInfo>
-  applyUpdate(): Promise<UpdateInfo>
-}
-
 export interface WorkspaceAdapter {
   list(): Promise<Workspace[]>
   create(data: { name: string; description?: string; icon?: string }): Promise<Workspace>
@@ -145,6 +126,5 @@ export interface AppAdapters {
   todo: TodoAdapter
   transaction: TransactionAdapter
   ai: AIAdapter
-  desktop?: DesktopAdapter
   workspace: WorkspaceAdapter
 }

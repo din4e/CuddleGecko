@@ -32,13 +32,10 @@ import {
   Menu,
 } from 'lucide-react'
 import { BrandWordmark } from '../components/BrandWordmark'
-import DesktopMenuListener from '../components/DesktopMenuListener'
-import WindowTitleBar from '../components/WindowTitleBar'
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher'
 import { cn } from '@/lib/utils'
 import { useNavConfigStore } from '../stores/navConfig'
 import { CUSTOMIZABLE_PATHS } from '../lib/nav'
-import { isWailsRuntime } from '../lib/wails'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed'
 
@@ -69,7 +66,6 @@ export default function AppLayout() {
     () => typeof window !== 'undefined' && localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1',
   )
   const [mobileOpen, setMobileOpen] = useState(false)
-  const isWails = isWailsRuntime()
   const navOrder = useNavConfigStore((s) => s.order)
   const navHidden = useNavConfigStore((s) => s.hidden)
   const loadNav = useNavConfigStore((s) => s.load)
@@ -100,10 +96,10 @@ export default function AppLayout() {
     document.documentElement.style.colorScheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
   }, [])
 
-  // Load per-user nav layout (web mode only).
+  // Load per-user nav layout.
   useEffect(() => {
-    if (!isWails) loadNav()
-  }, [loadNav, isWails])
+    loadNav()
+  }, [loadNav])
 
   useEffect(() => {
     const onResize = () => {
@@ -144,8 +140,6 @@ export default function AppLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      <DesktopMenuListener />
-      <WindowTitleBar />
       <div className="flex flex-1 min-h-0">
 
       {/* Backdrop for mobile sidebar */}
