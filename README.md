@@ -8,7 +8,10 @@ A local-first, self-hosted personal CRM with network graph visualization.
 - **Interaction Timeline** — Record meetings, calls, messages per contact
 - **Smart Reminders** — Schedule follow-ups with status tracking (pending/done/snoozed)
 - **Events** — Calendar events with color coding, buddy linking, and time filters
-- **Todos** — Task management with status tracking, priority levels, three views (timeline/grouped/kanban), and sync-to-event
+- **Todos** — Task management with status tracking, priority levels, three views (timeline/grouped/kanban), sync-to-event, **sub-tasks**, **recurring tasks** (daily/weekly/monthly/yearly/weekdays), **lists/projects**, **polymorphic tags**, Markdown notes, and in-tab reminders
+- **Habits** — Daily habit check-ins with current/longest streak, 30-day completion rate, and a 5-week heatmap
+- **Pomodoro** — Focus/break timer with task linking and today/all-time focus stats
+- **Calendar** — Unified month calendar (events + due todos) and an Eisenhower (important × urgent) matrix view
 - **Finance Tracking** — Income/expense records with category, buddy linking, and summary
 - **Network Graph** — Force-directed visualization of your relationship network
 - **AI Assistant** — Multi-provider LLM chat (DeepSeek, GLM, MiniMax, Kimi, Qwen, OpenAI, custom) with CRM data context, relationship analysis, and event insights
@@ -220,11 +223,19 @@ All endpoints at `/api`:
 | GET | /graph | Network graph data |
 | GET/POST | /events | List/Create events |
 | PUT/DELETE | /events/:id | Event update/delete |
-| GET/POST | /todos | List/Create todos (status filter) |
+| GET/POST | /todos | List/Create todos (status/list_id/tag_ids/overdue filter) |
 | PUT | /todos/:id | Update todo |
-| PATCH | /todos/:id/toggle | Toggle todo status |
+| PATCH | /todos/:id/toggle | Toggle todo status (recurring todos spawn next occurrence) |
 | POST | /todos/:id/sync-event | Sync todo to event |
 | DELETE | /todos/:id | Delete todo |
+| GET/PUT | /todos/:id/tags | Get/Set todo tags |
+| GET/POST | /todos/:id/items | List/Create sub-tasks |
+| PUT/PATCH/DELETE | /todos/:id/items/:iid | Update/toggle/delete sub-task |
+| GET/POST/PUT/DELETE | /todo-lists | Todo list (project) CRUD |
+| GET/POST/PUT/DELETE | /habits | Habit CRUD |
+| POST | /habits/:id/checkin | Toggle habit check-in (?date=YYYY-MM-DD) |
+| GET | /pomodoros/summary | Today/all-time focus totals |
+| POST | /pomodoros | Record a pomodoro session |
 | GET/POST | /transactions | List/Create transactions |
 | GET | /transactions/summary | Transaction summary |
 | PUT/DELETE | /transactions/:id | Transaction update/delete |
@@ -265,13 +276,17 @@ The MCP endpoint is protected by JWT auth and requires a workspace context. Conf
 }
 ```
 
-### Available Tools (43)
+### Available Tools (53)
 
 | Category | Tools |
 |----------|-------|
 | Buddies | `list_buddies`, `get_buddy`, `create_buddy`, `update_buddy`, `delete_buddy`, `get_buddy_tags`, `set_buddy_tags` |
 | Events | `list_events`, `create_event`, `update_event`, `delete_event` |
-| Todos | `list_todos`, `create_todo`, `update_todo`, `toggle_todo`, `sync_todo_to_event`, `delete_todo` |
+| Todos | `list_todos`, `create_todo`, `update_todo`, `toggle_todo`, `sync_todo_to_event`, `set_todo_tags`, `delete_todo` |
+| Todo Lists | `list_todo_lists`, `create_todo_list`, `update_todo_list`, `delete_todo_list` |
+| Sub-tasks | `list_todo_items`, `create_todo_item`, `toggle_todo_item`, `delete_todo_item` |
+| Habits | `list_habits`, `create_habit`, `checkin_habit`, `delete_habit` |
+| Pomodoro | `record_pomodoro`, `get_pomodoro_summary` |
 | Tags | `list_tags`, `create_tag`, `update_tag`, `delete_tag` |
 | Transactions | `list_transactions`, `get_transaction_summary`, `create_transaction`, `update_transaction`, `delete_transaction` |
 | Interactions | `list_interactions`, `create_interaction`, `update_interaction`, `delete_interaction` |

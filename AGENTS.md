@@ -144,7 +144,10 @@ All at `/api`, JWT-protected except auth endpoints:
 | Relations | GET/POST /buddies/:id/relations, DELETE /:id |
 | Graph | GET /graph (nodes + edges) |
 | Events | GET/POST list/create, PUT/DELETE /:id |
-| Todos | GET/POST list/create, PUT /:id, PATCH /:id/toggle, POST /:id/sync-event, DELETE /:id |
+| Todos | GET/POST list/create (status/list_id/tag_ids/overdue filter), PUT /:id, PATCH /:id/toggle (recurring spawns next), POST /:id/sync-event, DELETE /:id; GET/PUT /:id/tags; GET/POST /:id/items, PUT/PATCH/DELETE /:id/items/:iid |
+| Todo Lists | GET/POST/PUT/DELETE /todo-lists |
+| Habits | GET/POST/PUT/DELETE /habits, POST /:id/checkin?date= |
+| Pomodoro | GET /pomodoros/summary, POST /pomodoros |
 | Transactions | GET/POST list/create, GET /summary, PUT/DELETE /:id |
 | AI | GET/PUT providers, POST activate/test, GET/POST conversations, POST chat (SSE), POST analyze |
 
