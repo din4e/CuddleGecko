@@ -19,7 +19,7 @@ type Contact struct {
 	Birthday          *time.Time     `json:"birthday"`
 	Notes             string         `gorm:"type:longtext" json:"notes"`
 	RelationshipLabels []string      `gorm:"type:longtext;serializer:json" json:"relationship_labels"`
-	Tags              []Tag          `gorm:"many2many:contact_tags" json:"tags"`
+	Tags              []Tag          `gorm:"-" json:"tags"`
 	CreatedAt         time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt         time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`

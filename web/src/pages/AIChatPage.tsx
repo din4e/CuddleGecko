@@ -58,9 +58,14 @@ export default function AIChatPage() {
   const [tags, setTags] = useState<Tag[]>([])
   const [analyzing, setAnalyzing] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('ai_sidebar_width'))
+    return saved > 0 ? saved : 208
+  })
+  const [isResizing, setIsResizing] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const mentionRef = useRef<HTMLDivElement>(null)
   const mentionDataLoadedRef = useRef(false)
 
@@ -160,7 +165,7 @@ export default function AIChatPage() {
     return conv.id
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value
     setInput(val)
 
@@ -175,6 +180,25 @@ export default function AIChatPage() {
       }
     }
     setMentionPopup(false)
+  }
+
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+    const startX = e.clientX
+    const startW = sidebarWidth
+    const onMove = (ev: MouseEvent) => {
+      const w = Math.min(480, Math.max(192, startW + ev.clientX - startX))
+      setSidebarWidth(w)
+      localStorage.setItem('ai_sidebar_width', String(w))
+    }
+    const onUp = () => {
+      setIsResizing(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
   }
 
   const triggerMention = (tab: MentionTab) => {
@@ -364,9 +388,27 @@ export default function AIChatPage() {
 
   const hasActiveConv = activeConvId !== null || messages.length > 0
 
+  // Auto-grow the input textarea with its content (capped), reset when cleared.
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+  }, [input])
+
   return (
-    <div className="flex flex-1 min-h-0">
-      <div className={`shrink-0 flex flex-col bg-card transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-12' : 'w-52'}`}>
+    <div className="flex h-full min-h-0">
+      <div
+        className={`relative shrink-0 flex flex-col bg-card ${isResizing ? '' : 'transition-[width] duration-200 ease-out'} ${sidebarCollapsed ? 'w-12' : ''}`}
+        style={sidebarCollapsed ? undefined : { width: sidebarWidth }}
+      >
+        {!sidebarCollapsed && (
+          <div
+            onMouseDown={startResize}
+            className="absolute right-0 top-0 z-20 h-full w-1 cursor-col-resize hover:bg-primary/40 active:bg-primary/60"
+            aria-hidden
+          />
+        )}
         <div className={`flex items-center gap-1 border-b ${sidebarCollapsed ? 'justify-center px-1 py-1.5' : 'px-2 py-2'}`}>
           {!sidebarCollapsed && (
             <Button onClick={handleNewChat} className="flex-1 justify-center gap-1.5 h-7 text-xs" size="sm">
@@ -476,8 +518,8 @@ export default function AIChatPage() {
                   <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                       m.role === 'user'
-                        ? 'max-w-[75%] bg-primary text-primary-foreground rounded-br-md'
-                        : 'max-w-[85%] bg-muted rounded-bl-md'
+                        ? 'max-w-[min(75%,34rem)] bg-primary text-primary-foreground rounded-br-md'
+                        : 'max-w-[min(85%,42rem)] bg-muted rounded-bl-md'
                     }`}>
                       {m.role === 'user' ? (
                         <div className="whitespace-pre-wrap">{m.content}</div>
@@ -497,7 +539,7 @@ export default function AIChatPage() {
               )}
               {streaming && streamContent && (
                 <div className="flex justify-start">
-                  <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm">
+                  <div className="max-w-[min(85%,42rem)] rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm">
                     <Markdown content={streamContent} />
                   </div>
                 </div>
@@ -656,9 +698,10 @@ export default function AIChatPage() {
             )}
 
             <div className="flex gap-2">
-              <input
+              <textarea
                 ref={inputRef}
-                className="flex-1 rounded-xl border bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-ring transition-colors outline-none"
+                rows={1}
+                className="flex-1 resize-none rounded-xl border bg-muted/50 px-3 py-2 text-sm leading-relaxed placeholder:text-muted-foreground/60 focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-ring transition-colors outline-none max-h-40 overflow-y-auto"
                 aria-label={t('ai.placeholder')}
                 placeholder={t('ai.placeholder')}
                 value={input}

@@ -74,12 +74,14 @@ export interface GraphNode {
   relationship_labels: string[]
   avatar_emoji: string
   avatar_url: string
+  last_interaction_at?: string
 }
 
 export interface GraphEdge {
   source: number
   target: number
   relation_type: string
+  created_at?: string
 }
 
 export interface GraphData {
@@ -188,6 +190,30 @@ export interface Workspace {
 export type TodoStatus = 'pending' | 'done'
 export type TodoPriority = 'low' | 'normal' | 'high'
 export type AmountType = '' | 'income' | 'expense'
+export type RepeatRule = '' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'weekdays'
+
+export interface TodoList {
+  id: number
+  user_id: number
+  workspace_id: number
+  name: string
+  color: string
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface TodoItem {
+  id: number
+  todo_id: number
+  user_id: number
+  workspace_id: number
+  title: string
+  done: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
 
 export interface Todo {
   id: number
@@ -202,7 +228,13 @@ export interface Todo {
   amount_type: AmountType
   contact_ids: number[]
   color: string
+  list_id: number | null
+  repeat_rule: RepeatRule
+  repeat_every: number
+  repeat_until: string | null
   completed_at: string | null
+  tags: Tag[]
+  items: TodoItem[]
   created_at: string
   updated_at: string
 }

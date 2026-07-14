@@ -34,11 +34,14 @@ func main() {
 	userRepo := repository.NewUserRepo(db)
 	contactRepo := repository.NewContactRepo(db)
 	tagRepo := repository.NewTagRepo(db)
+	taggingRepo := repository.NewTaggingRepo(db)
 	interactionRepo := repository.NewInteractionRepo(db)
 	reminderRepo := repository.NewReminderRepo(db)
 	relationRepo := repository.NewRelationRepo(db)
 	eventRepo := repository.NewEventRepo(db)
 	todoRepo := repository.NewTodoRepo(db)
+	todoListRepo := repository.NewTodoListRepo(db)
+	todoItemRepo := repository.NewTodoItemRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
 	aiRepo := repository.NewAIRepo(db)
 	workspaceRepo := repository.NewWorkspaceRepo(db)
@@ -49,20 +52,22 @@ func main() {
 	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
 	authSvc := service.NewAuthService(userRepo, &cfg.JWT, workspaceSvc)
 	captchaSvc := service.NewCaptchaService(cfg.Captcha, settingRepo)
-	contactSvc := service.NewContactService(contactRepo)
+	contactSvc := service.NewContactService(contactRepo, taggingRepo)
 	tagSvc := service.NewTagService(tagRepo)
 	interactionSvc := service.NewInteractionService(interactionRepo)
 	reminderSvc := service.NewReminderService(reminderRepo)
-	relationSvc := service.NewRelationService(relationRepo, contactRepo)
+	relationSvc := service.NewRelationService(relationRepo, contactRepo, interactionRepo)
 	eventSvc := service.NewEventService(eventRepo)
-	todoSvc := service.NewTodoService(todoRepo, eventRepo)
+	todoSvc := service.NewTodoService(todoRepo, eventRepo, taggingRepo, todoItemRepo)
+	todoListSvc := service.NewTodoListService(todoListRepo)
+	todoItemSvc := service.NewTodoItemService(todoItemRepo, todoRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
 	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo)
 	userSettingSvc := service.NewUserSettingService(userSettingRepo)
 
 	// MCP Server
-	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc)
+	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, todoListSvc, todoItemSvc, transactionSvc, aiSvc, workspaceSvc)
 
 	// Ensure avatar directory exists
 	avatarDir := cfg.Server.AvatarDir
@@ -75,7 +80,7 @@ func main() {
 	}
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, todoListSvc, todoItemSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc)
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)

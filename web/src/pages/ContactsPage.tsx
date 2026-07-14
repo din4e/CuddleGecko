@@ -333,7 +333,6 @@ export default function ContactsPage() {
           {contacts.map((contact) => (
             <Link key={contact.id} to={`/buddies/${contact.id}`}>
               <ContactGridCard contact={contact} labelRenderer={labelRenderer} />
-              <ContactGridCard contact={contact} labelRenderer={labelRenderer} />
             </Link>
           ))}
         </div>

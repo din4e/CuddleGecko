@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"gorm.io/gorm"
@@ -31,11 +32,26 @@ func (r *TodoRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.To
 	return &todo, nil
 }
 
-func (r *TodoRepo) List(ctx context.Context, workspaceID uint, status *string, page, pageSize int) ([]model.Todo, int64, error) {
+// List supports filtering by status, list (0 = Inbox), overdue, and an explicit
+// ID allow-list (used to apply a tag filter resolved by the tagging repo).
+func (r *TodoRepo) List(ctx context.Context, workspaceID uint, status *string, listID *uint, overdue bool, idFilter []uint, page, pageSize int) ([]model.Todo, int64, error) {
 	var todos []model.Todo
 	query := r.db.WithContext(ctx).Model(&model.Todo{}).Where("workspace_id = ?", workspaceID)
 	if status != nil && *status != "" {
 		query = query.Where("status = ?", *status)
+	}
+	if listID != nil {
+		if *listID == 0 {
+			query = query.Where("list_id IS NULL")
+		} else {
+			query = query.Where("list_id = ?", *listID)
+		}
+	}
+	if overdue {
+		query = query.Where("status = ? AND due_time IS NOT NULL AND due_time < ?", "pending", time.Now())
+	}
+	if len(idFilter) > 0 {
+		query = query.Where("id IN ?", idFilter)
 	}
 
 	var total int64
@@ -61,7 +77,7 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, status *string, p
 
 func (r *TodoRepo) Update(ctx context.Context, todo *model.Todo) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{ID: todo.ID}).
-		Select("title", "description", "status", "priority", "due_time", "amount", "amount_type", "contact_ids", "color", "completed_at").
+		Select("title", "description", "status", "priority", "due_time", "amount", "amount_type", "contact_ids", "color", "list_id", "repeat_rule", "repeat_every", "repeat_until", "notified", "completed_at").
 		Updates(todo).Error; err != nil {
 		return fmt.Errorf("update todo: %w", err)
 	}
