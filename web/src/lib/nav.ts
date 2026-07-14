@@ -1,4 +1,4 @@
-import { Network, Calendar, ListChecks, Wallet, Bot, Tag, Bell, Flame, Timer } from 'lucide-react'
+import { Network, Calendar, ListChecks, Wallet, Bot, Tag, Bell, Flame, Timer, CalendarDays } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface CustomizableNavItem {
@@ -14,6 +14,7 @@ export const CUSTOMIZABLE_NAV: CustomizableNavItem[] = [
   { to: '/todos', label: 'nav.todos', icon: ListChecks },
   { to: '/habits', label: 'nav.habits', icon: Flame },
   { to: '/pomodoro', label: 'nav.pomodoro', icon: Timer },
+  { to: '/calendar', label: 'nav.calendar', icon: CalendarDays },
   { to: '/finance', label: 'nav.finance', icon: Wallet },
   { to: '/ai', label: 'nav.ai', icon: Bot },
   { to: '/tags', label: 'nav.tags', icon: Tag },
