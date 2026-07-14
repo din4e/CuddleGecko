@@ -2,13 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { buttonVariants } from '../components/ui/button'
-import type { Reminder, Event, Todo, Transaction } from '../types'
+import { Button, buttonVariants } from '../components/ui/button'
+import type { Reminder, Event, Todo, Transaction, GraphData } from '../types'
 import { useRemindersList } from '../hooks/api/useReminders'
 import { useEventsList } from '../hooks/api/useEvents'
 import { useTodosList } from '../hooks/api/useTodos'
 import { useTransactionsList } from '../hooks/api/useTransactions'
 import { useContactsList } from '../hooks/api/useContacts'
+import { useDashboardConfigStore } from '../stores/dashboardConfig'
+import { FULL_WIDTH_WIDGETS } from '../lib/dashboard'
+import { graphApi } from '../api/graph'
+import { DashboardNetworkWidget } from '../components/DashboardNetworkWidget'
+import { cn } from '@/lib/utils'
 import {
   Users,
   CalendarCheck,
@@ -23,6 +28,12 @@ import {
   Clock,
   AlertCircle,
   ArrowRight,
+  GripVertical,
+  Eye,
+  EyeOff,
+  Pencil,
+  Check,
+  Network,
 } from 'lucide-react'
 
 interface MonthBucket {
@@ -126,8 +137,22 @@ function TrendChart({ buckets }: { buckets: MonthBucket[] }) {
 
 export default function DashboardPage() {
   const { t, i18n } = useTranslation()
-  const [monthIncome, setMonthIncome] = useState(0)
-  const [monthExpense, setMonthExpense] = useState(0)
+  const [editMode, setEditMode] = useState(false)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [graphData, setGraphData] = useState<GraphData | null>(null)
+
+  const { order, hidden, load, save } = useDashboardConfigStore()
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  useEffect(() => {
+    graphApi
+      .get()
+      .then((res) => setGraphData(res.data))
+      .catch(() => {})
+  }, [])
 
   const now = new Date()
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
@@ -135,7 +160,7 @@ export default function DashboardPage() {
 
   const { data: remindersData, isPending: remindersLoading } = useRemindersList('pending', 1, 50)
   const { data: eventsData, isPending: eventsLoading } = useEventsList({ page: 1, page_size: 100, start_after: todayStart, end_before: todayEnd })
-  const { data: todosData, isPending: todosLoading } = useTodosList('pending', 1, 100)
+  const { data: todosData, isPending: todosLoading } = useTodosList({ status: 'pending', page: 1, page_size: 100 })
   const { data: txData, isPending: txLoading } = useTransactionsList({ page: 1, page_size: 1000 })
   const { data: contactsData } = useContactsList({ page: 1, page_size: 1 })
 
@@ -146,7 +171,7 @@ export default function DashboardPage() {
   const totalContacts = contactsData?.total ?? 0
   const loading = remindersLoading || eventsLoading || todosLoading || txLoading
 
-  useEffect(() => {
+  const { monthIncome, monthExpense } = useMemo(() => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
     let inc = 0
     let exp = 0
@@ -156,8 +181,7 @@ export default function DashboardPage() {
         else exp += tx.amount
       }
     }
-    setMonthIncome(inc)
-    setMonthExpense(exp)
+    return { monthIncome: inc, monthExpense: exp }
   }, [transactions, now])
 
   const trend = useMemo(() => {
@@ -182,6 +206,17 @@ export default function DashboardPage() {
       .slice(0, 5)
   }, [todos])
 
+  // Contacts seen in recent activity (today's events + pending todos + recent transactions),
+  // used to scope the dashboard network widget. Capped to keep the graph readable.
+  const recentContactIds = useMemo(() => {
+    const ids = new Set<number>()
+    events.forEach((e) => (e.contact_ids || []).forEach((id) => ids.add(id)))
+    todos.forEach((t0) => (t0.contact_ids || []).forEach((id) => ids.add(id)))
+    // transactions are fetched as the most-recent page (page_size:1000), so all are "recent".
+    transactions.forEach((tx) => (tx.contact_ids || []).forEach((id) => ids.add(id)))
+    return new Set([...ids].slice(0, 24))
+  }, [events, todos, transactions])
+
   const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 
   if (loading) return <div>{t('dashboard.loading')}</div>
@@ -191,20 +226,8 @@ export default function DashboardPage() {
     { title: t('dashboard.todayEvents'), value: events.length, icon: CalendarDays, color: 'text-purple-500', to: '/events' },
     { title: t('dashboard.pendingTodos'), value: todos.length, icon: ListChecks, color: 'text-orange-500', to: '/todos' },
     { title: t('dashboard.pendingReminders'), value: reminders.length, icon: Bell, color: 'text-yellow-500', to: '/reminders' },
-    {
-      title: t('dashboard.monthIncome'),
-      value: fmt(monthIncome),
-      icon: TrendingUp,
-      color: 'text-green-500',
-      to: '/finance',
-    },
-    {
-      title: t('dashboard.monthExpense'),
-      value: fmt(monthExpense),
-      icon: TrendingDown,
-      color: 'text-red-500',
-      to: '/finance',
-    },
+    { title: t('dashboard.monthIncome'), value: fmt(monthIncome), icon: TrendingUp, color: 'text-green-500', to: '/finance' },
+    { title: t('dashboard.monthExpense'), value: fmt(monthExpense), icon: TrendingDown, color: 'text-red-500', to: '/finance' },
   ]
 
   const quickActions = [
@@ -214,168 +237,272 @@ export default function DashboardPage() {
     { label: t('dashboard.newTransaction'), icon: Wallet, to: '/finance', color: 'text-green-500' },
   ]
 
+  // In edit mode render every widget (so hidden ones can be un-hidden); otherwise hide them.
+  const visibleOrder = editMode ? order : order.filter((id) => !hidden.includes(id))
+
+  const toggleHide = (id: string) => {
+    const next = hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id]
+    save(order, next)
+  }
+
+  const handleDrop = (toIdx: number) => {
+    if (dragIndex === null || dragIndex === toIdx) {
+      setDragIndex(null)
+      return
+    }
+    const next = [...order]
+    const [moved] = next.splice(dragIndex, 1)
+    next.splice(toIdx, 0, moved)
+    setDragIndex(null)
+    save(next, hidden)
+  }
+
+  const renderWidget = (id: string) => {
+    switch (id) {
+      case 'stats':
+        return (
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+            {stats.map(({ title, value, icon: Icon, color, to }) => (
+              <Link key={title} to={to} className="group">
+                <Card className="transition-colors group-hover:border-primary/40">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground truncate">{title}</span>
+                      <Icon className={`h-4 w-4 ${color}`} aria-hidden="true" />
+                    </div>
+                    <div className="mt-2 text-2xl font-bold tabular-nums">{value}</div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )
+      case 'quickActions':
+        return (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t('dashboard.quickActions')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {quickActions.map(({ label, icon: Icon, to, color }) => (
+                  <Link key={label} to={to} className={`${buttonVariants({ variant: 'outline', size: 'sm' })} flex items-center gap-1.5`}>
+                    <Icon className={`h-4 w-4 ${color}`} aria-hidden="true" />
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      case 'events':
+        return (
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CalendarCheck className="h-4 w-4 text-purple-500" />
+                {t('dashboard.todaysEvents')}
+              </CardTitle>
+              <Link to="/events" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+                {t('dashboard.viewAll')} <ArrowRight className="h-3 w-3" />
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {events.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noData')}</p>
+              ) : (
+                <ul className="space-y-2">
+                  {events.slice(0, 5).map((e) => (
+                    <li key={e.id} className="flex items-start justify-between gap-2 py-1.5 border-b last:border-0">
+                      <div className="flex items-start gap-2 min-w-0">
+                        {e.color && <span className="mt-1.5 h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: e.color }} />}
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{e.title}</div>
+                          {e.location && <div className="text-xs text-muted-foreground truncate">{e.location}</div>}
+                        </div>
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-0.5">
+                        <Clock className="h-3 w-3" />
+                        {new Date(e.start_time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        )
+      case 'reminders':
+        return (
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Bell className="h-4 w-4 text-yellow-500" />
+                {t('dashboard.upcomingReminders')}
+              </CardTitle>
+              <Link to="/reminders" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+                {t('dashboard.viewAll')} <ArrowRight className="h-3 w-3" />
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {reminders.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noData')}</p>
+              ) : (
+                <ul className="space-y-2">
+                  {reminders.slice(0, 5).map((r) => {
+                    const due = new Date(r.remind_at)
+                    const today = new Date()
+                    const overdue = due < today
+                    return (
+                      <li key={r.id} className="flex items-center justify-between gap-2 py-1.5 border-b last:border-0">
+                        <span className="font-medium truncate">{r.title}</span>
+                        <span className={`text-xs whitespace-nowrap ${overdue ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+                          {due.toLocaleDateString()}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        )
+      case 'todos':
+        return (
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <AlertCircle className="h-4 w-4 text-orange-500" />
+                {t('dashboard.overdueTodos')}
+              </CardTitle>
+              <Link to="/todos" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+                {t('dashboard.viewAll')} <ArrowRight className="h-3 w-3" />
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {overdueTodos.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noData')}</p>
+              ) : (
+                <ul className="space-y-2">
+                  {overdueTodos.map((t0) => (
+                    <li key={t0.id} className="flex items-center justify-between gap-2 py-1.5 border-b last:border-0">
+                      <span className="font-medium truncate">{t0.title}</span>
+                      <span className="text-xs text-red-500 whitespace-nowrap">
+                        {new Date(t0.due_time || '').toLocaleDateString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        )
+      case 'network':
+        return (
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Network className="h-4 w-4 text-primary" />
+                {t('dashboard.networkTitle')}
+              </CardTitle>
+              <Link to="/graph" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+                {t('dashboard.viewAll')} <ArrowRight className="h-3 w-3" />
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <DashboardNetworkWidget graphData={graphData} recentIds={recentContactIds} />
+            </CardContent>
+          </Card>
+        )
+      case 'trend':
+        return (
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-base">{t('dashboard.incomeExpenseTrend')}</CardTitle>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="flex items-center gap-1">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-green-500 dark:bg-green-400" />
+                  <span className="text-muted-foreground">{t('dashboard.income')}</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-red-500 dark:bg-red-400" />
+                  <span className="text-muted-foreground">{t('dashboard.expense')}</span>
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <TrendChart buckets={trend} />
+            </CardContent>
+          </Card>
+        )
+      default:
+        return null
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold">
           {t('dashboard.greeting')} 👋
         </h1>
+        <Button
+          variant={editMode ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setEditMode((v) => !v)}
+        >
+          {editMode ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+          {editMode ? t('dashboard.done') : t('dashboard.customize')}
+        </Button>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-        {stats.map(({ title, value, icon: Icon, color, to }) => (
-          <Link key={title} to={to} className="group">
-            <Card className="transition-colors group-hover:border-primary/40">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground truncate">{title}</span>
-                  <Icon className={`h-4 w-4 ${color}`} aria-hidden="true" />
+      {editMode && (
+        <p className="text-xs text-muted-foreground -mt-3">{t('dashboard.editHint')}</p>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {visibleOrder.map((id, idx) => {
+          const isHidden = hidden.includes(id)
+          const fullWidth = FULL_WIDTH_WIDGETS.has(id)
+          return (
+            <div
+              key={id}
+              className={cn(
+                'col-span-1',
+                fullWidth && 'lg:col-span-3',
+                editMode && 'rounded-xl ring-2 ring-primary/40 ring-offset-2 ring-offset-background',
+                editMode && isHidden && 'opacity-50',
+                editMode && 'bg-card/40',
+              )}
+              draggable={editMode}
+              onDragStart={() => setDragIndex(idx)}
+              onDragOver={(e) => {
+                if (editMode) e.preventDefault()
+              }}
+              onDrop={() => handleDrop(idx)}
+            >
+              {editMode && (
+                <div className="flex items-center justify-between px-1 pb-1 pt-1 select-none">
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground cursor-grab">
+                    <GripVertical className="h-3.5 w-3.5" />
+                    {id}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleHide(id)}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    title={isHidden ? t('dashboard.showWidget') : t('dashboard.hideWidget')}
+                  >
+                    {isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    {isHidden ? t('dashboard.showWidget') : t('dashboard.hideWidget')}
+                  </button>
                 </div>
-                <div className="mt-2 text-2xl font-bold tabular-nums">{value}</div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+              )}
+              <div className={editMode ? 'pointer-events-none' : undefined}>{renderWidget(id)}</div>
+            </div>
+          )
+        })}
       </div>
-
-      {/* Quick actions */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">{t('dashboard.quickActions')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {quickActions.map(({ label, icon: Icon, to, color }) => (
-              <Link key={label} to={to} className={`${buttonVariants({ variant: 'outline', size: 'sm' })} flex items-center gap-1.5`}>
-                <Icon className={`h-4 w-4 ${color}`} aria-hidden="true" />
-                {label}
-              </Link>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Today's events */}
-        <Card>
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CalendarCheck className="h-4 w-4 text-purple-500" />
-              {t('dashboard.todaysEvents')}
-            </CardTitle>
-            <Link to="/events" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
-              {t('dashboard.viewAll')} <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {events.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noData')}</p>
-            ) : (
-              <ul className="space-y-2">
-                {events.slice(0, 5).map((e) => (
-                  <li key={e.id} className="flex items-start justify-between gap-2 py-1.5 border-b last:border-0">
-                    <div className="flex items-start gap-2 min-w-0">
-                      {e.color && <span className="mt-1.5 h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: e.color }} />}
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{e.title}</div>
-                        {e.location && <div className="text-xs text-muted-foreground truncate">{e.location}</div>}
-                      </div>
-                    </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-0.5">
-                      <Clock className="h-3 w-3" />
-                      {new Date(e.start_time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Upcoming reminders */}
-        <Card>
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Bell className="h-4 w-4 text-yellow-500" />
-              {t('dashboard.upcomingReminders')}
-            </CardTitle>
-            <Link to="/reminders" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
-              {t('dashboard.viewAll')} <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {reminders.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noData')}</p>
-            ) : (
-              <ul className="space-y-2">
-                {reminders.slice(0, 5).map((r) => {
-                  const due = new Date(r.remind_at)
-                  const today = new Date()
-                  const overdue = due < today
-                  return (
-                    <li key={r.id} className="flex items-center justify-between gap-2 py-1.5 border-b last:border-0">
-                      <span className="font-medium truncate">{r.title}</span>
-                      <span className={`text-xs whitespace-nowrap ${overdue ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
-                        {due.toLocaleDateString()}
-                      </span>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Overdue / pending todos */}
-        <Card>
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <AlertCircle className="h-4 w-4 text-orange-500" />
-              {t('dashboard.overdueTodos')}
-            </CardTitle>
-            <Link to="/todos" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
-              {t('dashboard.viewAll')} <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {overdueTodos.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noData')}</p>
-            ) : (
-              <ul className="space-y-2">
-                {overdueTodos.map((t0) => (
-                  <li key={t0.id} className="flex items-center justify-between gap-2 py-1.5 border-b last:border-0">
-                    <span className="font-medium truncate">{t0.title}</span>
-                    <span className="text-xs text-red-500 whitespace-nowrap">
-                      {new Date(t0.due_time || '').toLocaleDateString()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Income/expense trend chart */}
-      <Card>
-        <CardHeader className="pb-2 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">{t('dashboard.incomeExpenseTrend')}</CardTitle>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-sm bg-green-500 dark:bg-green-400" />
-              <span className="text-muted-foreground">{t('dashboard.income')}</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-sm bg-red-500 dark:bg-red-400" />
-              <span className="text-muted-foreground">{t('dashboard.expense')}</span>
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <TrendChart buckets={trend} />
-        </CardContent>
-      </Card>
     </div>
   )
 }

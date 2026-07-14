@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { useGraphSettings } from '../stores/graphSettings'
 import { getNodeLabelColor } from '../lib/constants'
+import { getRecencyColor, RECENCY_STOPS } from '../lib/graph'
 import { ZoomIn, ZoomOut, Maximize, Minimize, RotateCcw, Crosshair, Loader2, Network } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import EmptyState from '../components/EmptyState'
@@ -84,6 +85,7 @@ type GraphNodeData = {
   relationship_labels: string[]
   avatar_emoji?: string
   avatar_url?: string
+  last_interaction_at?: string
   __isCenter?: boolean
   __cluster?: string
 }
@@ -105,6 +107,7 @@ export default function GraphPage() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('force')
+  const [colorMode, setColorMode] = useState<'label' | 'recency'>('label')
   const nodeRadius = useGraphSettings((s) => s.nodeRadius)
   const emojiSizeSetting = useGraphSettings((s) => s.emojiSize)
 
@@ -397,7 +400,11 @@ export default function GraphPage() {
     const fontSize = (isSelf ? 12 : 11) / globalScale
     const emojiSize = (isSelf ? emojiSizeSetting + 4 : emojiSizeSetting) / globalScale
 
-    const color = isSelf ? '#10b981' : getNodeColor(node.relationship_labels)
+    const color = isSelf
+      ? '#10b981'
+      : colorMode === 'recency'
+        ? getRecencyColor(node.last_interaction_at)
+        : getNodeColor(node.relationship_labels)
     const bgColor = dark ? '#1f2937' : '#ffffff'
     const textColor = dark ? '#e5e7eb' : '#1f2937'
 
@@ -447,7 +454,7 @@ export default function GraphPage() {
       ctx.fillStyle = isSelf ? '#10b981' : textColor
       ctx.fillText(node.name, x, y + r + 2 / globalScale)
     }
-  }, [nodeRadius, emojiSizeSetting, dark, isLarge])
+  }, [nodeRadius, emojiSizeSetting, dark, isLarge, colorMode])
 
   // Reheat simulation and adjust forces when switching layout
   useEffect(() => {
@@ -514,6 +521,11 @@ export default function GraphPage() {
     { value: 'force', label: t('graph.layoutForce') },
     { value: 'cluster', label: t('graph.layoutCluster') },
     { value: 'random', label: t('graph.layoutRandom') },
+  ]
+
+  const colorModeOptions = [
+    { value: 'label' as const, label: t('graph.colorLabel') },
+    { value: 'recency' as const, label: t('graph.colorRecency') },
   ]
 
   const filterModeOptions = [
@@ -595,6 +607,20 @@ export default function GraphPage() {
                 options={filterModeOptions}
               />
             </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">{t('graph.colorBy')}</span>
+              <SegmentedControl value={colorMode} onChange={setColorMode} options={colorModeOptions} />
+            </div>
+            {colorMode === 'recency' && (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground">
+                {RECENCY_STOPS.map((s) => (
+                  <span key={s.label} className="inline-flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+                    {t(s.label)}
+                  </span>
+                ))}
+              </div>
+            )}
             {isLarge && layoutMode !== 'random' && (
               <span className="text-xs text-muted-foreground">
                 {t('graph.largeGraphHint')}
@@ -671,7 +697,9 @@ export default function GraphPage() {
             nodeLabel="name"
             nodeColor={(node: GraphNode) => {
               if (node.id === SELF_NODE_ID) return '#10b981'
-              return getNodeColor(node.relationship_labels)
+              return colorMode === 'recency'
+                ? getRecencyColor(node.last_interaction_at)
+                : getNodeColor(node.relationship_labels)
             }}
             nodeVal={(node: GraphNode) => {
               const count = fgData.linkCounts.get(node.id) || 0

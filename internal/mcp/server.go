@@ -27,6 +27,8 @@ type MCPServer struct {
 	relationSvc    *service.RelationService
 	eventSvc       *service.EventService
 	todoSvc        *service.TodoService
+	todoListSvc    *service.TodoListService
+	todoItemSvc    *service.TodoItemService
 	transactionSvc *service.TransactionService
 	aiSvc          *service.AIService
 	workspaceSvc   *service.WorkspaceService
@@ -44,6 +46,8 @@ func NewServer(
 	relationSvc *service.RelationService,
 	eventSvc *service.EventService,
 	todoSvc *service.TodoService,
+	todoListSvc *service.TodoListService,
+	todoItemSvc *service.TodoItemService,
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
 	workspaceSvc *service.WorkspaceService,
@@ -56,6 +60,8 @@ func NewServer(
 		relationSvc:    relationSvc,
 		eventSvc:       eventSvc,
 		todoSvc:        todoSvc,
+		todoListSvc:    todoListSvc,
+		todoItemSvc:    todoItemSvc,
 		transactionSvc: transactionSvc,
 		aiSvc:          aiSvc,
 		workspaceSvc:   workspaceSvc,
@@ -65,6 +71,8 @@ func NewServer(
 	s.registerBuddyTools()
 	s.registerEventTools()
 	s.registerTodoTools()
+	s.registerTodoListTools()
+	s.registerTodoItemTools()
 	s.registerTagTools()
 	s.registerTransactionTools()
 	s.registerInteractionTools()

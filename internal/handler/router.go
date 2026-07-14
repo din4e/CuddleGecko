@@ -21,6 +21,8 @@ type Handlers struct {
 	Upload      *UploadHandler
 	Event       *EventHandler
 	Todo        *TodoHandler
+	TodoList    *TodoListHandler
+	TodoItem    *TodoItemHandler
 	Transaction *TransactionHandler
 	AI          *AIHandler
 	Workspace   *WorkspaceHandler
@@ -39,6 +41,8 @@ func NewHandlers(
 	relationSvc *service.RelationService,
 	eventSvc *service.EventService,
 	todoSvc *service.TodoService,
+	todoListSvc *service.TodoListService,
+	todoItemSvc *service.TodoItemService,
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
 	workspaceSvc *service.WorkspaceService,
@@ -58,6 +62,8 @@ func NewHandlers(
 		Upload:      NewUploadHandler(uploadDir),
 		Event:       NewEventHandler(eventSvc),
 		Todo:        NewTodoHandler(todoSvc),
+		TodoList:    NewTodoListHandler(todoListSvc),
+		TodoItem:    NewTodoItemHandler(todoItemSvc),
 		Transaction: NewTransactionHandler(transactionSvc),
 		AI:          NewAIHandler(aiSvc, aiCfg),
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
@@ -97,6 +103,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			protected.PUT("/settings/captcha", h.Captcha.UpdateConfig)
 			protected.GET("/settings/nav", h.UserSetting.GetNav)
 			protected.PUT("/settings/nav", h.UserSetting.UpdateNav)
+			protected.GET("/settings/dashboard", h.UserSetting.GetDashboard)
+			protected.PUT("/settings/dashboard", h.UserSetting.UpdateDashboard)
 
 			// Workspace management (no workspace context needed)
 			protected.GET("/workspaces", h.Workspace.List)
@@ -160,6 +168,18 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.PATCH("/todos/:id/toggle", h.Todo.ToggleStatus)
 			wsProtected.POST("/todos/:id/sync-event", h.Todo.SyncToEvent)
 			wsProtected.DELETE("/todos/:id", h.Todo.Delete)
+			wsProtected.GET("/todos/:id/items", h.TodoItem.ListByTodo)
+			wsProtected.POST("/todos/:id/items", h.TodoItem.Create)
+			wsProtected.PUT("/todos/:id/items/:iid", h.TodoItem.Update)
+			wsProtected.PATCH("/todos/:id/items/:iid/toggle", h.TodoItem.Toggle)
+			wsProtected.DELETE("/todos/:id/items/:iid", h.TodoItem.Delete)
+			wsProtected.GET("/todos/:id/tags", h.Todo.GetTags)
+			wsProtected.PUT("/todos/:id/tags", h.Todo.ReplaceTags)
+
+			wsProtected.GET("/todo-lists", h.TodoList.List)
+			wsProtected.POST("/todo-lists", h.TodoList.Create)
+			wsProtected.PUT("/todo-lists/:id", h.TodoList.Update)
+			wsProtected.DELETE("/todo-lists/:id", h.TodoList.Delete)
 
 			wsProtected.GET("/transactions", h.Transaction.List)
 			wsProtected.GET("/transactions/summary", h.Transaction.Summary)

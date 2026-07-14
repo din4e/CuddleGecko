@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"gorm.io/gorm"
@@ -80,4 +81,27 @@ func (r *InteractionRepo) Delete(ctx context.Context, workspaceID, id uint) erro
 		return fmt.Errorf("delete interaction: %w", err)
 	}
 	return nil
+}
+
+// LastByContact returns a map of contactID → most-recent interaction time (MAX(occurred_at)),
+// used to give graph nodes a temporal dimension. Contacts with no interactions are absent.
+func (r *InteractionRepo) LastByContact(ctx context.Context, workspaceID uint) (map[uint]time.Time, error) {
+	type row struct {
+		ContactID uint      `gorm:"column:contact_id"`
+		Last      time.Time `gorm:"column:last_at"`
+	}
+	var rows []row
+	if err := r.db.WithContext(ctx).
+		Table("interactions").
+		Select("contact_id, MAX(occurred_at) AS last_at").
+		Where("workspace_id = ?", workspaceID).
+		Group("contact_id").
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("last interaction by contact: %w", err)
+	}
+	out := make(map[uint]time.Time, len(rows))
+	for _, rw := range rows {
+		out[rw.ContactID] = rw.Last
+	}
+	return out, nil
 }

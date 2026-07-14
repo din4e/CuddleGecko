@@ -35,8 +35,8 @@ func (m *mockTodoSvcRepo) GetByID(ctx context.Context, workspaceID, id uint) (*m
 	return args.Get(0).(*model.Todo), args.Error(1)
 }
 
-func (m *mockTodoSvcRepo) List(ctx context.Context, workspaceID uint, status *string, page, pageSize int) ([]model.Todo, int64, error) {
-	args := m.Called(ctx, workspaceID, status, page, pageSize)
+func (m *mockTodoSvcRepo) List(ctx context.Context, workspaceID uint, status *string, listID *uint, overdue bool, idFilter []uint, page, pageSize int) ([]model.Todo, int64, error) {
+	args := m.Called(ctx, workspaceID, status, listID, overdue, idFilter, page, pageSize)
 	if args.Get(0) == nil {
 		return nil, 0, args.Error(2)
 	}
@@ -57,6 +57,28 @@ type mockTodoEventRepo struct {
 
 func (m *mockTodoEventRepo) Create(ctx context.Context, event *model.Event) error {
 	return m.Called(ctx, event).Error(0)
+}
+
+type hNoopTaggingRepo struct{}
+
+func (hNoopTaggingRepo) SetTags(context.Context, uint, string, uint, []uint) error                        { return nil }
+func (hNoopTaggingRepo) GetTags(context.Context, uint, string, uint) ([]model.Tag, error)                 { return nil, nil }
+func (hNoopTaggingRepo) GetTagsByTargets(context.Context, uint, string, []uint) (map[uint][]model.Tag, error) { return nil, nil }
+func (hNoopTaggingRepo) FilterTargetIDs(context.Context, uint, string, []uint) ([]uint, error)            { return nil, nil }
+func (hNoopTaggingRepo) RemoveAll(context.Context, uint, string, uint) error                              { return nil }
+
+type hNoopTodoItemRepo struct{}
+
+func (hNoopTodoItemRepo) Create(context.Context, *model.TodoItem) error                                    { return nil }
+func (hNoopTodoItemRepo) GetByID(context.Context, uint, uint) (*model.TodoItem, error)                     { return nil, nil }
+func (hNoopTodoItemRepo) ListByTodo(context.Context, uint, uint) ([]model.TodoItem, error)                 { return nil, nil }
+func (hNoopTodoItemRepo) ListByTodos(context.Context, uint, []uint) (map[uint][]model.TodoItem, error)     { return nil, nil }
+func (hNoopTodoItemRepo) Update(context.Context, *model.TodoItem) error                                    { return nil }
+func (hNoopTodoItemRepo) Delete(context.Context, uint, uint) error                                         { return nil }
+func (hNoopTodoItemRepo) DeleteByTodo(context.Context, uint, uint) error                                   { return nil }
+
+func newSvc(repo *mockTodoSvcRepo) *service.TodoService {
+	return service.NewTodoService(repo, new(mockTodoEventRepo), hNoopTaggingRepo{}, hNoopTodoItemRepo{})
 }
 
 func setupTodoRouter(todoSvc *service.TodoService) *gin.Engine {
@@ -82,11 +104,10 @@ func setupTodoRouter(todoSvc *service.TodoService) *gin.Engine {
 
 func TestTodoHandler_List(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
-	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := newSvc(repo)
 	router := setupTodoRouter(svc)
 
-	repo.On("List", mock.Anything, uint(1), (*string)(nil), 1, 50).Return([]model.Todo{}, int64(0), nil)
+	repo.On("List", mock.Anything, uint(1), (*string)(nil), (*uint)(nil), false, []uint(nil), 1, 50).Return([]model.Todo{}, int64(0), nil)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/api/todos", nil)
@@ -98,12 +119,11 @@ func TestTodoHandler_List(t *testing.T) {
 
 func TestTodoHandler_List_WithStatusFilter(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
-	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := newSvc(repo)
 	router := setupTodoRouter(svc)
 
 	pending := "pending"
-	repo.On("List", mock.Anything, uint(1), &pending, 1, 50).Return([]model.Todo{}, int64(0), nil)
+	repo.On("List", mock.Anything, uint(1), &pending, mock.Anything, mock.Anything, mock.Anything, 1, 50).Return([]model.Todo{}, int64(0), nil)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/api/todos?status=pending", nil)
@@ -114,8 +134,7 @@ func TestTodoHandler_List_WithStatusFilter(t *testing.T) {
 
 func TestTodoHandler_Create(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
-	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := newSvc(repo)
 	router := setupTodoRouter(svc)
 
 	repo.On("Create", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
@@ -136,8 +155,7 @@ func TestTodoHandler_Create(t *testing.T) {
 
 func TestTodoHandler_Create_MissingTitle(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
-	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := newSvc(repo)
 	router := setupTodoRouter(svc)
 
 	body, _ := json.Marshal(map[string]interface{}{})
@@ -151,13 +169,12 @@ func TestTodoHandler_Create_MissingTitle(t *testing.T) {
 
 func TestTodoHandler_Create_InvalidDueTime(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
-	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := newSvc(repo)
 	router := setupTodoRouter(svc)
 
 	body, _ := json.Marshal(map[string]interface{}{
-		"title":     "test",
-		"due_time":  "not-a-date",
+		"title":    "test",
+		"due_time": "not-a-date",
 	})
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/api/todos", bytes.NewBuffer(body))
@@ -169,8 +186,7 @@ func TestTodoHandler_Create_InvalidDueTime(t *testing.T) {
 
 func TestTodoHandler_Update(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
-	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := newSvc(repo)
 	router := setupTodoRouter(svc)
 
 	existing := &model.Todo{ID: 1, Title: "old", Priority: "normal"}
@@ -191,8 +207,7 @@ func TestTodoHandler_Update(t *testing.T) {
 
 func TestTodoHandler_Update_NotFound(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
-	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := newSvc(repo)
 	router := setupTodoRouter(svc)
 
 	repo.On("GetByID", mock.Anything, uint(1), uint(99)).Return(nil, service.ErrTodoNotFound)
@@ -208,8 +223,7 @@ func TestTodoHandler_Update_NotFound(t *testing.T) {
 
 func TestTodoHandler_ToggleStatus(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
-	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := newSvc(repo)
 	router := setupTodoRouter(svc)
 
 	existing := &model.Todo{ID: 1, Status: "pending"}
@@ -226,7 +240,7 @@ func TestTodoHandler_ToggleStatus(t *testing.T) {
 func TestTodoHandler_SyncToEvent(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, hNoopTaggingRepo{}, hNoopTodoItemRepo{})
 	router := setupTodoRouter(svc)
 
 	existing := &model.Todo{ID: 1, Title: "meeting"}
@@ -242,8 +256,7 @@ func TestTodoHandler_SyncToEvent(t *testing.T) {
 
 func TestTodoHandler_Delete(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
-	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := newSvc(repo)
 	router := setupTodoRouter(svc)
 
 	repo.On("Delete", mock.Anything, uint(1), uint(1)).Return(nil)
@@ -257,8 +270,7 @@ func TestTodoHandler_Delete(t *testing.T) {
 
 func TestTodoHandler_Delete_NotFound(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
-	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := newSvc(repo)
 	router := setupTodoRouter(svc)
 
 	repo.On("Delete", mock.Anything, uint(1), uint(99)).Return(service.ErrTodoNotFound)

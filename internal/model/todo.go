@@ -19,8 +19,21 @@ type Todo struct {
 	AmountType  string         `gorm:"size:20" json:"amount_type"` // "" / income / expense
 	ContactIDs  []uint         `gorm:"type:longtext;serializer:json" json:"contact_ids"`
 	Color       string         `gorm:"size:20" json:"color"`
+	// List this todo belongs to; nil = Inbox.
+	ListID *uint `gorm:"index" json:"list_id"`
+	// Recurrence: empty = one-off. daily/weekly/monthly/yearly/weekdays.
+	RepeatRule  string     `gorm:"size:20" json:"repeat_rule"`
+	RepeatEvery int        `gorm:"default:1" json:"repeat_every"`
+	RepeatUntil *time.Time `json:"repeat_until"`
+	// Notified tracks whether the current due occurrence has already fired a
+	// reminder (idempotency flag, reset when a recurring todo rolls forward).
+	Notified    bool           `gorm:"default:false" json:"-"`
 	CompletedAt *time.Time     `json:"completed_at"`
 	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// Virtual (not DB columns) — populated by the service layer for API output.
+	Tags  []Tag      `gorm:"-" json:"tags"`
+	Items []TodoItem `gorm:"-" json:"items"`
 }

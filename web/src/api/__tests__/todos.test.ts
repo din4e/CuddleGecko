@@ -23,13 +23,13 @@ describe('todosApi', () => {
   it('list() calls GET /todos with default pagination', async () => {
     mockRequest.get.mockResolvedValue([])
     await todosApi.list()
-    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { status: undefined, page: 1, page_size: 50 } })
+    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { status: undefined, list_id: undefined, tag_ids: undefined, overdue: undefined, page: 1, page_size: 50 } })
   })
 
-  it('list(status) calls GET /todos with status and pagination', async () => {
+  it('list({status}) calls GET /todos with status and pagination', async () => {
     mockRequest.get.mockResolvedValue([])
-    await todosApi.list('pending')
-    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { status: 'pending', page: 1, page_size: 50 } })
+    await todosApi.list({ status: 'pending' })
+    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { status: 'pending', list_id: undefined, tag_ids: undefined, overdue: undefined, page: 1, page_size: 50 } })
   })
 
   it('create(data) calls POST /todos', async () => {
