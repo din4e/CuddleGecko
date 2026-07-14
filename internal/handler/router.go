@@ -24,6 +24,7 @@ type Handlers struct {
 	TodoList    *TodoListHandler
 	TodoItem    *TodoItemHandler
 	Habit       *HabitHandler
+	Pomodoro    *PomodoroHandler
 	Transaction *TransactionHandler
 	AI          *AIHandler
 	Workspace   *WorkspaceHandler
@@ -52,6 +53,7 @@ func NewHandlers(
 	aiCfg config.AIConfig,
 	userSettingSvc *service.UserSettingService,
 	habitSvc *service.HabitService,
+	pomodoroSvc *service.PomodoroService,
 ) *Handlers {
 	return &Handlers{
 		Auth:        NewAuthHandler(authSvc, captchaSvc),
@@ -67,6 +69,7 @@ func NewHandlers(
 		TodoList:    NewTodoListHandler(todoListSvc),
 		TodoItem:    NewTodoItemHandler(todoItemSvc),
 		Habit:       NewHabitHandler(habitSvc),
+		Pomodoro:    NewPomodoroHandler(pomodoroSvc),
 		Transaction: NewTransactionHandler(transactionSvc),
 		AI:          NewAIHandler(aiSvc, aiCfg),
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
@@ -189,6 +192,10 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.PUT("/habits/:id", h.Habit.Update)
 			wsProtected.DELETE("/habits/:id", h.Habit.Delete)
 			wsProtected.POST("/habits/:id/checkin", h.Habit.CheckIn)
+
+			wsProtected.GET("/pomodoros", h.Pomodoro.List)
+			wsProtected.GET("/pomodoros/summary", h.Pomodoro.Summary)
+			wsProtected.POST("/pomodoros", h.Pomodoro.Create)
 
 			wsProtected.GET("/transactions", h.Transaction.List)
 			wsProtected.GET("/transactions/summary", h.Transaction.Summary)

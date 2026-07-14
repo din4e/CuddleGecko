@@ -73,6 +73,7 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		&model.TodoItem{},
 		&model.Habit{},
 		&model.HabitLog{},
+		&model.PomodoroSession{},
 		&model.Transaction{},
 		&model.AIProvider{},
 		&model.AIConversation{},
