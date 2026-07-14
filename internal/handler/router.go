@@ -23,6 +23,7 @@ type Handlers struct {
 	Todo        *TodoHandler
 	TodoList    *TodoListHandler
 	TodoItem    *TodoItemHandler
+	Habit       *HabitHandler
 	Transaction *TransactionHandler
 	AI          *AIHandler
 	Workspace   *WorkspaceHandler
@@ -50,6 +51,7 @@ func NewHandlers(
 	uploadDir string,
 	aiCfg config.AIConfig,
 	userSettingSvc *service.UserSettingService,
+	habitSvc *service.HabitService,
 ) *Handlers {
 	return &Handlers{
 		Auth:        NewAuthHandler(authSvc, captchaSvc),
@@ -64,6 +66,7 @@ func NewHandlers(
 		Todo:        NewTodoHandler(todoSvc),
 		TodoList:    NewTodoListHandler(todoListSvc),
 		TodoItem:    NewTodoItemHandler(todoItemSvc),
+		Habit:       NewHabitHandler(habitSvc),
 		Transaction: NewTransactionHandler(transactionSvc),
 		AI:          NewAIHandler(aiSvc, aiCfg),
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
@@ -180,6 +183,12 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.POST("/todo-lists", h.TodoList.Create)
 			wsProtected.PUT("/todo-lists/:id", h.TodoList.Update)
 			wsProtected.DELETE("/todo-lists/:id", h.TodoList.Delete)
+
+			wsProtected.GET("/habits", h.Habit.List)
+			wsProtected.POST("/habits", h.Habit.Create)
+			wsProtected.PUT("/habits/:id", h.Habit.Update)
+			wsProtected.DELETE("/habits/:id", h.Habit.Delete)
+			wsProtected.POST("/habits/:id/checkin", h.Habit.CheckIn)
 
 			wsProtected.GET("/transactions", h.Transaction.List)
 			wsProtected.GET("/transactions/summary", h.Transaction.Summary)

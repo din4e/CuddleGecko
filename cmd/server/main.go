@@ -42,6 +42,8 @@ func main() {
 	todoRepo := repository.NewTodoRepo(db)
 	todoListRepo := repository.NewTodoListRepo(db)
 	todoItemRepo := repository.NewTodoItemRepo(db)
+	habitRepo := repository.NewHabitRepo(db)
+	habitLogRepo := repository.NewHabitLogRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
 	aiRepo := repository.NewAIRepo(db)
 	workspaceRepo := repository.NewWorkspaceRepo(db)
@@ -61,13 +63,14 @@ func main() {
 	todoSvc := service.NewTodoService(todoRepo, eventRepo, taggingRepo, todoItemRepo)
 	todoListSvc := service.NewTodoListService(todoListRepo)
 	todoItemSvc := service.NewTodoItemService(todoItemRepo, todoRepo)
+	habitSvc := service.NewHabitService(habitRepo, habitLogRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
 	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo)
 	userSettingSvc := service.NewUserSettingService(userSettingRepo)
 
 	// MCP Server
-	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, todoListSvc, todoItemSvc, transactionSvc, aiSvc, workspaceSvc)
+	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, todoListSvc, todoItemSvc, transactionSvc, aiSvc, workspaceSvc, habitSvc)
 
 	// Ensure avatar directory exists
 	avatarDir := cfg.Server.AvatarDir
@@ -80,7 +83,7 @@ func main() {
 	}
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, todoListSvc, todoItemSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, todoListSvc, todoItemSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc, habitSvc)
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)
