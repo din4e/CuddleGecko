@@ -71,6 +71,8 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		&model.Todo{},
 		&model.TodoList{},
 		&model.TodoItem{},
+		&model.Habit{},
+		&model.HabitLog{},
 		&model.Transaction{},
 		&model.AIProvider{},
 		&model.AIConversation{},

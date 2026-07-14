@@ -215,6 +215,26 @@ export interface TodoItem {
   updated_at: string
 }
 
+export interface Habit {
+  id: number
+  user_id: number
+  workspace_id: number
+  name: string
+  color: string
+  emoji: string
+  frequency: string
+  archived: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+  // virtual (service-enriched)
+  today_done: boolean
+  streak: number
+  best: number
+  rate_30: number
+  recent: string[] // checked-in dates YYYY-MM-DD within the heatmap window
+}
+
 export interface Todo {
   id: number
   user_id: number
