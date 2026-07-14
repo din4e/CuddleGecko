@@ -19,6 +19,7 @@ const AIChatPage = lazy(() => import('./pages/AIChatPage'))
 const TodosPage = lazy(() => import('./pages/TodosPage'))
 const HabitsPage = lazy(() => import('./pages/HabitsPage'))
 const PomodoroPage = lazy(() => import('./pages/PomodoroPage'))
+const CalendarPage = lazy(() => import('./pages/CalendarPage'))
 const TerminalPage = lazy(() => import('./pages/TerminalPage'))
 
 function PageLoader() {
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="todos" element={<Suspense fallback={<PageLoader />}><TodosPage /></Suspense>} />
           <Route path="habits" element={<Suspense fallback={<PageLoader />}><HabitsPage /></Suspense>} />
           <Route path="pomodoro" element={<Suspense fallback={<PageLoader />}><PomodoroPage /></Suspense>} />
+          <Route path="calendar" element={<Suspense fallback={<PageLoader />}><CalendarPage /></Suspense>} />
           <Route path="finance" element={<Suspense fallback={<PageLoader />}><FinancePage /></Suspense>} />
           <Route path="tags" element={<Suspense fallback={<PageLoader />}><TagsPage /></Suspense>} />
           <Route path="reminders" element={<Suspense fallback={<PageLoader />}><RemindersPage /></Suspense>} />
