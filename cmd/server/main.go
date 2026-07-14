@@ -44,6 +44,7 @@ func main() {
 	todoItemRepo := repository.NewTodoItemRepo(db)
 	habitRepo := repository.NewHabitRepo(db)
 	habitLogRepo := repository.NewHabitLogRepo(db)
+	pomodoroRepo := repository.NewPomodoroRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
 	aiRepo := repository.NewAIRepo(db)
 	workspaceRepo := repository.NewWorkspaceRepo(db)
@@ -64,13 +65,14 @@ func main() {
 	todoListSvc := service.NewTodoListService(todoListRepo)
 	todoItemSvc := service.NewTodoItemService(todoItemRepo, todoRepo)
 	habitSvc := service.NewHabitService(habitRepo, habitLogRepo)
+	pomodoroSvc := service.NewPomodoroService(pomodoroRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
 	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo)
 	userSettingSvc := service.NewUserSettingService(userSettingRepo)
 
 	// MCP Server
-	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, todoListSvc, todoItemSvc, transactionSvc, aiSvc, workspaceSvc, habitSvc)
+	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, todoListSvc, todoItemSvc, transactionSvc, aiSvc, workspaceSvc, habitSvc, pomodoroSvc)
 
 	// Ensure avatar directory exists
 	avatarDir := cfg.Server.AvatarDir
@@ -83,7 +85,7 @@ func main() {
 	}
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, todoListSvc, todoItemSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc, habitSvc)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, todoListSvc, todoItemSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc, habitSvc, pomodoroSvc)
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)

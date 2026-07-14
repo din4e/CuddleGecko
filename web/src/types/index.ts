@@ -235,6 +235,28 @@ export interface Habit {
   recent: string[] // checked-in dates YYYY-MM-DD within the heatmap window
 }
 
+export type PomodoroKind = 'focus' | 'break'
+
+export interface PomodoroSession {
+  id: number
+  user_id: number
+  workspace_id: number
+  todo_id: number | null
+  duration_seconds: number
+  kind: PomodoroKind
+  completed: boolean
+  started_at: string
+  ended_at: string
+  created_at: string
+}
+
+export interface PomodoroSummary {
+  today_count: number
+  today_seconds: number
+  total_count: number
+  total_seconds: number
+}
+
 export interface Todo {
   id: number
   user_id: number
