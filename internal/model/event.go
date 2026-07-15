@@ -9,10 +9,10 @@ import (
 type Event struct {
 	ID          uint           `gorm:"primaryKey" json:"id"`
 	UserID      uint           `gorm:"index;not null" json:"user_id"`
-	WorkspaceID uint           `gorm:"index;not null;default:0" json:"workspace_id"`
+	WorkspaceID uint           `gorm:"index;not null;default:0;index:idx_events_workspace_start,priority:1" json:"workspace_id"`
 	Title       string         `gorm:"size:200;not null" json:"title"`
 	Description string         `gorm:"type:longtext" json:"description"`
-	StartTime   time.Time      `gorm:"not null;index" json:"start_time"`
+	StartTime   time.Time      `gorm:"not null;index;index:idx_events_workspace_start,priority:2" json:"start_time"`
 	EndTime     *time.Time     `json:"end_time"`
 	Location    string         `gorm:"size:200" json:"location"`
 	ContactIDs  []uint         `gorm:"type:longtext;serializer:json" json:"contact_ids"`

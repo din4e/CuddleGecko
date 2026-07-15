@@ -142,6 +142,12 @@ export interface TransactionSummary {
   balance: number
 }
 
+export interface TransactionTrendPoint {
+  month: string
+  type: 'income' | 'expense'
+  amount: number
+}
+
 export interface AIProvider {
   id: number
   user_id: number

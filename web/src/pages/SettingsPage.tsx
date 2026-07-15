@@ -161,10 +161,9 @@ export default function SettingsPage() {
     await persistNav({ order: navOrder, hidden })
   }
 
-  // Auto-check once on mount.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    handleCheckUpdate()
+    const timer = window.setTimeout(() => void handleCheckUpdate(), 0)
+    return () => window.clearTimeout(timer)
   }, [handleCheckUpdate])
 
   const handleExport = async () => {

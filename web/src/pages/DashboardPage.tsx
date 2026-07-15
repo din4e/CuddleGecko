@@ -7,7 +7,7 @@ import type { Reminder, Event, Todo, Transaction, GraphData } from '../types'
 import { useRemindersList } from '../hooks/api/useReminders'
 import { useEventsList } from '../hooks/api/useEvents'
 import { useTodosList } from '../hooks/api/useTodos'
-import { useTransactionsList } from '../hooks/api/useTransactions'
+import { useTransactionsList, useTransactionsTrend } from '../hooks/api/useTransactions'
 import { useContactsList } from '../hooks/api/useContacts'
 import { useDashboardConfigStore } from '../stores/dashboardConfig'
 import { FULL_WIDTH_WIDGETS } from '../lib/dashboard'
@@ -43,10 +43,15 @@ interface MonthBucket {
   expense: number
 }
 
-function buildLast6Months(locale: string): MonthBucket[] {
+const EMPTY_REMINDERS: Reminder[] = []
+const EMPTY_EVENTS: Event[] = []
+const EMPTY_TODOS: Todo[] = []
+const EMPTY_TRANSACTIONS: Transaction[] = []
+
+function buildLastMonths(locale: string, months: number): MonthBucket[] {
   const buckets: MonthBucket[] = []
   const now = new Date()
-  for (let i = 5; i >= 0; i--) {
+  for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const label = d.toLocaleDateString(locale, { month: 'short' })
@@ -161,42 +166,34 @@ export default function DashboardPage() {
   const { data: remindersData, isPending: remindersLoading } = useRemindersList('pending', 1, 50)
   const { data: eventsData, isPending: eventsLoading } = useEventsList({ page: 1, page_size: 100, start_after: todayStart, end_before: todayEnd })
   const { data: todosData, isPending: todosLoading } = useTodosList({ status: 'pending', page: 1, page_size: 100 })
-  const { data: txData, isPending: txLoading } = useTransactionsList({ page: 1, page_size: 1000 })
+  // The list is only used to identify people in recent activity. Aggregated chart
+  // data comes from the dedicated endpoint instead of downloading all transactions.
+  const { data: txData, isPending: txLoading } = useTransactionsList({ page: 1, page_size: 100 })
+  const { data: trendData, isPending: trendLoading } = useTransactionsTrend(6)
   const { data: contactsData } = useContactsList({ page: 1, page_size: 1 })
 
-  const reminders: Reminder[] = remindersData?.items ?? []
-  const events: Event[] = eventsData?.items ?? []
-  const todos: Todo[] = todosData?.items ?? []
-  const transactions: Transaction[] = txData?.items ?? []
+  const reminders = remindersData?.items ?? EMPTY_REMINDERS
+  const events = eventsData?.items ?? EMPTY_EVENTS
+  const todos = todosData?.items ?? EMPTY_TODOS
+  const transactions = txData?.items ?? EMPTY_TRANSACTIONS
   const totalContacts = contactsData?.total ?? 0
-  const loading = remindersLoading || eventsLoading || todosLoading || txLoading
-
-  const { monthIncome, monthExpense } = useMemo(() => {
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    let inc = 0
-    let exp = 0
-    for (const tx of transactions) {
-      if (tx.date >= monthStart) {
-        if (tx.type === 'income') inc += tx.amount
-        else exp += tx.amount
-      }
-    }
-    return { monthIncome: inc, monthExpense: exp }
-  }, [transactions, now])
+  const loading = remindersLoading || eventsLoading || todosLoading || txLoading || trendLoading
 
   const trend = useMemo(() => {
-    const buckets = buildLast6Months(i18n.language)
-    const withinLast6 = transactions.filter((tx) => tx.date >= sixMonthsAgoFromNow())
-    for (const tx of withinLast6) {
-      const d = new Date(tx.date)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      const b = buckets.find((x) => x.key === key)
-      if (!b) continue
-      if (tx.type === 'income') b.income += tx.amount
-      else b.expense += tx.amount
+    const buckets = buildLastMonths(i18n.language, 6)
+    const byMonth = new Map(buckets.map((bucket) => [bucket.key, bucket]))
+    for (const point of trendData ?? []) {
+      const bucket = byMonth.get(point.month)
+      if (!bucket) continue
+      if (point.type === 'income') bucket.income = point.amount
+      else bucket.expense = point.amount
     }
     return buckets
-  }, [transactions, i18n.language])
+  }, [trendData, i18n.language])
+
+  const currentMonth = trend.at(-1)
+  const monthIncome = currentMonth?.income ?? 0
+  const monthExpense = currentMonth?.expense ?? 0
 
   const overdueTodos = useMemo(() => {
     const now = new Date()
@@ -212,7 +209,8 @@ export default function DashboardPage() {
     const ids = new Set<number>()
     events.forEach((e) => (e.contact_ids || []).forEach((id) => ids.add(id)))
     todos.forEach((t0) => (t0.contact_ids || []).forEach((id) => ids.add(id)))
-    // transactions are fetched as the most-recent page (page_size:1000), so all are "recent".
+    // The latest 100 transactions are enough to surface the current relationship context
+    // while keeping the dashboard's first request lightweight.
     transactions.forEach((tx) => (tx.contact_ids || []).forEach((id) => ids.add(id)))
     return new Set([...ids].slice(0, 24))
   }, [events, todos, transactions])
@@ -263,14 +261,16 @@ export default function DashboardPage() {
         return (
           <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
             {stats.map(({ title, value, icon: Icon, color, to }) => (
-              <Link key={title} to={to} className="group">
-                <Card className="transition-colors group-hover:border-primary/40">
+              <Link key={title} to={to} className="group outline-none">
+                <Card className="h-full border-transparent bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/30 group-hover:shadow-md group-focus-visible:ring-2 group-focus-visible:ring-ring">
                   <CardContent className="pt-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground truncate">{title}</span>
-                      <Icon className={`h-4 w-4 ${color}`} aria-hidden="true" />
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-xs font-medium text-muted-foreground truncate">{title}</span>
+                      <span className={`grid size-8 shrink-0 place-items-center rounded-lg bg-muted ${color}`}>
+                        <Icon className="h-4 w-4" aria-hidden="true" />
+                      </span>
                     </div>
-                    <div className="mt-2 text-2xl font-bold tabular-nums">{value}</div>
+                    <div className="mt-3 text-2xl font-semibold tracking-tight tabular-nums">{value}</div>
                   </CardContent>
                 </Card>
               </Link>
@@ -279,7 +279,7 @@ export default function DashboardPage() {
         )
       case 'quickActions':
         return (
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">{t('dashboard.quickActions')}</CardTitle>
             </CardHeader>
@@ -297,7 +297,7 @@ export default function DashboardPage() {
         )
       case 'events':
         return (
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <CalendarCheck className="h-4 w-4 text-purple-500" />
@@ -334,7 +334,7 @@ export default function DashboardPage() {
         )
       case 'reminders':
         return (
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Bell className="h-4 w-4 text-yellow-500" />
@@ -369,7 +369,7 @@ export default function DashboardPage() {
         )
       case 'todos':
         return (
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <AlertCircle className="h-4 w-4 text-orange-500" />
@@ -399,7 +399,7 @@ export default function DashboardPage() {
         )
       case 'network':
         return (
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Network className="h-4 w-4 text-primary" />
@@ -416,7 +416,7 @@ export default function DashboardPage() {
         )
       case 'trend':
         return (
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <CardTitle className="text-base">{t('dashboard.incomeExpenseTrend')}</CardTitle>
               <div className="flex items-center gap-3 text-xs">
@@ -441,11 +441,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-bold">
-          {t('dashboard.greeting')} 👋
-        </h1>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-primary">{new Date().toLocaleDateString(i18n.language, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t('dashboard.greeting')}</h1>
+        </div>
         <Button
           variant={editMode ? 'default' : 'outline'}
           size="sm"
@@ -460,7 +461,7 @@ export default function DashboardPage() {
         <p className="text-xs text-muted-foreground -mt-3">{t('dashboard.editHint')}</p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         {visibleOrder.map((id, idx) => {
           const isHidden = hidden.includes(id)
           const fullWidth = FULL_WIDTH_WIDGETS.has(id)
@@ -505,9 +506,4 @@ export default function DashboardPage() {
       </div>
     </div>
   )
-}
-
-function sixMonthsAgoFromNow(): string {
-  const now = new Date()
-  return new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString()
 }

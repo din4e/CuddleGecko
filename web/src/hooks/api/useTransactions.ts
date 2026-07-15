@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { transactionsApi } from '../../api/transactions'
 import { rootKey } from './keys'
-import type { Transaction, TransactionSummary, PaginatedData } from '../../types'
+import type { Transaction, TransactionSummary, TransactionTrendPoint, PaginatedData } from '../../types'
 
 const scope = 'transactions'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
@@ -26,6 +26,13 @@ export function useTransactionsSummary() {
   return useQuery<TransactionSummary>({
     queryKey: [...allKey(), 'summary'] as const,
     queryFn: () => transactionsApi.summary().then((r) => r.data),
+  })
+}
+
+export function useTransactionsTrend(months = 6) {
+  return useQuery<TransactionTrendPoint[]>({
+    queryKey: [...allKey(), 'trend', months] as const,
+    queryFn: ({ signal }) => transactionsApi.trend(months, signal).then((r) => r.data),
   })
 }
 

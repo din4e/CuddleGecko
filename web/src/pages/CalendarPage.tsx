@@ -10,23 +10,25 @@ import { useEventsList } from '../hooks/api/useEvents'
 import { useTodosList } from '../hooks/api/useTodos'
 
 const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] // Sun..Sat
+const EMPTY_EVENTS: Event[] = []
+const EMPTY_TODOS: Todo[] = []
 
 function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1) }
 function endOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59) }
-function ymd(d: Date) { return d.toISOString().slice(0, 10) }
-function sameDay(a: Date, b: Date) { return ymd(a) === ymd(b) }
+function dayKey(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+function sameDay(a: Date, b: Date) { return dayKey(a) === dayKey(b) }
 
 export default function CalendarPage() {
   const { t } = useTranslation()
   const today = new Date()
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
 
-  const monthStart = startOfMonth(cursor)
-  const monthEnd = endOfMonth(cursor)
+  const monthStart = useMemo(() => startOfMonth(cursor), [cursor])
+  const monthEnd = useMemo(() => endOfMonth(cursor), [cursor])
   const { data: eventsData } = useEventsList({ start_after: monthStart.toISOString(), end_before: monthEnd.toISOString(), page_size: 200 })
   const { data: todosData } = useTodosList({ page: 1, page_size: 200 })
-  const events = eventsData?.items ?? []
-  const todos = todosData?.items ?? []
+  const events = eventsData?.items ?? EMPTY_EVENTS
+  const todos = todosData?.items ?? EMPTY_TODOS
 
   // Build 6x7 grid
   const grid = useMemo(() => {
@@ -42,15 +44,35 @@ export default function CalendarPage() {
     return cells
   }, [monthStart])
 
-  const eventsFor = (d: Date): Event[] => events.filter((e) => sameDay(new Date(e.start_time), d))
-  const todosFor = (d: Date): Todo[] => todos.filter((td) => td.due_time && sameDay(new Date(td.due_time), d))
+  const eventsByDay = useMemo(() => {
+    const result = new Map<string, Event[]>()
+    for (const event of events) {
+      const key = dayKey(new Date(event.start_time))
+      const items = result.get(key)
+      if (items) items.push(event)
+      else result.set(key, [event])
+    }
+    return result
+  }, [events])
+
+  const todosByDay = useMemo(() => {
+    const result = new Map<string, Todo[]>()
+    for (const todo of todos) {
+      if (!todo.due_time) continue
+      const key = dayKey(new Date(todo.due_time))
+      const items = result.get(key)
+      if (items) items.push(todo)
+      else result.set(key, [todo])
+    }
+    return result
+  }, [todos])
 
   const monthLabel = cursor.toLocaleDateString(undefined, { year: 'numeric', month: 'long' })
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{t('calendar.title')}</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{t('calendar.title')}</h1>
       </div>
 
       <Tabs defaultValue="calendar">
@@ -72,18 +94,20 @@ export default function CalendarPage() {
             <Button variant="ghost" size="sm" onClick={() => setCursor(new Date(today.getFullYear(), today.getMonth(), 1))}>{t('calendar.today')}</Button>
           </div>
 
-          <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-            {WEEKDAYS.map((w) => {
-              const lbl = new Date(2024, 0, 7 + w).toLocaleDateString(undefined, { weekday: 'narrow' })
-              return <div key={w} className="py-1">{lbl}</div>
-            })}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {grid.map((d, i) => {
+          <div className="overflow-x-auto pb-1">
+            <div className="min-w-[700px]">
+              <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+                {WEEKDAYS.map((w) => {
+                  const lbl = new Date(2024, 0, 7 + w).toLocaleDateString(undefined, { weekday: 'narrow' })
+                  return <div key={w} className="py-1">{lbl}</div>
+                })}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {grid.map((d, i) => {
               const inMonth = d.getMonth() === cursor.getMonth()
               const isToday = sameDay(d, today)
-              const evs = eventsFor(d)
-              const tds = todosFor(d)
+              const evs = eventsByDay.get(dayKey(d)) ?? EMPTY_EVENTS
+              const tds = todosByDay.get(dayKey(d)) ?? EMPTY_TODOS
               return (
                 <div key={i} className={`min-h-[84px] rounded-md border p-1 text-xs ${inMonth ? 'bg-card' : 'bg-muted/30 opacity-50'} ${isToday ? 'ring-1 ring-primary' : ''}`}>
                   <div className={`text-right ${isToday ? 'font-bold text-primary' : ''}`}>{d.getDate()}</div>
@@ -105,7 +129,9 @@ export default function CalendarPage() {
                   </div>
                 </div>
               )
-            })}
+                })}
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-blue-500" />{t('calendar.event')}</span>
@@ -115,19 +141,19 @@ export default function CalendarPage() {
 
         {/* Eisenhower matrix */}
         <TabsContent value="matrix">
-          <Matrix todos={todos} t={t} />
+          <Matrix todos={todos} t={t} now={today} />
         </TabsContent>
       </Tabs>
     </div>
   )
 }
 
-function Matrix({ todos, t }: { todos: Todo[]; t: (k: string) => string }) {
+function Matrix({ todos, t, now }: { todos: Todo[]; t: (k: string) => string; now: Date }) {
   const URGENT_HOURS = 48
   const isUrgent = (td: Todo) => {
     if (!td.due_time) return false
     const due = new Date(td.due_time).getTime()
-    const diff = due - Date.now()
+    const diff = due - now.getTime()
     return diff <= URGENT_HOURS * 3600 * 1000 // overdue or within 48h
   }
   const isImportant = (td: Todo) => td.priority === 'high'

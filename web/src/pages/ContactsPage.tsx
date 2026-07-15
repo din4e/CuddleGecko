@@ -15,6 +15,7 @@ import EmojiPicker from '../components/EmojiPicker'
 import type { Contact } from '../types'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
+import { loadContactDetailPage } from '../lib/pageLoaders'
 import { labelColors, presetLabelKeys } from '../lib/constants'
 import { Plus, Search, X, Upload } from 'lucide-react'
 import { useContactsList, useCreateContact } from '../hooks/api/useContacts'
@@ -246,7 +247,7 @@ const ContactTableRow = memo(function ContactTableRow({ contact, labelRenderer }
   return (
     <TableRow className="cursor-pointer">
       <TableCell>
-        <Link to={`/buddies/${contact.id}`} className="flex items-center gap-3 hover:underline">
+        <Link to={`/buddies/${contact.id}`} className="flex items-center gap-3 hover:underline" onMouseEnter={() => void loadContactDetailPage()} onFocus={() => void loadContactDetailPage()} onTouchStart={() => void loadContactDetailPage()}>
           <AvatarDisplay emoji={contact.avatar_emoji} imageUrl={contact.avatar_url} name={contact.name} />
           <span className="font-medium">{contact.name}</span>
         </Link>
@@ -331,7 +332,7 @@ export default function ContactsPage() {
       ) : view === 'grid' ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" aria-busy={isFetching}>
           {contacts.map((contact) => (
-            <Link key={contact.id} to={`/buddies/${contact.id}`}>
+            <Link key={contact.id} to={`/buddies/${contact.id}`} onMouseEnter={() => void loadContactDetailPage()} onFocus={() => void loadContactDetailPage()} onTouchStart={() => void loadContactDetailPage()}>
               <ContactGridCard contact={contact} labelRenderer={labelRenderer} />
             </Link>
           ))}

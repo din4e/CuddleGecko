@@ -152,8 +152,8 @@ export default function FinancePage() {
       />
 
       {summary && (
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="flex flex-col">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Card className="flex flex-col shadow-sm">
             <CardContent className="flex-1 pt-4 flex items-center gap-3">
               <TrendingUp className="h-8 w-8 text-green-500 shrink-0" aria-hidden="true" />
               <div>
@@ -162,7 +162,7 @@ export default function FinancePage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="flex flex-col">
+          <Card className="flex flex-col shadow-sm">
             <CardContent className="flex-1 pt-4 flex items-center gap-3">
               <TrendingDown className="h-8 w-8 text-red-500 shrink-0" aria-hidden="true" />
               <div>
@@ -171,7 +171,7 @@ export default function FinancePage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="flex flex-col">
+          <Card className="flex flex-col shadow-sm">
             <CardContent className="flex-1 pt-4 flex items-center gap-3">
               <Wallet className="h-8 w-8 text-blue-500 shrink-0" aria-hidden="true" />
               <div>
@@ -203,7 +203,7 @@ export default function FinancePage() {
       ) : transactions.length === 0 ? (
         <EmptyState message={t('finance.noTransactions')} />
       ) : view === 'list' ? (
-        <Card>
+        <Card className="overflow-x-auto shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>

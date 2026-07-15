@@ -64,6 +64,7 @@ export default function AIChatPage() {
   })
   const [isResizing, setIsResizing] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
+  const [inputFocusRequest, setInputFocusRequest] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const mentionRef = useRef<HTMLDivElement>(null)
@@ -105,7 +106,8 @@ export default function AIChatPage() {
   }, [adapters])
 
   useEffect(() => {
-    loadConversations()
+    const timer = window.setTimeout(() => void loadConversations(), 0)
+    return () => window.clearTimeout(timer)
   }, [loadConversations])
 
   useEffect(() => {
@@ -117,6 +119,10 @@ export default function AIChatPage() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  useEffect(() => {
+    if (inputFocusRequest > 0) inputRef.current?.focus()
+  }, [inputFocusRequest])
 
   const loadMessages = useCallback(async (convId: number) => {
     if (!adapters?.ai) return
@@ -210,19 +216,19 @@ export default function AIChatPage() {
       return cleaned ? `${cleaned} @` : '@'
     })
     void loadMentionData()
-    inputRef.current?.focus()
+    setInputFocusRequest((request) => request + 1)
   }
 
   const handleSelectMention = (item: MentionItem) => {
     if (!mentions.some((m) => m.type === item.type && m.id === item.id)) {
       setMentions((prev) => [...prev, item])
     }
-    const lastAt = input.lastIndexOf('@')
-    if (lastAt !== -1) {
-      setInput(input.slice(0, lastAt))
-    }
+    setInput((previous) => {
+      const lastAt = previous.lastIndexOf('@')
+      return lastAt === -1 ? previous : previous.slice(0, lastAt)
+    })
     setMentionFilter('')
-    inputRef.current?.focus()
+    setInputFocusRequest((request) => request + 1)
   }
 
   const removeMention = (item: MentionItem) => {
@@ -235,7 +241,7 @@ export default function AIChatPage() {
         ? prev
         : [...prev, { type: 'finance', id: 0, name: t('ai.financialInsight') }]
     ))
-    inputRef.current?.focus()
+    setInputFocusRequest((request) => request + 1)
   }, [t])
 
   const resolveContactIds = (): number[] => {
@@ -385,6 +391,16 @@ export default function AIChatPage() {
     }
     return out
   }, [tags, filter, mentions])
+
+  const tagUsageCounts = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const contact of contacts) {
+      for (const tag of contact.tags ?? []) {
+        counts.set(tag.id, (counts.get(tag.id) ?? 0) + 1)
+      }
+    }
+    return counts
+  }, [contacts])
 
   const hasActiveConv = activeConvId !== null || messages.length > 0
 
@@ -686,7 +702,7 @@ export default function AIChatPage() {
                         <div className="h-3 w-3 shrink-0 rounded-full border" style={{ backgroundColor: tag.color }} />
                         <span className="truncate">{tag.name}</span>
                         <span className="ml-auto shrink-0 text-muted-foreground">
-                          {contacts.filter((contact) => contact.tags?.some((ct) => ct.id === tag.id)).length}
+                          {tagUsageCounts.get(tag.id) ?? 0}
                         </span>
                       </button>
                     )) : (

@@ -61,8 +61,7 @@ type replaceTodoTagsRequest struct {
 func (h *TodoHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	page, pageSize := parsePagination(c, 50)
 
 	var status *string
 	if v := c.Query("status"); v != "" {

@@ -57,8 +57,11 @@ func (r *ContactRepo) List(ctx context.Context, workspaceID uint, page, pageSize
 	}
 
 	if len(tagIDs) > 0 {
-		query = query.Joins("JOIN taggings ON taggings.target_id = contacts.id AND taggings.target_type = 'contact'").
-			Where("taggings.tag_id IN ?", tagIDs)
+		// EXISTS avoids duplicate contact rows when multiple selected tags match.
+		query = query.Where(
+			"EXISTS (SELECT 1 FROM taggings WHERE taggings.workspace_id = ? AND taggings.target_type = ? AND taggings.target_id = contacts.id AND taggings.tag_id IN ?)",
+			workspaceID, model.TagTargetContact, tagIDs,
+		)
 	}
 
 	if err := query.Model(&model.Contact{}).Count(&total).Error; err != nil {

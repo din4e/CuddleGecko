@@ -31,8 +31,7 @@ type updateTagRequest struct {
 func (h *TagHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	page, pageSize := parsePagination(c, 50)
 	tags, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize)
 	if err != nil {
 		response.InternalError(c, "failed to list tags")

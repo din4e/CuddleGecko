@@ -3,17 +3,19 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"gorm.io/gorm"
 )
 
 type TransactionRepo struct {
-	db *gorm.DB
+	db     *gorm.DB
+	driver string
 }
 
 func NewTransactionRepo(db *gorm.DB) *TransactionRepo {
-	return &TransactionRepo{db: db}
+	return &TransactionRepo{db: db, driver: db.Dialector.Name()}
 }
 
 func (r *TransactionRepo) Create(ctx context.Context, tx *model.Transaction) error {
@@ -41,7 +43,14 @@ func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, page
 		query = query.Where("type = ?", *txType)
 	}
 	if contactID != nil {
-		query = query.Where("contact_id = ?", *contactID)
+		// ContactIDs is persisted as JSON, so filtering against a non-existent
+		// contact_id column both fails and prevents linked transactions from
+		// appearing in contact views.
+		if r.driver == "sqlite" {
+			query = query.Where("EXISTS (SELECT 1 FROM json_each(contact_ids) WHERE json_each.value = ?)", *contactID)
+		} else {
+			query = query.Where("JSON_CONTAINS(contact_ids, JSON_ARRAY(?))", *contactID)
+		}
 	}
 
 	if err := query.Model(&model.Transaction{}).Count(&total).Error; err != nil {
@@ -57,6 +66,25 @@ func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, page
 	}
 
 	return txs, total, nil
+}
+
+func (r *TransactionRepo) MonthlyTrend(ctx context.Context, workspaceID uint, since time.Time) ([]model.TransactionTrendPoint, error) {
+	monthExpr := "strftime('%Y-%m', date)"
+	if r.driver != "sqlite" {
+		monthExpr = "DATE_FORMAT(date, '%Y-%m')"
+	}
+
+	var points []model.TransactionTrendPoint
+	err := r.db.WithContext(ctx).Model(&model.Transaction{}).
+		Select(monthExpr+" AS month, type, COALESCE(SUM(amount), 0) AS amount").
+		Where("workspace_id = ? AND date >= ?", workspaceID, since).
+		Group(monthExpr + ", type").
+		Order("month ASC, type ASC").
+		Scan(&points).Error
+	if err != nil {
+		return nil, fmt.Errorf("transaction monthly trend: %w", err)
+	}
+	return points, nil
 }
 
 func (r *TransactionRepo) ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Transaction, error) {

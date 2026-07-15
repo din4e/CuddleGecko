@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import BuddyPicker from '../components/BuddyPicker'
 import { toast } from 'sonner'
-import type { Todo, Contact, Tag, RepeatRule } from '../types'
+import type { Todo, Contact, Tag, TodoList, RepeatRule } from '../types'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
 import {
@@ -68,6 +68,10 @@ const REPEAT_OPTIONS: { value: RepeatRule; labelKey: string }[] = [
   { value: 'yearly', labelKey: 'todos.repeatYearly' },
   { value: 'weekdays', labelKey: 'todos.repeatWeekdays' },
 ]
+
+const EMPTY_TODOS: Todo[] = []
+const EMPTY_LISTS: TodoList[] = []
+const EMPTY_TAGS: Tag[] = []
 
 function isOverdue(todo: Todo): boolean {
   return todo.status === 'pending' && !!todo.due_time && new Date(todo.due_time).getTime() < Date.now()
@@ -299,12 +303,12 @@ export default function TodosPage() {
   const createList = useCreateTodoList()
   const deleteList = useDeleteTodoList()
 
-  useReminders(data?.items ?? [])
+  const todos = data?.items ?? EMPTY_TODOS
+  useReminders(todos)
 
-  const todos = data?.items ?? []
   const total = data?.total ?? 0
-  const listsArr = lists ?? []
-  const tagsArr: Tag[] = tagsData?.items ?? []
+  const listsArr = lists ?? EMPTY_LISTS
+  const tagsArr = tagsData?.items ?? EMPTY_TAGS
 
   // Form state
   const [formTitle, setFormTitle] = useState('')
@@ -444,8 +448,15 @@ export default function TodosPage() {
     return d > new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) && d <= weekEnd
   }
 
-  const pendingTodos = todos.filter((t) => t.status === 'pending')
-  const doneTodos = todos.filter((t) => t.status === 'done')
+  const { pendingTodos, doneTodos } = useMemo(() => {
+    const pending: Todo[] = []
+    const done: Todo[] = []
+    for (const todo of todos) {
+      if (todo.status === 'pending') pending.push(todo)
+      else if (todo.status === 'done') done.push(todo)
+    }
+    return { pendingTodos: pending, doneTodos: done }
+  }, [todos])
 
   const groupedTodos = useMemo(() => {
     const overdueGroup: Todo[] = []

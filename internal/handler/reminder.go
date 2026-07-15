@@ -35,8 +35,7 @@ func (h *ReminderHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
 	status := model.ReminderStatus(c.Query("status"))
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	page, pageSize := parsePagination(c, 50)
 
 	reminders, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, status, page, pageSize)
 	if err != nil {
