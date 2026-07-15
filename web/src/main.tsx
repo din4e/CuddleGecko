@@ -17,7 +17,11 @@ setupBrandFaviconSync()
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      // Most lists are invalidated immediately after a mutation. A short cache
+      // window makes back-and-forth navigation across subpages feel instant
+      // without serving stale local writes.
+      staleTime: 60_000,
+      gcTime: 10 * 60_000,
       refetchOnWindowFocus: false,
       retry: 1,
     },

@@ -466,8 +466,8 @@ export default function ContactDetailPage() {
                   ref={fgRef}
                   graphData={miniGraphData}
                   nodeLabel="name"
-                  nodeColor={(node: any) => node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? getNodeLabelColor(node.relationship_labels[0]) : '#6b7280')}
-                  nodeVal={(node: any) => node.__isCenter ? 4 : 2}
+                  nodeColor={(node: MiniGraphNode) => node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? getNodeLabelColor(node.relationship_labels[0]) : '#6b7280')}
+                  nodeVal={(node: MiniGraphNode) => node.__isCenter ? 4 : 2}
                   linkColor={() => '#94a3b8'}
                   linkWidth={1.5}
                   linkDirectionalArrowLength={3}

@@ -118,7 +118,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			protected.PUT("/workspaces/:id", h.Workspace.Update)
 			protected.DELETE("/workspaces/:id", h.Workspace.Delete)
 			protected.POST("/workspaces/:id/switch", h.Workspace.Switch)
-				protected.GET("/workspaces/default", h.Workspace.GetDefault)
+			protected.GET("/workspaces/default", h.Workspace.GetDefault)
 		}
 
 		// Workspace-scoped routes
@@ -199,6 +199,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 
 			wsProtected.GET("/transactions", h.Transaction.List)
 			wsProtected.GET("/transactions/summary", h.Transaction.Summary)
+			wsProtected.GET("/transactions/trend", h.Transaction.MonthlyTrend)
 			wsProtected.POST("/transactions", h.Transaction.Create)
 			wsProtected.PUT("/transactions/:id", h.Transaction.Update)
 			wsProtected.DELETE("/transactions/:id", h.Transaction.Delete)

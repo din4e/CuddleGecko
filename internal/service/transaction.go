@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 )
@@ -15,6 +16,7 @@ type TransactionRepository interface {
 	List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint) ([]model.Transaction, int64, error)
 	ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Transaction, error)
 	Summary(ctx context.Context, workspaceID uint) (income float64, expense float64, err error)
+	MonthlyTrend(ctx context.Context, workspaceID uint, since time.Time) ([]model.TransactionTrendPoint, error)
 	Update(ctx context.Context, tx *model.Transaction) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 }
@@ -46,6 +48,10 @@ func (s *TransactionService) List(ctx context.Context, userID, workspaceID uint,
 
 func (s *TransactionService) Summary(ctx context.Context, userID, workspaceID uint) (income float64, expense float64, err error) {
 	return s.repo.Summary(ctx, workspaceID)
+}
+
+func (s *TransactionService) MonthlyTrend(ctx context.Context, userID, workspaceID uint, since time.Time) ([]model.TransactionTrendPoint, error) {
+	return s.repo.MonthlyTrend(ctx, workspaceID, since)
 }
 
 func (s *TransactionService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Transaction) (*model.Transaction, error) {

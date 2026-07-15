@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
@@ -12,6 +12,7 @@ import { useTodosList } from '../hooks/api/useTodos'
 type Mode = 'focus' | 'break'
 const WORK_KEY = 'pomo_work_min'
 const BREAK_KEY = 'pomo_break_min'
+const EMPTY_TODOS: { id: number; title: string }[] = []
 
 function fmt(sec: number) {
   const m = Math.floor(sec / 60)
@@ -30,16 +31,55 @@ export default function PomodoroPage() {
   const record = useRecordPomodoro()
   const { data: summary } = usePomodoroSummary()
   const { data: todosData } = useTodosList({ status: 'pending', page: 1, page_size: 30 })
-  const todos = todosData?.items ?? []
+  const todos = todosData?.items ?? EMPTY_TODOS
 
   const totalForMode = (mode === 'focus' ? workMin : breakMin) * 60
   const pct = totalForMode > 0 ? ((totalForMode - secondsLeft) / totalForMode) * 100 : 0
 
-  // reset countdown when switching mode or length
-  useEffect(() => {
-    setSecondsLeft((mode === 'focus' ? workMin : breakMin) * 60)
+  const durationFor = useCallback((nextMode: Mode, nextWorkMin = workMin, nextBreakMin = breakMin) => (
+    (nextMode === 'focus' ? nextWorkMin : nextBreakMin) * 60
+  ), [breakMin, workMin])
+
+  const resetTimer = useCallback((nextMode = mode, nextWorkMin = workMin, nextBreakMin = breakMin) => {
     setRunning(false)
-  }, [mode, workMin, breakMin])
+    setSecondsLeft(durationFor(nextMode, nextWorkMin, nextBreakMin))
+  }, [breakMin, durationFor, mode, workMin])
+
+  const selectMode = (nextMode: Mode) => {
+    if (nextMode === mode) return
+    setMode(nextMode)
+    resetTimer(nextMode)
+  }
+
+  const persistWork = (value: number) => {
+    const next = Math.min(120, Math.max(1, value || 25))
+    setWorkMin(next)
+    localStorage.setItem(WORK_KEY, String(next))
+    if (mode === 'focus') resetTimer('focus', next, breakMin)
+  }
+
+  const persistBreak = (value: number) => {
+    const next = Math.min(60, Math.max(1, value || 5))
+    setBreakMin(next)
+    localStorage.setItem(BREAK_KEY, String(next))
+    if (mode === 'break') resetTimer('break', workMin, next)
+  }
+
+  const completionRef = useRef(false)
+  const completeSession = useCallback(() => {
+    const completedMode = mode
+    const nextMode: Mode = completedMode === 'focus' ? 'break' : 'focus'
+    setRunning(false)
+    if (completedMode === 'focus') {
+      record.mutate({ duration_seconds: workMin * 60, kind: 'focus', completed: true, todo_id: todoId || null })
+      toast.success(t('pomo.focusDone', { min: workMin }))
+    } else {
+      toast.success(t('pomo.breakDone'))
+    }
+    setMode(nextMode)
+    setSecondsLeft(durationFor(nextMode))
+    completionRef.current = false
+  }, [durationFor, mode, record, t, todoId, workMin])
 
   // tick
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -49,45 +89,30 @@ export default function PomodoroPage() {
       setSecondsLeft((s) => {
         if (s <= 1) {
           clearInterval(intervalRef.current!)
+          if (!completionRef.current) {
+            completionRef.current = true
+            window.setTimeout(completeSession, 0)
+          }
           return 0
         }
         return s - 1
       })
     }, 1000)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [running])
-
-  // completion
-  useEffect(() => {
-    if (secondsLeft !== 0) return
-    if (running) setRunning(false)
-    if (mode === 'focus') {
-      const duration = workMin * 60
-      record.mutate({ duration_seconds: duration, kind: 'focus', completed: true, todo_id: todoId || null })
-      toast.success(t('pomo.focusDone', { min: workMin }))
-    } else {
-      toast.success(t('pomo.breakDone'))
-    }
-    // auto switch focus<->break
-    setMode((m) => (m === 'focus' ? 'break' : 'focus'))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secondsLeft])
-
-  const persistWork = (v: number) => { setWorkMin(v); localStorage.setItem(WORK_KEY, String(v)) }
-  const persistBreak = (v: number) => { setBreakMin(v); localStorage.setItem(BREAK_KEY, String(v)) }
+  }, [completeSession, running])
 
   const radius = 90
   const circ = 2 * Math.PI * radius
 
   return (
-    <div className="space-y-4 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{t('pomo.title')}</h1>
+    <div className="mx-auto w-full max-w-5xl space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-semibold tracking-tight">{t('pomo.title')}</h1>
         <div className="flex gap-2">
-          <Button variant={mode === 'focus' ? 'default' : 'outline'} size="sm" onClick={() => setMode('focus')}>
+          <Button variant={mode === 'focus' ? 'default' : 'outline'} size="sm" onClick={() => selectMode('focus')}>
             <Brain className="h-4 w-4 mr-1" />{t('pomo.focus')}
           </Button>
-          <Button variant={mode === 'break' ? 'default' : 'outline'} size="sm" onClick={() => setMode('break')}>
+          <Button variant={mode === 'break' ? 'default' : 'outline'} size="sm" onClick={() => selectMode('break')}>
             <Coffee className="h-4 w-4 mr-1" />{t('pomo.break')}
           </Button>
         </div>
@@ -101,8 +126,8 @@ export default function PomodoroPage() {
         <StatCard label={t('pomo.totalMin')} value={Math.round((summary?.total_seconds ?? 0) / 60)} />
       </div>
 
-      <Card>
-        <CardContent className="p-6 flex flex-col items-center gap-4">
+      <Card className="shadow-sm">
+        <CardContent className="flex flex-col items-center gap-5 p-6 sm:p-8">
           <div className="relative">
             <svg width="220" height="220" className="-rotate-90">
               <circle cx="110" cy="110" r={radius} fill="none" stroke="currentColor" className="text-muted/30" strokeWidth="12" />
@@ -124,7 +149,7 @@ export default function PomodoroPage() {
             <Button size="lg" onClick={() => setRunning((r) => !r)} disabled={secondsLeft === 0}>
               {running ? <><Pause className="h-5 w-5 mr-1" />{t('pomo.pause')}</> : <><Play className="h-5 w-5 mr-1" />{t('pomo.start')}</>}
             </Button>
-            <Button size="lg" variant="outline" onClick={() => { setRunning(false); setSecondsLeft(totalForMode) }}>
+            <Button size="lg" variant="outline" onClick={() => resetTimer()}>
               <RotateCcw className="h-5 w-5 mr-1" />{t('pomo.reset')}
             </Button>
           </div>

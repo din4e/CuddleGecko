@@ -211,8 +211,11 @@ export default function GraphPage() {
 
   // Re-measure when toggling fullscreen, then recenter.
   useEffect(() => {
-    measureContainer()
-    scheduleRecenter()
+    const timer = window.setTimeout(() => {
+      measureContainer()
+      scheduleRecenter()
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [isFullscreen, measureContainer, scheduleRecenter])
 
   // Debounced recenter on dimension change.

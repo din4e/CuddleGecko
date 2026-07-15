@@ -39,6 +39,7 @@ import WorkspaceSwitcher from '../components/WorkspaceSwitcher'
 import { cn } from '@/lib/utils'
 import { useNavConfigStore } from '../stores/navConfig'
 import { CUSTOMIZABLE_PATHS } from '../lib/nav'
+import { preloadPage } from '../lib/pageLoaders'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed'
 
@@ -145,7 +146,7 @@ export default function AppLayout() {
   ]
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="h-[100dvh] flex flex-col bg-background">
       <div className="flex flex-1 min-h-0">
 
       {/* Backdrop for mobile sidebar */}
@@ -160,7 +161,7 @@ export default function AppLayout() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'flex shrink-0 flex-col border-r bg-card transition-[width] duration-200 ease-out',
+          'flex shrink-0 flex-col border-r bg-sidebar transition-[width] duration-200 ease-out',
           sidebarCollapsed ? 'w-[4.5rem] items-center overflow-x-hidden px-2 py-4' : 'w-64 p-4',
           'hidden lg:flex',
           mobileOpen && 'fixed inset-y-0 left-0 z-50 flex lg:static lg:z-auto',
@@ -190,6 +191,9 @@ export default function AppLayout() {
               title={sidebarCollapsed ? t(label) : undefined}
               aria-label={t(label)}
               onClick={closeMobileSidebar}
+              onMouseEnter={() => preloadPage(to)}
+              onFocus={() => preloadPage(to)}
+              onTouchStart={() => preloadPage(to)}
               className={({ isActive }) =>
                 cn(
                   'flex items-center rounded-md text-sm transition-colors',
@@ -293,7 +297,7 @@ export default function AppLayout() {
 
         {/* Content */}
         <main className="flex-1 overflow-hidden min-h-0">
-          <div className="h-full overflow-auto p-6 border-0">
+          <div className="h-full overflow-auto p-3 sm:p-4 lg:p-5 2xl:p-6 border-0">
             <Outlet />
           </div>
         </main>
