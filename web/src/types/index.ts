@@ -240,6 +240,7 @@ export interface Todo {
   // Denormalized checklist progress (optional on the client for resilience).
   item_total?: number
   item_done?: number
+  pomodoro_count?: number
   created_at: string
   updated_at: string
 }

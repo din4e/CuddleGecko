@@ -230,6 +230,26 @@ func (h *TodoHandler) Move(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// IncrementPomodoro records one completed focus session on a todo (called by the
+// client when a 25-min Pomodoro finishes).
+func (h *TodoHandler) IncrementPomodoro(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, ok := h.parseTodoID(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.IncrementPomodoro(c.Request.Context(), userID, workspaceID, id); err != nil {
+		if errors.Is(err, service.ErrTodoNotFound) {
+			response.NotFound(c, "todo not found")
+			return
+		}
+		response.InternalError(c, "failed to increment pomodoro")
+		return
+	}
+	response.OK(c, nil)
+}
+
 func (h *TodoHandler) Create(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)

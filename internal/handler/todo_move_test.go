@@ -45,3 +45,18 @@ func TestTodoHandler_Move_CycleReturns400(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "cannot move")
 }
+
+func TestTodoHandler_IncrementPomodoro(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1, WorkspaceID: 1}, nil)
+	repo.On("IncrementPomodoro", mock.Anything, uint(1), uint(1)).Return(nil)
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("POST", "/api/todos/1/pomodoro", nil))
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}

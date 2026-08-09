@@ -115,6 +115,10 @@ func (m *mockTodoRepo) SetPinned(ctx context.Context, workspaceID, id uint, pinn
 	return m.Called(ctx, workspaceID, id, pinned).Error(0)
 }
 
+func (m *mockTodoRepo) IncrementPomodoro(ctx context.Context, workspaceID, id uint) error {
+	return m.Called(ctx, workspaceID, id).Error(0)
+}
+
 func (m *mockTodoRepo) ReplaceTags(ctx context.Context, todoID uint, tags []model.Tag) error {
 	return m.Called(ctx, todoID, tags).Error(0)
 }

@@ -175,6 +175,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.PATCH("/todos/:id/move", h.Todo.Move)
 			wsProtected.POST("/todos/:id/sync-event", h.Todo.SyncToEvent)
 			wsProtected.POST("/todos/:id/duplicate", h.Todo.Duplicate)
+			wsProtected.POST("/todos/:id/pomodoro", h.Todo.IncrementPomodoro)
 			wsProtected.POST("/todos/:id/restore", h.Todo.Restore)
 			wsProtected.DELETE("/todos/:id", h.Todo.Delete)
 

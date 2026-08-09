@@ -84,6 +84,14 @@ export function useMoveTodo() {
   })
 }
 
+export function usePomodoroTodo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => todosApi.pomodoro(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+  })
+}
+
 export function useTogglePin() {
   const qc = useQueryClient()
   return useMutation({

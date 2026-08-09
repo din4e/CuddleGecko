@@ -52,6 +52,9 @@ export const todosApi = {
   duplicate: (id: number) =>
     request.post<Todo>(`/todos/${id}/duplicate`).then((d) => ({ data: d })),
 
+  pomodoro: (id: number) =>
+    request.post<void>(`/todos/${id}/pomodoro`).then(() => {}),
+
   delete: (id: number) =>
     request.delete<void>(`/todos/${id}`).then(() => {}),
 
