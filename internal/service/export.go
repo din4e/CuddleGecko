@@ -28,6 +28,8 @@ type ExportPayload struct {
 	Todos        []todoExport           `json:"todos"`
 	Transactions []model.Transaction    `json:"transactions"`
 	Events       []model.Event          `json:"events"`
+	Workouts     []workoutExport        `json:"workouts"`
+	BodyMetrics  []model.BodyMetric     `json:"body_metrics"`
 }
 
 // todoExport captures a todo's portable state for export/import. Tags travel as
@@ -60,6 +62,39 @@ type itemExport struct {
 	SortOrder int    `json:"sort_order"`
 }
 
+// workoutExport captures a workout's portable state for export/import. Exercises
+// travel inline and are re-attached to the freshly-created workout on import.
+type workoutExport struct {
+	ID          uint           `json:"id"`
+	Name        string         `json:"name"`
+	Type        string         `json:"type"`
+	Status      string         `json:"status"`
+	Intensity   string         `json:"intensity"`
+	ScheduledAt *time.Time     `json:"scheduled_at"`
+	DurationMin *int           `json:"duration_min"`
+	Calories    *float64       `json:"calories"`
+	Color       string         `json:"color"`
+	Location    string         `json:"location"`
+	Notes       string         `json:"notes"`
+	SortOrder   int            `json:"sort_order"`
+	CompletedAt *time.Time     `json:"completed_at"`
+	Exercises   []exerciseExport `json:"exercises"`
+}
+
+type exerciseExport struct {
+	Name        string   `json:"name"`
+	Category    string   `json:"category"`
+	Sets        *int     `json:"sets"`
+	Reps        *int     `json:"reps"`
+	Weight      *float64 `json:"weight"`
+	Distance    *float64 `json:"distance"`
+	DurationSec *int     `json:"duration_sec"`
+	RestSec     *int     `json:"rest_sec"`
+	Done        bool     `json:"done"`
+	SortOrder   int      `json:"sort_order"`
+	Notes       string   `json:"notes"`
+}
+
 type ExportService struct {
 	contactRepo     ContactRepository
 	tagRepo         TagRepository
@@ -70,6 +105,9 @@ type ExportService struct {
 	todoItemRepo    TodoItemRepository
 	txRepo          TransactionRepository
 	eventRepo       EventRepository
+	workoutRepo     WorkoutRepository
+	workoutExRepo   WorkoutExerciseRepository
+	bodyMetricRepo  BodyMetricRepository
 	notifier        TodoChangeNotifier
 }
 
@@ -103,6 +141,23 @@ func WithEventRepo(r EventRepository) ExportServiceOption {
 	return func(s *ExportService) {
 		if r != nil {
 			s.eventRepo = r
+		}
+	}
+}
+
+// WithWorkoutRepos wires workout/exercise/body-metric access so fitness data is
+// included in the JSON export/import round-trip. Optional for backward
+// compatibility (tests omit it).
+func WithWorkoutRepos(workoutRepo WorkoutRepository, exRepo WorkoutExerciseRepository, bodyRepo BodyMetricRepository) ExportServiceOption {
+	return func(s *ExportService) {
+		if workoutRepo != nil {
+			s.workoutRepo = workoutRepo
+		}
+		if exRepo != nil {
+			s.workoutExRepo = exRepo
+		}
+		if bodyRepo != nil {
+			s.bodyMetricRepo = bodyRepo
 		}
 	}
 }
@@ -218,6 +273,47 @@ func (s *ExportService) ExportJSON(ctx context.Context, workspaceID uint) (strin
 		}
 	}
 
+	// Workouts + their exercises (fitness data). Optional.
+	var workoutExports []workoutExport
+	if s.workoutRepo != nil {
+		workouts, _, werr := s.workoutRepo.List(ctx, workspaceID, model.WorkoutListQuery{Page: 1, PageSize: 100000})
+		if werr != nil {
+			return "", fmt.Errorf("export workouts: %w", werr)
+		}
+		workoutExports = make([]workoutExport, 0, len(workouts))
+		for _, w := range workouts {
+			exOut := make([]exerciseExport, 0)
+			if s.workoutExRepo != nil {
+				exs, eerr := s.workoutExRepo.ListExercises(ctx, w.ID)
+				if eerr != nil {
+					return "", fmt.Errorf("export exercises: %w", eerr)
+				}
+				for _, e := range exs {
+					exOut = append(exOut, exerciseExport{
+						Name: e.Name, Category: e.Category, Sets: e.Sets, Reps: e.Reps,
+						Weight: e.Weight, Distance: e.Distance, DurationSec: e.DurationSec,
+						RestSec: e.RestSec, Done: e.Done, SortOrder: e.SortOrder, Notes: e.Notes,
+					})
+				}
+			}
+			workoutExports = append(workoutExports, workoutExport{
+				ID: w.ID, Name: w.Name, Type: w.Type, Status: w.Status, Intensity: w.Intensity,
+				ScheduledAt: w.ScheduledAt, DurationMin: w.DurationMin, Calories: w.Calories,
+				Color: w.Color, Location: w.Location, Notes: w.Notes, SortOrder: w.SortOrder,
+				CompletedAt: w.CompletedAt, Exercises: exOut,
+			})
+		}
+	}
+
+	// Body / health records. Optional.
+	var bodyMetrics []model.BodyMetric
+	if s.bodyMetricRepo != nil {
+		bodyMetrics, _, err = s.bodyMetricRepo.List(ctx, workspaceID, 1, 100000)
+		if err != nil {
+			return "", fmt.Errorf("export body metrics: %w", err)
+		}
+	}
+
 	data := ExportData{
 		Version:    "1.0",
 		ExportedAt: time.Now(),
@@ -230,6 +326,8 @@ func (s *ExportService) ExportJSON(ctx context.Context, workspaceID uint) (strin
 			Todos:        todoExports,
 			Transactions: transactions,
 			Events:       events,
+			Workouts:     workoutExports,
+			BodyMetrics:  bodyMetrics,
 		},
 	}
 
@@ -548,6 +646,78 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 				tags = append(tags, model.Tag{ID: id})
 			}
 			_ = s.todoRepo.ReplaceTags(ctx, newTodo.ID, tags)
+		}
+	}
+
+	// Workouts + their exercises (fitness data). Exercises are re-attached to the
+	// freshly-created workout via an old→new id map. Skipped without repos.
+	if s.workoutRepo != nil {
+		workoutOldToNew := make(map[uint]uint, len(data.Data.Workouts))
+		for _, we := range data.Data.Workouts {
+			status := we.Status
+			if status == "" {
+				status = model.WorkoutStatusPlanned
+			}
+			wType := we.Type
+			if wType == "" {
+				wType = "other"
+			}
+			newW := &model.Workout{
+				UserID:      userID,
+				WorkspaceID: workspaceID,
+				Name:        we.Name,
+				Type:        wType,
+				Status:      status,
+				Intensity:   we.Intensity,
+				ScheduledAt: we.ScheduledAt,
+				DurationMin: we.DurationMin,
+				Calories:    we.Calories,
+				Color:       we.Color,
+				Location:    we.Location,
+				Notes:       we.Notes,
+				SortOrder:   we.SortOrder,
+				CompletedAt: we.CompletedAt,
+			}
+			if err := s.workoutRepo.Create(ctx, newW); err != nil {
+				continue
+			}
+			workoutOldToNew[we.ID] = newW.ID
+			if s.workoutExRepo != nil {
+				for _, ee := range we.Exercises {
+					_ = s.workoutExRepo.CreateExercise(ctx, &model.WorkoutExercise{
+						WorkoutID: newW.ID, Name: ee.Name, Category: ee.Category, Sets: ee.Sets,
+						Reps: ee.Reps, Weight: ee.Weight, Distance: ee.Distance, DurationSec: ee.DurationSec,
+						RestSec: ee.RestSec, Done: ee.Done, SortOrder: ee.SortOrder, Notes: ee.Notes,
+					})
+				}
+			}
+		}
+	}
+
+	// Body / health records (no FK to remap). Skipped without a repo.
+	if s.bodyMetricRepo != nil {
+		for _, m := range data.Data.BodyMetrics {
+			newM := &model.BodyMetric{
+				UserID:      userID,
+				WorkspaceID: workspaceID,
+				RecordedAt:  m.RecordedAt,
+				Weight:      m.Weight,
+				Height:      m.Height,
+				BodyFat:     m.BodyFat,
+				MuscleMass:  m.MuscleMass,
+				RestingHR:   m.RestingHR,
+				Systolic:    m.Systolic,
+				Diastolic:   m.Diastolic,
+				SleepHours:  m.SleepHours,
+				Steps:       m.Steps,
+				Energy:      m.Energy,
+				Mood:        m.Mood,
+				Notes:       m.Notes,
+			}
+			if newM.RecordedAt.IsZero() {
+				newM.RecordedAt = time.Now()
+			}
+			_ = s.bodyMetricRepo.Create(ctx, newM)
 		}
 	}
 

@@ -21,6 +21,7 @@ type Handlers struct {
 	Upload      *UploadHandler
 	Event       *EventHandler
 	Todo        *TodoHandler
+	Workout     *WorkoutHandler
 	Transaction *TransactionHandler
 	AI          *AIHandler
 	Workspace   *WorkspaceHandler
@@ -40,6 +41,7 @@ func NewHandlers(
 	relationSvc *service.RelationService,
 	eventSvc *service.EventService,
 	todoSvc *service.TodoService,
+	workoutSvc *service.WorkoutService,
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
 	workspaceSvc *service.WorkspaceService,
@@ -59,6 +61,7 @@ func NewHandlers(
 		Upload:      NewUploadHandler(uploadDir),
 		Event:       NewEventHandler(eventSvc),
 		Todo:        NewTodoHandler(todoSvc),
+		Workout:     NewWorkoutHandler(workoutSvc),
 		Transaction: NewTransactionHandler(transactionSvc),
 		AI:          NewAIHandler(aiSvc, aiCfg),
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
@@ -191,6 +194,28 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			// Tag associations on a todo
 			wsProtected.GET("/todos/:id/tags", h.Todo.GetTags)
 			wsProtected.PUT("/todos/:id/tags", h.Todo.ReplaceTags)
+
+			// Workouts (training plans) + their exercise checklists
+			wsProtected.GET("/workouts", h.Workout.List)
+			wsProtected.GET("/workouts/stats", h.Workout.Stats)
+			wsProtected.POST("/workouts", h.Workout.Create)
+			wsProtected.PUT("/workouts/:id", h.Workout.Update)
+			wsProtected.PATCH("/workouts/:id/toggle", h.Workout.ToggleStatus)
+			wsProtected.PATCH("/workouts/:id/reorder", h.Workout.Reorder)
+			wsProtected.DELETE("/workouts/:id", h.Workout.Delete)
+			wsProtected.GET("/workouts/:id/exercises", h.Workout.ListExercises)
+			wsProtected.POST("/workouts/:id/exercises", h.Workout.CreateExercise)
+			wsProtected.PUT("/workouts/:id/exercises/:exerciseId", h.Workout.UpdateExercise)
+			wsProtected.PATCH("/workouts/:id/exercises/:exerciseId/toggle", h.Workout.ToggleExercise)
+			wsProtected.PATCH("/workouts/:id/exercises/:exerciseId/reorder", h.Workout.ReorderExercise)
+			wsProtected.DELETE("/workouts/:id/exercises/:exerciseId", h.Workout.DeleteExercise)
+
+			// Body / health records
+			wsProtected.GET("/body-metrics", h.Workout.ListMetrics)
+			wsProtected.GET("/body-metrics/summary", h.Workout.BodySummary)
+			wsProtected.POST("/body-metrics", h.Workout.CreateMetric)
+			wsProtected.PUT("/body-metrics/:id", h.Workout.UpdateMetric)
+			wsProtected.DELETE("/body-metrics/:id", h.Workout.DeleteMetric)
 
 			wsProtected.GET("/transactions", h.Transaction.List)
 			wsProtected.GET("/transactions/summary", h.Transaction.Summary)

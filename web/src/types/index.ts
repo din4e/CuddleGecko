@@ -264,3 +264,151 @@ export interface TodoStats {
   done_today: number
   done_this_week: number
 }
+
+// --- Fitness module (workouts + body metrics) ---
+
+export type WorkoutType = 'strength' | 'cardio' | 'flexibility' | 'balance' | 'sport' | 'other'
+export type WorkoutStatus = 'planned' | 'in_progress' | 'completed' | 'skipped'
+export type WorkoutIntensity = '' | 'low' | 'medium' | 'high'
+export type WorkoutSort = 'scheduled' | 'created' | 'manual'
+
+export interface Workout {
+  id: number
+  user_id: number
+  workspace_id: number
+  name: string
+  type: WorkoutType
+  status: WorkoutStatus
+  intensity: WorkoutIntensity
+  scheduled_at: string | null
+  duration_min: number | null
+  calories: number | null
+  color: string
+  location: string
+  notes: string
+  sort_order: number
+  completed_at: string | null
+  /** Denormalized exercise progress (optional on the client for resilience). */
+  item_total?: number
+  item_done?: number
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkoutExercise {
+  id: number
+  workout_id: number
+  name: string
+  category: string
+  sets: number | null
+  reps: number | null
+  weight: number | null
+  distance: number | null
+  duration_sec: number | null
+  rest_sec: number | null
+  done: boolean
+  sort_order: number
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export interface BodyMetric {
+  id: number
+  user_id: number
+  workspace_id: number
+  recorded_at: string
+  weight: number | null
+  height: number | null
+  body_fat: number | null
+  muscle_mass: number | null
+  resting_hr: number | null
+  systolic: number | null
+  diastolic: number | null
+  sleep_hours: number | null
+  steps: number | null
+  energy: number | null
+  mood: number | null
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkoutStats {
+  total: number
+  planned: number
+  in_progress: number
+  completed: number
+  skipped: number
+  this_week: number
+  total_minutes: number
+  total_calories: number
+}
+
+export interface BodyMetricSummary {
+  latest: BodyMetric | null
+  latest_weight: number | null
+  prev_weight: number | null
+  weight_trend: 'up' | 'down' | 'flat' | 'none'
+  count: number
+  first_at: string | null
+  last_at: string | null
+}
+
+/** Query parameters for listing workouts. */
+export interface WorkoutListParams {
+  status?: WorkoutStatus
+  type?: WorkoutType
+  q?: string
+  date_after?: string
+  date_before?: string
+  sort?: WorkoutSort
+  order?: 'asc' | 'desc'
+  page?: number
+  page_size?: number
+}
+
+/** Update payload with explicit clear flags for nullable fields. */
+export interface WorkoutUpdateInput extends Partial<Omit<Workout, 'scheduled_at' | 'duration_min' | 'calories'>> {
+  scheduled_at?: string | null
+  duration_min?: number | null
+  calories?: number | null
+  clear_scheduled_at?: boolean
+  clear_duration_min?: boolean
+  clear_calories?: boolean
+}
+
+export interface WorkoutExerciseInput {
+  name: string
+  category?: string
+  sets?: number | null
+  reps?: number | null
+  weight?: number | null
+  distance?: number | null
+  duration_sec?: number | null
+  rest_sec?: number | null
+  notes?: string
+}
+
+export interface BodyMetricInput {
+  recorded_at?: string
+  weight?: number | null
+  height?: number | null
+  body_fat?: number | null
+  muscle_mass?: number | null
+  resting_hr?: number | null
+  systolic?: number | null
+  diastolic?: number | null
+  sleep_hours?: number | null
+  steps?: number | null
+  energy?: number | null
+  mood?: number | null
+  notes?: string
+}
+
+/** BMI from weight (kg) + height (cm); 0 when inputs are missing/non-positive. */
+export function bmi(weightKg?: number | null, heightCm?: number | null): number {
+  if (!weightKg || !heightCm || weightKg <= 0 || heightCm <= 0) return 0
+  const m = heightCm / 100
+  return weightKg / (m * m)
+}

@@ -166,6 +166,10 @@ func main() {
 	seedTransactions(db, user, contacts)
 	seedEvents(db, user, contacts)
 
+	// --- Workouts (training plans) + Body metrics (health records) demo data ---
+	seedWorkouts(db, user)
+	seedBodyMetrics(db, user)
+
 	fmt.Println("\nSeed data complete!")
 	fmt.Println("Login: demo / test123")
 }
@@ -401,4 +405,137 @@ func seedEvents(db *gorm.DB, user model.User, contacts []model.Contact) {
 		db.FirstOrCreate(&events[i], model.Event{WorkspaceID: wsID, Title: events[i].Title})
 	}
 	fmt.Printf("Created %d events\n", len(events))
+}
+
+// seedWorkouts adds a few demo training plans with exercise checklists (fitness
+// module), spanning statuses so the stats surface has something to show.
+// Idempotent on (workspace, name).
+func seedWorkouts(db *gorm.DB, user model.User) {
+	var workspace model.Workspace
+	if err := db.Where("owner_id = ?", user.ID).Order("created_at ASC").First(&workspace).Error; err != nil {
+		return
+	}
+	wsID := workspace.ID
+
+	iptr := func(v int) *int { return &v }
+	fptr := func(v float64) *float64 { return &v }
+	at := func(offsetDays, hour int) *time.Time {
+		n := time.Now()
+		t := time.Date(n.Year(), n.Month(), n.Day(), hour, 0, 0, 0, time.Local).AddDate(0, 0, offsetDays)
+		return &t
+	}
+	completedAt := func(offsetDays int) *time.Time {
+		t := time.Now().AddDate(0, 0, -offsetDays)
+		return &t
+	}
+
+	type exDef struct {
+		name string
+		sets *int
+		reps *int
+		weight *float64
+		distance *float64
+		duration *int
+		done bool
+	}
+	type workoutDef struct {
+		w          model.Workout
+		exercises  []exDef
+	}
+	defs := []workoutDef{
+		{
+			w: model.Workout{Name: "晨跑 5 公里", Type: "cardio", Status: model.WorkoutStatusCompleted,
+				Intensity: "medium", ScheduledAt: at(-2, 7), DurationMin: iptr(32), Calories: fptr(320),
+				Color: "#22c55e", Location: "奥林匹克森林公园", CompletedAt: completedAt(2)},
+			exercises: []exDef{
+				{name: "跑步", distance: fptr(5), duration: iptr(1800), done: true},
+				{name: "拉伸放松", duration: iptr(300), done: true},
+			},
+		},
+		{
+			w: model.Workout{Name: "上肢力量训练", Type: "strength", Status: model.WorkoutStatusPlanned,
+				Intensity: "high", ScheduledAt: at(1, 19), DurationMin: iptr(60), Calories: fptr(0),
+				Color: "#ef4444", Location: "健身房"},
+			exercises: []exDef{
+				{name: "卧推", sets: iptr(4), reps: iptr(8), weight: fptr(60), done: false},
+				{name: "引体向上", sets: iptr(4), reps: iptr(6), done: false},
+				{name: "哑铃弯举", sets: iptr(3), reps: iptr(12), weight: fptr(12), done: false},
+			},
+		},
+		{
+			w: model.Workout{Name: "瑜伽拉伸", Type: "flexibility", Status: model.WorkoutStatusInProgress,
+				Intensity: "low", ScheduledAt: at(0, 21), DurationMin: iptr(45), Color: "#8b5cf6", Location: "家中"},
+			exercises: []exDef{
+				{name: "下犬式", duration: iptr(60), done: true},
+				{name: "战士一式", duration: iptr(60), done: false},
+			},
+		},
+	}
+
+	ensureWorkout := func(def workoutDef) model.Workout {
+		w := def.w
+		w.UserID = user.ID
+		w.WorkspaceID = wsID
+		db.Where("workspace_id = ? AND name = ?", wsID, w.Name).FirstOrCreate(&w)
+		db.Model(&w).Updates(map[string]interface{}{
+			"type": w.Type, "status": w.Status, "intensity": w.Intensity, "scheduled_at": w.ScheduledAt,
+			"duration_min": w.DurationMin, "calories": w.Calories, "color": w.Color, "location": w.Location,
+			"completed_at": w.CompletedAt,
+		})
+		return w
+	}
+	ensureExercise := func(workoutID uint, e exDef, order int) {
+		var ex model.WorkoutExercise
+		db.Where("workout_id = ? AND name = ?", workoutID, e.name).FirstOrCreate(&ex,
+			model.WorkoutExercise{WorkoutID: workoutID, Name: e.name, SortOrder: order})
+		db.Model(&ex).Updates(map[string]interface{}{
+			"sets": e.sets, "reps": e.reps, "weight": e.weight, "distance": e.distance,
+			"duration_sec": e.duration, "done": e.done, "sort_order": order,
+		})
+	}
+	syncWorkoutCounts := func(workoutID uint) {
+		var total, done int64
+		db.Model(&model.WorkoutExercise{}).Where("workout_id = ?", workoutID).Count(&total)
+		db.Model(&model.WorkoutExercise{}).Where("workout_id = ? AND done = ?", workoutID, true).Count(&done)
+		db.Model(&model.Workout{}).Where("id = ?", workoutID).
+			Updates(map[string]interface{}{"item_total": total, "item_done": done})
+	}
+
+	for _, def := range defs {
+		w := ensureWorkout(def)
+		for i, e := range def.exercises {
+			ensureExercise(w.ID, e, i)
+		}
+		syncWorkoutCounts(w.ID)
+	}
+	fmt.Printf("Created %d workouts\n", len(defs))
+}
+
+// seedBodyMetrics adds a short history of body/health records so the trend chart
+// and summary have data. Idempotent on (workspace, recorded_at).
+func seedBodyMetrics(db *gorm.DB, user model.User) {
+	var workspace model.Workspace
+	if err := db.Where("owner_id = ?", user.ID).Order("created_at ASC").First(&workspace).Error; err != nil {
+		return
+	}
+	wsID := workspace.ID
+
+	fptr := func(v float64) *float64 { return &v }
+	iptr := func(v int) *int { return &v }
+	day := func(daysAgo int, hour int) time.Time {
+		n := time.Now()
+		return time.Date(n.Year(), n.Month(), n.Day(), hour, 0, 0, 0, time.Local).AddDate(0, 0, -daysAgo)
+	}
+
+	records := []model.BodyMetric{
+		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(28, 9), Weight: fptr(72.5), Height: fptr(175), BodyFat: fptr(20.1), RestingHR: iptr(68), SleepHours: fptr(7), Energy: iptr(3), Mood: iptr(3)},
+		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(21, 9), Weight: fptr(72.1), Height: fptr(175), BodyFat: fptr(19.7), RestingHR: iptr(67), SleepHours: fptr(7.5), Steps: iptr(9000), Energy: iptr(4), Mood: iptr(4)},
+		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(14, 9), Weight: fptr(71.6), Height: fptr(175), BodyFat: fptr(19.2), MuscleMass: fptr(31.5), RestingHR: iptr(66), Systolic: iptr(118), Diastolic: iptr(78), SleepHours: fptr(6.5), Steps: iptr(11000), Energy: iptr(4), Mood: iptr(4)},
+		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(7, 9), Weight: fptr(71.2), Height: fptr(175), BodyFat: fptr(18.8), MuscleMass: fptr(31.8), RestingHR: iptr(65), Systolic: iptr(116), Diastolic: iptr(76), SleepHours: fptr(8), Steps: iptr(12000), Energy: iptr(5), Mood: iptr(4)},
+		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(1, 9), Weight: fptr(70.9), Height: fptr(175), BodyFat: fptr(18.5), MuscleMass: fptr(32.0), RestingHR: iptr(64), Systolic: iptr(115), Diastolic: iptr(75), SleepHours: fptr(7.5), Steps: iptr(8500), Energy: iptr(4), Mood: iptr(5)},
+	}
+	for i := range records {
+		db.FirstOrCreate(&records[i], model.BodyMetric{WorkspaceID: wsID, RecordedAt: records[i].RecordedAt})
+	}
+	fmt.Printf("Created %d body metrics\n", len(records))
 }
