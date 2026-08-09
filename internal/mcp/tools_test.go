@@ -28,7 +28,7 @@ func newTodoOnlyServer(t *testing.T) (*MCPServer, *repository.TodoRepo) {
 	require.NoError(t, db.AutoMigrate(&model.Todo{}, &model.TodoItem{}, &model.Tag{}))
 	todoRepo := repository.NewTodoRepo(db)
 	todoSvc := service.NewTodoService(todoRepo, nil, todoRepo)
-	srv := NewServer(nil, nil, nil, nil, nil, nil, todoSvc, nil, nil, nil)
+	srv := NewServer(nil, nil, nil, nil, nil, nil, todoSvc, nil, nil, nil, nil)
 	return srv, todoRepo
 }
 

@@ -45,6 +45,9 @@ func main() {
 	relationRepo := repository.NewRelationRepo(db)
 	eventRepo := repository.NewEventRepo(db)
 	todoRepo := repository.NewTodoRepo(db)
+	workoutRepo := repository.NewWorkoutRepo(db)
+	workoutExerciseRepo := repository.NewWorkoutExerciseRepo(db)
+	bodyMetricRepo := repository.NewBodyMetricRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
 	aiRepo := repository.NewAIRepo(db)
 	workspaceRepo := repository.NewWorkspaceRepo(db)
@@ -65,13 +68,14 @@ func main() {
 	// before the todo service so it can be wired in as the change notifier.
 	hub := realtime.NewHub()
 	todoSvc := service.NewTodoService(todoRepo, eventRepo, todoRepo, service.WithTodoNotifier(hub))
+	workoutSvc := service.NewWorkoutService(workoutRepo, workoutExerciseRepo, bodyMetricRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
-	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo, service.WithExportNotifier(hub), service.WithTransactionRepo(transactionRepo), service.WithEventRepo(eventRepo))
+	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo, service.WithExportNotifier(hub), service.WithTransactionRepo(transactionRepo), service.WithEventRepo(eventRepo), service.WithWorkoutRepos(workoutRepo, workoutExerciseRepo, bodyMetricRepo))
 	userSettingSvc := service.NewUserSettingService(userSettingRepo)
 
 	// MCP Server
-	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc)
+	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, transactionSvc, aiSvc, workspaceSvc)
 
 	// Ensure avatar directory exists
 	avatarDir := cfg.Server.AvatarDir
@@ -84,7 +88,7 @@ func main() {
 	}
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc)
 	handlers.WS = handler.NewWSHandler(hub, &cfg.JWT, workspaceSvc, cfg.Server.Mode, cfg.CORS.AllowOrigins)
 
 	// Router
