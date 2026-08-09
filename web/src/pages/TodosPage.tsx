@@ -22,6 +22,7 @@ import EmptyState from '../components/EmptyState'
 import TodoCard from '../components/TodoCard'
 import TodoTree from '../components/TodoTreeRow'
 import { buildTodoTree } from '../lib/buildTodoTree'
+import { usePomodoroStore } from '../stores/pomodoro'
 import { TodoFormDialog } from '../components/TodoFormDialog'
 import {
   useTodosList,
@@ -438,6 +439,11 @@ export default function TodosPage() {
     handleMove(pendingTodos[i].id, pendingTodos[i + 1].id)
   }
 
+  // Pomodoro start (timer lives in the global Zustand store — see AppLayout).
+  const handleStartPomodoro = useCallback((todo: Todo) => {
+    usePomodoroStore.getState().start(todo.id, todo.title)
+  }, [])
+
   // Tree-view reparenting: indent/outdent/up/down all reduce to a single move
   // call (parent_id + place-after sibling).
   const handleTreeMove = async (id: number, parentId: number | null, afterId: number | null) => {
@@ -512,6 +518,7 @@ export default function TodosPage() {
       onDelete={setConfirmDelete}
       formatDate={formatDate}
       parentTitle={todo.parent_id ? todoTitleById.get(todo.parent_id) : undefined}
+      onStartPomodoro={handleStartPomodoro}
     />
   )
 
@@ -779,6 +786,7 @@ export default function TodosPage() {
               onDelete={setConfirmDelete}
               onMove={handleTreeMove}
               onAddChild={openCreateChild}
+              onStartPomodoro={handleStartPomodoro}
               formatDate={formatDate}
               selectable={selectionMode}
               selectedIds={selectedIds}

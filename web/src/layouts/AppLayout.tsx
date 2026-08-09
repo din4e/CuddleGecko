@@ -6,6 +6,9 @@ import { useWorkspaceStore } from '../stores/workspace'
 import { useModeStore } from '../stores/mode'
 import { useQueryClient } from '@tanstack/react-query'
 import { startTodoWsSync } from '../lib/wsSync'
+import { PomodoroTimer } from '../components/PomodoroTimer'
+import { usePomodoroStore } from '../stores/pomodoro'
+import { usePomodoroTodo } from '../hooks/api/useTodos'
 import { Button } from '../components/ui/button'
 import BrandIcon from '../components/BrandIcon'
 import {
@@ -65,6 +68,16 @@ export default function AppLayout() {
   const logout = useAuthStore((s) => s.logout)
   const qc = useQueryClient()
   const currentWorkspaceId = useWorkspaceStore((s) => s.currentWorkspace?.id) ?? null
+
+  // Pomodoro timer (global — persists across page navigation via Zustand store).
+  const pomodoroMutation = usePomodoroTodo()
+  const pomo = usePomodoroStore()
+  useEffect(() => {
+    pomo.setOnComplete(() => {
+      const id = usePomodoroStore.getState().focusTodoId
+      if (id != null) pomodoroMutation.mutate(id)
+    })
+  }, [pomo, pomodoroMutation])
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
@@ -313,6 +326,20 @@ export default function AppLayout() {
         {/* Content */}
         <main className="flex-1 overflow-hidden min-h-0">
           <div className="h-full overflow-auto p-6">
+            {(pomo.phase !== 'idle' || pomo.focusTodoId != null) && (
+              <div className="mb-4 max-w-md">
+                <PomodoroTimer
+                  phase={pomo.phase}
+                  secondsLeft={pomo.secondsLeft}
+                  running={pomo.running}
+                  focusTodoTitle={pomo.focusTodoTitle}
+                  onStart={() => pomo.start(null)}
+                  onPause={pomo.pause}
+                  onReset={pomo.reset}
+                  onSkip={pomo.skip}
+                />
+              </div>
+            )}
             <Outlet />
           </div>
         </main>

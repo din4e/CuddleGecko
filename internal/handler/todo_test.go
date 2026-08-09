@@ -112,6 +112,10 @@ func (m *mockTodoSvcRepo) SetPinned(ctx context.Context, workspaceID, id uint, p
 	return m.Called(ctx, workspaceID, id, pinned).Error(0)
 }
 
+func (m *mockTodoSvcRepo) IncrementPomodoro(ctx context.Context, workspaceID, id uint) error {
+	return m.Called(ctx, workspaceID, id).Error(0)
+}
+
 func (m *mockTodoSvcRepo) ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error) {
 	args := m.Called(ctx, workspaceID)
 	if args.Get(0) == nil {
@@ -180,6 +184,7 @@ func setupTodoRouter(todoSvc *service.TodoService) *gin.Engine {
 		api.PATCH("/todos/:id/move", h.Move)
 		api.POST("/todos/:id/sync-event", h.SyncToEvent)
 		api.POST("/todos/:id/duplicate", h.Duplicate)
+		api.POST("/todos/:id/pomodoro", h.IncrementPomodoro)
 		api.POST("/todos/:id/restore", h.Restore)
 		api.DELETE("/todos/:id", h.Delete)
 		api.GET("/todos/:id/items", h.ListItems)

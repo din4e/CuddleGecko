@@ -31,6 +31,7 @@ type TodoRepository interface {
 	PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID uint) (*model.Todo, error)
 	Duplicate(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error)
 	SetPinned(ctx context.Context, workspaceID, id uint, pinned bool) error
+	IncrementPomodoro(ctx context.Context, workspaceID, id uint) error
 	BulkAction(ctx context.Context, workspaceID uint, ids []uint, action string) (int64, error)
 	ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error)
 	Restore(ctx context.Context, workspaceID, id uint) error
@@ -372,6 +373,20 @@ func (s *TodoService) TogglePin(ctx context.Context, userID, workspaceID, id uin
 	todo.Pinned = next
 	s.notify(ctx, workspaceID, id, TodoUpdated)
 	return todo, nil
+}
+
+// IncrementPomodoro records one completed focus session on a todo (the client
+// calls it when a 25-min Pomodoro finishes). Emits an update so other devices
+// see the new count.
+func (s *TodoService) IncrementPomodoro(ctx context.Context, userID, workspaceID, id uint) error {
+	if err := s.ensureTodoOwned(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	if err := s.repo.IncrementPomodoro(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	s.notify(ctx, workspaceID, id, TodoUpdated)
+	return nil
 }
 
 // --- Tag associations ---

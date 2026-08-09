@@ -31,6 +31,8 @@ type Todo struct {
 	// list views can render progress badges without extra queries.
 	ItemTotal  int            `gorm:"not null;default:0" json:"item_total"`
 	ItemDone   int            `gorm:"not null;default:0" json:"item_done"`
+	// Pomodoros completed on this todo (25-min focus sessions).
+	PomodoroCount int         `gorm:"not null;default:0" json:"pomodoro_count"`
 	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`

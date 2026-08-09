@@ -163,3 +163,17 @@ func TestTodoRepo_BulkDelete_Cascades(t *testing.T) {
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound, "descendant %d should be cascade-deleted by bulk delete", id)
 	}
 }
+
+func TestTodoRepo_IncrementPomodoro(t *testing.T) {
+	repo := NewTodoRepo(newTodoTestDB(t))
+	ctx := context.Background()
+	todo := mustCreateTodo(t, repo, 1, "focus")
+	assert.Equal(t, 0, todo.PomodoroCount, "starts at 0")
+
+	require.NoError(t, repo.IncrementPomodoro(ctx, 1, todo.ID))
+	require.NoError(t, repo.IncrementPomodoro(ctx, 1, todo.ID))
+
+	got, err := repo.GetByID(ctx, 1, todo.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, got.PomodoroCount, "atomic +1 twice")
+}

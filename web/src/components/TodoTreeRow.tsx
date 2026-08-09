@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
-  Circle, ListTodo, Pencil, Plus, Trash2,
+  Circle, ListTodo, Pencil, Plus, Timer, Trash2,
 } from 'lucide-react'
 import type { Todo } from '../types'
 import type { TodoNode } from '../lib/buildTodoTree'
@@ -18,6 +18,7 @@ export interface TodoTreeHandlers {
   onDelete: (todo: Todo) => void
   onMove: (id: number, parentId: number | null, afterId: number | null) => void
   onAddChild: (todo: Todo) => void
+  onStartPomodoro?: (todo: Todo) => void
   formatDate: (d: string | null) => string
   selectable?: boolean
   selectedIds?: Set<number>
@@ -61,7 +62,7 @@ function TreeRow(props: RowProps) {
   const { node, siblings, index, parentId, grandparentId, depth } = props
   const {
     collapsed, onToggleCollapse, onToggle, onRename, onEdit, onDelete, onMove, onAddChild, formatDate,
-    selectable, selectedIds, onSelectToggle,
+    selectable, selectedIds, onSelectToggle, onStartPomodoro,
   } = props
   const todo = node.todo
   const hasChildren = node.children.length > 0
@@ -197,6 +198,18 @@ function TreeRow(props: RowProps) {
           <ListTodo className="h-3 w-3" />
           {!!todo.item_total && <span>{todo.item_done}/{todo.item_total}</span>}
         </button>
+        {onStartPomodoro && (
+          <button
+            type="button"
+            onClick={() => onStartPomodoro(todo)}
+            aria-label={t('todos.pomoStart')}
+            title={t('todos.pomoStart')}
+            className="flex items-center gap-0.5 rounded px-1 text-[10px] text-muted-foreground hover:bg-accent"
+          >
+            <Timer className="h-3 w-3" />
+            {!!todo.pomodoro_count && <span className="tabular-nums">{todo.pomodoro_count}</span>}
+          </button>
+        )}
 
         {/* hover actions — always visible on touch/small screens, hover-reveal on md+ */}
         <div className="flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
@@ -252,6 +265,7 @@ function TreeRow(props: RowProps) {
             onDelete={onDelete}
             onMove={onMove}
             onAddChild={onAddChild}
+            onStartPomodoro={onStartPomodoro}
             formatDate={formatDate}
             selectable={selectable}
             selectedIds={selectedIds}

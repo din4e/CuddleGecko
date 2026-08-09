@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, Circle, Clock, CalendarClock, ListTodo, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight } from 'lucide-react'
+import { CheckCircle2, Circle, Clock, CalendarClock, ListTodo, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
@@ -31,6 +31,7 @@ export interface TodoCardProps {
   onDelete: (todo: Todo) => void
   formatDate: (dateStr: string | null) => string
   parentTitle?: string
+  onStartPomodoro?: (todo: Todo) => void
 }
 
 const TodoCard = memo(function TodoCard({
@@ -49,6 +50,7 @@ const TodoCard = memo(function TodoCard({
   onDelete,
   formatDate,
   parentTitle,
+  onStartPomodoro,
 }: TodoCardProps) {
   const { t } = useTranslation()
   const [editingTitle, setEditingTitle] = useState(false)
@@ -196,6 +198,12 @@ const TodoCard = memo(function TodoCard({
 
         {!compact && (
           <div className="flex items-center gap-1 pt-1">
+            {onStartPomodoro && (
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onStartPomodoro(todo)} aria-label={t('todos.pomoStart')} title={t('todos.pomoStart')}>
+                <Timer className="h-3 w-3 mr-0.5" />
+                {!!todo.pomodoro_count && <span className="tabular-nums">{todo.pomodoro_count}</span>}
+              </Button>
+            )}
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onTogglePin(todo)} aria-label={t('todos.pinAria')}>
               <Star className={`h-3.5 w-3.5 ${todo.pinned ? 'fill-amber-400 text-amber-500' : 'text-muted-foreground'}`} />
             </Button>
