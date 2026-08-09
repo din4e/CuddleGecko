@@ -6,7 +6,7 @@ import { buttonVariants } from '../components/ui/button'
 import type { Reminder, Event, Todo, Transaction } from '../types'
 import { useRemindersList } from '../hooks/api/useReminders'
 import { useEventsList } from '../hooks/api/useEvents'
-import { useTodosList } from '../hooks/api/useTodos'
+import { useTodosList, useTodoStats } from '../hooks/api/useTodos'
 import { useTransactionsList } from '../hooks/api/useTransactions'
 import { useContactsList } from '../hooks/api/useContacts'
 import {
@@ -135,7 +135,9 @@ export default function DashboardPage() {
 
   const { data: remindersData, isPending: remindersLoading } = useRemindersList('pending', 1, 50)
   const { data: eventsData, isPending: eventsLoading } = useEventsList({ page: 1, page_size: 100, start_after: todayStart, end_before: todayEnd })
-  const { data: todosData, isPending: todosLoading } = useTodosList('pending', 1, 100)
+  const { data: todosData, isPending: todosLoading } = useTodosList({ status: 'pending', page: 1, page_size: 100 })
+  // Accurate productivity totals (pending/overdue/deferred/…) for the stat tiles.
+  const { data: todoStats } = useTodoStats()
   const { data: txData, isPending: txLoading } = useTransactionsList({ page: 1, page_size: 1000 })
   const { data: contactsData } = useContactsList({ page: 1, page_size: 1 })
 
@@ -189,7 +191,9 @@ export default function DashboardPage() {
   const stats = [
     { title: t('dashboard.totalContacts'), value: totalContacts, icon: Users, color: 'text-blue-500', to: '/buddies' },
     { title: t('dashboard.todayEvents'), value: events.length, icon: CalendarDays, color: 'text-purple-500', to: '/events' },
-    { title: t('dashboard.pendingTodos'), value: todos.length, icon: ListChecks, color: 'text-orange-500', to: '/todos' },
+    { title: t('dashboard.pendingTodos'), value: todoStats?.pending ?? 0, icon: ListChecks, color: 'text-orange-500', to: '/todos' },
+    { title: t('dashboard.overdueTodos'), value: todoStats?.overdue ?? 0, icon: AlertCircle, color: 'text-red-500', to: '/todos' },
+    { title: t('dashboard.deferredTodos'), value: todoStats?.deferred ?? 0, icon: Clock, color: 'text-amber-500', to: '/todos' },
     { title: t('dashboard.pendingReminders'), value: reminders.length, icon: Bell, color: 'text-yellow-500', to: '/reminders' },
     {
       title: t('dashboard.monthIncome'),

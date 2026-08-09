@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
@@ -37,7 +37,20 @@ describe('LoginPage', () => {
     vi.clearAllMocks()
     authMocks.isLoading = false
     authMocks.login.mockReset()
-    localStorage.clear()
+    // jsdom in this config has no localStorage; provide a working in-memory one.
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, String(v)) },
+      removeItem: (k: string) => { store.delete(k) },
+      clear: () => { store.clear() },
+      key: () => null,
+      length: 0,
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('renders username, password and submit button', () => {

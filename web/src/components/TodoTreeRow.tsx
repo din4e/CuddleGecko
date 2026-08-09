@@ -1,0 +1,289 @@
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import {
+  ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
+  Circle, ListTodo, Pencil, Plus, Trash2,
+} from 'lucide-react'
+import type { Todo } from '../types'
+import type { TodoNode } from '../lib/buildTodoTree'
+import { cn } from '@/lib/utils'
+import { TodoChecklist } from './TodoChecklist'
+
+export interface TodoTreeHandlers {
+  collapsed: Set<number>
+  onToggleCollapse: (id: number) => void
+  onToggle: (id: number) => void
+  onRename: (id: number, title: string) => void
+  onEdit: (todo: Todo) => void
+  onDelete: (todo: Todo) => void
+  onMove: (id: number, parentId: number | null, afterId: number | null) => void
+  onAddChild: (todo: Todo) => void
+  formatDate: (d: string | null) => string
+  selectable?: boolean
+  selectedIds?: Set<number>
+  onSelectToggle?: (id: number) => void
+}
+
+interface RowProps extends TodoTreeHandlers {
+  node: TodoNode
+  siblings: TodoNode[]
+  index: number
+  parentId: number | null
+  grandparentId: number | null
+  depth: number
+}
+
+/** TodoTree renders roots and recurses; each row knows its sibling group so it
+ *  can compute indent/outdent/up/down move targets. */
+export default function TodoTree({
+  nodes,
+  ...handlers
+}: { nodes: TodoNode[] } & TodoTreeHandlers) {
+  return (
+    <>
+      {nodes.map((node, i) => (
+        <TreeRow
+          key={node.todo.id}
+          node={node}
+          siblings={nodes}
+          index={i}
+          parentId={null}
+          grandparentId={null}
+          depth={0}
+          {...handlers}
+        />
+      ))}
+    </>
+  )
+}
+
+function TreeRow(props: RowProps) {
+  const { node, siblings, index, parentId, grandparentId, depth } = props
+  const {
+    collapsed, onToggleCollapse, onToggle, onRename, onEdit, onDelete, onMove, onAddChild, formatDate,
+    selectable, selectedIds, onSelectToggle,
+  } = props
+  const todo = node.todo
+  const hasChildren = node.children.length > 0
+  const isOpen = !collapsed.has(todo.id)
+
+  const prevSibling = index > 0 ? siblings[index - 1] : null
+  const nextSibling = index < siblings.length - 1 ? siblings[index + 1] : null
+  const canIndent = !!prevSibling
+  const canOutdent = parentId != null
+  const canUp = index > 0
+  const canDown = index < siblings.length - 1
+
+  const { t } = useTranslation()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(todo.title)
+  const [showItems, setShowItems] = useState(false)
+  const startEdit = () => {
+    setDraft(todo.title)
+    setEditing(true)
+  }
+  const commit = () => {
+    const v = draft.trim()
+    if (v && v !== todo.title) onRename(todo.id, v)
+    setEditing(false)
+  }
+
+  // Outliner keyboard: Tab indents under the previous sibling, Shift+Tab
+  // outdents to the grandparent. Prevent the browser's focus walk so the row
+  // keeps operating on the same todo.
+  const handleRowKey = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab') return
+    if (e.shiftKey) {
+      if (!canOutdent) return
+      e.preventDefault()
+      onMove(todo.id, grandparentId, parentId)
+    } else {
+      if (!canIndent) return
+      e.preventDefault()
+      onMove(todo.id, prevSibling!.todo.id, null)
+    }
+  }
+
+  const dueOverdue = todo.status === 'pending' && todo.due_time && new Date(todo.due_time) < new Date()
+
+  return (
+    <div>
+      <div
+        tabIndex={0}
+        onKeyDown={handleRowKey}
+        className="group flex items-center gap-1.5 rounded-md px-1 py-0.5 hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        style={{ paddingLeft: depth * 18 + 4 }}
+      >
+        {/* selection checkbox (bulk mode) */}
+        {selectable && onSelectToggle && (
+          <input
+            type="checkbox"
+            checked={selectedIds?.has(todo.id) ?? false}
+            onChange={() => onSelectToggle(todo.id)}
+            aria-label={t('todos.select')}
+            className="h-3.5 w-3.5"
+          />
+        )}
+
+        {/* expand / collapse caret */}
+        <button
+          type="button"
+          className="p-0.5 text-muted-foreground disabled:opacity-0"
+          disabled={!hasChildren}
+          onClick={() => hasChildren && onToggleCollapse(todo.id)}
+          aria-label={hasChildren ? (isOpen ? t('todos.collapse') : t('todos.expand')) : undefined}
+        >
+          {hasChildren ? (
+            isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+          ) : (
+            <span className="inline-block w-4" />
+          )}
+        </button>
+
+        {/* toggle done */}
+        <button type="button" className="p-0.5" onClick={() => onToggle(todo.id)} aria-label={t('todos.toggleDone')}>
+          {todo.status === 'done' ? (
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+          ) : (
+            <Circle className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
+
+        {/* title (double-click to rename) */}
+        {editing ? (
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit()
+              if (e.key === 'Escape') setEditing(false)
+            }}
+            className="min-w-0 flex-1 rounded-sm bg-transparent px-1 outline-none ring-1 ring-primary"
+          />
+        ) : (
+          <span
+            onDoubleClick={startEdit}
+            className={cn(
+              'min-w-0 flex-1 truncate text-sm',
+              todo.status === 'done' && 'text-muted-foreground line-through',
+            )}
+          >
+            {todo.title}
+          </span>
+        )}
+
+        {/* compact meta */}
+        {todo.priority === 'high' && todo.status !== 'done' && (
+          <span className="text-[10px] font-semibold text-destructive">!{todo.priority[0].toUpperCase()}</span>
+        )}
+        {todo.due_time && (
+          <span className={cn('text-[10px] whitespace-nowrap', dueOverdue ? 'text-destructive' : 'text-muted-foreground')}>
+            {formatDate(todo.due_time)}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowItems((v) => !v)}
+          aria-label={t('todos.subtasks')}
+          aria-expanded={showItems}
+          title={t('todos.subtasks')}
+          className={cn(
+            'flex items-center gap-0.5 rounded px-1 text-[10px] hover:bg-accent',
+            showItems ? 'text-primary' : 'text-muted-foreground',
+          )}
+        >
+          <ListTodo className="h-3 w-3" />
+          {!!todo.item_total && <span>{todo.item_done}/{todo.item_total}</span>}
+        </button>
+
+        {/* hover actions — always visible on touch/small screens, hover-reveal on md+ */}
+        <div className="flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+          <RowBtn onClick={() => onAddChild(todo)} title={t('todos.addChild')}>
+            <Plus className="h-3.5 w-3.5" />
+          </RowBtn>
+          <RowBtn disabled={!canOutdent} onClick={() => onMove(todo.id, grandparentId, parentId)} title={t('todos.outdent')}>
+            <ArrowLeft className="h-3.5 w-3.5" />
+          </RowBtn>
+          <RowBtn disabled={!canIndent} onClick={() => onMove(todo.id, prevSibling!.todo.id, null)} title={t('todos.indent')}>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </RowBtn>
+          <RowBtn
+            disabled={!canUp}
+            onClick={() => onMove(todo.id, parentId, index >= 2 ? siblings[index - 2].todo.id : null)}
+            title={t('todos.moveUp')}
+          >
+            <ChevronUp className="h-3.5 w-3.5" />
+          </RowBtn>
+          <RowBtn disabled={!canDown} onClick={() => onMove(todo.id, parentId, nextSibling ? nextSibling.todo.id : null)} title={t('todos.moveDown')}>
+            <ChevronDown className="h-3.5 w-3.5" />
+          </RowBtn>
+          <RowBtn onClick={() => onEdit(todo)} title={t('common.edit')}>
+            <Pencil className="h-3.5 w-3.5" />
+          </RowBtn>
+          <RowBtn onClick={() => onDelete(todo)} title={t('common.delete')} className="text-destructive">
+            <Trash2 className="h-3.5 w-3.5" />
+          </RowBtn>
+        </div>
+      </div>
+
+      {showItems && (
+        <div style={{ paddingLeft: depth * 18 + 24 }} className="py-1">
+          <TodoChecklist todoId={todo.id} />
+        </div>
+      )}
+
+      {isOpen &&
+        node.children.map((child, i) => (
+          <TreeRow
+            key={child.todo.id}
+            node={child}
+            siblings={node.children}
+            index={i}
+            parentId={todo.id}
+            grandparentId={parentId}
+            depth={depth + 1}
+            collapsed={collapsed}
+            onToggleCollapse={onToggleCollapse}
+            onToggle={onToggle}
+            onRename={onRename}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onMove={onMove}
+            onAddChild={onAddChild}
+            formatDate={formatDate}
+            selectable={selectable}
+            selectedIds={selectedIds}
+            onSelectToggle={onSelectToggle}
+          />
+        ))}
+    </div>
+  )
+}
+
+function RowBtn({
+  children, onClick, disabled, title, className,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  disabled?: boolean
+  title: string
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30',
+        className,
+      )}
+    >
+      {children}
+    </button>
+  )
+}

@@ -188,6 +188,33 @@ export interface Workspace {
 export type TodoStatus = 'pending' | 'done'
 export type TodoPriority = 'low' | 'normal' | 'high'
 export type AmountType = '' | 'income' | 'expense'
+export type TodoSort = 'due_date' | 'priority' | 'title' | 'created' | 'manual'
+
+/** Query parameters for listing todos (TickTick-style filter/sort/smart-list). */
+export interface TodoListParams {
+  status?: TodoStatus
+  priority?: TodoPriority
+  q?: string
+  due_before?: string
+  due_after?: string
+  overdue?: boolean
+  started?: boolean
+  tag_id?: number
+  sort?: TodoSort
+  order?: 'asc' | 'desc'
+  parent_id?: number | null
+  page?: number
+  page_size?: number
+}
+
+/** Update payload with explicit clear flags for nullable fields. */
+export interface TodoUpdateInput extends Partial<Omit<Todo, 'due_time' | 'amount'>> {
+  due_time?: string | null
+  amount?: number | null
+  clear_due_time?: boolean
+  clear_start_time?: boolean
+  clear_amount?: boolean
+}
 
 export interface Todo {
   id: number
@@ -198,11 +225,41 @@ export interface Todo {
   status: TodoStatus
   priority: TodoPriority
   due_time: string | null
+  start_time?: string | null
   amount: number | null
   amount_type: AmountType
   contact_ids: number[]
+  tags?: Tag[]
   color: string
+  pinned?: boolean
+  repeat?: string
+  repeat_interval?: number
+  parent_id?: number | null
+  sort_order?: number
   completed_at: string | null
+  // Denormalized checklist progress (optional on the client for resilience).
+  item_total?: number
+  item_done?: number
   created_at: string
   updated_at: string
+}
+
+export interface TodoItem {
+  id: number
+  todo_id: number
+  content: string
+  done: boolean
+  due_time?: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface TodoStats {
+  total: number
+  pending: number
+  overdue: number
+  deferred: number
+  done_today: number
+  done_this_week: number
 }

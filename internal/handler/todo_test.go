@@ -35,8 +35,8 @@ func (m *mockTodoSvcRepo) GetByID(ctx context.Context, workspaceID, id uint) (*m
 	return args.Get(0).(*model.Todo), args.Error(1)
 }
 
-func (m *mockTodoSvcRepo) List(ctx context.Context, workspaceID uint, status *string, page, pageSize int) ([]model.Todo, int64, error) {
-	args := m.Called(ctx, workspaceID, status, page, pageSize)
+func (m *mockTodoSvcRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQuery) ([]model.Todo, int64, error) {
+	args := m.Called(ctx, workspaceID, q)
 	if args.Get(0) == nil {
 		return nil, 0, args.Error(2)
 	}
@@ -49,6 +49,104 @@ func (m *mockTodoSvcRepo) Update(ctx context.Context, todo *model.Todo) error {
 
 func (m *mockTodoSvcRepo) Delete(ctx context.Context, workspaceID, id uint) error {
 	return m.Called(ctx, workspaceID, id).Error(0)
+}
+
+func (m *mockTodoSvcRepo) ListItems(ctx context.Context, todoID uint) ([]model.TodoItem, error) {
+	args := m.Called(ctx, todoID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]model.TodoItem), args.Error(1)
+}
+
+func (m *mockTodoSvcRepo) GetItem(ctx context.Context, todoID, itemID uint) (*model.TodoItem, error) {
+	args := m.Called(ctx, todoID, itemID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.TodoItem), args.Error(1)
+}
+
+func (m *mockTodoSvcRepo) CreateItem(ctx context.Context, item *model.TodoItem) error {
+	return m.Called(ctx, item).Error(0)
+}
+
+func (m *mockTodoSvcRepo) UpdateItem(ctx context.Context, todoID uint, item *model.TodoItem) error {
+	return m.Called(ctx, todoID, item).Error(0)
+}
+
+func (m *mockTodoSvcRepo) SetItemDone(ctx context.Context, todoID, itemID uint, done bool) error {
+	return m.Called(ctx, todoID, itemID, done).Error(0)
+}
+
+func (m *mockTodoSvcRepo) DeleteItem(ctx context.Context, todoID, itemID uint) error {
+	return m.Called(ctx, todoID, itemID).Error(0)
+}
+
+func (m *mockTodoSvcRepo) ReorderItem(ctx context.Context, todoID, itemID uint, afterItemID *uint) error {
+	return m.Called(ctx, todoID, itemID, afterItemID).Error(0)
+}
+
+func (m *mockTodoSvcRepo) PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID uint) (*model.Todo, error) {
+	args := m.Called(ctx, userID, workspaceID, todoID, itemID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Todo), args.Error(1)
+}
+
+func (m *mockTodoSvcRepo) Duplicate(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error) {
+	args := m.Called(ctx, userID, workspaceID, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Todo), args.Error(1)
+}
+
+func (m *mockTodoSvcRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint, action string) (int64, error) {
+	args := m.Called(ctx, workspaceID, ids, action)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *mockTodoSvcRepo) SetPinned(ctx context.Context, workspaceID, id uint, pinned bool) error {
+	return m.Called(ctx, workspaceID, id, pinned).Error(0)
+}
+
+func (m *mockTodoSvcRepo) ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error) {
+	args := m.Called(ctx, workspaceID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]model.Todo), args.Error(1)
+}
+
+func (m *mockTodoSvcRepo) Restore(ctx context.Context, workspaceID, id uint) error {
+	return m.Called(ctx, workspaceID, id).Error(0)
+}
+
+func (m *mockTodoSvcRepo) ReplaceTags(ctx context.Context, todoID uint, tags []model.Tag) error {
+	return m.Called(ctx, todoID, tags).Error(0)
+}
+
+func (m *mockTodoSvcRepo) GetTags(ctx context.Context, todoID uint) ([]model.Tag, error) {
+	args := m.Called(ctx, todoID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]model.Tag), args.Error(1)
+}
+
+func (m *mockTodoSvcRepo) Stats(ctx context.Context, workspaceID uint) (model.TodoStats, error) {
+	args := m.Called(ctx, workspaceID)
+	return args.Get(0).(model.TodoStats), args.Error(1)
+}
+
+func (m *mockTodoSvcRepo) Reorder(ctx context.Context, workspaceID, id uint, afterID *uint) error {
+	return m.Called(ctx, workspaceID, id, afterID).Error(0)
+}
+
+func (m *mockTodoSvcRepo) Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint) error {
+	return m.Called(ctx, workspaceID, id, parentID, afterID).Error(0)
 }
 
 type mockTodoEventRepo struct {
@@ -71,11 +169,28 @@ func setupTodoRouter(todoSvc *service.TodoService) *gin.Engine {
 	})
 	{
 		api.GET("/todos", h.List)
+		api.GET("/todos/stats", h.Stats)
+		api.GET("/todos/trash", h.ListTrash)
 		api.POST("/todos", h.Create)
+		api.POST("/todos/bulk", h.BulkAction)
 		api.PUT("/todos/:id", h.Update)
 		api.PATCH("/todos/:id/toggle", h.ToggleStatus)
+		api.PATCH("/todos/:id/pin", h.TogglePin)
+		api.PATCH("/todos/:id/reorder", h.Reorder)
+		api.PATCH("/todos/:id/move", h.Move)
 		api.POST("/todos/:id/sync-event", h.SyncToEvent)
+		api.POST("/todos/:id/duplicate", h.Duplicate)
+		api.POST("/todos/:id/restore", h.Restore)
 		api.DELETE("/todos/:id", h.Delete)
+		api.GET("/todos/:id/items", h.ListItems)
+		api.POST("/todos/:id/items", h.CreateItem)
+		api.PUT("/todos/:id/items/:itemId", h.UpdateItem)
+		api.PATCH("/todos/:id/items/:itemId/toggle", h.ToggleItem)
+		api.PATCH("/todos/:id/items/:itemId/reorder", h.ReorderItem)
+		api.POST("/todos/:id/items/:itemId/promote", h.PromoteItem)
+		api.DELETE("/todos/:id/items/:itemId", h.DeleteItem)
+		api.GET("/todos/:id/tags", h.GetTags)
+		api.PUT("/todos/:id/tags", h.ReplaceTags)
 	}
 	return r
 }
@@ -83,10 +198,12 @@ func setupTodoRouter(todoSvc *service.TodoService) *gin.Engine {
 func TestTodoHandler_List(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
-	repo.On("List", mock.Anything, uint(1), (*string)(nil), 1, 50).Return([]model.Todo{}, int64(0), nil)
+	repo.On("List", mock.Anything, uint(1), mock.MatchedBy(func(q model.TodoListQuery) bool {
+		return q.Page == 1 && q.PageSize == 50 && q.Sort == model.TodoSortDueDate && q.Order == "asc" && q.Status == ""
+	})).Return([]model.Todo{}, int64(0), nil)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/api/todos", nil)
@@ -99,31 +216,185 @@ func TestTodoHandler_List(t *testing.T) {
 func TestTodoHandler_List_WithStatusFilter(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
-	pending := "pending"
-	repo.On("List", mock.Anything, uint(1), &pending, 1, 50).Return([]model.Todo{}, int64(0), nil)
+	repo.On("List", mock.Anything, uint(1), mock.MatchedBy(func(q model.TodoListQuery) bool {
+		return q.Status == "pending" && q.Sort == model.TodoSortDueDate
+	})).Return([]model.Todo{}, int64(0), nil)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/api/todos?status=pending", nil)
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_List_WithSortAndSearch(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("List", mock.Anything, uint(1), mock.MatchedBy(func(q model.TodoListQuery) bool {
+		return q.Sort == model.TodoSortPriority && q.Order == "desc" && q.Search == "milk" && q.Overdue
+	})).Return([]model.Todo{}, int64(0), nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos?sort=priority&order=desc&q=milk&overdue=1", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_List_InvalidDueBefore(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos?due_before=not-a-date", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestTodoHandler_BulkAction(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("BulkAction", mock.Anything, uint(1), []uint{1, 2, 3}, "complete").Return(int64(2), nil)
+
+	body, _ := json.Marshal(map[string]interface{}{"ids": []int{1, 2, 3}, "action": "complete"})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/todos/bulk", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_TogglePin(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1, Pinned: false}, nil)
+	repo.On("SetPinned", mock.Anything, uint(1), uint(1), true).Return(nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("PATCH", "/api/todos/1/pin", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_BulkAction_InvalidAction(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	body, _ := json.Marshal(map[string]interface{}{"ids": []int{1}, "action": "bogus"})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/todos/bulk", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestTodoHandler_Stats(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("Stats", mock.Anything, uint(1)).Return(model.TodoStats{Total: 5, Pending: 3, Overdue: 1, DoneToday: 2, DoneThisWeek: 4}, nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos/stats", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_ListTrash(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("ListTrash", mock.Anything, uint(1)).Return([]model.Todo{{ID: 7, Title: "deleted"}}, nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos/trash", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_Restore(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("Restore", mock.Anything, uint(1), uint(7)).Return(nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/todos/7/restore", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_Reorder(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	after := uint(2)
+	repo.On("GetByID", mock.Anything, uint(1), uint(3)).Return(&model.Todo{ID: 3}, nil)
+	repo.On("Reorder", mock.Anything, uint(1), uint(3), &after).Return(nil)
+
+	body, _ := json.Marshal(map[string]interface{}{"after_id": 2})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("PATCH", "/api/todos/3/reorder", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
 }
 
 func TestTodoHandler_Create(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
-	repo.On("Create", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
+	repo.On("Create", mock.Anything, mock.MatchedBy(func(t *model.Todo) bool {
+		return t.Title == "test todo" && t.Priority == "high" && t.Description == "with details" && t.DueTime != nil
+	})).Return(nil)
 
 	body, _ := json.Marshal(map[string]interface{}{
-		"title":     "test todo",
-		"priority":  "high",
-		"due_time":  "2026-05-25T10:00:00Z",
+		"title":       "test todo",
+		"description": "with details",
+		"priority":    "high",
+		"due_time":    "2026-05-25T10:00:00Z",
 	})
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/api/todos", bytes.NewBuffer(body))
@@ -137,7 +408,7 @@ func TestTodoHandler_Create(t *testing.T) {
 func TestTodoHandler_Create_MissingTitle(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
 	body, _ := json.Marshal(map[string]interface{}{})
@@ -152,7 +423,7 @@ func TestTodoHandler_Create_MissingTitle(t *testing.T) {
 func TestTodoHandler_Create_InvalidDueTime(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
 	body, _ := json.Marshal(map[string]interface{}{
@@ -170,7 +441,7 @@ func TestTodoHandler_Create_InvalidDueTime(t *testing.T) {
 func TestTodoHandler_Update(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
 	existing := &model.Todo{ID: 1, Title: "old", Priority: "normal"}
@@ -192,7 +463,7 @@ func TestTodoHandler_Update(t *testing.T) {
 func TestTodoHandler_Update_NotFound(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
 	repo.On("GetByID", mock.Anything, uint(1), uint(99)).Return(nil, service.ErrTodoNotFound)
@@ -209,7 +480,7 @@ func TestTodoHandler_Update_NotFound(t *testing.T) {
 func TestTodoHandler_ToggleStatus(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
 	existing := &model.Todo{ID: 1, Status: "pending"}
@@ -226,7 +497,7 @@ func TestTodoHandler_ToggleStatus(t *testing.T) {
 func TestTodoHandler_SyncToEvent(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
 	existing := &model.Todo{ID: 1, Title: "meeting"}
@@ -243,7 +514,7 @@ func TestTodoHandler_SyncToEvent(t *testing.T) {
 func TestTodoHandler_Delete(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
 	repo.On("Delete", mock.Anything, uint(1), uint(1)).Return(nil)
@@ -255,10 +526,27 @@ func TestTodoHandler_Delete(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
+func TestTodoHandler_Duplicate(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1, Title: "original"}, nil)
+	repo.On("Duplicate", mock.Anything, uint(1), uint(1), uint(1)).Return(&model.Todo{ID: 9, Title: "original", Status: "pending"}, nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/todos/1/duplicate", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	repo.AssertExpectations(t)
+}
+
 func TestTodoHandler_Delete_NotFound(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
-	svc := service.NewTodoService(repo, eventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
 	repo.On("Delete", mock.Anything, uint(1), uint(99)).Return(service.ErrTodoNotFound)
@@ -268,4 +556,188 @@ func TestTodoHandler_Delete_NotFound(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestTodoHandler_ListItems(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
+	repo.On("ListItems", mock.Anything, uint(1)).Return([]model.TodoItem{{ID: 5, Content: "a"}}, nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos/1/items", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_CreateItem(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
+	repo.On("CreateItem", mock.Anything, mock.MatchedBy(func(i *model.TodoItem) bool {
+		return i.Content == "step" && i.TodoID == 1
+	})).Return(nil)
+
+	body, _ := json.Marshal(map[string]interface{}{"content": "step"})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/todos/1/items", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_CreateItem_MissingContent(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	body, _ := json.Marshal(map[string]interface{}{})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/todos/1/items", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestTodoHandler_ToggleItem(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
+	repo.On("GetItem", mock.Anything, uint(1), uint(3)).Return(&model.TodoItem{ID: 3, Done: false}, nil)
+	repo.On("SetItemDone", mock.Anything, uint(1), uint(3), true).Return(nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("PATCH", "/api/todos/1/items/3/toggle", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_DeleteItem(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
+	repo.On("GetItem", mock.Anything, uint(1), uint(3)).Return(&model.TodoItem{ID: 3, Done: true}, nil)
+	repo.On("DeleteItem", mock.Anything, uint(1), uint(3)).Return(nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/api/todos/1/items/3", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_ReorderItem(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	after := uint(2)
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
+	repo.On("GetItem", mock.Anything, uint(1), uint(3)).Return(&model.TodoItem{ID: 3}, nil)
+	repo.On("ReorderItem", mock.Anything, uint(1), uint(3), &after).Return(nil)
+
+	body, _ := json.Marshal(map[string]interface{}{"after_id": 2})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("PATCH", "/api/todos/1/items/3/reorder", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_PromoteItem(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
+	repo.On("GetItem", mock.Anything, uint(1), uint(3)).Return(&model.TodoItem{ID: 3, Content: "step"}, nil)
+	repo.On("PromoteItem", mock.Anything, uint(1), uint(1), uint(1), uint(3)).Return(&model.Todo{ID: 9, Title: "step"}, nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/todos/1/items/3/promote", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_GetTags(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
+	repo.On("GetTags", mock.Anything, uint(1)).Return([]model.Tag{{ID: 7, Name: "work"}}, nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos/1/tags", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_ReplaceTags(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
+	repo.On("ReplaceTags", mock.Anything, uint(1), mock.MatchedBy(func(tags []model.Tag) bool {
+		return len(tags) == 2 && tags[0].ID == 7 && tags[1].ID == 8
+	})).Return(nil)
+
+	body, _ := json.Marshal(map[string]interface{}{"tag_ids": []int{7, 8}})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("PUT", "/api/todos/1/tags", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_List_WithTagFilter(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("List", mock.Anything, uint(1), mock.MatchedBy(func(q model.TodoListQuery) bool {
+		return len(q.TagIDs) == 1 && q.TagIDs[0] == 5
+	})).Return([]model.Todo{}, int64(0), nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos?tag_id=5", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
 }

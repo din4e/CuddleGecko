@@ -55,7 +55,14 @@ export interface GraphAdapter {
 
 export interface ExportAdapter {
   exportJSON(): Promise<string>
+  exportTodosCSV(): Promise<string>
+  exportContactsCSV(): Promise<string>
+  exportTransactionsCSV(): Promise<string>
+  exportEventsCSV(): Promise<string>
   importJSON(data: string): Promise<void>
+  importTodosCSV(data: string): Promise<number>
+  importContactsCSV(data: string): Promise<number>
+  importTransactionsCSV(data: string): Promise<number>
 }
 
 export interface EventAdapter {
