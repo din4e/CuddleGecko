@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -45,6 +46,26 @@ func toUint(v interface{}) uint {
 		return val
 	default:
 		return 0
+	}
+}
+
+func toBool(v interface{}) bool {
+	switch val := v.(type) {
+	case bool:
+		return val
+	case string:
+		s := strings.ToLower(strings.TrimSpace(val))
+		return s == "true" || s == "1" || s == "yes"
+	case float64:
+		return val != 0
+	case float32:
+		return val != 0
+	case int:
+		return val != 0
+	case int64:
+		return val != 0
+	default:
+		return false
 	}
 }
 

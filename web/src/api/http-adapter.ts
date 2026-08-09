@@ -59,7 +59,14 @@ function createHTTPAdapters(): AppAdapters {
 
     export: {
       exportJSON: () => request.post<string>('/export'),
+      exportTodosCSV: () => request.post<string>('/export/todos'),
+      exportContactsCSV: () => request.post<string>('/export/contacts'),
+      exportTransactionsCSV: () => request.post<string>('/export/transactions'),
+      exportEventsCSV: () => request.post<string>('/export/events'),
       importJSON: (data) => request.post<void>('/import', { data }).then(() => {}),
+      importTodosCSV: (data) => request.post<{ imported: number }>('/import/todos', { data }).then((r) => r.imported ?? 0),
+      importContactsCSV: (data) => request.post<{ imported: number }>('/import/contacts', { data }).then((r) => r.imported ?? 0),
+      importTransactionsCSV: (data) => request.post<{ imported: number }>('/import/transactions', { data }).then((r) => r.imported ?? 0),
     },
 
     event: {

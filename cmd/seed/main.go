@@ -9,6 +9,7 @@ import (
 	"github.com/din4e/cuddlegecko/internal/service"
 	"github.com/din4e/cuddlegecko/pkg/config"
 	"github.com/din4e/cuddlegecko/pkg/database"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -37,6 +38,19 @@ func main() {
 	db.Model(&user).Update("password_hash", hashedPassword)
 	fmt.Printf("User: %s (id=%d)\n", user.Username, user.ID)
 
+	// Resolve the demo user's default workspace so every seeded entity lands in
+	// it — the workspace-scoped API (and export) only sees rows in the user's
+	// workspace, so leaving WorkspaceID at its 0 default orphans the data.
+	var workspace model.Workspace
+	if err := db.Where("owner_id = ?", user.ID).Order("created_at ASC").First(&workspace).Error; err != nil {
+		workspace = model.Workspace{Name: "Personal", OwnerID: user.ID}
+		if err := db.Create(&workspace).Error; err != nil {
+			log.Fatalf("Failed to create workspace: %v", err)
+		}
+		db.FirstOrCreate(&model.WorkspaceMember{}, model.WorkspaceMember{WorkspaceID: workspace.ID, UserID: user.ID, Role: "owner"})
+	}
+	wsID := workspace.ID
+
 	// Create tags
 	tags := []model.Tag{
 		{UserID: user.ID, Name: "重要", Color: "#ef4444"},
@@ -46,6 +60,7 @@ func main() {
 	}
 	for i := range tags {
 		db.FirstOrCreate(&tags[i], model.Tag{UserID: user.ID, Name: tags[i].Name})
+		db.Model(&tags[i]).Update("workspace_id", wsID) // fix orphaned workspace-0 rows
 	}
 	fmt.Printf("Created %d tags\n", len(tags))
 
@@ -73,6 +88,7 @@ func main() {
 		if result.Error != nil {
 			log.Printf("Warning: contact %s: %v", contacts[i].Name, result.Error)
 		}
+		db.Model(&contacts[i]).Update("workspace_id", wsID)
 	}
 	fmt.Printf("Created %d buddies\n", len(contacts))
 
@@ -103,6 +119,7 @@ func main() {
 			ContactID: interaction.ContactID,
 			Title:     interaction.Title,
 		})
+		db.Model(&interaction).Update("workspace_id", wsID)
 	}
 	fmt.Printf("Created %d interactions\n", len(interactions))
 
@@ -120,6 +137,7 @@ func main() {
 			ContactID: reminder.ContactID,
 			Title:     reminder.Title,
 		})
+		db.Model(&reminder).Update("workspace_id", wsID)
 	}
 	fmt.Printf("Created %d reminders\n", len(reminders))
 
@@ -137,9 +155,250 @@ func main() {
 			ContactIDA: rel.ContactIDA,
 			ContactIDB: rel.ContactIDB,
 		})
+		db.Model(&rel).Update("workspace_id", wsID)
 	}
 	fmt.Printf("Created %d relations\n", len(relations))
 
+	// --- Todos (TickTick-style task module) ---
+	seedTodos(db, user, tags, contacts)
+
+	// --- Transactions (finance) + Events (calendar) demo data ---
+	seedTransactions(db, user, contacts)
+	seedEvents(db, user, contacts)
+
 	fmt.Println("\nSeed data complete!")
 	fmt.Println("Login: demo / test123")
+}
+
+// seedTodos populates the task module with a realistic spread across the smart
+// lists (Today / Overdue / Next 7 days / Pending / Completed / Trash) and the
+// stats surface (total / pending / overdue / deferred / done-today / done-this-week).
+// It is idempotent: re-runs refresh mutable fields rather than duplicating rows.
+func seedTodos(db *gorm.DB, user model.User, tags []model.Tag, contacts []model.Contact) {
+	// Resolve the demo user's default workspace. The user is created above via
+	// FirstOrCreate (bypassing registration), which would otherwise leave them
+	// without a workspace — and every /todos, /buddies, /tags route is gated by
+	// the WorkspaceAuth middleware that resolves the default workspace. Create
+	// one if missing so the seeded data is actually reachable.
+	var workspace model.Workspace
+	if err := db.Where("owner_id = ?", user.ID).Order("created_at ASC").First(&workspace).Error; err != nil {
+		workspace = model.Workspace{Name: "Personal", OwnerID: user.ID}
+		if err := db.Create(&workspace).Error; nil != err {
+			log.Fatalf("Failed to create workspace: %v", err)
+		}
+		db.FirstOrCreate(&model.WorkspaceMember{}, model.WorkspaceMember{
+			WorkspaceID: workspace.ID, UserID: user.ID, Role: "owner",
+		})
+	}
+	wsID := workspace.ID
+	fmt.Printf("Workspace: %s (id=%d)\n", workspace.Name, wsID)
+
+	// Timestamp helpers relative to "now" so the smart lists stay meaningful.
+	todayAt := func(hour, min int) *time.Time {
+		n := time.Now()
+		t := time.Date(n.Year(), n.Month(), n.Day(), hour, min, 0, 0, time.Local)
+		return &t
+	}
+	relAt := func(d time.Duration) *time.Time { t := time.Now().Add(d); return &t }
+	amt := func(f float64) *float64 { return &f }
+
+	// ensureTodo creates or refreshes a todo so re-running the seed stays correct
+	// (relative timestamps drift on each run, so we can't rely on FirstOrCreate
+	// leaving the first-run value in place).
+	ensureTodo := func(t model.Todo, tagIDs []uint) model.Todo {
+		t.UserID = user.ID
+		t.WorkspaceID = wsID
+		if t.Status == "" {
+			t.Status = "pending"
+		}
+		if t.Priority == "" {
+			t.Priority = "normal"
+		}
+		db.Where("workspace_id = ? AND title = ?", wsID, t.Title).FirstOrCreate(&t)
+		db.Model(&t).Updates(map[string]interface{}{
+			"description":     t.Description,
+			"status":          t.Status,
+			"priority":        t.Priority,
+			"due_time":        t.DueTime,
+			"start_time":      t.StartTime,
+			"pinned":          t.Pinned,
+			"amount":          t.Amount,
+			"amount_type":     t.AmountType,
+			"color":           t.Color,
+			"repeat":          t.Repeat,
+			"repeat_interval": t.RepeatInterval,
+			"completed_at":    t.CompletedAt,
+		})
+		// contact_ids uses a JSON serializer, so it must go through a model
+		// instance rather than a raw map update.
+		if len(t.ContactIDs) > 0 {
+			db.Model(&model.Todo{}).Where("id = ?", t.ID).Updates(model.Todo{ContactIDs: t.ContactIDs})
+		}
+		if len(tagIDs) > 0 {
+			chosen := make([]model.Tag, 0, len(tagIDs))
+			for _, id := range tagIDs {
+				for i := range tags {
+					if tags[i].ID == id {
+						chosen = append(chosen, tags[i])
+						break
+					}
+				}
+			}
+			db.Model(&t).Association("Tags").Replace(chosen)
+		}
+		return t
+	}
+
+	ensureItem := func(todoID uint, content string, done bool, order int) {
+		var item model.TodoItem
+		db.Where("todo_id = ? AND content = ?", todoID, content).FirstOrCreate(&item,
+			model.TodoItem{TodoID: todoID, Content: content, Done: done, SortOrder: order})
+		db.Model(&item).Updates(map[string]interface{}{"done": done, "sort_order": order})
+	}
+
+	// syncItemCounts recomputes the denormalized parent progress from the actual
+	// items, so the checklist counters never drift from reality.
+	syncItemCounts := func(todoID uint) {
+		var total, done int64
+		db.Model(&model.TodoItem{}).Where("todo_id = ?", todoID).Count(&total)
+		db.Model(&model.TodoItem{}).Where("todo_id = ? AND done = ?", todoID, true).Count(&done)
+		db.Model(&model.Todo{}).Where("id = ?", todoID).
+			Updates(map[string]interface{}{"item_total": total, "item_done": done})
+	}
+
+	tagIDs := func(ids ...uint) []uint { return ids }
+	todoDefs := []struct {
+		todo model.Todo
+		tags []uint
+	}{
+		// Today + pinned, high priority.
+		{model.Todo{Title: "完成季度汇报", Description: "整理 Q2 数据并提交给管理层", Priority: "high", Pinned: true, DueTime: todayAt(18, 0), Color: "#ef4444", ContactIDs: []uint{contacts[2].ID}}, tagIDs(tags[0].ID)},
+		// Overdue.
+		{model.Todo{Title: "给旺财洗澡", Priority: "normal", DueTime: relAt(-48 * time.Hour), ContactIDs: []uint{contacts[3].ID}}, tagIDs(tags[3].ID)},
+		// Next 7 days.
+		{model.Todo{Title: "订机票去上海", Priority: "high", DueTime: relAt(72 * time.Hour)}, tagIDs(tags[2].ID)},
+		// Recurring daily.
+		{model.Todo{Title: "每日站会", Priority: "normal", Repeat: "daily", DueTime: todayAt(9, 30)}, nil},
+		// Recurring weekly.
+		{model.Todo{Title: "每周复盘周报", Priority: "normal", Repeat: "weekly", DueTime: relAt(5 * 24 * time.Hour)}, nil},
+		// Recurring weekdays.
+		{model.Todo{Title: "健身房锻炼", Priority: "low", Repeat: "weekdays", DueTime: todayAt(19, 0)}, nil},
+		// Finance-linked (expense amount).
+		{model.Todo{Title: "缴房租", Description: "本月房租", Priority: "high", Amount: amt(3500), AmountType: "expense", DueTime: relAt(5 * 24 * time.Hour)}, tagIDs(tags[1].ID)},
+		// Parent with a partially-done checklist.
+		{model.Todo{Title: "读完《设计模式》", Priority: "normal", DueTime: relAt(10 * 24 * time.Hour)}, nil},
+		// Parent with an untouched checklist.
+		{model.Todo{Title: "准备小红生日聚会", Priority: "normal", DueTime: relAt(6 * 24 * time.Hour), ContactIDs: []uint{contacts[1].ID}}, tagIDs(tags[0].ID)},
+		// Deferred (future start_time) — hidden from actionable views, counted in stats.
+		{model.Todo{Title: "学习 Rust 新语言", Priority: "low", StartTime: relAt(10 * 24 * time.Hour)}, nil},
+		// Done today.
+		{model.Todo{Title: "整理上月报销", Priority: "normal", Status: "done", CompletedAt: relAt(-2 * time.Hour)}, nil},
+		// Done this week.
+		{model.Todo{Title: "回复客户邮件", Priority: "high", Status: "done", CompletedAt: relAt(-3 * 24 * time.Hour)}, nil},
+		// Done (older, outside this week).
+		{model.Todo{Title: "周末大采购", Priority: "low", Status: "done", CompletedAt: relAt(-30 * 24 * time.Hour)}, nil},
+	}
+
+	created := make([]model.Todo, len(todoDefs))
+	for i, d := range todoDefs {
+		created[i] = ensureTodo(d.todo, d.tags)
+	}
+	fmt.Printf("Created %d todos\n", len(todoDefs))
+
+	byTitle := func(title string) model.Todo {
+		for _, t := range created {
+			if t.Title == title {
+				return t
+			}
+		}
+		return model.Todo{}
+	}
+
+	// Checklists (subtasks) — progress counters synced from the real rows.
+	book := []struct {
+		content string
+		done    bool
+	}{
+		{"通读第一部分", true},
+		{"整理章节笔记", true},
+		{"动手实现示例代码", false},
+	}
+	for i, it := range book {
+		ensureItem(byTitle("读完《设计模式》").ID, it.content, it.done, i)
+	}
+	syncItemCounts(byTitle("读完《设计模式》").ID)
+
+	party := []struct {
+		content string
+		done    bool
+	}{
+		{"预定餐厅", false},
+		{"订购生日蛋糕", false},
+		{"邀请朋友参加", false},
+	}
+	for i, it := range party {
+		ensureItem(byTitle("准备小红生日聚会").ID, it.content, it.done, i)
+	}
+	syncItemCounts(byTitle("准备小红生日聚会").ID)
+	fmt.Println("Todo subtasks attached")
+
+	// One trashed todo so the Trash smart list isn't empty. Hard-remove any prior
+	// same-title row (including soft-deleted ones) first so re-runs don't stack up.
+	const trashTitle = "旧的废弃任务（示例）"
+	db.Unscoped().Where("workspace_id = ? AND title = ?", wsID, trashTitle).Delete(&model.Todo{})
+	trash := model.Todo{UserID: user.ID, WorkspaceID: wsID, Title: trashTitle, Priority: "low"}
+	if err := db.Create(&trash).Error; err == nil {
+		db.Delete(&trash) // soft-delete -> surfaces under /todos/trash
+	}
+	fmt.Println("Trashed todo created")
+}
+
+// seedTransactions adds a few income/expense demo transactions (finance module),
+// some linked to buddies. Idempotent on (workspace, title).
+func seedTransactions(db *gorm.DB, user model.User, contacts []model.Contact) {
+	var workspace model.Workspace
+	if err := db.Where("owner_id = ?", user.ID).Order("created_at ASC").First(&workspace).Error; err != nil {
+		return
+	}
+	wsID := workspace.ID
+	rel := func(daysAgo int) time.Time { return time.Now().AddDate(0, 0, -daysAgo) }
+	txs := []model.Transaction{
+		{UserID: user.ID, WorkspaceID: wsID, Title: "工资", Amount: 12000, Type: "income", Category: "工资", Date: rel(2)},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "理财收益", Amount: 450, Type: "income", Category: "理财", Date: rel(10)},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "房租", Amount: 3500, Type: "expense", Category: "住房", Date: rel(3), ContactIDs: []uint{contacts[2].ID}},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "聚餐", Amount: 320, Type: "expense", Category: "餐饮", Date: rel(5), ContactIDs: []uint{contacts[0].ID}},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "宠物打疫苗", Amount: 200, Type: "expense", Category: "宠物", Date: rel(7), ContactIDs: []uint{contacts[3].ID}},
+	}
+	for i := range txs {
+		db.FirstOrCreate(&txs[i], model.Transaction{WorkspaceID: wsID, Title: txs[i].Title})
+	}
+	fmt.Printf("Created %d transactions\n", len(txs))
+}
+
+// seedEvents adds a few demo calendar events (events module), some linked to
+// buddies. Idempotent on (workspace, title).
+func seedEvents(db *gorm.DB, user model.User, contacts []model.Contact) {
+	var workspace model.Workspace
+	if err := db.Where("owner_id = ?", user.ID).Order("created_at ASC").First(&workspace).Error; err != nil {
+		return
+	}
+	wsID := workspace.ID
+	at := func(offsetDays, hour int) time.Time {
+		n := time.Now()
+		return time.Date(n.Year(), n.Month(), n.Day(), hour, 0, 0, 0, time.Local).AddDate(0, 0, offsetDays)
+	}
+	endPlus := func(start time.Time, hours int) *time.Time { e := start.Add(time.Duration(hours) * time.Hour); return &e }
+
+	s1 := at(1, 10)
+	s2 := at(3, 19)
+	s3 := at(7, 14)
+	events := []model.Event{
+		{UserID: user.ID, WorkspaceID: wsID, Title: "项目评审会", StartTime: s1, EndTime: endPlus(s1, 1), Location: "会议室A", Color: "#3b82f6", ContactIDs: []uint{contacts[2].ID}},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "和小明看电影", StartTime: s2, Location: "万达影城", Color: "#22c55e", ContactIDs: []uint{contacts[0].ID}},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "带旺财体检", StartTime: s3, Location: "宠物医院", Color: "#f59e0b", ContactIDs: []uint{contacts[3].ID}},
+	}
+	for i := range events {
+		db.FirstOrCreate(&events[i], model.Event{WorkspaceID: wsID, Title: events[i].Title})
+	}
+	fmt.Printf("Created %d events\n", len(events))
 }

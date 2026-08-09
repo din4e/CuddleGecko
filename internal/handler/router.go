@@ -26,6 +26,7 @@ type Handlers struct {
 	Workspace   *WorkspaceHandler
 	Export      *ExportHandler
 	UserSetting *UserSettingHandler
+	WS          *WSHandler
 	avatarDir   string
 }
 
@@ -78,6 +79,14 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 	api := r.Group("/api")
 	{
 		api.GET("/captcha", h.Captcha.Get)
+
+		// WebSocket upgrade for real-time multi-device todo sync. Registered in
+		// the bare group (not behind JWTAuth/WorkspaceAuth) because browsers
+		// cannot set headers on the WS handshake — the handler authenticates
+		// from the query string instead.
+		if h.WS != nil {
+			api.GET("/ws", h.WS.Connect)
+		}
 
 		auth := api.Group("/auth")
 		auth.Use(middleware.NewIPRateLimiter(10, time.Minute).Middleware())
@@ -155,11 +164,32 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.DELETE("/events/:id", h.Event.Delete)
 
 			wsProtected.GET("/todos", h.Todo.List)
+			wsProtected.GET("/todos/stats", h.Todo.Stats)
+			wsProtected.GET("/todos/trash", h.Todo.ListTrash)
 			wsProtected.POST("/todos", h.Todo.Create)
+			wsProtected.POST("/todos/bulk", h.Todo.BulkAction)
 			wsProtected.PUT("/todos/:id", h.Todo.Update)
 			wsProtected.PATCH("/todos/:id/toggle", h.Todo.ToggleStatus)
+			wsProtected.PATCH("/todos/:id/pin", h.Todo.TogglePin)
+			wsProtected.PATCH("/todos/:id/reorder", h.Todo.Reorder)
+			wsProtected.PATCH("/todos/:id/move", h.Todo.Move)
 			wsProtected.POST("/todos/:id/sync-event", h.Todo.SyncToEvent)
+			wsProtected.POST("/todos/:id/duplicate", h.Todo.Duplicate)
+			wsProtected.POST("/todos/:id/restore", h.Todo.Restore)
 			wsProtected.DELETE("/todos/:id", h.Todo.Delete)
+
+			// Checklist (subtask) operations on a todo
+			wsProtected.GET("/todos/:id/items", h.Todo.ListItems)
+			wsProtected.POST("/todos/:id/items", h.Todo.CreateItem)
+			wsProtected.PUT("/todos/:id/items/:itemId", h.Todo.UpdateItem)
+			wsProtected.PATCH("/todos/:id/items/:itemId/toggle", h.Todo.ToggleItem)
+			wsProtected.PATCH("/todos/:id/items/:itemId/reorder", h.Todo.ReorderItem)
+			wsProtected.POST("/todos/:id/items/:itemId/promote", h.Todo.PromoteItem)
+			wsProtected.DELETE("/todos/:id/items/:itemId", h.Todo.DeleteItem)
+
+			// Tag associations on a todo
+			wsProtected.GET("/todos/:id/tags", h.Todo.GetTags)
+			wsProtected.PUT("/todos/:id/tags", h.Todo.ReplaceTags)
 
 			wsProtected.GET("/transactions", h.Transaction.List)
 			wsProtected.GET("/transactions/summary", h.Transaction.Summary)
@@ -187,7 +217,14 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			}
 
 			wsProtected.POST("/export", h.Export.Export)
+			wsProtected.POST("/export/todos", h.Export.ExportTodosCSV)
+			wsProtected.POST("/export/contacts", h.Export.ExportContactsCSV)
+			wsProtected.POST("/export/transactions", h.Export.ExportTransactionsCSV)
+			wsProtected.POST("/export/events", h.Export.ExportEventsCSV)
 			wsProtected.POST("/import", h.Export.Import)
+			wsProtected.POST("/import/todos", h.Export.ImportTodosCSV)
+			wsProtected.POST("/import/contacts", h.Export.ImportContactsCSV)
+			wsProtected.POST("/import/transactions", h.Export.ImportTransactionsCSV)
 		}
 	}
 }

@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../stores/auth'
+import { useWorkspaceStore } from '../stores/workspace'
+import { useModeStore } from '../stores/mode'
+import { useQueryClient } from '@tanstack/react-query'
+import { startTodoWsSync } from '../lib/wsSync'
 import { Button } from '../components/ui/button'
 import BrandIcon from '../components/BrandIcon'
 import {
@@ -59,6 +63,8 @@ function isMobileViewport() {
 export default function AppLayout() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
+  const qc = useQueryClient()
+  const currentWorkspaceId = useWorkspaceStore((s) => s.currentWorkspace?.id) ?? null
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
@@ -110,6 +116,25 @@ export default function AppLayout() {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  // Real-time multi-device todo sync. One WebSocket scoped to the current
+  // workspace; on any inbound "todo.changed" frame we invalidate the todos query
+  // scope so TanStack Query refetches the fresh state. Reconnects on workspace
+  // switch or remount; desktop/local mode is skipped (uses local IPC).
+  useEffect(() => {
+    if (useModeStore.getState().mode !== 'remote') return
+    if (currentWorkspaceId == null) return
+    if (!localStorage.getItem('access_token')) return
+
+    const controller = startTodoWsSync({
+      getToken: () => localStorage.getItem('access_token'),
+      workspaceId: currentWorkspaceId,
+      onTodoChanged: () => {
+        qc.invalidateQueries({ queryKey: ['todos'] })
+      },
+    })
+    return () => controller.stop()
+  }, [qc, currentWorkspaceId])
 
   const toggleLang = () => {
     const next = i18n.language === 'zh' ? 'en' : 'zh'

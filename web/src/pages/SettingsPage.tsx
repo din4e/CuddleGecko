@@ -184,6 +184,75 @@ export default function SettingsPage() {
     }
   }
 
+  const handleExportCSV = async () => {
+    if (!adapters) return
+    try {
+      const csv = await adapters.export.exportTodosCSV()
+      // BOM so spreadsheet apps detect UTF-8 (CJK titles render correctly).
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `cuddlegecko-todos-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(t('settings.exportSuccess'))
+    } catch {
+      toast.error(t('settings.exportFailed'))
+    }
+  }
+
+  const handleExportContacts = async () => {
+    if (!adapters) return
+    try {
+      const csv = await adapters.export.exportContactsCSV()
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `cuddlegecko-contacts-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(t('settings.exportSuccess'))
+    } catch {
+      toast.error(t('settings.exportFailed'))
+    }
+  }
+
+  const handleExportTransactions = async () => {
+    if (!adapters) return
+    try {
+      const csv = await adapters.export.exportTransactionsCSV()
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `cuddlegecko-transactions-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(t('settings.exportSuccess'))
+    } catch {
+      toast.error(t('settings.exportFailed'))
+    }
+  }
+
+  const handleExportEvents = async () => {
+    if (!adapters) return
+    try {
+      const csv = await adapters.export.exportEventsCSV()
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `cuddlegecko-events-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(t('settings.exportSuccess'))
+    } catch {
+      toast.error(t('settings.exportFailed'))
+    }
+  }
+
   const handleImport = () => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -195,6 +264,60 @@ export default function SettingsPage() {
         const text = await file.text()
         await adapters.export.importJSON(text)
         toast.success(t('settings.importSuccess'))
+      } catch {
+        toast.error(t('settings.importFailed'))
+      }
+    }
+    input.click()
+  }
+
+  const handleImportCSV = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.csv'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file || !adapters) return
+      try {
+        const text = await file.text()
+        const n = await adapters.export.importTodosCSV(text)
+        toast.success(t('settings.imported', { n }))
+      } catch {
+        toast.error(t('settings.importFailed'))
+      }
+    }
+    input.click()
+  }
+
+  const handleImportContacts = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.csv'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file || !adapters) return
+      try {
+        const text = await file.text()
+        const n = await adapters.export.importContactsCSV(text)
+        toast.success(t('settings.imported', { n }))
+      } catch {
+        toast.error(t('settings.importFailed'))
+      }
+    }
+    input.click()
+  }
+
+  const handleImportTransactions = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.csv'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file || !adapters) return
+      try {
+        const text = await file.text()
+        const n = await adapters.export.importTransactionsCSV(text)
+        toast.success(t('settings.imported', { n }))
       } catch {
         toast.error(t('settings.importFailed'))
       }
@@ -283,6 +406,78 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
               <div className="font-medium flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                {t('settings.exportCSV')}
+              </div>
+              <p className="text-sm text-muted-foreground">{t('settings.exportCSVDesc')}</p>
+            </div>
+            <Button variant="outline" onClick={handleExportCSV} disabled={!adapters}>
+              {t('settings.exportCSV')}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <div className="font-medium flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                {t('settings.exportContactsCSV')}
+              </div>
+              <p className="text-sm text-muted-foreground">{t('settings.exportContactsCSVDesc')}</p>
+            </div>
+            <Button variant="outline" onClick={handleExportContacts} disabled={!adapters}>
+              {t('settings.exportContactsCSV')}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <div className="font-medium flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                {t('settings.exportTransactionsCSV')}
+              </div>
+              <p className="text-sm text-muted-foreground">{t('settings.exportTransactionsCSVDesc')}</p>
+            </div>
+            <Button variant="outline" onClick={handleExportTransactions} disabled={!adapters}>
+              {t('settings.exportTransactionsCSV')}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <div className="font-medium flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                {t('settings.importTransactionsCSV')}
+              </div>
+              <p className="text-sm text-muted-foreground">{t('settings.importTransactionsCSVDesc')}</p>
+            </div>
+            <Button variant="outline" onClick={handleImportTransactions} disabled={!adapters}>
+              {t('settings.importTransactionsCSV')}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <div className="font-medium flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                {t('settings.exportEventsCSV')}
+              </div>
+              <p className="text-sm text-muted-foreground">{t('settings.exportEventsCSVDesc')}</p>
+            </div>
+            <Button variant="outline" onClick={handleExportEvents} disabled={!adapters}>
+              {t('settings.exportEventsCSV')}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <div className="font-medium flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                {t('settings.importContactsCSV')}
+              </div>
+              <p className="text-sm text-muted-foreground">{t('settings.importContactsCSVDesc')}</p>
+            </div>
+            <Button variant="outline" onClick={handleImportContacts} disabled={!adapters}>
+              {t('settings.importContactsCSV')}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <div className="font-medium flex items-center gap-2">
                 <Upload className="h-4 w-4" />
                 {t('settings.importJSON')}
               </div>
@@ -290,6 +485,18 @@ export default function SettingsPage() {
             </div>
             <Button variant="outline" onClick={handleImport} disabled={!adapters}>
               {t('settings.importJSON')}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <div className="font-medium flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                {t('settings.importCSV')}
+              </div>
+              <p className="text-sm text-muted-foreground">{t('settings.importCSVDesc')}</p>
+            </div>
+            <Button variant="outline" onClick={handleImportCSV} disabled={!adapters}>
+              {t('settings.importCSV')}
             </Button>
           </div>
         </CardContent>
