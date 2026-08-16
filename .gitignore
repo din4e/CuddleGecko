@@ -37,9 +37,10 @@ data/
 config.local.yaml
 config.*.local.yaml
 
-# --- Wails (desktop) ---
-build/bin/
-frontend/dist/
+# --- Wails (desktop) — the desktop client moved to the CuddleGeckoDesktop
+# repo at the 03a8f82 split; kept only web/src/wailsjs in case a stray
+# generated binding reappears from an old toolchain. build/bin and frontend/
+# never existed in this repo post-split. ---
 web/src/wailsjs/
 
 # --- IDE & OS ---

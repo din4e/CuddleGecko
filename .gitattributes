@@ -5,3 +5,4 @@
 *.sh           text eol=lf
 web/conf/*     text eol=lf
 web/Dockerfile text eol=lf
+Dockerfile     text eol=lf

@@ -4,154 +4,126 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CuddleGecko (小蜥抱抱) is a local-first personal CRM with network graph visualization, AI assistant, and finance tracking. Go backend + React SPA frontend. Supports Web mode (Gin server) and Desktop mode (Wails v2). Roadmap: Web → Desktop → SaaS cloud.
+CuddleGecko (小蜥抱抱) is a local-first personal CRM with network graph visualization, AI assistant, finance tracking, todos (nested tree + pomodoro), and fitness/workout tracking. Go backend + React SPA frontend. **Web-only repo** — the Wails desktop client lives in the separate **CuddleGeckoDesktop** repo (split in commit 03a8f82; no desktop/, wails.json, or wails-adapter here).
 
 ## Build & Run
 
 ```bash
 # Backend
 CG_CAPTCHA_ENABLED=false air          # hot-reload dev server (disables captcha for dev)
-go run ./cmd/server                    # start on :8080 (no hot-reload)
-go build -o cuddlegecko ./cmd/server   # build binary
-go test ./...                          # all tests
-go test ./internal/service/...         # single package
-go test -run TestAuthService_Register_Success ./...  # single test
-go vet ./...                           # lint
+go run ./cmd/server                   # start on :8080 (no hot-reload)
+go build -o cuddlegecko ./cmd/server  # build binary
+go test ./...                         # all tests (CI also runs -race)
+go test ./internal/service/...        # single package
+go vet ./...                          # lint
 
 # Frontend
 cd web && npm install
-cd web && npm run dev       # dev server (127.0.0.1:3001)
-cd web && npm run build     # production build
-cd web && npm run lint      # ESLint
-cd web && npm test          # Vitest unit tests
+cd web && npm run dev        # dev server (127.0.0.1:3001)
+cd web && npm run build      # production build (CI gate)
+cd web && npm run lint       # ESLint (0 errors required)
+cd web && npm test           # Vitest
 
-# Desktop (Wails v2)
-wails dev                    # dev mode with hot reload
-wails build                  # production build (outputs to build/bin/)
+# Type-check — GOTCHA: use the app project config.
+cd web && npx tsc -p tsconfig.app.json --noEmit
+# A bare `tsc --noEmit` at the repo root is a NO-OP (project references) —
+# it silently checks nothing and has masked real type errors before.
+
+# Seed / audit
+go run ./cmd/seed                              # demo/test123 account with sample data
+go run golang.org/x/vuln/cmd/govulncheck@latest ./...  # CVE audit (CI gate)
 ```
 
-**Windows port note:** Port 5173 may be reserved by Hyper-V. Vite is configured to use port 3000, auto-fallback if occupied.
+CI (`.github/workflows/ci.yml`): backend build + vet + test `-race` + govulncheck; frontend tsc(app) + lint + vitest + production build. Runs on push to main/dev and PRs.
 
 ## Architecture
 
 ### Backend — Layered (Go)
 
 ```
-cmd/server/main.go    → wires all dependencies (web mode entry point)
+cmd/server/main.go    → wires all dependencies (entry point)
+cmd/seed, cmd/seed-stress, cmd/migrate → data tooling
 internal/handler/     → Gin HTTP handlers, thin layer calling services
-internal/service/     → business logic, no HTTP awareness
-internal/repository/  → GORM database access, interfaces defined in service package
-internal/model/       → domain types (User, Contact, Tag, Interaction, Reminder, Relation, Event, Todo, Transaction, AIProvider, AIConversation, AIMessage)
-pkg/config/           → Viper config with CG_ env prefix
-pkg/database/         → GORM init, SQLite WAL mode / MySQL switch
-pkg/llm/              → OpenAI-compatible LLM streaming client (pure net/http, no SDK)
-pkg/middleware/       → JWT Bearer auth, CORS
+internal/service/     → business logic + VALIDATION (service layer validates, so
+                        MCP tools can't bypass HTTP binding rules — see validation.go)
+internal/repository/  → GORM access; interfaces defined in service package
+internal/model/       → domain types + composite index tags (tested in indexes_test.go)
+internal/mcp/         → MCP server (JSON-RPC 2.0, Streamable HTTP) for external AI tools
+internal/realtime/    → WebSocket hub for multi-device todo sync
+pkg/config/           → Viper config, CG_ env prefix
+pkg/database/         → GORM init: SQLite WAL (single conn) / MySQL
+pkg/llm/              → OpenAI-compatible streaming client (pure net/http)
+pkg/middleware/       → JWT auth, CORS, IP rate limiting, workspace-membership cache
 pkg/response/         → unified JSON: {code, data, message}
 ```
 
-### Desktop — Wails v2 (Go + React)
+**Key backend patterns (established, tested — keep them):**
+- **Stats** = single-pass conditional aggregation (`SUM(CASE WHEN …)`), never N COUNT queries.
+- **Todo cascade** delete/restore + cycle check = recursive CTEs (`subtreeIDs`, `ancestorChainContains`), never full-graph loads.
+- **Reorder** = one `UPDATE … SET sort_order = CASE id WHEN …` (`renumberSortOrder`), never per-row UPDATE loops.
+- **Pagination** = `clampPage(page, pageSize)` in every repo List; `maxPageSize = 100000` (deliberately large — export reads full sets through the same Lists; a tight cap silently truncates backups).
+- **Cross-driver SQL**: contact-id JSON filters branch on `Dialector.Name()` (SQLite `json_each` / MySQL `JSON_CONTAINS`/`JSON_OVERLAPS`); month bucketing uses `substr(date,1,7)` on SQLite (NOT `strftime` — it converts to UTC and mis-buckets non-UTC dates).
+- **Error mapping**: service validators return sentinel errors (`ErrInvalidTransaction` …) wrapped with `%w`; handlers map them to 400 via `errors.Is`.
+- **Rate limits**: `/api/auth/*` 10/min/IP; AI LLM routes (`/ai/chat`, `/ai/chat/sync`, `/ai/analyze/*`) 20/min; `/api/captcha` 30/min (router.go).
+
+### Frontend — SPA (React 19 + Vite + TS)
 
 ```
-main.go               → thin wrapper: embeds frontend assets, calls desktop.Run()
-wails.json            → Wails project configuration
-desktop/              → Wails desktop application
-  run.go              → Run(assets) with wails.Run() entry point
-  app.go              → App struct with startup/shutdown lifecycle
-  menu.go             → native menu bar (File, Edit, View, Help)
-  windowstate.go      → window position/size persistence
-  bindings/           → Wails binding structs wrapping services
-    state.go          → global binding state + userID tracking
-    auth.go, contact.go, tag.go, interaction.go, reminder.go, graph.go, event.go, transaction.go, ai.go, desktop.go
-    export.go         → JSON import/export
-    types.go          → request/response types for Wails bindings
-web/src/wailsjs/      → auto-generated JS bindings (gitignored)
+web/src/api/           # one module per domain; Axios client unwraps {code,data,message}
+web/src/hooks/api/     # TanStack Query hooks — THE way to fetch (30s staleTime, cached across pages)
+web/src/stores/        # Zustand: auth, workspace, pomodoro, navConfig, mode (HTTP adapter singleton)
+web/src/components/    # dialogs, pickers, cards, TodoTreeRow, terminal/ (xterm + sanitized formatters)
+web/src/lib/           # utils (cn, isoToLocalInput), ics (RFC5545 folding), quickAdd, wsSync
+web/src/i18n/          # react-i18next, en/zh locales — ALL UI strings through t()
+web/src/layouts/       # AppLayout + PomodoroBar (isolated so store ticks don't re-render the app)
+web/src/pages/         # route-level views
 ```
 
-**Dual-mode frontend:** The React frontend supports two runtime modes:
-- **Local mode** (desktop): Calls Go methods via Wails IPC bindings
-- **Remote mode** (desktop/web): Calls HTTP API via axios
+**Key frontend patterns (established, tested — keep them):**
+- Fetch via the shared hooks; NEVER raw `useEffect` + setState (defeats the cache).
+- Invalidate by scope prefix: `qc.invalidateQueries({ queryKey: rootKey('contacts') })`.
+- Mutation errors: global `MutationCache onError` toasts unless the hook sets `meta: { localErrorHandling: true }`.
+- datetime-local inputs load via `isoToLocalInput()` (lib/utils) — slicing ISO shifts by the UTC offset per edit.
+- Optimistic updates: `getQueriesData` + per-key `setQueryData` (the `setQueriesData` updater takes ONE arg — a second `query` param is undefined; regression tests in hooks/api/__tests__/).
+- Terminal: user text MUST pass `sanitize()` (components/terminal/formatters.ts) before xterm.
+- Dark mode via `useIsDarkMode()` hook, not per-frame classList reads.
 
-Mode switching is managed by `stores/mode.ts` using adapter interfaces defined in `api/adapter.ts`.
-
-**Dependency injection:** Constructor functions, no global state. Service tests use mock repos.
-
-**Repository error pattern:** `GetByID`/`GetUserByUsername` return raw GORM errors (service checks `gorm.ErrRecordNotFound`). Other methods wrap with `fmt.Errorf`.
-
-### Frontend — SPA (React)
-
-```
-web/src/api/client.ts      → Axios with JWT interceptor + backend envelope unwrap
-web/src/api/adapter.ts     → AppAdapters interface (dual-mode: HTTP vs Wails IPC)
-web/src/api/http-adapter.ts → HTTP adapter using Axios
-web/src/api/wails-adapter.ts → Wails IPC adapter using dynamic imports
-web/src/api/{domain}.ts    → One module per domain (auth, contacts, tags, etc.)
-web/src/types/index.ts     → TypeScript types matching Go models
-web/src/stores/auth.ts     → Zustand auth store with localStorage persistence
-web/src/stores/mode.ts     → Local/remote mode switching
-web/src/stores/graphSettings.ts → Graph visualization settings
-web/src/i18n/              → react-i18next setup with en/zh locales
-web/src/layouts/AppLayout.tsx → Sidebar + header + dark mode toggle
-web/src/components/ProtectedRoute.tsx → Redirect to /login if unauthenticated
-web/src/components/GeckoIcon.tsx → SVG gecko logo
-web/src/components/BuddyPicker.tsx → Multi-select buddy picker with search
-web/src/components/ViewToggle.tsx → List/card view toggle
-web/src/pages/             → Route-level views
-```
-
-**API response handling:** Backend wraps all responses in `{code, data, message}`. The Axios response interceptor in `client.ts` unwraps this so `res.data` is the actual payload. Pages access `res.data` directly.
-
-**Auth flow:** Login/register stores tokens in localStorage → `checkAuth()` on app mount calls `/auth/me` → 401 triggers automatic refresh token retry → redirect to `/login` on failure.
-
-**Graph optimization (large datasets):** `GraphPage.tsx` supports three layout modes with performance tuning for 1000+ nodes:
-- **Force** — Default d3-force-directed. For large graphs: charge strength -40, link distance 15, cooldown 200 ticks.
-- **Cluster** — Nodes pre-positioned by primary relationship label into circular groups (pseudo-random offset within cluster). Reduced charge (-20) and link distance (20) to keep clusters compact. Simulation settles clusters while preserving group structure.
-- **Random** — Deterministic scatter via `pseudoRandom(id)` (sin-based). `cooldownTicks=0` skips simulation entirely for instant render.
-- **Large graph auto-tuning** (>300 nodes): self-node capped to 50 connections (high-degree nodes only); name labels hidden when `globalScale < 0.6` to reduce canvas text overhead; `onEngineInit` overrides d3 force parameters for faster convergence.
-- **Self node**: `id=-1`, connects user to contacts. For large graphs only connects to nodes with existing edges (≤50).
+**SSE wire format**: AI stream tokens are JSON envelopes (`data: {"c":"…"}` / `{"error":"…"}`), never raw text (newline-in-token framing). Out-of-tree clients must parse the envelope.
 
 ## Key Domain Types
 
-- **Contact** — name, email, phone, birthday, notes, relationship_labels (multi-select), avatar_emoji, avatar_url, tags[]
+- **Contact** — name, nickname, email, phone, birthday, notes, relationship_labels, avatar_emoji, avatar_url, tags[]
 - **Interaction** — type (meeting/call/message/email), title, content, occurred_at
 - **Tag** — name, color (hex)
-- **Reminder** — title, description, remind_at, status (pending/done/snoozed)
+- **Reminder** — title, description, remind_at, status (pending/done/snoozed), contact_id
 - **ContactRelation** — contact_id_a, contact_id_b, relation_type
 - **Event** — title, description, start_time, end_time, location, color, contact_ids[]
-- **Todo** — title, description, status (pending/done), priority (low/normal/high), due_time, amount, amount_type, contact_ids[], color, completed_at
+- **Todo** — title, description, status, priority, pinned, due_time, start_time, repeat/repeat_interval, sort_order, parent_id (nested tree), item_total/item_done, pomodoro_count, contact_ids[], tags[]
+- **Workout** — name, type, status, intensity, scheduled_at, duration, calories, exercises[] (sets/reps/weight), sort_order
+- **BodyMetric** — recorded_at, weight, height, body_fat, resting_hr, sleep, steps, energy, mood
 - **Transaction** — title, amount, type (income/expense), category, contact_ids[], date, notes
-- **AIProvider** — provider_type, name, base_url, api_key, model, is_active
-- **AIConversation** — user_id, title, messages[]
-- **AIMessage** — conversation_id, role (user/assistant/system), content
-- **RelationshipLabels** — family, friend, colleague, client, pet, other (multi-select, supports custom)
+- **AIProvider / AIConversation / AIMessage**
 
-## Seed Data
-
-```bash
-go run ./cmd/seed   # creates demo/test123 account with sample buddies, tags, interactions, reminders, relations
-```
-
-## API Routes
-
-All at `/api`, JWT-protected except auth endpoints:
+## API Routes (at /api, JWT-protected except auth/captcha/ws)
 
 | Group | Methods |
 |-------|---------|
-| Auth | POST register/login/refresh, GET me |
-| Buddies | GET/POST list/create, GET/PUT/DELETE /:id, GET/PUT /:id/tags |
-| Tags | GET/POST list/create, PUT/DELETE /:id |
-| Interactions | GET/POST /buddies/:id/interactions, PUT/DELETE /:id |
-| Reminders | GET list (status filter), POST /buddies/:id/reminders, PUT/DELETE /:id |
-| Relations | GET/POST /buddies/:id/relations, DELETE /:id |
-| Graph | GET /graph (nodes + edges) |
-| Events | GET/POST list/create, PUT/DELETE /:id |
-| Todos | GET/POST list/create, PUT /:id, PATCH /:id/toggle, POST /:id/sync-event, DELETE /:id |
-| Transactions | GET/POST list/create, GET /summary, PUT/DELETE /:id |
-| AI | GET/PUT providers, POST activate/test, GET/POST conversations, POST chat (SSE), POST analyze |
+| Auth | POST register/login/refresh, GET me (rate-limited) |
+| Buddies | GET/POST, GET/PUT/DELETE /:id, tags; ?contact_id= filters on reminders |
+| Contacts/Tags/Interactions/Relations | CRUD |
+| Graph | GET /graph (projected nodes, no tag preload) |
+| Events | CRUD + `?q=` title search |
+| Todos | CRUD + trash (cascade), PATCH toggle, POST move/reorder (tree), sync-event, items (subtasks), bulk |
+| Workouts | CRUD + exercises, toggle, reorder; body metrics CRUD + summary |
+| Transactions | CRUD + /summary + **/monthly** (dashboard aggregate) + `?q=` search + `?contact_id=` (JSON contains) |
+| AI | providers, conversations, POST chat (SSE envelope), analyze/* (rate-limited) |
+| MCP | POST /mcp |
 
 ## Conventions
 
 - Bilingual project: UI text/comments may be Chinese (中文). Code, commit messages, API fields in English.
-- Go: `context.Context` as first param. Return errors, don't panic.
-- Frontend: Use path alias `@/` for imports (configured in vite.config.ts + tsconfig).
-- Config env vars: `CG_` prefix with underscores for nesting (`CG_SERVER_PORT`, `CG_DATABASE_DRIVER`).
-- Database: SQLite for desktop/web, MySQL for SaaS. Repository layer abstracts dialect differences.
+- Go: `context.Context` first param; return errors, don't panic; repo GetByID returns raw GORM errors (service checks `gorm.ErrRecordNotFound`).
+- Frontend: path alias `@/`; all UI strings via `t()`; i18n keys added to BOTH en and zh locales.
+- Config env vars: `CG_` prefix (`CG_SERVER_PORT`, `CG_DATABASE_DRIVER`).
+- Database: SQLite default (WAL, single conn), MySQL optional (docker-compose DSN); repository layer branches where dialect SQL differs.
+- Verification bar: backend `go build && go vet && go test ./...`; frontend `tsc -p tsconfig.app.json --noEmit && npm run lint && npx vitest run`.

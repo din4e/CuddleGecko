@@ -201,6 +201,7 @@ All endpoints at `/api`:
 | POST | /auth/login | Login |
 | POST | /auth/refresh | Refresh token |
 | GET | /auth/me | Current user |
+| GET | /version | Build version + health probe (public) |
 | GET/POST | /workspaces | List/Create workspaces |
 | PUT/DELETE | /workspaces/:id | Workspace update/delete |
 | POST | /workspaces/:id/switch | Switch active workspace |
@@ -218,15 +219,19 @@ All endpoints at `/api`:
 | PUT/DELETE | /reminders/:id | Reminder update/delete |
 | DELETE | /relations/:id | Delete relation |
 | GET | /graph | Network graph data |
-| GET/POST | /events | List/Create events |
+| GET/POST | /events | List/Create events (search via `?q=`) |
 | PUT/DELETE | /events/:id | Event update/delete |
 | GET/POST | /todos | List/Create todos (status filter) |
+| GET | /todos/trash | Soft-deleted todos (cascade-deleted subtrees) |
+| POST | /todos/:id/move | Reparent + reorder (tree) |
+| POST | /todos/:id/reorder | Manual order |
 | PUT | /todos/:id | Update todo |
 | PATCH | /todos/:id/toggle | Toggle todo status |
 | POST | /todos/:id/sync-event | Sync todo to event |
 | DELETE | /todos/:id | Delete todo |
 | GET/POST | /transactions | List/Create transactions |
 | GET | /transactions/summary | Transaction summary |
+| GET | /transactions/monthly | Monthly income/expense aggregate (dashboard trend) |
 | PUT/DELETE | /transactions/:id | Transaction update/delete |
 | GET | /ai/presets | List AI provider presets |
 | GET | /ai/env-status | Check environment-based AI config |
@@ -322,6 +327,18 @@ cd web && npm run build    # production build
 cd web && npm run lint     # ESLint
 cd web && npm test         # Vitest unit tests
 ```
+
+### CI
+
+`.github/workflows/ci.yml` runs on every push to `main`/`dev` and every PR:
+
+- **Backend**: `go build` + `go vet` + `go test -race` + **govulncheck** audit (blocks reachable dependency CVEs)
+- **Frontend**: `tsc -p tsconfig.app.json --noEmit` (note: a bare `tsc --noEmit` at the repo root is a **no-op** — the root tsconfig uses project references), ESLint, Vitest
+
+### Notes
+
+- **Rate limits**: `/api/auth/*` is limited to 10 req/min per IP; the LLM-calling AI routes (`/ai/chat`, `/ai/chat/sync`, `/ai/analyze/*`) to 20/min; `/api/captcha` to 30/min. Adjust in `internal/handler/router.go`.
+- **SSE wire format**: AI streaming tokens are JSON envelopes (`data: {"c":"..."}` / `{"error":"..."}`), not raw text — any out-of-tree client parsing `data: <raw>` (e.g. the CuddleGeckoDesktop app) must parse the envelope.
 
 ## License
 
