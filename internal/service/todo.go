@@ -40,6 +40,7 @@ type TodoRepository interface {
 // TodoItemRepository handles checklist (subtask) persistence for a todo.
 type TodoItemRepository interface {
 	ListItems(ctx context.Context, todoID uint) ([]model.TodoItem, error)
+	ListItemsByTodoIDs(ctx context.Context, todoIDs []uint) ([]model.TodoItem, error)
 	GetItem(ctx context.Context, todoID, itemID uint) (*model.TodoItem, error)
 	CreateItem(ctx context.Context, item *model.TodoItem) error
 	UpdateItem(ctx context.Context, todoID uint, item *model.TodoItem) error

@@ -43,12 +43,7 @@ func (r *TodoRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.To
 }
 
 func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQuery) ([]model.Todo, int64, error) {
-	if q.Page <= 0 {
-		q.Page = 1
-	}
-	if q.PageSize <= 0 {
-		q.PageSize = 50
-	}
+	q.Page, q.PageSize = clampPage(q.Page, q.PageSize)
 
 	query := r.db.WithContext(ctx).Model(&model.Todo{}).Where("workspace_id = ?", workspaceID)
 
@@ -145,31 +140,9 @@ func (r *TodoRepo) Update(ctx context.Context, todo *model.Todo) error {
 // trash together and can be restored from there.
 func (r *TodoRepo) Delete(ctx context.Context, workspaceID, id uint) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Load the (non-deleted) parent graph for the workspace.
-		var nodes []model.Todo
-		if err := tx.Where("workspace_id = ?", workspaceID).
-			Select("id, parent_id").Find(&nodes).Error; err != nil {
-			return fmt.Errorf("load todo graph for cascade delete: %w", err)
-		}
-		children := make(map[uint][]uint)
-		for _, n := range nodes {
-			if n.ParentID != nil {
-				children[*n.ParentID] = append(children[*n.ParentID], n.ID)
-			}
-		}
-		// BFS descendants of id (inclusive).
-		var ids []uint
-		seen := map[uint]bool{}
-		queue := []uint{id}
-		for len(queue) > 0 {
-			cur := queue[0]
-			queue = queue[1:]
-			if seen[cur] {
-				continue
-			}
-			seen[cur] = true
-			ids = append(ids, cur)
-			queue = append(queue, children[cur]...)
+		ids, err := r.subtreeIDs(tx, workspaceID, []uint{id}, false)
+		if err != nil {
+			return err
 		}
 		if err := tx.Where("id IN ? AND workspace_id = ?", ids, workspaceID).
 			Delete(&model.Todo{}).Error; err != nil {
@@ -220,11 +193,12 @@ func (r *TodoRepo) Reorder(ctx context.Context, workspaceID, id uint, afterID *u
 		ordered = append(ordered, all[movedIdx])
 		ordered = append(ordered, rest[insertAt:]...)
 
+		ids := make([]uint, len(ordered))
 		for i, t := range ordered {
-			if err := tx.Model(&model.Todo{}).Where("id = ?", t.ID).
-				Update("sort_order", i).Error; err != nil {
-				return fmt.Errorf("renumber todo order: %w", err)
-			}
+			ids[i] = t.ID
+		}
+		if err := renumberSortOrder(tx, &model.Todo{}, ids); err != nil {
+			return fmt.Errorf("renumber todo order: %w", err)
 		}
 		return nil
 	})
@@ -251,18 +225,15 @@ func (r *TodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, aft
 			if err := tx.Where("id = ? AND workspace_id = ?", *parentID, workspaceID).First(&parent).Error; err != nil {
 				return ErrTodoInvalidParent
 			}
-			// Cycle check: walk the candidate parent's ancestor chain; if we hit
-			// `id`, the candidate is a descendant of the moved todo.
-			cur := parent.ParentID
-			for cur != nil {
-				if *cur == id {
-					return ErrTodoCycle
-				}
-				var anc model.Todo
-				if err := tx.Select("parent_id").Where("id = ?", *cur).First(&anc).Error; err != nil {
-					break
-				}
-				cur = anc.ParentID
+			// Cycle check: moving `id` under `parentID` would create a cycle if
+			// `id` is an ancestor of `parentID`. One recursive-CTE walk up the
+			// parent chain replaces a query-per-ancestor.
+			isAnc, err := r.ancestorChainContains(tx, workspaceID, *parentID, id)
+			if err != nil {
+				return err
+			}
+			if isAnc {
+				return ErrTodoCycle
 			}
 		}
 
@@ -297,18 +268,19 @@ func (r *TodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, aft
 		ordered = append(ordered, siblings[:insertAt]...)
 		ordered = append(ordered, model.Todo{ID: id})
 		ordered = append(ordered, siblings[insertAt:]...)
+		ids := make([]uint, len(ordered))
 		for i, t := range ordered {
-			if err := tx.Model(&model.Todo{}).Where("id = ?", t.ID).
-				Update("sort_order", i).Error; err != nil {
-				return fmt.Errorf("renumber siblings after move: %w", err)
-			}
+			ids[i] = t.ID
+		}
+		if err := renumberSortOrder(tx, &model.Todo{}, ids); err != nil {
+			return fmt.Errorf("renumber siblings after move: %w", err)
 		}
 		return nil
 	})
 }
 
-// Stats computes a productivity overview. Each count uses a fresh query so the
-// differing WHERE clauses don't accumulate.
+// Stats computes a productivity overview in a single pass over the workspace's
+// todos via conditional aggregation, instead of six sequential COUNT queries.
 func (r *TodoRepo) Stats(ctx context.Context, workspaceID uint) (model.TodoStats, error) {
 	now := time.Now()
 	startToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
@@ -318,39 +290,38 @@ func (r *TodoRepo) Stats(ctx context.Context, workspaceID uint) (model.TodoStats
 	}
 	startWeek := startToday.AddDate(0, 0, -daysSinceMonday)
 
-	// base returns a fresh query scoped to the workspace.
-	base := func() *gorm.DB {
-		return r.db.WithContext(ctx).Model(&model.Todo{}).Where("workspace_id = ?", workspaceID)
-	}
-
-	count := func(query *gorm.DB) (int64, error) {
-		var n int64
-		if err := query.Count(&n).Error; err != nil {
-			return 0, fmt.Errorf("stat count: %w", err)
-		}
-		return n, nil
-	}
-
 	var stats model.TodoStats
-	var err error
-	if stats.Total, err = count(base()); err != nil {
-		return stats, err
+	var row struct {
+		Total        int64 `gorm:"column:total"`
+		Pending      int64 `gorm:"column:pending"`
+		Overdue      int64 `gorm:"column:overdue"`
+		Deferred     int64 `gorm:"column:deferred"`
+		DoneToday    int64 `gorm:"column:done_today"`
+		DoneThisWeek int64 `gorm:"column:done_this_week"`
 	}
-	if stats.Pending, err = count(base().Where("status = ?", "pending")); err != nil {
-		return stats, err
+	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
+		Where("workspace_id = ?", workspaceID).
+		Select("COUNT(*) AS total, "+
+			"COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS pending, "+
+			"COALESCE(SUM(CASE WHEN status = ? AND due_time IS NOT NULL AND due_time < ? THEN 1 ELSE 0 END), 0) AS overdue, "+
+			"COALESCE(SUM(CASE WHEN status = ? AND start_time IS NOT NULL AND start_time > ? THEN 1 ELSE 0 END), 0) AS deferred, "+
+			"COALESCE(SUM(CASE WHEN status = ? AND completed_at >= ? THEN 1 ELSE 0 END), 0) AS done_today, "+
+			"COALESCE(SUM(CASE WHEN status = ? AND completed_at >= ? THEN 1 ELSE 0 END), 0) AS done_this_week",
+			"pending",
+			"pending", now,
+			"pending", now,
+			"done", startToday,
+			"done", startWeek,
+		).
+		Scan(&row).Error; err != nil {
+		return stats, fmt.Errorf("todo stats: %w", err)
 	}
-	if stats.Overdue, err = count(base().Where("status = ? AND due_time IS NOT NULL AND due_time < ?", "pending", now)); err != nil {
-		return stats, err
-	}
-	if stats.Deferred, err = count(base().Where("status = ? AND start_time IS NOT NULL AND start_time > ?", "pending", now)); err != nil {
-		return stats, err
-	}
-	if stats.DoneToday, err = count(base().Where("status = ? AND completed_at >= ?", "done", startToday)); err != nil {
-		return stats, err
-	}
-	if stats.DoneThisWeek, err = count(base().Where("status = ? AND completed_at >= ?", "done", startWeek)); err != nil {
-		return stats, err
-	}
+	stats.Total = row.Total
+	stats.Pending = row.Pending
+	stats.Overdue = row.Overdue
+	stats.Deferred = row.Deferred
+	stats.DoneToday = row.DoneToday
+	stats.DoneThisWeek = row.DoneThisWeek
 	return stats, nil
 }
 
@@ -380,6 +351,21 @@ func (r *TodoRepo) ListItems(ctx context.Context, todoID uint) ([]model.TodoItem
 	if err := r.db.WithContext(ctx).Where("todo_id = ?", todoID).
 		Order("sort_order ASC, id ASC").Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("list todo items: %w", err)
+	}
+	return items, nil
+}
+
+// ListItemsByTodoIDs is the bulk counterpart to ListItems: it fetches checklist
+// items for many todos in a single query (ordered so per-todo grouping stays
+// stable), used by export to avoid an N+1 of one query per todo.
+func (r *TodoRepo) ListItemsByTodoIDs(ctx context.Context, todoIDs []uint) ([]model.TodoItem, error) {
+	if len(todoIDs) == 0 {
+		return nil, nil
+	}
+	var items []model.TodoItem
+	if err := r.db.WithContext(ctx).Where("todo_id IN ?", todoIDs).
+		Order("todo_id ASC, sort_order ASC, id ASC").Find(&items).Error; err != nil {
+		return nil, fmt.Errorf("list todo items by ids: %w", err)
 	}
 	return items, nil
 }
@@ -506,11 +492,12 @@ func (r *TodoRepo) ReorderItem(ctx context.Context, todoID, itemID uint, afterIt
 		ordered = append(ordered, all[movedIdx])
 		ordered = append(ordered, rest[insertAt:]...)
 
+		ids := make([]uint, len(ordered))
 		for i, it := range ordered {
-			if err := tx.Model(&model.TodoItem{}).Where("id = ?", it.ID).
-				Update("sort_order", i).Error; err != nil {
-				return fmt.Errorf("renumber todo item order: %w", err)
-			}
+			ids[i] = it.ID
+		}
+		if err := renumberSortOrder(tx, &model.TodoItem{}, ids); err != nil {
+			return fmt.Errorf("renumber todo item order: %w", err)
 		}
 		return nil
 	})
@@ -678,31 +665,11 @@ func (r *TodoRepo) Restore(ctx context.Context, workspaceID, id uint) error {
 			First(&parent).Error; err != nil {
 			return gorm.ErrRecordNotFound
 		}
-		// Gather the full descendant subtree from the complete graph (including
-		// soft-deleted rows) so a cascade-deleted tree restores together.
-		var nodes []model.Todo
-		if err := tx.Unscoped().Where("workspace_id = ?", workspaceID).
-			Select("id, parent_id").Find(&nodes).Error; err != nil {
-			return fmt.Errorf("load todo graph for cascade restore: %w", err)
-		}
-		children := make(map[uint][]uint)
-		for _, n := range nodes {
-			if n.ParentID != nil {
-				children[*n.ParentID] = append(children[*n.ParentID], n.ID)
-			}
-		}
-		var ids []uint
-		seen := map[uint]bool{}
-		queue := []uint{id}
-		for len(queue) > 0 {
-			cur := queue[0]
-			queue = queue[1:]
-			if seen[cur] {
-				continue
-			}
-			seen[cur] = true
-			ids = append(ids, cur)
-			queue = append(queue, children[cur]...)
+		// Gather the full descendant subtree (including soft-deleted rows) so a
+		// cascade-deleted tree restores together.
+		ids, err := r.subtreeIDs(tx, workspaceID, []uint{id}, true)
+		if err != nil {
+			return err
 		}
 		if err := tx.Unscoped().Model(&model.Todo{}).
 			Where("id IN ? AND workspace_id = ? AND deleted_at IS NOT NULL", ids, workspaceID).
@@ -737,34 +704,61 @@ func (r *TodoRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint,
 }
 
 // descendantIDsInclusive returns the given ids together with all of their
-// (transitive) descendants in the workspace, so a cascade delete/restore covers
-// the full subtree. It is read-only and does not itself mutate.
+// (transitive) non-deleted descendants in the workspace, so a cascade delete
+// covers the full subtree. Read-only; delegates to subtreeIDs.
 func (r *TodoRepo) descendantIDsInclusive(ctx context.Context, workspaceID uint, ids []uint) ([]uint, error) {
-	var nodes []model.Todo
-	if err := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID).
-		Select("id, parent_id").Find(&nodes).Error; err != nil {
-		return nil, fmt.Errorf("load todo graph for cascade: %w", err)
+	return r.subtreeIDs(r.db.WithContext(ctx), workspaceID, ids, false)
+}
+
+// subtreeIDs returns each root id together with all of its transitive
+// descendants in the workspace, computed by a recursive CTE. This replaces an
+// earlier implementation that loaded the entire workspace todo graph and ran a
+// BFS in Go on every delete/restore — a full table scan on the hottest write
+// path. The depth cap preserves the old BFS's cycle guard: the tree is kept
+// acyclic by Move's validation, but the cap makes a corrupt cycle fail-safe
+// instead of recursing forever. When includeDeleted is true the traversal also
+// walks soft-deleted rows, which Restore needs because a cascade-deleted
+// subtree is deleted in its entirety.
+// ancestorChainContains reports whether targetID is in startID's ancestor chain
+// (startID itself, or reachable by following parent_id upward). It uses one
+// recursive CTE instead of Move's former one-query-per-ancestor walk, and stops
+// naturally at a dangling parent_id (the old loop's break-on-not-found). The
+// depth cap guards against corrupt cycles. Used by Move's cycle check.
+func (r *TodoRepo) ancestorChainContains(tx *gorm.DB, workspaceID, startID, targetID uint) (bool, error) {
+	var count int64
+	err := tx.Raw(`WITH RECURSIVE chain(id, depth) AS (
+		SELECT id, 0 FROM todos WHERE id = ? AND workspace_id = ?
+		UNION ALL
+		SELECT t.parent_id, c.depth + 1 FROM todos t JOIN chain c ON t.id = c.id
+		WHERE t.parent_id IS NOT NULL AND c.depth < 1000
+	)
+	SELECT COUNT(*) FROM chain WHERE id = ?`, startID, workspaceID, targetID).Scan(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("ancestor chain check: %w", err)
 	}
-	children := make(map[uint][]uint)
-	for _, n := range nodes {
-		if n.ParentID != nil {
-			children[*n.ParentID] = append(children[*n.ParentID], n.ID)
-		}
+	return count > 0, nil
+}
+
+func (r *TodoRepo) subtreeIDs(tx *gorm.DB, workspaceID uint, roots []uint, includeDeleted bool) ([]uint, error) {
+	if len(roots) == 0 {
+		return nil, nil
 	}
-	var out []uint
-	seen := make(map[uint]bool)
-	queue := append([]uint{}, ids...)
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-		if seen[cur] {
-			continue
-		}
-		seen[cur] = true
-		out = append(out, cur)
-		queue = append(queue, children[cur]...)
+	deletedFilter := " AND deleted_at IS NULL"
+	if includeDeleted {
+		deletedFilter = ""
 	}
-	return out, nil
+	var ids []uint
+	err := tx.Raw(`WITH RECURSIVE subtree(id, depth) AS (
+		SELECT id, 0 FROM todos WHERE id IN ? AND workspace_id = ?`+deletedFilter+`
+		UNION ALL
+		SELECT t.id, s.depth + 1 FROM todos t JOIN subtree s ON t.parent_id = s.id
+		WHERE t.workspace_id = ? AND s.depth < 1000`+deletedFilter+`
+	)
+	SELECT id FROM subtree`, roots, workspaceID, workspaceID).Scan(&ids).Error
+	if err != nil {
+		return nil, fmt.Errorf("compute todo subtree: %w", err)
+	}
+	return ids, nil
 }
 
 // bulkComplete mirrors single-toggle semantics: recurring tasks with a due date

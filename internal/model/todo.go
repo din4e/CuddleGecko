@@ -9,13 +9,13 @@ import (
 type Todo struct {
 	ID          uint           `gorm:"primaryKey" json:"id"`
 	UserID      uint           `gorm:"index;not null" json:"user_id"`
-	WorkspaceID uint           `gorm:"index;not null;default:0" json:"workspace_id"`
+	WorkspaceID uint           `gorm:"index;not null;default:0;index:idx_todo_ws_status_due" json:"workspace_id"`
 	Title       string         `gorm:"size:200;not null" json:"title"`
 	Description string         `gorm:"type:longtext" json:"description"`
-	Status      string         `gorm:"size:20;not null;default:'pending'" json:"status"`   // pending / done
+	Status      string         `gorm:"size:20;not null;default:'pending';index:idx_todo_ws_status_due" json:"status"`   // pending / done
 	Priority    string         `gorm:"size:20;not null;default:'normal'" json:"priority"` // low / normal / high
 	Pinned       bool           `gorm:"not null;default:false" json:"pinned"`
-	DueTime     *time.Time     `json:"due_time"`
+	DueTime     *time.Time     `gorm:"index:idx_todo_ws_status_due" json:"due_time"`
 	StartTime   *time.Time     `json:"start_time"`
 	Amount      *float64       `json:"amount"`
 	AmountType  string         `gorm:"size:20" json:"amount_type"` // "" / income / expense

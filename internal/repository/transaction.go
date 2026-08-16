@@ -2,7 +2,11 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"gorm.io/gorm"
@@ -31,7 +35,7 @@ func (r *TransactionRepo) GetByID(ctx context.Context, workspaceID, id uint) (*m
 	return &tx, nil
 }
 
-func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint) ([]model.Transaction, int64, error) {
+func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string) ([]model.Transaction, int64, error) {
 	var txs []model.Transaction
 	var total int64
 
@@ -41,13 +45,26 @@ func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, page
 		query = query.Where("type = ?", *txType)
 	}
 	if contactID != nil {
-		query = query.Where("contact_id = ?", *contactID)
+		// contact_ids is a JSON-serialized column ([]uint); there is no scalar
+		// contact_id column, so filter with an array-containment predicate:
+		// SQLite exposes array elements via json_each, MySQL via JSON_CONTAINS.
+		switch r.db.Dialector.Name() {
+		case "sqlite":
+			query = query.Where("EXISTS (SELECT 1 FROM json_each(contact_ids) WHERE value = ?)", *contactID)
+		default:
+			query = query.Where("JSON_CONTAINS(contact_ids, ?)", strconv.FormatUint(uint64(*contactID), 10))
+		}
+	}
+
+	if search != "" {
+		query = query.Where("LOWER(title) LIKE ?", "%"+strings.ToLower(search)+"%")
 	}
 
 	if err := query.Model(&model.Transaction{}).Count(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("count transactions: %w", err)
 	}
 
+	page, pageSize = clampPage(page, pageSize)
 	offset := (page - 1) * pageSize
 	err := query.Offset(offset).Limit(pageSize).
 		Order("date DESC").
@@ -60,31 +77,29 @@ func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, page
 }
 
 func (r *TransactionRepo) ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Transaction, error) {
-	var txs []model.Transaction
-	query := r.db.WithContext(ctx).
-		Where("workspace_id = ?", workspaceID).
-		Order("date DESC")
+	if len(contactIDs) == 0 {
+		return nil, nil
+	}
+	query := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID)
+	// Filter in SQL (not in Go after a LIMIT) so the result isn't a biased sample
+	// of the workspace's most-recent transactions. contact_ids is a JSON array;
+	// match any transaction whose set overlaps the requested contactIDs.
+	switch r.db.Dialector.Name() {
+	case "sqlite":
+		query = query.Where("EXISTS (SELECT 1 FROM json_each(contact_ids) WHERE value IN ?)", contactIDs)
+	default: // MySQL — JSON_OVERLAPS against the requested-id set.
+		arr, _ := json.Marshal(contactIDs)
+		query = query.Where("JSON_OVERLAPS(contact_ids, ?)", arr)
+	}
+	query = query.Order("date DESC")
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
+	var txs []model.Transaction
 	if err := query.Find(&txs).Error; err != nil {
 		return nil, fmt.Errorf("list transactions by contact ids: %w", err)
 	}
-
-	idSet := make(map[uint]struct{}, len(contactIDs))
-	for _, id := range contactIDs {
-		idSet[id] = struct{}{}
-	}
-	filtered := make([]model.Transaction, 0, len(txs))
-	for _, tx := range txs {
-		for _, cid := range tx.ContactIDs {
-			if _, ok := idSet[cid]; ok {
-				filtered = append(filtered, tx)
-				break
-			}
-		}
-	}
-	return filtered, nil
+	return txs, nil
 }
 
 func (r *TransactionRepo) Summary(ctx context.Context, workspaceID uint) (income float64, expense float64, err error) {
@@ -110,6 +125,40 @@ func (r *TransactionRepo) Summary(ctx context.Context, workspaceID uint) (income
 		}
 	}
 	return
+}
+
+// Monthly returns per-month income/expense totals for the last `months` months
+// (including the current month) via a single GROUP BY, so the dashboard trend
+// chart and month tiles don't need to fetch every transaction.
+func (r *TransactionRepo) Monthly(ctx context.Context, workspaceID uint, months int) ([]model.TransactionMonthly, error) {
+	if months < 1 {
+		months = 6
+	}
+	now := time.Now()
+	start := time.Date(now.Year(), now.Month()-time.Month(months-1), 1, 0, 0, 0, 0, now.Location())
+
+	// Month truncation differs by driver: SQLite substr vs MySQL DATE_FORMAT.
+	// NB: strftime('%Y-%m', date) would CONVERT the stored timestamp to UTC
+	// before formatting, so a transaction dated 2026-08-01 00:30+08:00 would
+	// bucket into 2026-07. substr takes the literal "YYYY-MM" from the stored
+	// text instead, bucketing by the wall-clock month the user entered.
+	monthExpr := "substr(date, 1, 7)"
+	if r.db.Dialector.Name() == "mysql" {
+		monthExpr = "DATE_FORMAT(date, '%Y-%m')"
+	}
+
+	var rows []model.TransactionMonthly
+	if err := r.db.WithContext(ctx).Model(&model.Transaction{}).
+		Where("workspace_id = ? AND date >= ?", workspaceID, start).
+		Select(monthExpr+" AS month, "+
+			"SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, "+
+			"SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense").
+		Group("month").
+		Order("month ASC").
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("transaction monthly: %w", err)
+	}
+	return rows, nil
 }
 
 func (r *TransactionRepo) Update(ctx context.Context, tx *model.Transaction) error {

@@ -82,6 +82,19 @@ func (r *AIRepo) CreateConversation(ctx context.Context, c *model.AIConversation
 	return nil
 }
 
+// UpdateConversationTitle sets the title of an existing conversation, scoped to
+// the user. Replaces a previous call that re-inserted the already-persisted
+// row (CreateConversation on a row with an ID), which failed on the primary key
+// and silently dropped the auto-generated title.
+func (r *AIRepo) UpdateConversationTitle(ctx context.Context, userID, id uint, title string) error {
+	if err := r.db.WithContext(ctx).Model(&model.AIConversation{}).
+		Where("id = ? AND user_id = ?", id, userID).
+		Update("title", title).Error; err != nil {
+		return fmt.Errorf("update ai conversation title: %w", err)
+	}
+	return nil
+}
+
 func (r *AIRepo) GetConversationByID(ctx context.Context, userID, id uint) (*model.AIConversation, error) {
 	var c model.AIConversation
 	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).First(&c).Error; err != nil {
@@ -100,6 +113,7 @@ func (r *AIRepo) ListConversations(ctx context.Context, userID uint, page, pageS
 		return nil, 0, fmt.Errorf("count conversations: %w", err)
 	}
 
+	page, pageSize = clampPage(page, pageSize)
 	offset := (page - 1) * pageSize
 	if err := query.Offset(offset).Limit(pageSize).Order("updated_at DESC").Find(&conversations).Error; err != nil {
 		return nil, 0, fmt.Errorf("list conversations: %w", err)
@@ -128,6 +142,26 @@ func (r *AIRepo) ListMessagesByConversation(ctx context.Context, conversationID 
 	var messages []model.AIMessage
 	if err := r.db.WithContext(ctx).Where("conversation_id = ?", conversationID).Order("created_at ASC").Find(&messages).Error; err != nil {
 		return nil, fmt.Errorf("list messages: %w", err)
+	}
+	return messages, nil
+}
+
+// ListRecentMessagesByConversation returns the most recent `limit` messages of a
+// conversation in chronological order — a SQL-capped fetch so a long
+// conversation (longtext content) doesn't reload every row on every chat turn
+// just to truncate in Go. Served by idx_aimessage_conv_created.
+func (r *AIRepo) ListRecentMessagesByConversation(ctx context.Context, conversationID uint, limit int) ([]model.AIMessage, error) {
+	var messages []model.AIMessage
+	q := r.db.WithContext(ctx).Where("conversation_id = ?", conversationID).Order("created_at DESC, id DESC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	if err := q.Find(&messages).Error; err != nil {
+		return nil, fmt.Errorf("list recent messages: %w", err)
+	}
+	// Reverse into chronological order for the caller.
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
 	}
 	return messages, nil
 }

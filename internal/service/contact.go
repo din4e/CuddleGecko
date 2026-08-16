@@ -14,6 +14,7 @@ type ContactRepository interface {
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Contact, error)
 	GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Contact, error)
 	List(ctx context.Context, workspaceID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error)
+	ListGraphContacts(ctx context.Context, workspaceID uint) ([]model.Contact, error)
 	Update(ctx context.Context, contact *model.Contact) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 	ReplaceTags(ctx context.Context, contactID uint, tags []model.Tag) error

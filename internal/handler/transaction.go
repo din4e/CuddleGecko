@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 	"time"
 
@@ -21,8 +22,8 @@ func NewTransactionHandler(svc *service.TransactionService) *TransactionHandler 
 
 type createTransactionRequest struct {
 	Title      string  `json:"title" binding:"required"`
-	Amount     float64 `json:"amount" binding:"required"`
-	Type       string  `json:"type" binding:"required"`
+	Amount     float64 `json:"amount" binding:"required,gt=0"`
+	Type       string  `json:"type" binding:"required,oneof=income expense"`
 	Category   string  `json:"category"`
 	ContactIDs []uint  `json:"contact_ids"`
 	Date       string  `json:"date" binding:"required"`
@@ -31,8 +32,8 @@ type createTransactionRequest struct {
 
 type updateTransactionRequest struct {
 	Title      string  `json:"title"`
-	Amount     float64 `json:"amount"`
-	Type       string  `json:"type"`
+	Amount     float64 `json:"amount" binding:"omitempty,gt=0"`
+	Type       string  `json:"type" binding:"omitempty,oneof=income expense"`
 	Category   string  `json:"category"`
 	ContactIDs []uint  `json:"contact_ids"`
 	Date       string  `json:"date"`
@@ -56,7 +57,9 @@ func (h *TransactionHandler) List(c *gin.Context) {
 		contactID = &uid
 	}
 
-	txs, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, txType, contactID)
+	search := c.Query("q")
+
+	txs, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, txType, contactID, search)
 	if err != nil {
 		response.InternalError(c, "failed to list transactions")
 		return
@@ -75,6 +78,19 @@ func (h *TransactionHandler) Summary(c *gin.Context) {
 	}
 
 	response.OK(c, gin.H{"income": income, "expense": expense, "balance": income - expense})
+}
+
+func (h *TransactionHandler) Monthly(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	months, _ := strconv.Atoi(c.DefaultQuery("months", "6"))
+	rows, err := h.svc.Monthly(c.Request.Context(), userID, workspaceID, months)
+	if err != nil {
+		response.InternalError(c, "failed to get monthly summary")
+		return
+	}
+
+	response.OK(c, rows)
 }
 
 func (h *TransactionHandler) Create(c *gin.Context) {
@@ -105,6 +121,10 @@ func (h *TransactionHandler) Create(c *gin.Context) {
 
 	result, err := h.svc.Create(c.Request.Context(), userID, workspaceID, tx)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidTransaction) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		response.InternalError(c, "failed to create transaction")
 		return
 	}
@@ -149,6 +169,10 @@ func (h *TransactionHandler) Update(c *gin.Context) {
 	if err != nil {
 		if err == service.ErrTransactionNotFound {
 			response.NotFound(c, "transaction not found")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidTransaction) {
+			response.BadRequest(c, err.Error())
 			return
 		}
 		response.InternalError(c, "failed to update transaction")

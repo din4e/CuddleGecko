@@ -14,6 +14,10 @@ type WorkspaceMemberChecker interface {
 }
 
 func WorkspaceAuth(checker WorkspaceMemberChecker) gin.HandlerFunc {
+	// Cache IsMember results (short TTL) so the per-request membership COUNT
+	// only hits the DB once per member every memberTTL. Wrapped here so every
+	// caller gets caching transparently, with no wiring changes.
+	checker = NewCachingWorkspaceChecker(checker, memberTTL)
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
 		if userID == 0 {

@@ -27,6 +27,7 @@ type Handlers struct {
 	Workspace   *WorkspaceHandler
 	Export      *ExportHandler
 	UserSetting *UserSettingHandler
+	Version     *VersionHandler
 	WS          *WSHandler
 	avatarDir   string
 }
@@ -53,6 +54,7 @@ func NewHandlers(
 	return &Handlers{
 		Auth:        NewAuthHandler(authSvc, captchaSvc),
 		Captcha:     NewCaptchaHandler(captchaSvc),
+		Version:     NewVersionHandler(),
 		Contact:     NewContactHandler(contactSvc),
 		Tag:         NewTagHandler(tagSvc),
 		Interaction: NewInteractionHandler(interactionSvc),
@@ -81,7 +83,12 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 
 	api := r.Group("/api")
 	{
-		api.GET("/captcha", h.Captcha.Get)
+		// /captcha renders a PNG per request, so throttle it to bound CPU use.
+		api.GET("/captcha", middleware.NewIPRateLimiter(30, time.Minute).Middleware(), h.Captcha.Get)
+
+		// Build version + liveness probe. Public (version isn't a secret);
+		// doubles as the docker/monitor healthcheck target.
+		api.GET("/version", h.Version.Get)
 
 		// WebSocket upgrade for real-time multi-device todo sync. Registered in
 		// the bare group (not behind JWTAuth/WorkspaceAuth) because browsers
@@ -219,6 +226,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 
 			wsProtected.GET("/transactions", h.Transaction.List)
 			wsProtected.GET("/transactions/summary", h.Transaction.Summary)
+			wsProtected.GET("/transactions/monthly", h.Transaction.Monthly)
 			wsProtected.POST("/transactions", h.Transaction.Create)
 			wsProtected.PUT("/transactions/:id", h.Transaction.Update)
 			wsProtected.DELETE("/transactions/:id", h.Transaction.Delete)
@@ -235,11 +243,19 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 				ai.POST("/conversations", h.AI.CreateConversation)
 				ai.GET("/conversations/:id/messages", h.AI.GetMessages)
 				ai.DELETE("/conversations/:id", h.AI.DeleteConversation)
-				ai.POST("/chat", h.AI.StreamChat)
-				ai.POST("/chat/sync", h.AI.Chat)
-				ai.POST("/analyze/relationship/:contactId", h.AI.AnalyzeRelationship)
-				ai.POST("/analyze/event/:eventId", h.AI.AnalyzeEvent)
-				ai.POST("/analyze", h.AI.AnalyzeComprehensive)
+			}
+
+			// LLM-calling routes hit an external, paid API per request, so they're
+			// rate-limited per IP — bounded above the legit interactive rate to
+			// cap cost/abuse while a normal chat session is unaffected.
+			aiLLM := wsProtected.Group("/ai")
+			aiLLM.Use(middleware.NewIPRateLimiter(20, time.Minute).Middleware())
+			{
+				aiLLM.POST("/chat", h.AI.StreamChat)
+				aiLLM.POST("/chat/sync", h.AI.Chat)
+				aiLLM.POST("/analyze/relationship/:contactId", h.AI.AnalyzeRelationship)
+				aiLLM.POST("/analyze/event/:eventId", h.AI.AnalyzeEvent)
+				aiLLM.POST("/analyze", h.AI.AnalyzeComprehensive)
 			}
 
 			wsProtected.POST("/export", h.Export.Export)

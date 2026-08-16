@@ -59,6 +59,14 @@ func (m *mockTodoSvcRepo) ListItems(ctx context.Context, todoID uint) ([]model.T
 	return args.Get(0).([]model.TodoItem), args.Error(1)
 }
 
+func (m *mockTodoSvcRepo) ListItemsByTodoIDs(ctx context.Context, todoIDs []uint) ([]model.TodoItem, error) {
+	args := m.Called(ctx, todoIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]model.TodoItem), args.Error(1)
+}
+
 func (m *mockTodoSvcRepo) GetItem(ctx context.Context, todoID, itemID uint) (*model.TodoItem, error) {
 	args := m.Called(ctx, todoID, itemID)
 	if args.Get(0) == nil {

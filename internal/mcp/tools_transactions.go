@@ -14,10 +14,12 @@ func (s *MCPServer) registerTransactionTools() {
 			"page_size":  map[string]interface{}{"type": "integer", "description": "Items per page (default 20)", "default": 20},
 			"type":       map[string]interface{}{"type": "string", "description": "Filter by type: income or expense"},
 			"contact_id": map[string]interface{}{"type": "integer", "description": "Filter by contact ID"},
+			"search":     map[string]interface{}{"type": "string", "description": "Case-insensitive substring match on title"},
 		},
 	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
 		page := getArgInt(args, "page", 1)
 		pageSize := getArgInt(args, "page_size", 20)
+		search := toString(getArg(args, "search"))
 		var txType *string
 		if v := getArg(args, "type"); v != nil {
 			s := toString(v)
@@ -29,7 +31,7 @@ func (s *MCPServer) registerTransactionTools() {
 			contactID = &u
 		}
 
-		txs, total, err := s.transactionSvc.List(ctx, userID, workspaceID, page, pageSize, txType, contactID)
+		txs, total, err := s.transactionSvc.List(ctx, userID, workspaceID, page, pageSize, txType, contactID, search)
 		if err != nil {
 			return nil, err
 		}

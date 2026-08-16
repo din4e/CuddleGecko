@@ -20,12 +20,12 @@ const (
 type Workout struct {
 	ID          uint           `gorm:"primaryKey" json:"id"`
 	UserID      uint           `gorm:"index;not null" json:"user_id"`
-	WorkspaceID uint           `gorm:"index;not null;default:0" json:"workspace_id"`
+	WorkspaceID uint           `gorm:"index;not null;default:0;index:idx_workout_ws_status_sched" json:"workspace_id"`
 	Name        string         `gorm:"size:200;not null" json:"name"`
 	Type        string         `gorm:"size:20;not null;default:'other'" json:"type"`      // strength|cardio|flexibility|balance|sport|other
-	Status      string         `gorm:"size:20;not null;default:'planned'" json:"status"` // planned|in_progress|completed|skipped
+	Status      string         `gorm:"size:20;not null;default:'planned';index:idx_workout_ws_status_sched" json:"status"` // planned|in_progress|completed|skipped
 	Intensity   string         `gorm:"size:20" json:"intensity"`                         // ""|low|medium|high
-	ScheduledAt *time.Time     `json:"scheduled_at"`
+	ScheduledAt *time.Time     `gorm:"index:idx_workout_ws_status_sched" json:"scheduled_at"`
 	DurationMin *int           `json:"duration_min"`
 	Calories    *float64       `json:"calories"`
 	Color       string         `gorm:"size:20" json:"color"`

@@ -413,4 +413,45 @@ func TestTodoRepo_TrashAndRestore(t *testing.T) {
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
+// TestTodoRepo_CascadeDeleteRestore_DeepTree exercises multi-level (3-deep)
+// cascade in both Delete and Restore, plus workspace scoping: a todo in another
+// workspace whose parent_id happens to point at the deleted root must be
+// untouched. This locks in the recursive-CTE traversal across more than one hop.
+func TestTodoRepo_CascadeDeleteRestore_DeepTree(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+
+	root := mustCreateTodo(t, repo, 1, "root")
+	child := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "child", Status: "pending", Priority: "normal", ParentID: &root.ID}
+	require.NoError(t, repo.Create(ctx, child))
+	grand := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "grand", Status: "pending", Priority: "normal", ParentID: &child.ID}
+	require.NoError(t, repo.Create(ctx, grand))
+	// Unrelated top-level todo in the same workspace must NOT be cascaded.
+	mustCreateTodo(t, repo, 1, "other")
+	// A child in another workspace whose parent_id collides with root must be
+	// untouched (cascade is scoped by workspace_id).
+	ws2root := mustCreateTodo(t, repo, 2, "ws2root")
+	ws2child := &model.Todo{UserID: 1, WorkspaceID: 2, Title: "ws2child", Status: "pending", Priority: "normal", ParentID: &root.ID}
+	require.NoError(t, repo.Create(ctx, ws2child))
+	_ = ws2root
+
+	// Delete the root → entire 3-level subtree lands in trash.
+	require.NoError(t, repo.Delete(ctx, 1, root.ID))
+	trash, err := repo.ListTrash(ctx, 1)
+	require.NoError(t, err)
+	assert.Len(t, trash, 3, "root + child + grandchild cascaded to trash")
+	_, total, _ := repo.List(ctx, 1, model.TodoListQuery{})
+	assert.Equal(t, int64(1), total, "only the unrelated todo stays active in workspace 1")
+	_, ws2total, _ := repo.List(ctx, 2, model.TodoListQuery{})
+	assert.Equal(t, int64(2), ws2total, "workspace 2 untouched by workspace 1 cascade")
+
+	// Restore the root → entire subtree comes back together.
+	require.NoError(t, repo.Restore(ctx, 1, root.ID))
+	trash, _ = repo.ListTrash(ctx, 1)
+	assert.Empty(t, trash, "subtree fully restored")
+	_, total, _ = repo.List(ctx, 1, model.TodoListQuery{})
+	assert.Equal(t, int64(4), total, "root + child + grand + other all active again")
+}
+
 

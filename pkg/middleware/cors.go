@@ -23,6 +23,9 @@ func CORS(cfg *config.CORSConfig, mode string) gin.HandlerFunc {
 
 		if allowOrigin != "" {
 			c.Header("Access-Control-Allow-Origin", allowOrigin)
+			// The origin is reflected per-request; without Vary a shared
+			// proxy/CDN could cache one origin's response for another.
+			c.Header("Vary", "Origin")
 		}
 		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type,Authorization,Mcp-Session-Id")

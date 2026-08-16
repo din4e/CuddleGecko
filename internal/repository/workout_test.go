@@ -149,6 +149,30 @@ func TestWorkoutRepo_Stats(t *testing.T) {
 	assert.Equal(t, 300.0, stats.TotalCalories)
 }
 
+// TestWorkoutRepo_Reorder exercises the manual-order renumber path (which now
+// uses the shared single-statement CASE update) for the workouts table.
+func TestWorkoutRepo_Reorder(t *testing.T) {
+	db := newWorkoutTestDB(t)
+	repo := NewWorkoutRepo(db)
+	ctx := context.Background()
+	a := mustCreateWorkout(t, repo, 1, "a")
+	mustCreateWorkout(t, repo, 1, "b")
+	c := mustCreateWorkout(t, repo, 1, "c")
+	mustCreateWorkout(t, repo, 2, "other-ws") // must be untouched
+
+	// Move c to right after a → [a, c, b].
+	require.NoError(t, repo.Reorder(ctx, 1, c.ID, &a.ID))
+	ws, _, err := repo.List(ctx, 1, model.WorkoutListQuery{Sort: model.WorkoutSortManual})
+	require.NoError(t, err)
+	require.Len(t, ws, 3)
+	assert.Equal(t, []string{"a", "c", "b"}, []string{ws[0].Name, ws[1].Name, ws[2].Name})
+
+	// Move a to the top (afterID nil) → stays first; idempotent.
+	require.NoError(t, repo.Reorder(ctx, 1, a.ID, nil))
+	ws, _, _ = repo.List(ctx, 1, model.WorkoutListQuery{Sort: model.WorkoutSortManual})
+	assert.Equal(t, "a", ws[0].Name)
+}
+
 // --- Body metric summary trend ---
 
 func TestBodyMetricRepo_SummaryTrend(t *testing.T) {

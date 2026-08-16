@@ -12,7 +12,7 @@ var ErrReminderNotFound = errors.New("reminder not found")
 type ReminderRepository interface {
 	Create(ctx context.Context, reminder *model.Reminder) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Reminder, error)
-	List(ctx context.Context, workspaceID uint, status model.ReminderStatus, page, pageSize int) ([]model.Reminder, int64, error)
+	List(ctx context.Context, workspaceID uint, status model.ReminderStatus, contactID *uint, page, pageSize int) ([]model.Reminder, int64, error)
 	Update(ctx context.Context, reminder *model.Reminder) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 }
@@ -36,8 +36,8 @@ func (s *ReminderService) Create(ctx context.Context, userID, workspaceID, conta
 	return reminder, nil
 }
 
-func (s *ReminderService) List(ctx context.Context, userID, workspaceID uint, status model.ReminderStatus, page, pageSize int) ([]model.Reminder, int64, error) {
-	return s.repo.List(ctx, workspaceID, status, page, pageSize)
+func (s *ReminderService) List(ctx context.Context, userID, workspaceID uint, status model.ReminderStatus, contactID *uint, page, pageSize int) ([]model.Reminder, int64, error) {
+	return s.repo.List(ctx, workspaceID, status, contactID, page, pageSize)
 }
 
 func (s *ReminderService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Reminder) (*model.Reminder, error) {
@@ -55,6 +55,9 @@ func (s *ReminderService) Update(ctx context.Context, userID, workspaceID, id ui
 	}
 	if updates.Status != "" {
 		reminder.Status = updates.Status
+	}
+	if err := validateReminderStatus(reminder.Status); err != nil {
+		return nil, err
 	}
 
 	if err := s.repo.Update(ctx, reminder); err != nil {

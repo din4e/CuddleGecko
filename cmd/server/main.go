@@ -93,7 +93,13 @@ func main() {
 
 	// Router
 	gin.SetMode(cfg.Server.Mode)
-	r := gin.Default()
+	// gin.Default() logs the full path WITH query string — /api/ws passes the
+	// access token via ?token=..., which would leak valid 15-minute tokens
+	// into stdout/logs. Skip logging that path.
+	r := gin.New()
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+		SkipPaths: []string{"/api/ws"},
+	}), gin.Recovery())
 	handler.RegisterRoutes(r, handlers, cfg, workspaceSvc, mcpServer)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)

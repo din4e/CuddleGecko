@@ -31,11 +31,14 @@ func (r *ReminderRepo) GetByID(ctx context.Context, workspaceID, id uint) (*mode
 	return &reminder, nil
 }
 
-func (r *ReminderRepo) List(ctx context.Context, workspaceID uint, status model.ReminderStatus, page, pageSize int) ([]model.Reminder, int64, error) {
+func (r *ReminderRepo) List(ctx context.Context, workspaceID uint, status model.ReminderStatus, contactID *uint, page, pageSize int) ([]model.Reminder, int64, error) {
 	var reminders []model.Reminder
 	query := r.db.WithContext(ctx).Model(&model.Reminder{}).Where("workspace_id = ?", workspaceID)
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if contactID != nil {
+		query = query.Where("contact_id = ?", *contactID)
 	}
 
 	var total int64
@@ -43,12 +46,7 @@ func (r *ReminderRepo) List(ctx context.Context, workspaceID uint, status model.
 		return nil, 0, fmt.Errorf("count reminders: %w", err)
 	}
 
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 {
-		pageSize = 50
-	}
+	page, pageSize = clampPage(page, pageSize)
 	offset := (page - 1) * pageSize
 
 	if err := query.Order("remind_at ASC").Limit(pageSize).Offset(offset).Find(&reminders).Error; err != nil {

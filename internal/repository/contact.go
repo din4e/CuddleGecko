@@ -65,6 +65,7 @@ func (r *ContactRepo) List(ctx context.Context, workspaceID uint, page, pageSize
 		return nil, 0, fmt.Errorf("count contacts: %w", err)
 	}
 
+	page, pageSize = clampPage(page, pageSize)
 	offset := (page - 1) * pageSize
 	err := query.Preload("Tags").Offset(offset).Limit(pageSize).
 		Order("created_at DESC").
@@ -74,6 +75,23 @@ func (r *ContactRepo) List(ctx context.Context, workspaceID uint, page, pageSize
 	}
 
 	return contacts, total, nil
+}
+
+// ListGraphContacts returns only the columns the relationship graph needs
+// (id, name, relationship labels, avatar) — without the Tags Preload that List
+// runs as a second query and the graph then discards. Capped at the same 1000
+// the previous call used.
+func (r *ContactRepo) ListGraphContacts(ctx context.Context, workspaceID uint) ([]model.Contact, error) {
+	var contacts []model.Contact
+	if err := r.db.WithContext(ctx).
+		Select("id, name, relationship_labels, avatar_emoji, avatar_url").
+		Where("workspace_id = ?", workspaceID).
+		Order("created_at DESC").
+		Limit(1000).
+		Find(&contacts).Error; err != nil {
+		return nil, fmt.Errorf("list graph contacts: %w", err)
+	}
+	return contacts, nil
 }
 
 func (r *ContactRepo) Update(ctx context.Context, contact *model.Contact) error {

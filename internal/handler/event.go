@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 	"time"
 
@@ -76,6 +77,11 @@ func parseEventFromReq(req interface{}) (*model.Event, error) {
 		event.EndTime = &t
 	}
 
+	// An explicit end time must be after the start time.
+	if event.EndTime != nil && event.EndTime.Before(event.StartTime) {
+		return nil, errors.New("end time must be after start time")
+	}
+
 	return event, nil
 }
 
@@ -93,7 +99,9 @@ func (h *EventHandler) List(c *gin.Context) {
 		endBefore = &v
 	}
 
-	events, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, startAfter, endBefore)
+	search := c.Query("q")
+
+	events, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, startAfter, endBefore, search)
 	if err != nil {
 		response.InternalError(c, "failed to list events")
 		return
@@ -114,12 +122,16 @@ func (h *EventHandler) Create(c *gin.Context) {
 
 	event, err := parseEventFromReq(&req)
 	if err != nil {
-		response.BadRequest(c, "invalid time format")
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	result, err := h.svc.Create(c.Request.Context(), userID, workspaceID, event)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidEvent) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		response.InternalError(c, "failed to create event")
 		return
 	}
@@ -144,7 +156,7 @@ func (h *EventHandler) Update(c *gin.Context) {
 
 	event, err := parseEventFromReq(&req)
 	if err != nil {
-		response.BadRequest(c, "invalid time format")
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -152,6 +164,10 @@ func (h *EventHandler) Update(c *gin.Context) {
 	if err != nil {
 		if err == service.ErrEventNotFound {
 			response.NotFound(c, "event not found")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidEvent) {
+			response.BadRequest(c, err.Error())
 			return
 		}
 		response.InternalError(c, "failed to update event")
