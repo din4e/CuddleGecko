@@ -1,6 +1,8 @@
 package mcp
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"sync"
@@ -165,12 +167,20 @@ func fmtSessionID() string {
 	return time.Now().Format("20060102150405") + "-" + randomHex(8)
 }
 
+// randomHex returns 2n hex characters of cryptographically random data. The
+// previous implementation filled every byte with time.Now().UnixNano()%16, which
+// (because the loop outruns the nanosecond clock) made most/all bytes identical
+// and reduced the whole ID to time-based — i.e. guessable. Session IDs identify
+// an MCP session, so they must be unguessable.
 func randomHex(n int) string {
 	b := make([]byte, n)
-	for i := range b {
-		b[i] = "0123456789abcdef"[time.Now().UnixNano()%16]
+	if _, err := rand.Read(b); err != nil {
+		// crypto/rand practically never fails; fall back so we never return empty.
+		for i := range b {
+			b[i] = byte(time.Now().UnixNano() >> uint(i))
+		}
 	}
-	return string(b)
+	return hex.EncodeToString(b)
 }
 
 // Ensure json import is used

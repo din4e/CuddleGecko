@@ -72,6 +72,28 @@ func TestTodoRepo_Move_Cycle(t *testing.T) {
 	assert.ErrorIs(t, repo.Move(ctx, 1, root.ID, &child.ID, nil), ErrTodoCycle)
 }
 
+// TestTodoRepo_Move_DeepCycle builds a multi-level chain so the cycle check
+// must walk 2+ ancestors — exercising the recursive-CTE walk, not a one-hop
+// check. Also guards against false positives on an unrelated todo.
+func TestTodoRepo_Move_DeepCycle(t *testing.T) {
+	repo := NewTodoRepo(newTodoTestDB(t))
+	ctx := context.Background()
+	// Chain: root -> mid -> leaf.
+	root := mustCreateTodo(t, repo, 1, "root")
+	mid := mustCreateTodo(t, repo, 1, "mid")
+	require.NoError(t, repo.Move(ctx, 1, mid.ID, &root.ID, nil)) // mid under root
+	leaf := mustCreateTodo(t, repo, 1, "leaf")
+	require.NoError(t, repo.Move(ctx, 1, leaf.ID, &mid.ID, nil)) // leaf under mid
+
+	// Moving root under a deep descendant requires walking 2 ancestors to detect.
+	assert.ErrorIs(t, repo.Move(ctx, 1, root.ID, &leaf.ID, nil), ErrTodoCycle)
+	assert.ErrorIs(t, repo.Move(ctx, 1, root.ID, &mid.ID, nil), ErrTodoCycle)
+
+	// An unrelated todo can still be moved under leaf (no false cycle).
+	other := mustCreateTodo(t, repo, 1, "other")
+	assert.NoError(t, repo.Move(ctx, 1, other.ID, &leaf.ID, nil))
+}
+
 func TestTodoRepo_Move_InvalidParent(t *testing.T) {
 	repo := NewTodoRepo(newTodoTestDB(t))
 	ws1 := mustCreateTodo(t, repo, 1, "ws1 todo")

@@ -51,6 +51,10 @@ func (m *mockUserRepo) RevokeRefreshToken(ctx context.Context, token string) err
 	return m.Called(ctx, token).Error(0)
 }
 
+func (m *mockUserRepo) RevokeAllUserRefreshTokens(ctx context.Context, userID uint) error {
+	return m.Called(ctx, userID).Error(0)
+}
+
 func testJWTConfig() *config.JWTConfig {
 	return &config.JWTConfig{
 		Secret:     "test-secret",

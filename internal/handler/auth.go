@@ -21,7 +21,7 @@ func NewAuthHandler(svc *service.AuthService, captcha *service.CaptchaService) *
 type registerRequest struct {
 	Username      string `json:"username" binding:"required,min=3,max=50"`
 	Email         string `json:"email" binding:"required,email"`
-	Password      string `json:"password" binding:"required,min=6"`
+	Password      string `json:"password" binding:"required,min=6,max=72"` // bcrypt rejects >72 bytes
 	CaptchaID     string `json:"captcha_id"`
 	CaptchaAnswer string `json:"captcha_answer"`
 }

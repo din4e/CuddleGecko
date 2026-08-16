@@ -213,16 +213,13 @@ func (s *ExportService) ExportJSON(ctx context.Context, workspaceID uint) (strin
 		return "", fmt.Errorf("export relations: %w", err)
 	}
 
-	var allInteractions []model.Interaction
-	for _, c := range contacts {
-		ints, _, err := s.interactionRepo.ListByContact(ctx, workspaceID, c.ID, 1, 10000)
-		if err != nil {
-			return "", fmt.Errorf("export interactions: %w", err)
-		}
-		allInteractions = append(allInteractions, ints...)
+	// Bulk-fetch all interactions in one query instead of one per contact.
+	allInteractions, err := s.interactionRepo.ListByWorkspace(ctx, workspaceID)
+	if err != nil {
+		return "", fmt.Errorf("export interactions: %w", err)
 	}
 
-	reminders, _, err := s.reminderRepo.List(ctx, workspaceID, "", 1, 10000)
+	reminders, _, err := s.reminderRepo.List(ctx, workspaceID, "", nil, 1, 10000)
 	if err != nil {
 		return "", fmt.Errorf("export reminders: %w", err)
 	}
@@ -231,19 +228,31 @@ func (s *ExportService) ExportJSON(ctx context.Context, workspaceID uint) (strin
 	if err != nil {
 		return "", fmt.Errorf("export todos: %w", err)
 	}
+	// Bulk-fetch checklist items for all todos in one query, grouped by todo ID.
+	todoIDs := make([]uint, 0, len(todos))
+	for _, td := range todos {
+		todoIDs = append(todoIDs, td.ID)
+	}
+	allItems, err := s.todoItemRepo.ListItemsByTodoIDs(ctx, todoIDs)
+	if err != nil {
+		return "", fmt.Errorf("export todo items: %w", err)
+	}
+	itemsByTodo := make(map[uint][]itemExport, len(todos))
+	for _, it := range allItems {
+		itemsByTodo[it.TodoID] = append(itemsByTodo[it.TodoID], itemExport{
+			Content: it.Content, Done: it.Done, SortOrder: it.SortOrder,
+		})
+	}
+
 	todoExports := make([]todoExport, 0, len(todos))
 	for _, td := range todos {
-		items, err := s.todoItemRepo.ListItems(ctx, td.ID)
-		if err != nil {
-			return "", fmt.Errorf("export todo items: %w", err)
-		}
-		itemsOut := make([]itemExport, 0, len(items))
-		for _, it := range items {
-			itemsOut = append(itemsOut, itemExport{Content: it.Content, Done: it.Done, SortOrder: it.SortOrder})
-		}
 		tagNames := make([]string, 0, len(td.Tags))
 		for _, tg := range td.Tags {
 			tagNames = append(tagNames, tg.Name)
+		}
+		itemsOut := itemsByTodo[td.ID]
+		if itemsOut == nil {
+			itemsOut = []itemExport{}
 		}
 		todoExports = append(todoExports, todoExport{
 			ID: td.ID, ParentID: td.ParentID, SortOrder: td.SortOrder,
@@ -258,7 +267,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, workspaceID uint) (strin
 	// only included when a transaction repo is wired in.
 	var transactions []model.Transaction
 	if s.txRepo != nil {
-		transactions, _, err = s.txRepo.List(ctx, workspaceID, 1, 100000, nil, nil)
+		transactions, _, err = s.txRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "")
 		if err != nil {
 			return "", fmt.Errorf("export transactions: %w", err)
 		}
@@ -267,7 +276,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, workspaceID uint) (strin
 	// Events (calendar) are part of the workspace backup too. Optional.
 	var events []model.Event
 	if s.eventRepo != nil {
-		events, _, err = s.eventRepo.List(ctx, workspaceID, 1, 100000, nil, nil)
+		events, _, err = s.eventRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "")
 		if err != nil {
 			return "", fmt.Errorf("export events: %w", err)
 		}
@@ -280,21 +289,31 @@ func (s *ExportService) ExportJSON(ctx context.Context, workspaceID uint) (strin
 		if werr != nil {
 			return "", fmt.Errorf("export workouts: %w", werr)
 		}
+		// Bulk-fetch exercises for all workouts in one query, grouped by workout ID.
+		var exercisesByWorkout map[uint][]exerciseExport
+		if s.workoutExRepo != nil {
+			workoutIDs := make([]uint, 0, len(workouts))
+			for _, w := range workouts {
+				workoutIDs = append(workoutIDs, w.ID)
+			}
+			allExs, eerr := s.workoutExRepo.ListExercisesByWorkoutIDs(ctx, workoutIDs)
+			if eerr != nil {
+				return "", fmt.Errorf("export exercises: %w", eerr)
+			}
+			exercisesByWorkout = make(map[uint][]exerciseExport, len(workouts))
+			for _, e := range allExs {
+				exercisesByWorkout[e.WorkoutID] = append(exercisesByWorkout[e.WorkoutID], exerciseExport{
+					Name: e.Name, Category: e.Category, Sets: e.Sets, Reps: e.Reps,
+					Weight: e.Weight, Distance: e.Distance, DurationSec: e.DurationSec,
+					RestSec: e.RestSec, Done: e.Done, SortOrder: e.SortOrder, Notes: e.Notes,
+				})
+			}
+		}
 		workoutExports = make([]workoutExport, 0, len(workouts))
 		for _, w := range workouts {
-			exOut := make([]exerciseExport, 0)
-			if s.workoutExRepo != nil {
-				exs, eerr := s.workoutExRepo.ListExercises(ctx, w.ID)
-				if eerr != nil {
-					return "", fmt.Errorf("export exercises: %w", eerr)
-				}
-				for _, e := range exs {
-					exOut = append(exOut, exerciseExport{
-						Name: e.Name, Category: e.Category, Sets: e.Sets, Reps: e.Reps,
-						Weight: e.Weight, Distance: e.Distance, DurationSec: e.DurationSec,
-						RestSec: e.RestSec, Done: e.Done, SortOrder: e.SortOrder, Notes: e.Notes,
-					})
-				}
+			exOut := exercisesByWorkout[w.ID]
+			if exOut == nil {
+				exOut = []exerciseExport{}
 			}
 			workoutExports = append(workoutExports, workoutExport{
 				ID: w.ID, Name: w.Name, Type: w.Type, Status: w.Status, Intensity: w.Intensity,
@@ -889,7 +908,7 @@ func (s *ExportService) ExportTransactionsCSV(ctx context.Context, workspaceID u
 	if s.txRepo == nil {
 		return "", fmt.Errorf("transaction export not available")
 	}
-	txs, _, err := s.txRepo.List(ctx, workspaceID, 1, 100000, nil, nil)
+	txs, _, err := s.txRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "")
 	if err != nil {
 		return "", fmt.Errorf("export transactions csv: %w", err)
 	}
@@ -922,7 +941,7 @@ func (s *ExportService) ExportEventsCSV(ctx context.Context, workspaceID uint) (
 	if s.eventRepo == nil {
 		return "", fmt.Errorf("event export not available")
 	}
-	events, _, err := s.eventRepo.List(ctx, workspaceID, 1, 100000, nil, nil)
+	events, _, err := s.eventRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "")
 	if err != nil {
 		return "", fmt.Errorf("export events csv: %w", err)
 	}

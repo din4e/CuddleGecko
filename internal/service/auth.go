@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
+	"github.com/din4e/cuddlegecko/internal/repository"
 	"github.com/din4e/cuddlegecko/pkg/config"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -28,6 +29,7 @@ type UserRepository interface {
 	CreateRefreshToken(ctx context.Context, token *model.RefreshToken) error
 	GetRefreshToken(ctx context.Context, token string) (*model.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, token string) error
+	RevokeAllUserRefreshTokens(ctx context.Context, userID uint) error
 }
 
 type AuthResult struct {
@@ -105,6 +107,12 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 	}
 
 	if err := s.repo.RevokeRefreshToken(ctx, refreshToken); err != nil {
+		// A replay (token already revoked — likely stolen) invalidates the
+		// user's ENTIRE refresh-token family so the attacker's lineage dies too.
+		if errors.Is(err, repository.ErrReplayedToken) {
+			_ = s.repo.RevokeAllUserRefreshTokens(ctx, rt.UserID)
+			return nil, ErrInvalidToken
+		}
 		return nil, err
 	}
 

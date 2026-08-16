@@ -13,7 +13,7 @@ type EventRepository interface {
 	Create(ctx context.Context, event *model.Event) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Event, error)
 	GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Event, error)
-	List(ctx context.Context, workspaceID uint, page, pageSize int, startAfter, endBefore *string) ([]model.Event, int64, error)
+	List(ctx context.Context, workspaceID uint, page, pageSize int, startAfter, endBefore *string, search string) ([]model.Event, int64, error)
 	Update(ctx context.Context, event *model.Event) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 }
@@ -29,6 +29,9 @@ func NewEventService(repo EventRepository) *EventService {
 func (s *EventService) Create(ctx context.Context, userID, workspaceID uint, event *model.Event) (*model.Event, error) {
 	event.UserID = userID
 	event.WorkspaceID = workspaceID
+	if err := validateEvent(event); err != nil {
+		return nil, err
+	}
 	if err := s.repo.Create(ctx, event); err != nil {
 		return nil, err
 	}
@@ -39,8 +42,8 @@ func (s *EventService) GetByID(ctx context.Context, userID, workspaceID, id uint
 	return s.repo.GetByID(ctx, workspaceID, id)
 }
 
-func (s *EventService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, startAfter, endBefore *string) ([]model.Event, int64, error) {
-	return s.repo.List(ctx, workspaceID, page, pageSize, startAfter, endBefore)
+func (s *EventService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, startAfter, endBefore *string, search string) ([]model.Event, int64, error) {
+	return s.repo.List(ctx, workspaceID, page, pageSize, startAfter, endBefore, search)
 }
 
 func (s *EventService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Event) (*model.Event, error) {
@@ -61,6 +64,9 @@ func (s *EventService) Update(ctx context.Context, userID, workspaceID, id uint,
 	event.ContactIDs = updates.ContactIDs
 	event.Color = updates.Color
 
+	if err := validateEvent(event); err != nil {
+		return nil, err
+	}
 	if err := s.repo.Update(ctx, event); err != nil {
 		return nil, err
 	}

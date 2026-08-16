@@ -30,6 +30,7 @@ type WorkoutRepository interface {
 // WorkoutExerciseRepository handles the checklist of movements within a workout.
 type WorkoutExerciseRepository interface {
 	ListExercises(ctx context.Context, workoutID uint) ([]model.WorkoutExercise, error)
+	ListExercisesByWorkoutIDs(ctx context.Context, workoutIDs []uint) ([]model.WorkoutExercise, error)
 	GetExercise(ctx context.Context, workoutID, exerciseID uint) (*model.WorkoutExercise, error)
 	CreateExercise(ctx context.Context, ex *model.WorkoutExercise) error
 	UpdateExercise(ctx context.Context, workoutID uint, ex *model.WorkoutExercise) error

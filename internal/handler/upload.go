@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +27,11 @@ func NewUploadHandler(uploadDir string) *UploadHandler {
 }
 
 func (h *UploadHandler) UploadAvatar(c *gin.Context) {
+	// Cap the request body BEFORE parsing multipart — Go streams multipart
+	// parts to temp files while parsing, so a multi-GB body would hit the
+	// disk before the 5MB check below ever ran (disk-fill DoS).
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAvatarSize+64*1024)
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		response.BadRequest(c, "no file provided")

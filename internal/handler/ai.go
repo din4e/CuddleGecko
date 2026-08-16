@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
@@ -205,11 +206,15 @@ func (h *AIHandler) StreamChat(c *gin.Context) {
 				return false
 			}
 			if chunk.Error != nil {
-				fmt.Fprintf(w, "data: {\"error\":\"%s\"}\n\n", chunk.Error.Error())
+				payload, _ := json.Marshal(map[string]string{"error": chunk.Error.Error()})
+				fmt.Fprintf(w, "data: %s\n\n", payload)
 				c.Writer.Flush()
 				return false
 			}
-			fmt.Fprintf(w, "data: %s\n\n", chunk.Content)
+			// JSON-encode the token so a newline (common in markdown) can't break
+			// SSE framing — the data: line stays a single physical line.
+			payload, _ := json.Marshal(map[string]string{"c": chunk.Content})
+			fmt.Fprintf(w, "data: %s\n\n", payload)
 			c.Writer.Flush()
 			return true
 		case <-c.Request.Context().Done():

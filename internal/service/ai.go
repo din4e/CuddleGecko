@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -30,11 +31,21 @@ type AIRepository interface {
 	UpdateProvider(ctx context.Context, p *model.AIProvider) error
 	DeactivateAllProviders(ctx context.Context, userID uint) error
 	CreateConversation(ctx context.Context, c *model.AIConversation) error
+	UpdateConversationTitle(ctx context.Context, userID, id uint, title string) error
 	GetConversationByID(ctx context.Context, userID, id uint) (*model.AIConversation, error)
 	ListConversations(ctx context.Context, userID uint, page, pageSize int) ([]model.AIConversation, int64, error)
 	DeleteConversation(ctx context.Context, userID, id uint) error
 	CreateMessage(ctx context.Context, m *model.AIMessage) error
 	ListMessagesByConversation(ctx context.Context, conversationID uint) ([]model.AIMessage, error)
+	ListRecentMessagesByConversation(ctx context.Context, conversationID uint, limit int) ([]model.AIMessage, error)
+}
+
+// promptCacheEntry is a cached, workspace-scoped system prompt. The prompt is
+// LLM context assembled from several DB queries; a short TTL keeps it fresh
+// enough for context while avoiding rebuilding it on every chat message.
+type promptCacheEntry struct {
+	prompt string
+	at     time.Time
 }
 
 type AIService struct {
@@ -48,6 +59,8 @@ type AIService struct {
 	httpClient      *http.Client
 	clientCache     map[string]*llm.Client
 	clientMu        sync.RWMutex
+	promptCache     map[uint]promptCacheEntry
+	promptCacheMu   sync.Mutex
 }
 
 func NewAIService(
@@ -71,6 +84,7 @@ func NewAIService(
 			Timeout: 120 * time.Second,
 		},
 		clientCache: make(map[string]*llm.Client),
+		promptCache: make(map[uint]promptCacheEntry),
 	}
 }
 
@@ -276,7 +290,7 @@ func (s *AIService) StreamChat(ctx context.Context, userID, workspaceID, convers
 		return nil, err
 	}
 
-	messages, err := s.aiRepo.ListMessagesByConversation(ctx, conversationID)
+	messages, err := s.aiRepo.ListRecentMessagesByConversation(ctx, conversationID, maxHistoryMessages-1)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +312,9 @@ func (s *AIService) StreamChat(ctx context.Context, userID, workspaceID, convers
 			title = title[:50] + "..."
 		}
 		conv.Title = title
-		s.aiRepo.CreateConversation(ctx, conv)
+		if err := s.aiRepo.UpdateConversationTitle(ctx, userID, conversationID, title); err != nil {
+			return nil, fmt.Errorf("set conversation title: %w", err)
+		}
 	}
 
 	stream, err := client.StreamChat(ctx, llmMessages)
@@ -316,11 +332,18 @@ func (s *AIService) StreamChat(ctx context.Context, userID, workspaceID, convers
 				return
 			}
 			if chunk.Done {
-				s.aiRepo.CreateMessage(ctx, &model.AIMessage{
+				// Persist with a context detached from the request so a client
+				// disconnect after the stream completed doesn't silently drop the
+				// reply from history. Bounded so a stuck write can't leak the goroutine.
+				persistCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+				if err := s.aiRepo.CreateMessage(persistCtx, &model.AIMessage{
 					ConversationID: conversationID,
 					Role:           model.AIMessageAssistant,
 					Content:        full.String(),
-				})
+				}); err != nil {
+					log.Printf("ai: persist assistant message: %v", err)
+				}
+				cancel()
 				return
 			}
 			full.WriteString(chunk.Content)
@@ -352,7 +375,7 @@ func (s *AIService) Chat(ctx context.Context, userID, workspaceID, conversationI
 		return "", err
 	}
 
-	messages, err := s.aiRepo.ListMessagesByConversation(ctx, conversationID)
+	messages, err := s.aiRepo.ListRecentMessagesByConversation(ctx, conversationID, maxHistoryMessages-1)
 	if err != nil {
 		return "", err
 	}
@@ -488,11 +511,41 @@ func (s *AIService) AnalyzeEvent(ctx context.Context, userID, workspaceID, event
 
 // --- System prompt building ---
 
+// promptCacheTTL bounds how long a cached system prompt is reused.
+const promptCacheTTL = 60 * time.Second
+
+// buildSystemPrompt returns a workspace's system prompt, serving a short-TTL
+// cache so an active conversation doesn't rebuild it (several queries) on every
+// message. The prompt is LLM context, so brief staleness is acceptable.
 func (s *AIService) buildSystemPrompt(ctx context.Context, userID, workspaceID uint) (string, error) {
+	s.promptCacheMu.Lock()
+	if entry, ok := s.promptCache[workspaceID]; ok && time.Since(entry.at) < promptCacheTTL {
+		s.promptCacheMu.Unlock()
+		return entry.prompt, nil
+	}
+	s.promptCacheMu.Unlock()
+
+	prompt, err := s.buildSystemPromptUncached(ctx, userID, workspaceID)
+	if err != nil {
+		return "", err
+	}
+
+	s.promptCacheMu.Lock()
+	s.promptCache[workspaceID] = promptCacheEntry{prompt: prompt, at: time.Now()}
+	s.promptCacheMu.Unlock()
+	return prompt, nil
+}
+
+func (s *AIService) buildSystemPromptUncached(ctx context.Context, userID, workspaceID uint) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("You are CuddleGecko AI, a personal CRM assistant. You help the user manage and understand their relationships. Answer questions about their data or provide relationship advice.\n\n")
 
+	// Each section degrades independently: a transient DB failure just omits
+	// that section from the prompt (logged), rather than failing the chat turn.
 	contacts, _, err := s.contactRepo.List(ctx, workspaceID, 1, 50, "", nil)
+	if err != nil {
+		log.Printf("ai: system prompt: load contacts (ws %d): %v", workspaceID, err)
+	}
 	if err == nil && len(contacts) > 0 {
 		sb.WriteString(fmt.Sprintf("## Contacts (%d shown)\n", len(contacts)))
 		for _, c := range contacts {
@@ -509,7 +562,10 @@ func (s *AIService) buildSystemPrompt(ctx context.Context, userID, workspaceID u
 		sb.WriteString("\n")
 	}
 
-	events, _, err := s.eventRepo.List(ctx, workspaceID, 1, 10, nil, nil)
+	events, _, err := s.eventRepo.List(ctx, workspaceID, 1, 10, nil, nil, "")
+	if err != nil {
+		log.Printf("ai: system prompt: load events (ws %d): %v", workspaceID, err)
+	}
 	if err == nil && len(events) > 0 {
 		sb.WriteString("## Recent Events\n")
 		for _, e := range events {
@@ -519,6 +575,9 @@ func (s *AIService) buildSystemPrompt(ctx context.Context, userID, workspaceID u
 	}
 
 	income, expense, err := s.transactionRepo.Summary(ctx, workspaceID)
+	if err != nil {
+		log.Printf("ai: system prompt: tx summary (ws %d): %v", workspaceID, err)
+	}
 	if err == nil {
 		sb.WriteString(fmt.Sprintf("## Financial Summary\n- Income: %.2f\n- Expense: %.2f\n- Balance: %.2f\n\n", income, expense, income-expense))
 	}
@@ -745,7 +804,7 @@ func (s *AIService) buildFinancialAnalysis(ctx context.Context, userID, workspac
 	sb.WriteString(fmt.Sprintf("- Total Expense: %.2f\n", expense))
 	sb.WriteString(fmt.Sprintf("- Balance: %.2f\n\n", income-expense))
 
-	txs, _, err := s.transactionRepo.List(ctx, workspaceID, 1, 30, nil, nil)
+	txs, _, err := s.transactionRepo.List(ctx, workspaceID, 1, 30, nil, nil, "")
 	if err == nil && len(txs) > 0 {
 		sb.WriteString("### Recent Transactions\n")
 		for _, tx := range txs {

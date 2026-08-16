@@ -14,6 +14,7 @@ type InteractionRepository interface {
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Interaction, error)
 	ListByContact(ctx context.Context, workspaceID, contactID uint, page, pageSize int) ([]model.Interaction, int64, error)
 	ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Interaction, error)
+	ListByWorkspace(ctx context.Context, workspaceID uint) ([]model.Interaction, error)
 	Update(ctx context.Context, interaction *model.Interaction) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 }

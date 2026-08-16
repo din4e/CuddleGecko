@@ -14,10 +14,12 @@ func (s *MCPServer) registerEventTools() {
 			"page_size":   map[string]interface{}{"type": "integer", "description": "Items per page (default 20)", "default": 20},
 			"start_after": map[string]interface{}{"type": "string", "description": "Filter events starting after this date (RFC3339)"},
 			"end_before":  map[string]interface{}{"type": "string", "description": "Filter events ending before this date (RFC3339)"},
+			"search":      map[string]interface{}{"type": "string", "description": "Case-insensitive substring match on title"},
 		},
 	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
 		page := getArgInt(args, "page", 1)
 		pageSize := getArgInt(args, "page_size", 20)
+		search := toString(getArg(args, "search"))
 		var startAfter *string
 		if v := getArg(args, "start_after"); v != nil {
 			s := toString(v)
@@ -29,7 +31,7 @@ func (s *MCPServer) registerEventTools() {
 			endBefore = &s
 		}
 
-		events, total, err := s.eventSvc.List(ctx, userID, workspaceID, page, pageSize, startAfter, endBefore)
+		events, total, err := s.eventSvc.List(ctx, userID, workspaceID, page, pageSize, startAfter, endBefore, search)
 		if err != nil {
 			return nil, err
 		}

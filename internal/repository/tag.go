@@ -40,12 +40,7 @@ func (r *TagRepo) List(ctx context.Context, workspaceID uint, page, pageSize int
 		return nil, 0, fmt.Errorf("count tags: %w", err)
 	}
 
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 {
-		pageSize = 50
-	}
+	page, pageSize = clampPage(page, pageSize)
 	offset := (page - 1) * pageSize
 
 	if err := query.Order("id ASC").Limit(pageSize).Offset(offset).Find(&tags).Error; err != nil {

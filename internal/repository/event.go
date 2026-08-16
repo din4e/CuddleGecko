@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"gorm.io/gorm"
@@ -41,7 +42,7 @@ func (r *EventRepo) GetByIDs(ctx context.Context, workspaceID uint, ids []uint) 
 	return events, nil
 }
 
-func (r *EventRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, startAfter, endBefore *string) ([]model.Event, int64, error) {
+func (r *EventRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, startAfter, endBefore *string, search string) ([]model.Event, int64, error) {
 	var events []model.Event
 	var total int64
 
@@ -53,11 +54,15 @@ func (r *EventRepo) List(ctx context.Context, workspaceID uint, page, pageSize i
 	if endBefore != nil {
 		query = query.Where("start_time <= ?", *endBefore)
 	}
+	if search != "" {
+		query = query.Where("LOWER(title) LIKE ?", "%"+strings.ToLower(search)+"%")
+	}
 
 	if err := query.Model(&model.Event{}).Count(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("count events: %w", err)
 	}
 
+	page, pageSize = clampPage(page, pageSize)
 	offset := (page - 1) * pageSize
 	err := query.Offset(offset).Limit(pageSize).
 		Order("start_time DESC").

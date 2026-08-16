@@ -41,6 +41,7 @@ func (r *InteractionRepo) ListByContact(ctx context.Context, workspaceID, contac
 		return nil, 0, fmt.Errorf("count interactions: %w", err)
 	}
 
+	page, pageSize = clampPage(page, pageSize)
 	offset := (page - 1) * pageSize
 	err := query.Offset(offset).Limit(pageSize).
 		Order("occurred_at DESC").
@@ -50,6 +51,17 @@ func (r *InteractionRepo) ListByContact(ctx context.Context, workspaceID, contac
 	}
 
 	return interactions, total, nil
+}
+
+// ListByWorkspace returns every interaction in a workspace in one query, used
+// by export to avoid an N+1 of one query per contact.
+func (r *InteractionRepo) ListByWorkspace(ctx context.Context, workspaceID uint) ([]model.Interaction, error) {
+	var interactions []model.Interaction
+	if err := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID).
+		Order("occurred_at DESC, id DESC").Find(&interactions).Error; err != nil {
+		return nil, fmt.Errorf("list interactions by workspace: %w", err)
+	}
+	return interactions, nil
 }
 
 func (r *InteractionRepo) ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Interaction, error) {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/din4e/cuddlegecko/internal/model"
@@ -28,7 +29,7 @@ type updateReminderRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	RemindAt    string `json:"remind_at"`
-	Status      string `json:"status"`
+	Status      string `json:"status" binding:"omitempty,oneof=pending done snoozed"`
 }
 
 func (h *ReminderHandler) List(c *gin.Context) {
@@ -37,8 +38,15 @@ func (h *ReminderHandler) List(c *gin.Context) {
 	status := model.ReminderStatus(c.Query("status"))
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	var contactID *uint
+	if v := c.Query("contact_id"); v != "" {
+		if id, err := strconv.ParseUint(v, 10, 32); err == nil {
+			uid := uint(id)
+			contactID = &uid
+		}
+	}
 
-	reminders, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, status, page, pageSize)
+	reminders, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, status, contactID, page, pageSize)
 	if err != nil {
 		response.InternalError(c, "failed to list reminders")
 		return
@@ -101,6 +109,10 @@ func (h *ReminderHandler) Update(c *gin.Context) {
 	if err != nil {
 		if err == service.ErrReminderNotFound {
 			response.NotFound(c, "reminder not found")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidReminder) {
+			response.BadRequest(c, err.Error())
 			return
 		}
 		response.InternalError(c, "failed to update reminder")

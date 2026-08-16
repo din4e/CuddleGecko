@@ -65,7 +65,9 @@ func (s *RelationService) Delete(ctx context.Context, userID, workspaceID, id ui
 }
 
 func (s *RelationService) GetGraphData(ctx context.Context, userID, workspaceID uint) (*GraphData, error) {
-	contacts, _, err := s.contactRepo.List(ctx, workspaceID, 1, 1000, "", nil)
+	// Project only the columns the graph nodes need (no Tags Preload — that ran a
+	// second query per request whose results were discarded).
+	contacts, err := s.contactRepo.ListGraphContacts(ctx, workspaceID)
 	if err != nil {
 		return nil, err
 	}

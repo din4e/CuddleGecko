@@ -38,12 +38,7 @@ func (r *WorkoutRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model
 }
 
 func (r *WorkoutRepo) List(ctx context.Context, workspaceID uint, q model.WorkoutListQuery) ([]model.Workout, int64, error) {
-	if q.Page <= 0 {
-		q.Page = 1
-	}
-	if q.PageSize <= 0 {
-		q.PageSize = 50
-	}
+	q.Page, q.PageSize = clampPage(q.Page, q.PageSize)
 
 	query := r.db.WithContext(ctx).Model(&model.Workout{}).Where("workspace_id = ?", workspaceID)
 
@@ -166,11 +161,12 @@ func (r *WorkoutRepo) Reorder(ctx context.Context, workspaceID, id uint, afterID
 		ordered = append(ordered, all[movedIdx])
 		ordered = append(ordered, rest[insertAt:]...)
 
+		ids := make([]uint, len(ordered))
 		for i, t := range ordered {
-			if err := tx.Model(&model.Workout{}).Where("id = ?", t.ID).
-				Update("sort_order", i).Error; err != nil {
-				return fmt.Errorf("renumber workout order: %w", err)
-			}
+			ids[i] = t.ID
+		}
+		if err := renumberSortOrder(tx, &model.Workout{}, ids); err != nil {
+			return fmt.Errorf("renumber workout order: %w", err)
 		}
 		return nil
 	})
@@ -186,55 +182,50 @@ func (r *WorkoutRepo) Stats(ctx context.Context, workspaceID uint) (model.Workou
 	}
 	startWeek := startToday.AddDate(0, 0, -daysSinceMonday)
 
-	base := func() *gorm.DB {
-		return r.db.WithContext(ctx).Model(&model.Workout{}).Where("workspace_id = ?", workspaceID)
-	}
-	count := func(query *gorm.DB) (int64, error) {
-		var n int64
-		if err := query.Count(&n).Error; err != nil {
-			return 0, fmt.Errorf("stat count: %w", err)
-		}
-		return n, nil
-	}
-
+	// Single-pass conditional aggregation: one scan of the workspace's workouts
+	// yields every status count plus the completed duration/calories totals,
+	// replacing seven sequential round-trips (six COUNTs + a SUM) that — on the
+	// single-connection SQLite pool — serialized on every dashboard load.
 	var stats model.WorkoutStats
-	var err error
-	if stats.Total, err = count(base()); err != nil {
-		return stats, err
+	var row struct {
+		Total         int64   `gorm:"column:total"`
+		Planned       int64   `gorm:"column:planned"`
+		InProgress    int64   `gorm:"column:in_progress"`
+		Completed     int64   `gorm:"column:completed"`
+		Skipped       int64   `gorm:"column:skipped"`
+		ThisWeek      int64   `gorm:"column:this_week"`
+		TotalMinutes  int64   `gorm:"column:total_minutes"`
+		TotalCalories float64 `gorm:"column:total_calories"`
 	}
-	if stats.Planned, err = count(base().Where("status = ?", model.WorkoutStatusPlanned)); err != nil {
-		return stats, err
+	if err := r.db.WithContext(ctx).Model(&model.Workout{}).
+		Where("workspace_id = ?", workspaceID).
+		Select("COUNT(*) AS total, "+
+			"COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS planned, "+
+			"COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS in_progress, "+
+			"COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS completed, "+
+			"COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS skipped, "+
+			"COALESCE(SUM(CASE WHEN status = ? AND completed_at >= ? THEN 1 ELSE 0 END), 0) AS this_week, "+
+			"COALESCE(SUM(CASE WHEN status = ? THEN duration_min ELSE 0 END), 0) AS total_minutes, "+
+			"COALESCE(SUM(CASE WHEN status = ? THEN calories ELSE 0 END), 0) AS total_calories",
+			model.WorkoutStatusPlanned,
+			model.WorkoutStatusInProgress,
+			model.WorkoutStatusCompleted,
+			model.WorkoutStatusSkipped,
+			model.WorkoutStatusCompleted, startWeek,
+			model.WorkoutStatusCompleted,
+			model.WorkoutStatusCompleted,
+		).
+		Scan(&row).Error; err != nil {
+		return stats, fmt.Errorf("workout stats: %w", err)
 	}
-	if stats.InProgress, err = count(base().Where("status = ?", model.WorkoutStatusInProgress)); err != nil {
-		return stats, err
-	}
-	if stats.Completed, err = count(base().Where("status = ?", model.WorkoutStatusCompleted)); err != nil {
-		return stats, err
-	}
-	if stats.Skipped, err = count(base().Where("status = ?", model.WorkoutStatusSkipped)); err != nil {
-		return stats, err
-	}
-	if stats.ThisWeek, err = count(base().Where("status = ? AND completed_at >= ?", model.WorkoutStatusCompleted, startWeek)); err != nil {
-		return stats, err
-	}
-
-	// Aggregate duration + calories over completed workouts.
-	type agg struct {
-		Minutes  *int64
-		Calories *float64
-	}
-	var a agg
-	if err := base().Where("status = ?", model.WorkoutStatusCompleted).
-		Select("COALESCE(SUM(duration_min),0) AS minutes, COALESCE(SUM(calories),0) AS calories").
-		Scan(&a).Error; err != nil {
-		return stats, fmt.Errorf("stat aggregate: %w", err)
-	}
-	if a.Minutes != nil {
-		stats.TotalMinutes = *a.Minutes
-	}
-	if a.Calories != nil {
-		stats.TotalCalories = *a.Calories
-	}
+	stats.Total = row.Total
+	stats.Planned = row.Planned
+	stats.InProgress = row.InProgress
+	stats.Completed = row.Completed
+	stats.Skipped = row.Skipped
+	stats.ThisWeek = row.ThisWeek
+	stats.TotalMinutes = row.TotalMinutes
+	stats.TotalCalories = row.TotalCalories
 	return stats, nil
 }
 
@@ -255,6 +246,21 @@ func (r *WorkoutExerciseRepo) ListExercises(ctx context.Context, workoutID uint)
 	if err := r.db.WithContext(ctx).Where("workout_id = ?", workoutID).
 		Order("sort_order ASC, id ASC").Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("list exercises: %w", err)
+	}
+	return items, nil
+}
+
+// ListExercisesByWorkoutIDs is the bulk counterpart to ListExercises: it fetches
+// movements for many workouts in one query (ordered so per-workout grouping
+// stays stable), used by export to avoid an N+1 of one query per workout.
+func (r *WorkoutExerciseRepo) ListExercisesByWorkoutIDs(ctx context.Context, workoutIDs []uint) ([]model.WorkoutExercise, error) {
+	if len(workoutIDs) == 0 {
+		return nil, nil
+	}
+	var items []model.WorkoutExercise
+	if err := r.db.WithContext(ctx).Where("workout_id IN ?", workoutIDs).
+		Order("workout_id ASC, sort_order ASC, id ASC").Find(&items).Error; err != nil {
+		return nil, fmt.Errorf("list exercises by workout ids: %w", err)
 	}
 	return items, nil
 }
@@ -405,11 +411,12 @@ func (r *WorkoutExerciseRepo) ReorderExercise(ctx context.Context, workoutID, ex
 		ordered = append(ordered, all[movedIdx])
 		ordered = append(ordered, rest[insertAt:]...)
 
+		ids := make([]uint, len(ordered))
 		for i, t := range ordered {
-			if err := tx.Model(&model.WorkoutExercise{}).Where("id = ?", t.ID).
-				Update("sort_order", i).Error; err != nil {
-				return fmt.Errorf("renumber exercise order: %w", err)
-			}
+			ids[i] = t.ID
+		}
+		if err := renumberSortOrder(tx, &model.WorkoutExercise{}, ids); err != nil {
+			return fmt.Errorf("renumber exercise order: %w", err)
 		}
 		return nil
 	})
@@ -443,12 +450,7 @@ func (r *BodyMetricRepo) GetByID(ctx context.Context, workspaceID, id uint) (*mo
 }
 
 func (r *BodyMetricRepo) List(ctx context.Context, workspaceID uint, page, pageSize int) ([]model.BodyMetric, int64, error) {
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 {
-		pageSize = 50
-	}
+	page, pageSize = clampPage(page, pageSize)
 	query := r.db.WithContext(ctx).Model(&model.BodyMetric{}).Where("workspace_id = ?", workspaceID)
 
 	var total int64

@@ -12,9 +12,10 @@ var ErrTransactionNotFound = errors.New("transaction not found")
 type TransactionRepository interface {
 	Create(ctx context.Context, tx *model.Transaction) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Transaction, error)
-	List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint) ([]model.Transaction, int64, error)
+	List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string) ([]model.Transaction, int64, error)
 	ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Transaction, error)
 	Summary(ctx context.Context, workspaceID uint) (income float64, expense float64, err error)
+	Monthly(ctx context.Context, workspaceID uint, months int) ([]model.TransactionMonthly, error)
 	Update(ctx context.Context, tx *model.Transaction) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 }
@@ -30,6 +31,9 @@ func NewTransactionService(repo TransactionRepository) *TransactionService {
 func (s *TransactionService) Create(ctx context.Context, userID, workspaceID uint, tx *model.Transaction) (*model.Transaction, error) {
 	tx.UserID = userID
 	tx.WorkspaceID = workspaceID
+	if err := validateTransactionForCreate(tx); err != nil {
+		return nil, err
+	}
 	if err := s.repo.Create(ctx, tx); err != nil {
 		return nil, err
 	}
@@ -40,15 +44,22 @@ func (s *TransactionService) GetByID(ctx context.Context, userID, workspaceID, i
 	return s.repo.GetByID(ctx, workspaceID, id)
 }
 
-func (s *TransactionService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, txType *string, contactID *uint) ([]model.Transaction, int64, error) {
-	return s.repo.List(ctx, workspaceID, page, pageSize, txType, contactID)
+func (s *TransactionService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string) ([]model.Transaction, int64, error) {
+	return s.repo.List(ctx, workspaceID, page, pageSize, txType, contactID, search)
 }
 
 func (s *TransactionService) Summary(ctx context.Context, userID, workspaceID uint) (income float64, expense float64, err error) {
 	return s.repo.Summary(ctx, workspaceID)
 }
 
+func (s *TransactionService) Monthly(ctx context.Context, userID, workspaceID uint, months int) ([]model.TransactionMonthly, error) {
+	return s.repo.Monthly(ctx, workspaceID, months)
+}
+
 func (s *TransactionService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Transaction) (*model.Transaction, error) {
+	if err := validateTransactionForUpdate(updates); err != nil {
+		return nil, err
+	}
 	tx, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrTransactionNotFound
