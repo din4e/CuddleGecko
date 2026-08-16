@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X, Plus, ChevronDown } from 'lucide-react'
 import { contactsApi } from '../api/contacts'
 import type { Contact } from '../types'
@@ -12,6 +13,7 @@ interface BuddyPickerProps {
 }
 
 export default function BuddyPicker({ buddies, selectedIds, onChange, onBuddiesUpdate, placeholder = 'Search buddies...' }: BuddyPickerProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [quickName, setQuickName] = useState('')
@@ -120,6 +122,7 @@ export default function BuddyPicker({ buddies, selectedIds, onChange, onBuddiesU
               type="button"
               className="ml-0.5 rounded-full hover:bg-primary/20"
               onClick={(e) => { e.stopPropagation(); toggle(b.id) }}
+              aria-label={t('contacts.delete')}
             >
               <X className="h-3 w-3" />
             </button>

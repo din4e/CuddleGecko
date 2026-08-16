@@ -1,8 +1,10 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { contactsApi } from '../api/contacts'
+import { useQueryClient } from '@tanstack/react-query'
+import { useContactsList } from '../hooks/api/useContacts'
+import { useTagsList } from '../hooks/api/useTags'
+import { rootKey } from '../hooks/api/keys'
 import { todosApi } from '../api/todos'
-import { tagsApi } from '../api/tags'
 import { parseQuickAdd } from '../lib/quickAdd'
 import { buildICS } from '../lib/ics'
 import { Button } from '../components/ui/button'
@@ -16,7 +18,7 @@ import {
 } from '../components/ui/dialog'
 import { Plus, Trash2, CheckCircle2, Circle, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Todo, Contact, Tag, TodoSort, TodoListParams } from '../types'
+import type { Todo, TodoSort, TodoListParams } from '../types'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
 import TodoCard from '../components/TodoCard'
@@ -75,8 +77,13 @@ function smartListParams(list: SmartList): TodoListParams {
 
 export default function TodosPage() {
   const { t } = useTranslation()
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [tags, setTags] = useState<Tag[]>([])
+  // Contacts/tags come from the shared React-Query cache (30s staleTime) instead
+  // of raw per-mount fetches — navigating between pages no longer re-pulls them.
+  const qc = useQueryClient()
+  const { data: contactsData } = useContactsList({ page: 1, page_size: 100 })
+  const contacts = useMemo(() => contactsData?.items ?? [], [contactsData])
+  const { data: tagsData } = useTagsList(1, 200)
+  const tags = useMemo(() => tagsData?.items ?? [], [tagsData])
   const [smartList, setSmartList] = useState<SmartList>('all')
   const [quickTitle, setQuickTitle] = useState('')
   const [quickDue, setQuickDue] = useState('')
@@ -158,14 +165,6 @@ export default function TodosPage() {
 
   const todos = useMemo(() => data?.items ?? [], [data])
   const total = data?.total ?? 0
-
-  useEffect(() => {
-    contactsApi.list({ page: 1, page_size: 100 }).then((res) => setContacts(res.data?.items ?? [])).catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    tagsApi.list(1, 200).then((res) => setTags(res.data?.items ?? [])).catch(() => {})
-  }, [])
 
   const openCreate = useCallback(() => { setEditing(null); setPresetParent(null); setDialogOpen(true) }, [])
   const openCreateChild = useCallback((parent: Todo) => { setEditing(null); setPresetParent(parent); setDialogOpen(true) }, [])
@@ -268,9 +267,16 @@ export default function TodosPage() {
 
   // Export pending todos with due times as an iCalendar (.ics) download.
   const handleExportICS = useCallback(async () => {
+    // Cap the export fetch instead of pulling up to 100k todos — buildICS only
+    // needs the due-time ones anyway. Warn if truncated.
+    const cap = 1000
     try {
-      const res = await todosApi.list({ status: 'pending', page: 1, page_size: 100000 })
-      const ics = buildICS(res.data?.items ?? [])
+      const res = await todosApi.list({ status: 'pending', page: 1, page_size: cap })
+      const items = res.data?.items ?? []
+      if ((res.data?.total ?? 0) > cap) {
+        toast.warning(t('todos.exportIcsTruncated', { n: cap }))
+      }
+      const ics = buildICS(items)
       const blob = new Blob([ics], { type: 'text/calendar' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -337,7 +343,7 @@ export default function TodosPage() {
   }, [t, duplicateTodo])
 
   // --- Bulk selection ---
-  const toggleSelect = (id: number) => {
+  const toggleSelect = useCallback((id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) {
@@ -347,7 +353,7 @@ export default function TodosPage() {
       }
       return next
     })
-  }
+  }, [])
   const exitSelection = () => {
     setSelectionMode(false)
     setSelectedIds(new Set())
@@ -446,20 +452,21 @@ export default function TodosPage() {
 
   // Tree-view reparenting: indent/outdent/up/down all reduce to a single move
   // call (parent_id + place-after sibling).
-  const handleTreeMove = async (id: number, parentId: number | null, afterId: number | null) => {
+  const handleTreeMove = useCallback(async (id: number, parentId: number | null, afterId: number | null) => {
     try {
       await moveTodo.mutateAsync({ id, parentId, afterId })
     } catch {
       toast.error(t('todos.reorderFailed'))
     }
-  }
-  const toggleCollapse = (id: number) =>
+  }, [moveTodo, t])
+  const toggleCollapse = useCallback((id: number) =>
     setCollapsed((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
+  , [])
 
   const todoTree = useMemo(() => buildTodoTree(todos), [todos])
   // id → title for the "nested under <parent>" hint on cards in non-tree views.
@@ -903,7 +910,7 @@ export default function TodosPage() {
         tags={tags}
         parentCandidates={todos}
         presetParentId={presetParent?.id ?? null}
-        onContactsChange={setContacts}
+        onContactsChange={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
         onClose={() => { setDialogOpen(false); setPresetParent(null) }}
       />
 

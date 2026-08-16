@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { Button } from './ui/button'
 
@@ -24,6 +25,7 @@ export function ConfirmDialog({
   onConfirm,
 }: ConfirmDialogProps) {
   const [busy, setBusy] = useState(false)
+  const { t } = useTranslation()
 
   const handleConfirm = async () => {
     setBusy(true)
@@ -46,10 +48,10 @@ export function ConfirmDialog({
         <DialogDescription>{message}</DialogDescription>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
-            {cancelText}
+            {cancelText ?? t('common.cancel')}
           </Button>
           <Button variant={variant} onClick={handleConfirm} disabled={busy}>
-            {busy ? '…' : confirmText}
+            {busy ? '…' : (confirmText ?? t('common.confirm'))}
           </Button>
         </DialogFooter>
       </DialogContent>

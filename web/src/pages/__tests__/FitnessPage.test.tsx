@@ -43,6 +43,9 @@ vi.mock('react-i18next', () => ({
     },
     i18n: { language: 'zh' },
   }),
+  // The page under test imports i18n (via lib/toast), which calls
+  // i18n.use(initReactI18next) — the mock must provide it.
+  initReactI18next: { type: '3rdParty', init: () => {} },
 }))
 
 vi.mock('../../api/workouts', () => ({

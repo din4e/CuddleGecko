@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { workoutsApi } from '../../api/workouts'
+import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
 import type {
   Workout,
@@ -36,6 +37,7 @@ export function useCreateWorkout() {
   return useMutation({
     mutationFn: (input: Partial<Workout>) => workoutsApi.create(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onError: mutationErrorToast,
   })
 }
 
@@ -44,6 +46,7 @@ export function useUpdateWorkout() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: WorkoutUpdateInput }) => workoutsApi.update(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onError: mutationErrorToast,
   })
 }
 
@@ -52,6 +55,7 @@ export function useToggleWorkout() {
   return useMutation({
     mutationFn: (id: number) => workoutsApi.toggle(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onError: mutationErrorToast,
   })
 }
 
@@ -60,6 +64,7 @@ export function useReorderWorkout() {
   return useMutation({
     mutationFn: ({ id, afterId }: { id: number; afterId: number | null }) => workoutsApi.reorder(id, afterId),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onError: mutationErrorToast,
   })
 }
 
@@ -68,6 +73,7 @@ export function useDeleteWorkout() {
   return useMutation({
     mutationFn: (id: number) => workoutsApi.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onError: mutationErrorToast,
   })
 }
 
@@ -91,6 +97,7 @@ export function useCreateWorkoutExercise(workoutId: number) {
       qc.invalidateQueries({ queryKey: exercisesKey(workoutId) })
       qc.invalidateQueries({ queryKey: allKey() })
     },
+    onError: mutationErrorToast,
   })
 }
 
@@ -100,6 +107,7 @@ export function useUpdateWorkoutExercise(workoutId: number) {
     mutationFn: ({ exerciseId, data }: { exerciseId: number; data: WorkoutExerciseInput }) =>
       workoutsApi.updateExercise(workoutId, exerciseId, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: exercisesKey(workoutId) }),
+    onError: mutationErrorToast,
   })
 }
 
@@ -111,6 +119,7 @@ export function useToggleWorkoutExercise(workoutId: number) {
       qc.invalidateQueries({ queryKey: exercisesKey(workoutId) })
       qc.invalidateQueries({ queryKey: allKey() })
     },
+    onError: mutationErrorToast,
   })
 }
 
@@ -122,5 +131,6 @@ export function useDeleteWorkoutExercise(workoutId: number) {
       qc.invalidateQueries({ queryKey: exercisesKey(workoutId) })
       qc.invalidateQueries({ queryKey: allKey() })
     },
+    onError: mutationErrorToast,
   })
 }

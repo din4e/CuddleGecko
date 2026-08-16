@@ -2,19 +2,14 @@ import { create } from 'zustand'
 import { createHTTPAdapters } from '@/api/http-adapter'
 import type { AppAdapters } from '@/api/adapter'
 
-type AppMode = 'local' | 'remote'
-
+// Web-only build (the Wails desktop client lives in the separate
+// CuddleGeckoDesktop repo since commit 03a8f82): there is exactly one adapter
+// implementation — HTTP — created once and shared. The old local/remote mode
+// switching, remoteUrl, and initAdapters machinery had zero callers and was
+// removed; consumers subscribe to `adapters` only.
 interface ModeState {
-  mode: AppMode
-  remoteUrl: string
-  adapters: AppAdapters | null
-  adaptersLoading: boolean
-  setMode: (mode: AppMode) => void
-  setRemoteUrl: (url: string) => void
-  initAdapters: () => Promise<void>
+  adapters: AppAdapters
 }
-
-const savedUrl = localStorage.getItem('remote_url') || 'http://localhost:8080'
 
 let httpAdapters: AppAdapters | null = null
 function getHTTPAdapters(): AppAdapters {
@@ -22,22 +17,6 @@ function getHTTPAdapters(): AppAdapters {
   return httpAdapters
 }
 
-// Web-only build: always uses the HTTP adapter (no local Wails mode).
-export const useModeStore = create<ModeState>((set) => ({
-  mode: 'remote',
-  remoteUrl: savedUrl,
+export const useModeStore = create<ModeState>(() => ({
   adapters: getHTTPAdapters(),
-  adaptersLoading: false,
-
-  setMode: (mode) => {
-    localStorage.setItem('app_mode', mode)
-    set({ mode, adapters: getHTTPAdapters(), adaptersLoading: false })
-  },
-  setRemoteUrl: (url) => {
-    localStorage.setItem('remote_url', url)
-    set({ remoteUrl: url })
-  },
-  initAdapters: async () => {
-    set({ adapters: getHTTPAdapters(), adaptersLoading: false })
-  },
 }))

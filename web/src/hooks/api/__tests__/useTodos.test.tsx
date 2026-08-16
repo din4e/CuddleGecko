@@ -1,0 +1,181 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { renderHook, waitFor, act } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
+import { useTodosList, useToggleTodoStatus, useTogglePin } from '../useTodos'
+import { todosApi } from '../../../api/todos'
+import type { Todo, PaginatedData } from '../../../types'
+
+// Regression tests for the optimistic toggle/pin hooks. An adversarial review
+// found the original onMutate read a second `query` argument TanStack v5 never
+// passes — onMutate threw and the request was NEVER sent (toggling was fully
+// broken). These exercise the hooks against a real QueryClient so any regression
+// of that class (updater arity, multi-key snapshot/rollback, recurring exclusion)
+// fails loudly.
+
+vi.mock('../../../api/todos', () => ({
+  todosApi: {
+    list: vi.fn(),
+    toggleStatus: vi.fn(),
+    togglePin: vi.fn(),
+  },
+}))
+
+// rootKey reads localStorage at call time; pin it to a fixed workspace so the
+// query keys in these tests are deterministic (and no real storage is touched).
+vi.mock('../keys', () => ({
+  rootKey: (scope: string) => [scope, 'default'] as const,
+}))
+
+const page = (items: Todo[]): PaginatedData<Todo> => ({ items, total: items.length, page: 1, page_size: 50 })
+
+function makeTodo(partial: Partial<Todo>): Todo {
+  return {
+    id: 1, title: 't', status: 'pending', priority: 'normal', pinned: false,
+    contact_ids: [], tags: [], pomodoro_count: 0, item_total: 0, item_done: 0,
+    sort_order: 0, repeat: '', repeat_interval: 1, created_at: '', updated_at: '',
+    ...partial,
+  } as Todo
+}
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    // gcTime Infinity so the manually-seeded (inactive) cache page survives —
+    // it holds the optimistic flip with no observers to refetch it.
+    defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: Infinity } },
+  })
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  )
+  return { Wrapper, queryClient }
+}
+
+const twoPages = {
+  filterA: page([makeTodo({ id: 1, status: 'pending' })]),
+  filterB: page([makeTodo({ id: 1, status: 'pending' }), makeTodo({ id: 2 })]),
+}
+
+describe('useToggleTodoStatus (optimistic)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('sends the request and flips status across every cached list page', async () => {
+    // Stateful mock server: the toggle mutates server state, so the
+    // post-mutation refetch (onSettled invalidation) returns the TOGGLED data
+    // — exactly like the real backend. This is what lets the optimistic value
+    // survive reconciliation.
+    let serverStatus = 'pending'
+    const mockedList = vi.mocked(todosApi.list)
+    mockedList.mockImplementation(async () => ({
+      data: page([makeTodo({ id: 1, status: serverStatus as Todo['status'] })]),
+    }) as never)
+    const toggled = vi.mocked(todosApi.toggleStatus)
+    toggled.mockImplementation(async () => {
+      serverStatus = serverStatus === 'done' ? 'pending' : 'done'
+      return { data: undefined } as never
+    })
+
+    const { Wrapper, queryClient } = createWrapper()
+    const listA = renderHook(() => useTodosList({ status: 'pending' }), { wrapper: Wrapper })
+    await waitFor(() => expect(listA.result.current.data).toBeDefined())
+
+    // Seed a second cached page (different key) that also contains todo 1.
+    queryClient.setQueryData(
+      ['todos', 'default', 'list', { page: 1, page_size: 50, status: 'done' }],
+      twoPages.filterB,
+    )
+
+    const toggle = renderHook(() => useToggleTodoStatus(), { wrapper: Wrapper })
+    await act(async () => { await toggle.result.current.mutateAsync(1) })
+
+    // THE critical assertion: the request must actually be sent (the old
+    // updater-arity bug threw in onMutate before mutationFn ever ran).
+    expect(toggled).toHaveBeenCalledWith(1)
+
+    // Both cached pages show the toggled state after reconciliation.
+    await waitFor(() => {
+      const a = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'pending' }])
+      expect(a?.items.find((t) => t.id === 1)?.status).toBe('done')
+    })
+    // The manually-seeded page was optimistically flipped too (it's inactive —
+    // no refetch — so the optimistic value persists there).
+    const b = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'done' }])
+    expect(b?.items.find((t) => t.id === 1)?.status).toBe('done')
+  })
+
+  it('rolls back every page when the request fails', async () => {
+    const mockedList = vi.mocked(todosApi.list)
+    mockedList.mockResolvedValue({ data: twoPages.filterA } as never)
+    const toggled = vi.mocked(todosApi.toggleStatus)
+    toggled.mockRejectedValue(new Error('network') as never)
+
+    const { Wrapper, queryClient } = createWrapper()
+    const listA = renderHook(() => useTodosList({ status: 'pending' }), { wrapper: Wrapper })
+    await waitFor(() => expect(listA.result.current.data).toBeDefined())
+    queryClient.setQueryData(
+      ['todos', 'default', 'list', { page: 1, page_size: 50, status: 'done' }],
+      twoPages.filterB,
+    )
+
+    const toggle = renderHook(() => useToggleTodoStatus(), { wrapper: Wrapper })
+    await act(async () => {
+      await toggle.result.current.mutateAsync(1).catch(() => {}) // expected failure
+    })
+
+    const a = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'pending' }])
+    const b = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'done' }])
+    expect(a?.items.find((t) => t.id === 1)?.status).toBe('pending')
+    expect(b?.items.find((t) => t.id === 1)?.status).toBe('pending')
+  })
+
+  it('does not optimistically flip recurring pending todos (server advances them instead)', async () => {
+    const mockedList = vi.mocked(todosApi.list)
+    mockedList.mockResolvedValue({
+      data: page([makeTodo({ id: 7, status: 'pending', repeat: 'daily' })]),
+    } as never)
+    const toggled = vi.mocked(todosApi.toggleStatus)
+    toggled.mockResolvedValue({ data: undefined } as never)
+
+    const { Wrapper, queryClient } = createWrapper()
+    const list = renderHook(() => useTodosList({ status: 'pending' }), { wrapper: Wrapper })
+    await waitFor(() => expect(list.result.current.data).toBeDefined())
+
+    const toggle = renderHook(() => useToggleTodoStatus(), { wrapper: Wrapper })
+    await act(async () => { await toggle.result.current.mutateAsync(7) })
+
+    expect(toggled).toHaveBeenCalledWith(7) // request still sent
+    const cached = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'pending' }])
+    expect(cached?.items.find((t) => t.id === 7)?.status).toBe('pending') // but no local flip
+  })
+})
+
+describe('useTogglePin (optimistic)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('flips pinned and sends the request', async () => {
+    // Stateful mock server (see toggle test): pin flips server state so the
+    // post-mutation refetch agrees with the optimistic value.
+    let serverPinned = false
+    const mockedList = vi.mocked(todosApi.list)
+    mockedList.mockImplementation(async () => ({
+      data: page([makeTodo({ id: 1, pinned: serverPinned })]),
+    }) as never)
+    const pin = vi.mocked(todosApi.togglePin)
+    pin.mockImplementation(async () => {
+      serverPinned = !serverPinned
+      return { data: undefined } as never
+    })
+
+    const { Wrapper, queryClient } = createWrapper()
+    const list = renderHook(() => useTodosList({}), { wrapper: Wrapper })
+    await waitFor(() => expect(list.result.current.data).toBeDefined())
+
+    const toggle = renderHook(() => useTogglePin(), { wrapper: Wrapper })
+    await act(async () => { await toggle.result.current.mutateAsync(1) })
+
+    expect(pin).toHaveBeenCalledWith(1)
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50 }])
+      expect(cached?.items.find((t) => t.id === 1)?.pinned).toBe(true)
+    })
+  })
+})

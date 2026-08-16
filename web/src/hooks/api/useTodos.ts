@@ -39,6 +39,8 @@ export function useRestoreTodo() {
       qc.invalidateQueries({ queryKey: [...allKey(), 'trash'] })
       qc.invalidateQueries({ queryKey: allKey() })
     },
+    // TodosPage shows a specific restore-failed toast; suppress the global one.
+    meta: { localErrorHandling: true },
   })
 }
 
@@ -58,11 +60,41 @@ export function useUpdateTodo() {
   })
 }
 
+// Optimistically flip a todo's status in every cached list page so the checkbox
+// responds instantly; rollback on error, and reconcile with the server on
+// settle (the refetch also picks up re-sorting and recurring-task advancement).
+// Recurring pending tasks are excluded: the server advances their due date
+// rather than flipping status, so an optimistic flip would be visibly wrong.
 export function useToggleTodoStatus() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => todosApi.toggleStatus(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onMutate: async (id: number) => {
+      await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
+      // Snapshot every cached list page, then flip the field per key. (v5's
+      // setQueriesData updater receives only `old` — no query arg — so we use
+      // getQueriesData pairs instead.)
+      const previous = qc.getQueriesData<PaginatedData<Todo>>({ queryKey: [...allKey(), 'list'] })
+      for (const [key, old] of previous) {
+        if (!old) continue
+        qc.setQueryData(key, {
+          ...old,
+          items: old.items?.map((t) => {
+            if (t.id !== id) return t
+            if (t.status === 'pending' && t.repeat) return t
+            const done = t.status === 'done'
+            return { ...t, status: done ? 'pending' : 'done', completed_at: done ? null : new Date().toISOString() }
+          }),
+        })
+      }
+      return { previous: new Map(previous) }
+    },
+    onError: (_err, _id, ctx) => {
+      ctx?.previous.forEach((data, key) => qc.setQueryData(key, data))
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: allKey() })
+    },
   })
 }
 
@@ -92,11 +124,30 @@ export function usePomodoroTodo() {
   })
 }
 
+// Optimistically flip the pin so the star responds instantly; the refetch on
+// settle applies the pinned-first reordering.
 export function useTogglePin() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => todosApi.togglePin(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onMutate: async (id: number) => {
+      await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
+      const previous = qc.getQueriesData<PaginatedData<Todo>>({ queryKey: [...allKey(), 'list'] })
+      for (const [key, old] of previous) {
+        if (!old) continue
+        qc.setQueryData(key, {
+          ...old,
+          items: old.items?.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)),
+        })
+      }
+      return { previous: new Map(previous) }
+    },
+    onError: (_err, _id, ctx) => {
+      ctx?.previous.forEach((data, key) => qc.setQueryData(key, data))
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: allKey() })
+    },
   })
 }
 
@@ -108,6 +159,8 @@ export function useSyncTodoToEvent() {
       qc.invalidateQueries({ queryKey: rootKey('todos') })
       qc.invalidateQueries({ queryKey: rootKey('events') })
     },
+    // TodosPage shows a specific sync-failed toast; suppress the global one.
+    meta: { localErrorHandling: true },
   })
 }
 
@@ -116,6 +169,8 @@ export function useDuplicateTodo() {
   return useMutation({
     mutationFn: (id: number) => todosApi.duplicate(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    // TodosPage shows a specific duplicate-failed toast; suppress the global one.
+    meta: { localErrorHandling: true },
   })
 }
 
@@ -133,6 +188,8 @@ export function useBulkActionTodo() {
     mutationFn: ({ ids, action }: { ids: number[]; action: 'complete' | 'delete' }) =>
       todosApi.bulk(ids, action),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    // TodosPage shows a specific bulk-failed toast; suppress the global one.
+    meta: { localErrorHandling: true },
   })
 }
 

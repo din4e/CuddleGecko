@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bodyMetricsApi } from '../../api/bodyMetrics'
+import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
 import type { BodyMetric, BodyMetricInput, BodyMetricSummary, PaginatedData } from '../../types'
 
@@ -25,6 +26,7 @@ export function useCreateBodyMetric() {
   return useMutation({
     mutationFn: (input: BodyMetricInput) => bodyMetricsApi.create(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onError: mutationErrorToast,
   })
 }
 
@@ -33,6 +35,7 @@ export function useUpdateBodyMetric() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: BodyMetricInput }) => bodyMetricsApi.update(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onError: mutationErrorToast,
   })
 }
 
@@ -41,5 +44,6 @@ export function useDeleteBodyMetric() {
   return useMutation({
     mutationFn: (id: number) => bodyMetricsApi.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onError: mutationErrorToast,
   })
 }

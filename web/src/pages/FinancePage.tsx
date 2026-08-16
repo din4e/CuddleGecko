@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useDeferredValue, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { contactsApi } from '../api/contacts'
+import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
+import { useContactsList } from '../hooks/api/useContacts'
+import { rootKey } from '../hooks/api/keys'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
@@ -20,10 +23,11 @@ import BuddyPicker from '../components/BuddyPicker'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
+import { ListSkeleton } from '../components/ListSkeleton'
 import ListPageHeader from '../components/ListPageHeader'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
-import type { Transaction, Contact } from '../types'
+import type { Transaction } from '../types'
 import {
   useTransactionsList,
   useTransactionsSummary,
@@ -56,8 +60,19 @@ const emptyForm: TxFormData = {
 
 export default function FinancePage() {
   const { t } = useTranslation()
-  const [buddies, setBuddies] = useState<Contact[]>([])
+  // Buddies come from the shared React-Query cache (30s staleTime) instead of a
+  // raw per-mount fetch — navigating between pages no longer re-pulls the list.
+  const qc = useQueryClient()
+  const { data: buddiesData } = useContactsList({ page: 1, page_size: 200 })
+  const buddies = useMemo(() => buddiesData?.items ?? [], [buddiesData])
+  // O(1) id→name lookup so rendering N transaction rows doesn't run a
+  // buddies.find() per contact id per row (was O(rows × buddies)).
+  const buddyNameById = useMemo(() => new Map(buddies.map((b) => [b.id, b.name])), [buddies])
   const [typeFilter, setTypeFilter] = useState<TxType>('')
+  const [q, setQ] = useState('')
+  // Debounce the search: input stays responsive on `q`, list query refires only
+  // once typing settles (matches the FitnessPage pattern).
+  const deferredQ = useDeferredValue(q)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
@@ -70,6 +85,7 @@ export default function FinancePage() {
     page,
     page_size: pageSize,
     type: typeFilter || undefined,
+    q: deferredQ || undefined,
   })
   const { data: summary } = useTransactionsSummary()
   const createTx = useCreateTransaction()
@@ -78,10 +94,6 @@ export default function FinancePage() {
 
   const transactions = data?.items ?? []
   const total = data?.total ?? 0
-
-  useEffect(() => {
-    contactsApi.list({ page: 1, page_size: 200 }).then((res) => setBuddies(res.data.items || []))
-  }, [])
 
   const changeTypeFilter = (ty: TxType) => {
     setTypeFilter(ty)
@@ -109,9 +121,14 @@ export default function FinancePage() {
   }
 
   const handleSubmit = async () => {
+    const amount = parseFloat(form.amount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error(t('finance.invalidAmount'))
+      return
+    }
     const payload: Record<string, unknown> = {
       title: form.title,
-      amount: parseFloat(form.amount),
+      amount,
       type: form.type,
       category: form.category,
       date: form.date ? new Date(form.date).toISOString() : undefined,
@@ -185,7 +202,7 @@ export default function FinancePage() {
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {(['', 'income', 'expense'] as TxType[]).map((ty) => (
           <Button
             key={ty}
@@ -196,10 +213,17 @@ export default function FinancePage() {
             {ty === '' ? t('finance.all') : t(`finance.${ty}`)}
           </Button>
         ))}
+        <Input
+          type="search"
+          placeholder={t('finance.searchPlaceholder')}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="h-9 max-w-xs ml-auto"
+        />
       </div>
 
       {isPending ? (
-        <div>{t('finance.loading')}</div>
+        <ListSkeleton />
       ) : transactions.length === 0 ? (
         <EmptyState message={t('finance.noTransactions')} />
       ) : view === 'list' ? (
@@ -207,13 +231,13 @@ export default function FinancePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">Type</TableHead>
+                <TableHead className="w-10">{t('common.type')}</TableHead>
                 <TableHead>{t('finance.title_field')}</TableHead>
                 <TableHead>{t('finance.date')}</TableHead>
                 <TableHead>{t('finance.category')}</TableHead>
-                <TableHead>Buddies</TableHead>
+                <TableHead>{t('common.buddies')}</TableHead>
                 <TableHead className="text-right">{t('finance.amount')}</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-right">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -233,7 +257,7 @@ export default function FinancePage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {tx.contact_ids?.length > 0 ? (
-                      <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{tx.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}</span>
+                      <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{tx.contact_ids.map((cid) => buddyNameById.get(cid)).filter(Boolean).join(', ')}</span>
                     ) : '—'}
                   </TableCell>
                   <TableCell className="text-right">
@@ -279,7 +303,7 @@ export default function FinancePage() {
                 {tx.contact_ids?.length > 0 && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Heart className="h-3 w-3" />
-                    {tx.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}
+                    {tx.contact_ids.map((cid) => buddyNameById.get(cid)).filter(Boolean).join(', ')}
                   </div>
                 )}
                 <div className="flex gap-1 pt-1">
@@ -362,12 +386,12 @@ export default function FinancePage() {
               <Textarea id="tx-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>Buddies</Label>
+              <Label>{t('common.buddies')}</Label>
               <BuddyPicker
                 buddies={buddies}
                 selectedIds={form.contact_ids}
                 onChange={(ids) => setForm({ ...form, contact_ids: ids })}
-                onBuddiesUpdate={setBuddies}
+                onBuddiesUpdate={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
               />
             </div>
           </div>

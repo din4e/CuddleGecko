@@ -74,7 +74,13 @@ export const usePomodoroStore = create<PomodoroStore>((set, get) => ({
     })
   },
 
-  skip: () => get().tick(), // force a transition by running the tick with secondsLeft=0
+  // Skip forces the phase transition: zero the countdown first (tick() only
+  // decrements by one when secondsLeft > 1, so calling it alone "skipped" a
+  // single second, not the phase).
+  skip: () => {
+    set({ secondsLeft: 0 })
+    get().tick()
+  },
 
   tick: () => {
     const { secondsLeft, phase, onComplete } = get()

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
+import { isoToLocalInput } from '../lib/utils'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -37,7 +38,7 @@ export function WorkoutFormDialog({ open, editing, onClose }: WorkoutFormDialogP
   const [wType, setWType] = useState<WorkoutType>(editing?.type ?? 'other')
   const [status, setStatus] = useState<WorkoutStatus>(editing?.status ?? 'planned')
   const [intensity, setIntensity] = useState<WorkoutIntensity>(editing?.intensity ?? '')
-  const [scheduledAt, setScheduledAt] = useState(editing?.scheduled_at ? editing.scheduled_at.slice(0, 16) : '')
+  const [scheduledAt, setScheduledAt] = useState(editing?.scheduled_at ? isoToLocalInput(editing.scheduled_at) : '')
   const [duration, setDuration] = useState(editing?.duration_min != null ? String(editing.duration_min) : '')
   const [calories, setCalories] = useState(editing?.calories != null ? String(editing.calories) : '')
   const [location, setLocation] = useState(editing?.location ?? '')

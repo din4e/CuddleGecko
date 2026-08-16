@@ -12,6 +12,7 @@ import { CheckCircle, Clock, AlertCircle, Trash2, Pencil } from 'lucide-react'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
+import { ListSkeleton } from '../components/ListSkeleton'
 import ListPageHeader from '../components/ListPageHeader'
 import {
   useRemindersList,
@@ -109,7 +110,7 @@ export default function RemindersPage() {
           </Button>
         ))}
       </div>
-      {isPending ? <div>{t('reminders.loading')}</div> : reminders.length === 0 ? (
+      {isPending ? <ListSkeleton /> : reminders.length === 0 ? (
         <EmptyState message={t('reminders.noReminders')} />
       ) : view === 'list' ? (
         <Card>

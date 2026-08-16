@@ -1,12 +1,15 @@
 import { request } from './client'
-import type { Transaction, TransactionSummary, PaginatedData } from '../types'
+import type { Transaction, TransactionSummary, TransactionMonthly, PaginatedData } from '../types'
 
 export const transactionsApi = {
-  list: (params?: { page?: number; page_size?: number; type?: string; contact_id?: number }, signal?: AbortSignal) =>
+  list: (params?: { page?: number; page_size?: number; type?: string; contact_id?: number; q?: string }, signal?: AbortSignal) =>
     request.get<PaginatedData<Transaction>>('/transactions', { params, signal }).then((data) => ({ data })),
 
   summary: () =>
     request.get<TransactionSummary>('/transactions/summary').then((data) => ({ data })),
+
+  monthly: (months = 6) =>
+    request.get<TransactionMonthly[]>('/transactions/monthly', { params: { months } }).then((data) => ({ data })),
 
   create: (data: Partial<Transaction>) =>
     request.post<Transaction>('/transactions', data).then((d) => ({ data: d })),

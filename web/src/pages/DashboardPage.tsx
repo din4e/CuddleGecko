@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { buttonVariants } from '../components/ui/button'
-import type { Reminder, Event, Todo, Transaction } from '../types'
+import type { Reminder, Event, Todo } from '../types'
 import { useRemindersList } from '../hooks/api/useReminders'
 import { useEventsList } from '../hooks/api/useEvents'
 import { useTodosList, useTodoStats } from '../hooks/api/useTodos'
-import { useTransactionsList } from '../hooks/api/useTransactions'
+import { useTransactionsMonthly } from '../hooks/api/useTransactions'
+import { StatGridSkeleton } from '../components/ListSkeleton'
 import { useContactsList } from '../hooks/api/useContacts'
 import {
   Users,
@@ -126,8 +127,6 @@ function TrendChart({ buckets }: { buckets: MonthBucket[] }) {
 
 export default function DashboardPage() {
   const { t, i18n } = useTranslation()
-  const [monthIncome, setMonthIncome] = useState(0)
-  const [monthExpense, setMonthExpense] = useState(0)
 
   const now = new Date()
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
@@ -138,43 +137,38 @@ export default function DashboardPage() {
   const { data: todosData, isPending: todosLoading } = useTodosList({ status: 'pending', page: 1, page_size: 100 })
   // Accurate productivity totals (pending/overdue/deferred/…) for the stat tiles.
   const { data: todoStats } = useTodoStats()
-  const { data: txData, isPending: txLoading } = useTransactionsList({ page: 1, page_size: 1000 })
+  // Monthly income/expense aggregate (one tiny request) replaces fetching up to
+  // 1000 transactions to sum them client-side; it drives both the trend chart
+  // and the current-month tiles.
+  const { data: monthlyData, isPending: monthlyLoading } = useTransactionsMonthly(6)
   const { data: contactsData } = useContactsList({ page: 1, page_size: 1 })
 
   const reminders: Reminder[] = remindersData?.items ?? []
   const events: Event[] = eventsData?.items ?? []
-  const todos: Todo[] = todosData?.items ?? []
-  const transactions: Transaction[] = txData?.items ?? []
+  // Memoize so the array identity is stable while data is unchanged — a bare
+  // `?? []` produces a NEW empty array every render, which (as the dependency
+  // of the overdueTodos memo below) forced a pointless recompute per render.
+  const todos = useMemo<Todo[]>(() => todosData?.items ?? [], [todosData])
   const totalContacts = contactsData?.total ?? 0
-  const loading = remindersLoading || eventsLoading || todosLoading || txLoading
-
-  useEffect(() => {
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    let inc = 0
-    let exp = 0
-    for (const tx of transactions) {
-      if (tx.date >= monthStart) {
-        if (tx.type === 'income') inc += tx.amount
-        else exp += tx.amount
-      }
-    }
-    setMonthIncome(inc)
-    setMonthExpense(exp)
-  }, [transactions, now])
+  const loading = remindersLoading || eventsLoading || todosLoading || monthlyLoading
 
   const trend = useMemo(() => {
     const buckets = buildLast6Months(i18n.language)
-    const withinLast6 = transactions.filter((tx) => tx.date >= sixMonthsAgoFromNow())
-    for (const tx of withinLast6) {
-      const d = new Date(tx.date)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      const b = buckets.find((x) => x.key === key)
-      if (!b) continue
-      if (tx.type === 'income') b.income += tx.amount
-      else b.expense += tx.amount
+    const byKey = new Map((monthlyData ?? []).map((m) => [m.month, m]))
+    for (const b of buckets) {
+      const m = byKey.get(b.key)
+      if (m) {
+        b.income = m.income
+        b.expense = m.expense
+      }
     }
     return buckets
-  }, [transactions, i18n.language])
+  }, [monthlyData, i18n.language])
+
+  // The last bucket is the current month.
+  const currentMonth = trend[trend.length - 1]
+  const monthIncome = currentMonth?.income ?? 0
+  const monthExpense = currentMonth?.expense ?? 0
 
   const overdueTodos = useMemo(() => {
     const now = new Date()
@@ -186,7 +180,7 @@ export default function DashboardPage() {
 
   const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 
-  if (loading) return <div>{t('dashboard.loading')}</div>
+  if (loading) return <StatGridSkeleton />
 
   const stats = [
     { title: t('dashboard.totalContacts'), value: totalContacts, icon: Users, color: 'text-blue-500', to: '/buddies' },
@@ -382,9 +376,4 @@ export default function DashboardPage() {
       </Card>
     </div>
   )
-}
-
-function sixMonthsAgoFromNow(): string {
-  const now = new Date()
-  return new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString()
 }

@@ -43,6 +43,9 @@ export function PomodoroTimer({ phase, secondsLeft, running, focusTodoTitle, onS
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
         osc.start()
         osc.stop(ctx.currentTime + 0.5)
+        // Browsers cap concurrent AudioContexts (~6 in Chrome) — one leaked per
+        // completed session eventually makes new AudioContext() throw forever.
+        osc.onended = () => { ctx.close().catch(() => {}) }
       } catch {
         // AudioContext unavailable — ignore.
       }

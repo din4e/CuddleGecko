@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Repeat, Loader2 } from 'lucide-react'
+import { isoToLocalInput } from '../lib/utils'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -52,8 +53,8 @@ export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates
   const [formTitle, setFormTitle] = useState(editing?.title ?? '')
   const [formDesc, setFormDesc] = useState(editing?.description ?? '')
   const [formPriority, setFormPriority] = useState<'low' | 'normal' | 'high'>(editing?.priority ?? 'normal')
-  const [formDueTime, setFormDueTime] = useState(editing?.due_time ? editing.due_time.slice(0, 16) : '')
-  const [formStartTime, setFormStartTime] = useState(editing?.start_time ? editing.start_time.slice(0, 16) : '')
+  const [formDueTime, setFormDueTime] = useState(editing?.due_time ? isoToLocalInput(editing.due_time) : '')
+  const [formStartTime, setFormStartTime] = useState(editing?.start_time ? isoToLocalInput(editing.start_time) : '')
   const [formAmount, setFormAmount] = useState(editing?.amount != null ? String(editing.amount) : '')
   const [formAmountType, setFormAmountType] = useState<'' | 'income' | 'expense'>(editing?.amount_type ?? '')
   const [formContactIds, setFormContactIds] = useState<number[]>(editing?.contact_ids ?? [])

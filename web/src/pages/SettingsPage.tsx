@@ -162,8 +162,9 @@ export default function SettingsPage() {
   }
 
   // Auto-check once on mount.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // mount-trigger: the synchronous 'checking' flag is a one-time UI nicety before the async fetch
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     handleCheckUpdate()
   }, [handleCheckUpdate])
 

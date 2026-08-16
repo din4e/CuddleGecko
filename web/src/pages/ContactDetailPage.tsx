@@ -4,12 +4,14 @@ import type { ForceGraphMethods, NodeObject, LinkObject } from 'react-force-grap
 import type ForceGraph2DType from 'react-force-graph-2d'
 import { useTranslation } from 'react-i18next'
 import { useModeStore } from '../stores/mode'
+import { useIsDarkMode } from '../hooks/useIsDarkMode'
 import { contactsApi } from '../api/contacts'
 import { interactionsApi } from '../api/interactions'
 import { remindersApi } from '../api/reminders'
 import { relationsApi } from '../api/relations'
 import { tagsApi } from '../api/tags'
 import { uploadApi } from '../api/upload'
+import { ListSkeleton } from '../components/ListSkeleton'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
@@ -54,6 +56,7 @@ export default function ContactDetailPage() {
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [relations, setRelations] = useState<ContactRelation[]>([])
   const [allContacts, setAllContacts] = useState<Contact[]>([])
+  const dark = useIsDarkMode()
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -135,6 +138,13 @@ export default function ContactDetailPage() {
     return { nodes, links }
   }, [contact, relations, allContacts])
 
+  // id → name lookup so relation rows render the buddy's name, not a bare "#id".
+  const contactNameById = useMemo(() => {
+    const m = new Map<number, string>()
+    for (const c of allContacts) m.set(c.id, c.name)
+    return m
+  }, [allContacts])
+
   // Edit contact dialog
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', nickname: '', emails: [] as string[], phones: [] as string[], birthday: '', notes: '', relationship_labels: [] as string[], avatar_emoji: '', avatar_url: '' })
@@ -163,7 +173,7 @@ export default function ContactDetailPage() {
       const [cRes, iRes, rRes, relRes, allRes, tagsRes] = await Promise.all([
         contactsApi.get(contactId),
         interactionsApi.list(contactId, { page: 1, page_size: 50 }),
-        remindersApi.list(undefined, 1, 200),
+        remindersApi.list(undefined, 1, 200, undefined, contactId),
         relationsApi.list(contactId),
         contactsApi.list({ page: 1, page_size: 200 }),
         tagsApi.list(1, 200),
@@ -172,7 +182,7 @@ export default function ContactDetailPage() {
       setInteractions(iRes.data.items || [])
       const rData = rRes.data
       const rItems: Reminder[] = Array.isArray(rData) ? rData : (rData?.items ?? [])
-      setReminders(rItems.filter((r: Reminder) => r.contact_id === contactId))
+      setReminders(rItems)
       setRelations(Array.isArray(relRes.data) ? relRes.data : [])
       setAllContacts((allRes.data.items || []).filter((c: Contact) => c.id !== contactId))
       const tData = tagsRes.data
@@ -182,10 +192,39 @@ export default function ContactDetailPage() {
     }
   }, [contactId])
 
+  // Per-section refetchers: after a mutation only the affected section needs
+  // refreshing — not the whole 6-request loadData, which re-pulls the 200-row
+  // contacts/tags lists (and everything else) every single time.
+  const fetchContact = useCallback(async () => {
+    if (!contactId) return
+    const res = await contactsApi.get(contactId)
+    setContact(res.data)
+  }, [contactId])
+  const fetchAllContacts = useCallback(async () => {
+    const res = await contactsApi.list({ page: 1, page_size: 200 })
+    setAllContacts((res.data.items || []).filter((c: Contact) => c.id !== contactId))
+  }, [contactId])
+  const fetchInteractions = useCallback(async () => {
+    if (!contactId) return
+    const res = await interactionsApi.list(contactId, { page: 1, page_size: 50 })
+    setInteractions(res.data.items || [])
+  }, [contactId])
+  const fetchReminders = useCallback(async () => {
+    if (!contactId) return
+    const res = await remindersApi.list(undefined, 1, 200, undefined, contactId)
+    const data = res.data
+    setReminders(Array.isArray(data) ? data : (data?.items ?? []))
+  }, [contactId])
+  const fetchRelations = useCallback(async () => {
+    if (!contactId) return
+    const res = await relationsApi.list(contactId)
+    setRelations(Array.isArray(res.data) ? res.data : [])
+  }, [contactId])
+
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadData() }, [loadData])
 
-  if (loading) return <div>{t('dashboard.loading')}</div>
+  if (loading) return <ListSkeleton rows={6} />
   if (!contact) return <div>{t('contacts.notFound')}</div>
 
   // --- Contact edit ---
@@ -214,7 +253,10 @@ export default function ContactDetailPage() {
     })
     await contactsApi.replaceTags(contact.id, selectedTagIds)
     setEditOpen(false)
-    loadData()
+    // Contact details changed → refresh the contact and the buddy list (the
+    // name/emoji feeds the graph nodes and pickers); nothing else is affected.
+    fetchContact()
+    fetchAllContacts()
   }
 
   const handleDeleteContact = () => setDeleteOpen(true)
@@ -240,11 +282,11 @@ export default function ContactDetailPage() {
       await interactionsApi.create(contactId, payload)
     }
     setIntDialog({ open: false, editing: null })
-    loadData()
+    fetchInteractions()
   }
   const handleDeleteInt = async (intId: number) => {
     await interactionsApi.delete(intId)
-    loadData()
+    fetchInteractions()
   }
 
   // --- Reminder CRUD ---
@@ -264,11 +306,11 @@ export default function ContactDetailPage() {
       await remindersApi.create(contactId, payload)
     }
     setRemDialog({ open: false, editing: null })
-    loadData()
+    fetchReminders()
   }
   const handleDeleteRem = async (remId: number) => {
     await remindersApi.delete(remId)
-    loadData()
+    fetchReminders()
   }
 
   // --- Relation CRUD ---
@@ -282,11 +324,11 @@ export default function ContactDetailPage() {
       await relationsApi.create(contactId, { contact_id_b: cid, relation_type: relForm.relation_type })
     }
     setRelDialog(false)
-    loadData()
+    fetchRelations()
   }
   const handleDeleteRel = async (relId: number) => {
     await relationsApi.delete(relId)
-    loadData()
+    fetchRelations()
   }
 
   return (
@@ -437,11 +479,14 @@ export default function ContactDetailPage() {
             <p className="text-muted-foreground text-center py-8">{t('contacts.noRelations')}</p>
           ) : (
             <div className="space-y-3">
-              {relations.map((r) => (
+              {relations.map((r) => {
+                const otherId = r.contact_id_a === contact.id ? r.contact_id_b : r.contact_id_a
+                const otherName = contactNameById.get(otherId) || `#${otherId}`
+                return (
                 <Card key={r.id}>
                   <CardContent className="pt-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm">{t('contacts.relatedTo')} #{r.contact_id_a === contact.id ? r.contact_id_b : r.contact_id_a}</span>
+                      <span className="text-sm">{t('contacts.relatedTo')} {otherName}</span>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{r.relation_type || t('contacts.connected')}</Badge>
                         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDeleteRel(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -449,7 +494,8 @@ export default function ContactDetailPage() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           )}
         </TabsContent>
@@ -466,8 +512,8 @@ export default function ContactDetailPage() {
                   ref={fgRef}
                   graphData={miniGraphData}
                   nodeLabel="name"
-                  nodeColor={(node: any) => node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? getNodeLabelColor(node.relationship_labels[0]) : '#6b7280')}
-                  nodeVal={(node: any) => node.__isCenter ? 4 : 2}
+                  nodeColor={(node: MiniGraphNode) => node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? getNodeLabelColor(node.relationship_labels[0]) : '#6b7280')}
+                  nodeVal={(node: MiniGraphNode) => node.__isCenter ? 4 : 2}
                   linkColor={() => '#94a3b8'}
                   linkWidth={1.5}
                   linkDirectionalArrowLength={3}
@@ -479,7 +525,7 @@ export default function ContactDetailPage() {
                     if (x == null || y == null) return
                     const r = (node.__isCenter ? 10 : 7) / Math.sqrt(globalScale)
                     const color = node.__isCenter ? '#10b981' : (node.relationship_labels?.length ? getNodeLabelColor(node.relationship_labels[0]) : '#6b7280')
-                    const bgColor = document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff'
+                    const bgColor = dark ? '#1f2937' : '#ffffff'
 
                     ctx.beginPath()
                     ctx.arc(x, y, r, 0, 2 * Math.PI)
@@ -507,7 +553,7 @@ export default function ContactDetailPage() {
                     ctx.font = `${fontSize}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
                     ctx.textAlign = 'center'
                     ctx.textBaseline = 'top'
-                    ctx.fillStyle = document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#1f2937'
+                    ctx.fillStyle = dark ? '#e5e7eb' : '#1f2937'
                     ctx.fillText(node.name, x, y + r + 2 / globalScale)
                   }}
                   nodePointerAreaPaint={(node: MiniGraphNode, color: string, ctx: CanvasRenderingContext2D) => {
@@ -522,7 +568,7 @@ export default function ContactDetailPage() {
                   }}
                   width={graphDims.width}
                   height={graphDims.height}
-                  backgroundColor={document.documentElement.classList.contains('dark') ? '#111827' : 'transparent'}
+                  backgroundColor={dark ? '#111827' : 'transparent'}
                   cooldownTicks={100}
                   onEngineStop={() => { if (fgRef.current) fgRef.current.zoomToFit(40, 20) }}
                 />
@@ -545,7 +591,7 @@ export default function ContactDetailPage() {
                   value={editForm.avatar_emoji}
                   onChange={(emoji) => setEditForm({ ...editForm, avatar_emoji: emoji, avatar_url: emoji ? '' : editForm.avatar_url })}
                 />
-                <span className="text-muted-foreground text-sm">或</span>
+                <span className="text-muted-foreground text-sm">{t('common.or')}</span>
                 <div className="flex items-center gap-2">
                   <input
                     ref={fileInputRef}
@@ -685,7 +731,7 @@ export default function ContactDetailPage() {
                 <Input id="int-title" value={intForm.title} onChange={(e) => setIntForm({ ...intForm, title: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label id="int-type-label">Type</Label>
+                <Label id="int-type-label">{t('common.type')}</Label>
                 <div role="group" aria-labelledby="int-type-label" className="flex flex-wrap gap-1.5">
                   {interactionTypes.map((ty) => (
                     <Badge key={ty} variant={intForm.type === ty ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setIntForm({ ...intForm, type: ty })}>
@@ -696,11 +742,11 @@ export default function ContactDetailPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="int-content">Content</Label>
+              <Label htmlFor="int-content">{t('common.content')}</Label>
               <Textarea id="int-content" value={intForm.content} onChange={(e) => setIntForm({ ...intForm, content: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="int-date">Date</Label>
+              <Label htmlFor="int-date">{t('common.date')}</Label>
               <Input id="int-date" type="datetime-local" value={intForm.occurred_at} onChange={(e) => setIntForm({ ...intForm, occurred_at: e.target.value })} />
             </div>
           </div>
@@ -721,11 +767,11 @@ export default function ContactDetailPage() {
               <Input id="rem-title" value={remForm.title} onChange={(e) => setRemForm({ ...remForm, title: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="rem-description">Description</Label>
+              <Label htmlFor="rem-description">{t('common.description')}</Label>
               <Textarea id="rem-description" value={remForm.description} onChange={(e) => setRemForm({ ...remForm, description: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="rem-remind-at">Remind At</Label>
+              <Label htmlFor="rem-remind-at">{t('common.remindAt')}</Label>
               <Input id="rem-remind-at" type="datetime-local" value={remForm.remind_at} onChange={(e) => setRemForm({ ...remForm, remind_at: e.target.value })} />
             </div>
           </div>
