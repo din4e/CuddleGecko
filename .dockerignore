@@ -32,6 +32,13 @@ cmd/migrate
 
 # Plans / scratch
 .claude
+# OMC state (optimization backlog, wiki, session artifacts) — local-only, and
+# it ships the whole backlog into the build context otherwise.
+.omc
+
+# Docs + helper scripts aren't needed to build or run the server
+docs
+scripts
 
 # Docker compose files don't belong inside the image
 docker-compose.yml
