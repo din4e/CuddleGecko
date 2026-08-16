@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
+import { isoToLocalInput } from '../lib/utils'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -25,7 +26,7 @@ export function BodyRecordFormDialog({ open, editing, onClose }: BodyRecordFormD
     const pad = (n: number) => String(n).padStart(2, '0')
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
   }
-  const [recordedAt, setRecordedAt] = useState(editing?.recorded_at ? editing.recorded_at.slice(0, 16) : now())
+  const [recordedAt, setRecordedAt] = useState(editing?.recorded_at ? isoToLocalInput(editing.recorded_at) : now())
   const [weight, setWeight] = useState(editing?.weight != null ? String(editing.weight) : '')
   const [height, setHeight] = useState(editing?.height != null ? String(editing.height) : '')
   const [bodyFat, setBodyFat] = useState(editing?.body_fat != null ? String(editing.body_fat) : '')

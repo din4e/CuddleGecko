@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
@@ -58,7 +58,13 @@ export default function TodoTree({
   )
 }
 
-function TreeRow(props: RowProps) {
+// Memoized so an incidental TodosPage re-render (dialog open, search typing,
+// selection-mode toggle, …) doesn't re-render every visible row. Effective as
+// long as the shared props (handlers, formatDate, collapsed/selectedIds Sets,
+// the tree nodes) keep stable identity — TodosPage wraps those in useCallback /
+// useMemo / state. Data-changing props (collapsed, selectedIds, nodes) still
+// re-render rows, which is correct.
+const TreeRow = memo(function TreeRow(props: RowProps) {
   const { node, siblings, index, parentId, grandparentId, depth } = props
   const {
     collapsed, onToggleCollapse, onToggle, onRename, onEdit, onDelete, onMove, onAddChild, formatDate,
@@ -274,7 +280,7 @@ function TreeRow(props: RowProps) {
         ))}
     </div>
   )
-}
+})
 
 function RowBtn({
   children, onClick, disabled, title, className,

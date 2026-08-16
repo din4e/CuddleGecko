@@ -81,6 +81,12 @@ import type { CommandArgs } from './types'
 
 const PROMPT = '\r\n\x1b[32mgecko\x1b[0m> '
 
+// The visible prompt is "gecko> " (7 chars), so typed input starts at column 8.
+// All cursor-column math must agree on this: clearCurrentLine/Ctrl+A previously
+// used column 7 (the prompt's trailing space), which clobbered the ">" spacing
+// and disagreed with the backspace math (7 + pos ⇒ column 8 for pos = 1).
+const INPUT_START_COL = 8
+
 interface TerminalEmulatorProps {
   onNavigate?: (path: string) => void
 }
@@ -99,7 +105,7 @@ export default function TerminalEmulator({ onNavigate }: TerminalEmulatorProps) 
     async (
       command: string,
       args: CommandArgs,
-      adapters: NonNullable<ReturnType<typeof useModeStore.getState>['adapters']>,
+      adapters: ReturnType<typeof useModeStore.getState>['adapters'],
     ): Promise<string | { navigate: string }> => {
       switch (command) {
         case 'help':
@@ -433,11 +439,12 @@ export default function TerminalEmulator({ onNavigate }: TerminalEmulatorProps) 
           term.write('\x1b[C')
         }
       } else if (data === '\x01') {
-        // Ctrl+A - move to start
+        // Ctrl+A - move to start (column of the first input char, not the
+        // prompt's trailing space)
         const moveBack = cursorPosRef.current
         if (moveBack > 0) {
           cursorPosRef.current = 0
-          term.write(`\x1b[${7}G`)
+          term.write(`\x1b[${INPUT_START_COL}G`)
         }
       } else if (data === '\x05') {
         // Ctrl+E - move to end
@@ -481,8 +488,9 @@ export default function TerminalEmulator({ onNavigate }: TerminalEmulatorProps) 
 }
 
 function clearCurrentLine(term: Terminal) {
-  const promptLen = 7 // "gecko> " length
-  term.write(`\r\x1b[${promptLen}G\x1b[K`)
+  // Clear back to the FIRST input column (8) — not 7 — so a rewritten line
+  // (history recall, autocomplete) never clobbers the prompt's trailing space.
+  term.write(`\r\x1b[${INPUT_START_COL}G\x1b[K`)
 }
 
 function applyPipe(output: string, pipe: string): string {

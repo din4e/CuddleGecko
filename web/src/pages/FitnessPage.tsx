@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useDeferredValue } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, TrendingUp, TrendingDown, Minus, Activity, Flame, Timer, CheckCircle2, Pencil, Trash2 } from 'lucide-react'
 import ListPageHeader from '../components/ListPageHeader'
 import EmptyState from '../components/EmptyState'
+import { ListSkeleton } from '../components/ListSkeleton'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
@@ -35,6 +36,10 @@ export default function FitnessPage() {
 
   // --- Workouts tab state ---
   const [q, setQ] = useState('')
+  // Debounce the search: the input stays responsive on `q`, but the list query
+  // only refires once typing settles (one network request per pause, not per
+  // keystroke). Matches the ContactsPage pattern.
+  const deferredQ = useDeferredValue(q)
   const [typeFilter, setTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sort, setSort] = useState<'scheduled' | 'created'>('scheduled')
@@ -42,7 +47,7 @@ export default function FitnessPage() {
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null)
 
   const { data: workoutsPage, isLoading: workoutsLoading } = useWorkoutsList({
-    q,
+    q: deferredQ,
     type: (typeFilter || undefined) as WorkoutType | undefined,
     status: (statusFilter || undefined) as WorkoutStatus | undefined,
     sort,
@@ -112,7 +117,7 @@ export default function FitnessPage() {
           </div>
 
           {workoutsLoading ? (
-            <EmptyState message={t('todos.loading')} />
+            <ListSkeleton />
           ) : workouts.length === 0 ? (
             <EmptyState message={t('fitness.noWorkouts')} />
           ) : (
@@ -181,8 +186,11 @@ export default function FitnessPage() {
         </TabsContent>
       </Tabs>
 
-      <WorkoutFormDialog open={workoutDialogOpen} editing={editingWorkout} onClose={() => setWorkoutDialogOpen(false)} />
-      <BodyRecordFormDialog open={bodyDialogOpen} editing={editingMetric} onClose={() => setBodyDialogOpen(false)} />
+      {/* key remounts the dialog per record so the form state re-initializes
+          from `editing` — without it, "edit" opened the create form with stale
+          empty fields and Save produced a near-empty duplicate. */}
+      <WorkoutFormDialog key={editingWorkout?.id ?? 'new'} open={workoutDialogOpen} editing={editingWorkout} onClose={() => setWorkoutDialogOpen(false)} />
+      <BodyRecordFormDialog key={editingMetric?.id ?? 'new'} open={bodyDialogOpen} editing={editingMetric} onClose={() => setBodyDialogOpen(false)} />
       <ConfirmDialog
         open={deleteMetricId != null}
         onOpenChange={(o) => { if (!o) setDeleteMetricId(null) }}

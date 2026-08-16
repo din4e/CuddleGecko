@@ -8,6 +8,21 @@ export interface ParsedCommand {
   raw: string
 }
 
+// Index of the first '|' that sits OUTSIDE single/double quotes, or -1.
+// Mirrors the quote state machine tokenize uses, so `--name "A | B"` keeps its
+// pipe character inside the quoted value instead of truncating the command.
+function findPipeOutsideQuotes(input: string): number {
+  let inSingle = false
+  let inDouble = false
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i]
+    if (ch === "'" && !inDouble) inSingle = !inSingle
+    else if (ch === '"' && !inSingle) inDouble = !inDouble
+    else if (ch === '|' && !inSingle && !inDouble) return i
+  }
+  return -1
+}
+
 function tokenize(input: string): string[] {
   const tokens: string[] = []
   let current = ''
@@ -40,7 +55,9 @@ export function parseCommand(input: string): ParsedCommand | null {
   let pipeTarget: string | undefined
   let commandPart = trimmed
 
-  const pipeIdx = trimmed.indexOf('|')
+  // Pipe must be found OUTSIDE quotes: a plain indexOf('|') truncated
+  // `create buddy --name "A | B"` at the pipe and mangled the name.
+  const pipeIdx = findPipeOutsideQuotes(trimmed)
   if (pipeIdx !== -1) {
     commandPart = trimmed.slice(0, pipeIdx).trim()
     pipeTarget = trimmed.slice(pipeIdx + 1).trim().toLowerCase()

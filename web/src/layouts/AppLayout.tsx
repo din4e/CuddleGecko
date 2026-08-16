@@ -3,12 +3,9 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../stores/auth'
 import { useWorkspaceStore } from '../stores/workspace'
-import { useModeStore } from '../stores/mode'
 import { useQueryClient } from '@tanstack/react-query'
 import { startTodoWsSync } from '../lib/wsSync'
-import { PomodoroTimer } from '../components/PomodoroTimer'
-import { usePomodoroStore } from '../stores/pomodoro'
-import { usePomodoroTodo } from '../hooks/api/useTodos'
+import { PomodoroBar } from './PomodoroBar'
 import { Button } from '../components/ui/button'
 import BrandIcon from '../components/BrandIcon'
 import {
@@ -68,16 +65,6 @@ export default function AppLayout() {
   const logout = useAuthStore((s) => s.logout)
   const qc = useQueryClient()
   const currentWorkspaceId = useWorkspaceStore((s) => s.currentWorkspace?.id) ?? null
-
-  // Pomodoro timer (global — persists across page navigation via Zustand store).
-  const pomodoroMutation = usePomodoroTodo()
-  const pomo = usePomodoroStore()
-  useEffect(() => {
-    pomo.setOnComplete(() => {
-      const id = usePomodoroStore.getState().focusTodoId
-      if (id != null) pomodoroMutation.mutate(id)
-    })
-  }, [pomo, pomodoroMutation])
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
@@ -133,9 +120,9 @@ export default function AppLayout() {
   // Real-time multi-device todo sync. One WebSocket scoped to the current
   // workspace; on any inbound "todo.changed" frame we invalidate the todos query
   // scope so TanStack Query refetches the fresh state. Reconnects on workspace
-  // switch or remount; desktop/local mode is skipped (uses local IPC).
+  // switch or remount. (The old local-mode guard was unreachable in the
+  // web-only build and was removed with the mode machinery.)
   useEffect(() => {
-    if (useModeStore.getState().mode !== 'remote') return
     if (currentWorkspaceId == null) return
     if (!localStorage.getItem('access_token')) return
 
@@ -326,20 +313,7 @@ export default function AppLayout() {
         {/* Content */}
         <main className="flex-1 overflow-hidden min-h-0">
           <div className="h-full overflow-auto p-6">
-            {(pomo.phase !== 'idle' || pomo.focusTodoId != null) && (
-              <div className="mb-4 max-w-md">
-                <PomodoroTimer
-                  phase={pomo.phase}
-                  secondsLeft={pomo.secondsLeft}
-                  running={pomo.running}
-                  focusTodoTitle={pomo.focusTodoTitle}
-                  onStart={() => pomo.start(null)}
-                  onPause={pomo.pause}
-                  onReset={pomo.reset}
-                  onSkip={pomo.skip}
-                />
-              </div>
-            )}
+            <PomodoroBar />
             <Outlet />
           </div>
         </main>

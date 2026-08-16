@@ -63,6 +63,10 @@ export default function AIChatPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const mentionRef = useRef<HTMLDivElement>(null)
   const mentionDataLoadedRef = useRef(false)
+  // AbortController for the in-flight chat stream, so navigating away or
+  // switching conversations stops consuming tokens (and avoids setState on an
+  // unmounted/wrong-conversation view).
+  const abortRef = useRef<AbortController | null>(null)
 
   const createLocalMessage = useCallback((conversationId: number, role: AIMessage['role'], content: string): AIMessage => ({
     id: nextMessageId(),
@@ -99,8 +103,10 @@ export default function AIChatPage() {
     }
   }, [adapters])
 
+  // false positive: loadConversations awaits before any setState (fetch-on-mount)
   useEffect(() => {
-    loadConversations()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadConversations().catch(() => {})
   }, [loadConversations])
 
   useEffect(() => {
@@ -114,6 +120,7 @@ export default function AIChatPage() {
   }, [])
 
   const loadMessages = useCallback(async (convId: number) => {
+    abortRef.current?.abort() // stop any in-flight stream before switching
     if (!adapters?.ai) return
     try {
       const msgs = await adapters.ai.getMessages(convId)
@@ -125,6 +132,7 @@ export default function AIChatPage() {
   }, [adapters])
 
   const handleNewChat = async () => {
+    abortRef.current?.abort()
     if (!adapters?.ai) return
     try {
       const conv = await adapters.ai.createConversation({})
@@ -284,41 +292,72 @@ export default function AIChatPage() {
     setStreaming(true)
     setStreamContent('')
 
+    const controller = new AbortController()
+    abortRef.current = controller
     try {
       const token = localStorage.getItem('access_token')
         const resp = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ conversation_id: convId, message: text }),
+          signal: controller.signal,
         })
         if (!resp.ok || !resp.body) throw new Error('Failed')
         const reader = resp.body.getReader()
         const decoder = new TextDecoder()
         let fullContent = ''
+        let buf = '' // accumulates partial SSE events across reads
 
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          const chunk = decoder.decode(value, { stream: true })
-          for (const line of chunk.split('\n')) {
-            if (!line.startsWith('data: ')) continue
-            const data = line.slice(6)
-            if (data === '[DONE]') continue
-            if (data.startsWith('{') && data.includes('"error"')) continue
-            fullContent += data
-            setStreamContent(fullContent)
+          buf += decoder.decode(value, { stream: true })
+          // SSE events are terminated by a blank line (\n\n); process only whole
+          // events so a token split across reads — or one whose JSON content
+          // contains a newline — isn't mangled or dropped.
+          let sep: number
+          while ((sep = buf.indexOf('\n\n')) !== -1) {
+            const raw = buf.slice(0, sep)
+            buf = buf.slice(sep + 2)
+            for (const line of raw.split('\n')) {
+              if (!line.startsWith('data: ')) continue
+              const data = line.slice(6)
+              if (data === '[DONE]') continue
+              // Tokens are JSON ({"c":"..."} or {"error":"..."}), so newlines in
+              // the content no longer break framing.
+              try {
+                const obj = JSON.parse(data) as { c?: string; error?: string }
+                if (obj.error) continue
+                if (obj.c != null) {
+                  fullContent += obj.c
+                  setStreamContent(fullContent)
+                }
+              } catch {
+                /* ignore a malformed token */
+              }
+            }
           }
         }
 
         setMessages((prev) => [...prev, createLocalMessage(convId, 'assistant', fullContent)])
-    } catch {
-      setMessages((prev) => [...prev, createLocalMessage(convId, 'assistant', t('ai.sendFailed'))])
+    } catch (err) {
+      // An abort (conversation switch / unmount) isn't a failure — don't show
+      // the error bubble; let the finally clean up.
+      if (!(err instanceof Error && err.name === 'AbortError')) {
+        setMessages((prev) => [...prev, createLocalMessage(convId, 'assistant', t('ai.sendFailed'))])
+      }
     } finally {
       setStreaming(false)
       setStreamContent('')
       loadConversations()
     }
   }
+
+  // Stop the in-flight stream if the page unmounts (avoids token cost +
+  // setState-after-unmount).
+  useEffect(() => {
+    return () => abortRef.current?.abort()
+  }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -624,6 +663,7 @@ export default function AIChatPage() {
                         key={event.id}
                         type="button"
                         className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-muted transition-colors"
+                        // eslint-disable-next-line react-hooks/refs -- false positive: ref access is inside this onClick handler, not during render
                         onClick={() => handleSelectMention({ type: 'event', id: event.id, name: event.title, color: event.color })}
                       >
                         {event.color && <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: event.color }} />}

@@ -1,6 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import i18n from './i18n'
 import './index.css'
 import './i18n'
 import App from './App.tsx'
@@ -15,6 +17,16 @@ if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dar
 setupBrandFaviconSync()
 
 const queryClient = new QueryClient({
+  // Global safety net: any mutation whose caller doesn't handle the error
+  // itself surfaces a toast instead of failing as an unhandled rejection
+  // (silent-save bug class found in the form dialogs). Hooks whose call sites
+  // show specific messages opt out via meta: { localErrorHandling: true }.
+  mutationCache: new MutationCache({
+    onError: (_error, _variables, _context, mutation) => {
+      if (mutation.options.meta?.localErrorHandling) return
+      toast.error(i18n.t('common.error'))
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

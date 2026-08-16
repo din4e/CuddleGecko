@@ -20,6 +20,7 @@ import { Plus, Search, X, Upload } from 'lucide-react'
 import { useContactsList, useCreateContact } from '../hooks/api/useContacts'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
+import { ListSkeleton } from '../components/ListSkeleton'
 import ListPageHeader from '../components/ListPageHeader'
 
 function LabelPicker({ selected, onChange, t }: {
@@ -143,7 +144,7 @@ function ContactFormDialog({ open, onOpenChange, t }: ContactFormDialogProps) {
                 value={newContact.avatar_emoji}
                 onChange={(emoji) => setNewContact((prev) => ({ ...prev, avatar_emoji: emoji, avatar_url: emoji ? '' : prev.avatar_url }))}
               />
-              <span className="text-muted-foreground text-sm">或</span>
+              <span className="text-muted-foreground text-sm">{t('common.or')}</span>
               <div className="flex items-center gap-2">
                 <input
                   ref={fileInputRef}
@@ -325,14 +326,13 @@ export default function ContactsPage() {
       </div>
 
       {isPending ? (
-        <div>{t('dashboard.loading')}</div>
+        <ListSkeleton rows={9} />
       ) : contacts.length === 0 ? (
         <EmptyState message={t('contacts.noContacts')} />
       ) : view === 'grid' ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" aria-busy={isFetching}>
           {contacts.map((contact) => (
             <Link key={contact.id} to={`/buddies/${contact.id}`}>
-              <ContactGridCard contact={contact} labelRenderer={labelRenderer} />
               <ContactGridCard contact={contact} labelRenderer={labelRenderer} />
             </Link>
           ))}
@@ -346,7 +346,7 @@ export default function ContactsPage() {
                 <TableHead>{t('auth.email')}</TableHead>
                 <TableHead>{t('contacts.phone')}</TableHead>
                 <TableHead>{t('contacts.relationship')}</TableHead>
-                <TableHead className="text-right">Tags</TableHead>
+                <TableHead className="text-right">{t('common.tags')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

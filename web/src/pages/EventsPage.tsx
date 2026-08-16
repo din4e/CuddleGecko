@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useDeferredValue, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { contactsApi } from '../api/contacts'
+import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
+import { useContactsList } from '../hooks/api/useContacts'
+import { rootKey } from '../hooks/api/keys'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table'
@@ -19,11 +22,12 @@ import BuddyPicker from '../components/BuddyPicker'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
+import { ListSkeleton } from '../components/ListSkeleton'
 import ListPageHeader from '../components/ListPageHeader'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import { useModeStore } from '../stores/mode'
-import type { Event, Contact } from '../types'
+import type { Event } from '../types'
 import {
   useEventsList,
   useCreateEvent,
@@ -115,8 +119,19 @@ const emptyForm: EventFormData = {
 
 export default function EventsPage() {
   const { t } = useTranslation()
-  const [buddies, setBuddies] = useState<Contact[]>([])
+  // Buddies come from the shared React-Query cache (30s staleTime) instead of a
+  // raw per-mount fetch — navigating between pages no longer re-pulls the list.
+  const qc = useQueryClient()
+  const { data: buddiesData } = useContactsList({ page: 1, page_size: 200 })
+  const buddies = useMemo(() => buddiesData?.items ?? [], [buddiesData])
+  // O(1) id→name lookup so rendering N event rows doesn't run a buddies.find()
+  // per contact id per row (was O(rows × buddies)).
+  const buddyNameById = useMemo(() => new Map(buddies.map((b) => [b.id, b.name])), [buddies])
   const [filter, setFilter] = useState<TimeFilter>('all')
+  const [q, setQ] = useState('')
+  // Debounce the search: input stays responsive on `q`, list query refires only
+  // once typing settles (matches the FitnessPage/FinancePage pattern).
+  const deferredQ = useDeferredValue(q)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Event | null>(null)
   const [form, setForm] = useState<EventFormData>(emptyForm)
@@ -135,6 +150,7 @@ export default function EventsPage() {
     page_size: pageSize,
     start_after: range.start_after,
     end_before: range.end_before,
+    q: deferredQ || undefined,
   })
   const createEvent = useCreateEvent()
   const updateEvent = useUpdateEvent()
@@ -167,7 +183,6 @@ export default function EventsPage() {
   ]
 
   useEffect(() => {
-    contactsApi.list({ page: 1, page_size: 200 }).then((res) => setBuddies(res.data.items || []))
     adapters?.ai?.listProviders().then((providers) => {
       setAiAvailable(providers?.some((p) => p.is_active) ?? false)
     }).catch(() => setAiAvailable(false))
@@ -199,6 +214,10 @@ export default function EventsPage() {
   }
 
   const handleSubmit = async () => {
+    if (form.start_time && form.end_time && new Date(form.end_time) <= new Date(form.start_time)) {
+      toast.error(t('events.endBeforeStart'))
+      return
+    }
     const payload: Record<string, unknown> = {
       title: form.title,
       description: form.description,
@@ -239,7 +258,7 @@ export default function EventsPage() {
         }
       />
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {filterKeys.map(({ key, label }) => (
           <Button
             key={key}
@@ -250,10 +269,17 @@ export default function EventsPage() {
             {label}
           </Button>
         ))}
+        <Input
+          type="search"
+          placeholder={t('events.searchPlaceholder')}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="h-9 max-w-xs ml-auto"
+        />
       </div>
 
       {isPending ? (
-        <div>{t('events.loading')}</div>
+        <ListSkeleton />
       ) : events.length === 0 ? (
         <EmptyState message={t('events.noEvents')} />
       ) : view === 'list' ? (
@@ -263,11 +289,11 @@ export default function EventsPage() {
               <TableRow>
                 <TableHead className="w-4"></TableHead>
                 <TableHead>{t('events.title_field')}</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Time</TableHead>
+                <TableHead>{t('common.date')}</TableHead>
+                <TableHead>{t('common.time')}</TableHead>
                 <TableHead>{t('events.location')}</TableHead>
-                <TableHead>Buddies</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t('common.buddies')}</TableHead>
+                <TableHead className="text-right">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -293,7 +319,7 @@ export default function EventsPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {e.contact_ids?.length > 0 ? (
-                      <span className="flex items-center gap-1"><Heart className="h-3 w-3" aria-hidden="true" />{e.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}</span>
+                      <span className="flex items-center gap-1"><Heart className="h-3 w-3" aria-hidden="true" />{e.contact_ids.map((cid) => buddyNameById.get(cid)).filter(Boolean).join(', ')}</span>
                     ) : '—'}
                   </TableCell>
                   <TableCell className="text-right">
@@ -343,7 +369,7 @@ export default function EventsPage() {
                 {e.contact_ids?.length > 0 && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Heart className="h-3 w-3" aria-hidden="true" />
-                    {e.contact_ids.map((cid) => buddies.find((b) => b.id === cid)?.name).filter(Boolean).join(', ')}
+                    {e.contact_ids.map((cid) => buddyNameById.get(cid)).filter(Boolean).join(', ')}
                   </div>
                 )}
                 <div className="flex gap-1 pt-1">
@@ -422,12 +448,12 @@ export default function EventsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Buddies</Label>
+              <Label>{t('common.buddies')}</Label>
               <BuddyPicker
                 buddies={buddies}
                 selectedIds={form.contact_ids}
                 onChange={(ids) => setForm({ ...form, contact_ids: ids })}
-                onBuddiesUpdate={setBuddies}
+                onBuddiesUpdate={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
               />
             </div>
           </div>

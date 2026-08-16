@@ -140,6 +140,12 @@ export interface TransactionSummary {
   balance: number
 }
 
+export interface TransactionMonthly {
+  month: string // "YYYY-MM"
+  income: number
+  expense: number
+}
+
 export interface AIProvider {
   id: number
   user_id: number

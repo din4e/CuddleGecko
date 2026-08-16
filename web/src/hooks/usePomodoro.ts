@@ -17,56 +17,93 @@ export interface UsePomodoro {
   skip: () => void
 }
 
+interface TimerState {
+  phase: PomodoroPhase
+  secondsLeft: number
+  running: boolean
+  completed: number
+}
+
+const IDLE: TimerState = {
+  phase: 'idle',
+  secondsLeft: POMODORO_WORK_SECONDS,
+  running: false,
+  completed: 0,
+}
+
+/**
+ * advance performs the phase transition: work → break (counting the completed
+ * session), break → work. Pure — given the same state it returns the same
+ * result, so React StrictMode's double-invocation of updaters is harmless.
+ */
+function advance(st: TimerState): TimerState {
+  if (st.phase === 'work') {
+    return { ...st, phase: 'break', secondsLeft: POMODORO_BREAK_SECONDS, completed: st.completed + 1 }
+  }
+  return { ...st, phase: 'work', secondsLeft: POMODORO_WORK_SECONDS }
+}
+
+/**
+ * tick is the pure per-second update: decrement while time remains, transition
+ * when the countdown reaches zero. Effectively idempotent per input.
+ */
+function tick(st: TimerState): TimerState {
+  if (!st.running) return st
+  if (st.secondsLeft > 1) return { ...st, secondsLeft: st.secondsLeft - 1 }
+  return advance(st)
+}
+
 /**
  * usePomodoro runs a classic Pomodoro timer (25-min focus → 5-min break,
  * auto-looping). onWorkComplete fires when a focus session finishes (the caller
- * persists the count). Implemented as a pure-decrement tick + a separate
- * transition effect so React StrictMode (which double-invokes updaters) can't
- * double-count a completion.
+ * persists the count). All transitions live in pure updaters over a single
+ * state object — no effect-driven setState, and StrictMode-safe by construction.
  */
 export function usePomodoro(onWorkComplete?: () => void): UsePomodoro {
-  const [phase, setPhase] = useState<PomodoroPhase>('idle')
-  const [secondsLeft, setSecondsLeft] = useState(POMODORO_WORK_SECONDS)
-  const [running, setRunning] = useState(false)
-  const [completed, setCompleted] = useState(0)
+  const [timer, setTimer] = useState<TimerState>(IDLE)
 
+  // Latest-ref for the callback, kept current inside an effect (the canonical
+  // "latest ref" pattern — writing refs during render is disallowed).
   const cbRef = useRef(onWorkComplete)
-  cbRef.current = onWorkComplete
-
-  // Pure decrement (clamped at 0) — safe for StrictMode double-invocation.
   useEffect(() => {
-    if (!running) return
-    const t = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000)
-    return () => clearInterval(t)
-  }, [running])
+    cbRef.current = onWorkComplete
+  }, [onWorkComplete])
 
-  // Transition when the countdown hits 0.
+  // Fire onWorkComplete when `completed` increments (side effects belong in
+  // effects, not in state updaters — keeps tick pure).
+  const prevCompleted = useRef(0)
   useEffect(() => {
-    if (secondsLeft !== 0) return
-    if (phase === 'work') {
-      setCompleted((c) => c + 1)
+    if (timer.completed > prevCompleted.current) {
+      prevCompleted.current = timer.completed
       cbRef.current?.()
-      setPhase('break')
-      setSecondsLeft(POMODORO_BREAK_SECONDS)
-    } else if (phase === 'break') {
-      setPhase('work')
-      setSecondsLeft(POMODORO_WORK_SECONDS)
     }
-  }, [secondsLeft, phase])
+  }, [timer.completed])
+
+  useEffect(() => {
+    if (!timer.running) return
+    const t = setInterval(() => setTimer(tick), 1000)
+    return () => clearInterval(t)
+  }, [timer.running])
 
   const start = useCallback(() => {
-    setPhase((p) => (p === 'idle' ? 'work' : p))
-    setRunning(true)
+    setTimer((st) => (st.phase === 'idle' ? { ...st, phase: 'work', running: true } : { ...st, running: true }))
   }, [])
-  const pause = useCallback(() => setRunning(false), [])
-  const reset = useCallback(() => {
-    setRunning(false)
-    setPhase('idle')
-    setSecondsLeft(POMODORO_WORK_SECONDS)
-  }, [])
-  const skip = useCallback(() => setSecondsLeft(0), [])
+  const pause = useCallback(() => setTimer((st) => ({ ...st, running: false })), [])
+  const reset = useCallback(() => setTimer(IDLE), [])
+  // Skip transitions immediately (paused or running), matching the previous
+  // effect-driven behavior where reaching 0 advanced the phase at once.
+  const skip = useCallback(() => setTimer(advance), [])
 
-  return { phase, secondsLeft, running, completed, start, pause, reset, skip }
+  return {
+    phase: timer.phase,
+    secondsLeft: timer.secondsLeft,
+    running: timer.running,
+    completed: timer.completed,
+    start,
+    pause,
+    reset,
+    skip,
+  }
 }
 
 export function formatPomodoroTime(seconds: number): string {

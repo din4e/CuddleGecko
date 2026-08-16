@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { contactsApi } from '../../api/contacts'
+import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
 import type { Contact, PaginatedData } from '../../types'
 
@@ -28,6 +29,7 @@ export function useCreateContact() {
   return useMutation({
     mutationFn: (input: Partial<Contact>) => contactsApi.create(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onError: mutationErrorToast,
   })
 }
 
@@ -36,6 +38,7 @@ export function useUpdateContact() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Contact> }) => contactsApi.update(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onError: mutationErrorToast,
   })
 }
 
@@ -44,5 +47,6 @@ export function useDeleteContact() {
   return useMutation({
     mutationFn: (id: number) => contactsApi.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onError: mutationErrorToast,
   })
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Circle, ChevronUp, ChevronDown, ArrowUpRight, Trash2, Plus } from 'lucide-react'
+import { isoToLocalInput } from '../lib/utils'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import {
@@ -127,7 +128,7 @@ export function TodoChecklist({ todoId }: { todoId: number }) {
             )}
             <Input
               type="datetime-local"
-              value={item.due_time ? item.due_time.slice(0, 16) : ''}
+              value={item.due_time ? isoToLocalInput(item.due_time) : ''}
               onChange={(e) => handleItemDue(item.id, e.target.value)}
               className="h-7 w-44"
               aria-label={t('todos.dueTime')}

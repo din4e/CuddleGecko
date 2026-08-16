@@ -5,6 +5,7 @@ import type { ForceGraphMethods, LinkObject, NodeObject } from 'react-force-grap
 import type ForceGraph2DType from 'react-force-graph-2d'
 import { graphApi } from '../api/graph'
 import type { GraphData } from '../types'
+import { useIsDarkMode } from '../hooks/useIsDarkMode'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -34,10 +35,6 @@ function loadAvatarImages(nodes: { avatar_url?: string }[]) {
 function getNodeColor(labels: string[]): string {
   if (labels && labels.length > 0) return getNodeLabelColor(labels[0])
   return '#6b7280'
-}
-
-function isDarkMode(): boolean {
-  return document.documentElement.classList.contains('dark')
 }
 
 function pseudoRandom(seed: number): number {
@@ -207,7 +204,9 @@ export default function GraphPage() {
   }, [measureContainer])
 
   // Re-measure when toggling fullscreen, then recenter.
+  // canonical exception: DOM measurement reads layout then writes state, synchronously, in the effect
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     measureContainer()
     scheduleRecenter()
   }, [isFullscreen, measureContainer, scheduleRecenter])
@@ -381,7 +380,7 @@ export default function GraphPage() {
     fgRef.current?.centerAt(cx, cy, 400)
   }, [fgData.nodes])
 
-  const dark = isDarkMode()
+  const dark = useIsDarkMode()
   const isLarge = fgData.isLarge
 
   const nodeCanvasObject = useCallback((node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {

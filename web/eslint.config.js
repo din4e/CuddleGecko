@@ -19,5 +19,11 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // All prior violations are either fixed or documented inline suppressions
+      // (false positives / canonical DOM-measurement exceptions) — the rule is
+      // back to blocking so NEW effect-driven setState can't land silently.
+      'react-hooks/set-state-in-effect': 'error',
+    },
   },
 ])
