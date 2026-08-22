@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+<title>滴答清单导入 · 小蜥抱抱</title>
+<style>
+  :root {
+    --bg: #f6f6f7; --card: #ffffff; --text: #18181b; --muted: #71717a;
+    --border: #e4e4e7; --primary: #6d28d9; --primary-h: #5b21b6;
+    --ok: #15803d; --err: #b91c1c; --code-bg: #f4f4f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101012; --card: #1a1a1e; --text: #f4f4f5; --muted: #a1a1aa;
+      --border: #2a2a30; --primary: #a78bfa; --primary-h: #c4b5fd;
+      --ok: #4ade80; --err: #f87171; --code-bg: #26262c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); min-height: 100vh;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    display: flex; justify-content: center; padding: 32px 16px;
+  }
+  .wrap { width: 100%; max-width: 720px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  .step-no {
+    background: var(--primary); color: #fff; width: 20px; height: 20px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex: none;
+  }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input[type=text], input[type=password] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text); font-size: 14px;
+  }
+  input:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: transparent; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 140px; }
+  button {
+    background: var(--primary); color: #fff; border: 0; border-radius: 8px;
+    padding: 9px 18px; font-size: 14px; cursor: pointer; margin-top: 14px;
+  }
+  button:hover:not(:disabled) { background: var(--primary-h); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .captcha-row { display: flex; gap: 10px; align-items: center; }
+  .captcha-row input { flex: 1; }
+  .captcha-row img { height: 40px; border-radius: 6px; cursor: pointer; }
+  .drop {
+    border: 2px dashed var(--border); border-radius: 10px; padding: 28px;
+    text-align: center; color: var(--muted); font-size: 14px; cursor: pointer;
+    transition: border-color .15s;
+  }
+  .drop:hover, .drop.over { border-color: var(--primary); color: var(--primary); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-top: 12px; }
+  .stat { background: var(--code-bg); border-radius: 8px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 20px; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  .opts { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; font-size: 14px; }
+  .opts label { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--text); cursor: pointer; }
+  .opts input[type=checkbox] { accent-color: var(--primary); }
+  .log {
+    background: var(--code-bg); border-radius: 8px; padding: 12px; font-size: 12px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    max-height: 260px; overflow-y: auto; white-space: pre-wrap; line-height: 1.7;
+  }
+  .log .ok { color: var(--ok); } .log .err { color: var(--err); } .log .dim { color: var(--muted); }
+  .msg { font-size: 13px; margin-top: 10px; }
+  .msg.ok { color: var(--ok); } .msg.err { color: var(--err); }
+  details { margin-top: 14px; font-size: 13px; }
+  summary { cursor: pointer; color: var(--muted); }
+  .snippet {
+    background: var(--code-bg); border-radius: 8px; padding: 10px; margin-top: 8px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 11px; max-height: 160px;
+    overflow: auto; white-space: pre; user-select: all;
+  }
+  .hidden { display: none; }
+  a { color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>滴答清单 → 小蜥抱抱 数据导入</h1>
+  <div class="sub">把 dida365 导出的任务全量同步到本服务器的待办模块。可重复执行:每次先清理上次导入的整棵树(进回收站),再按导出文件重建</div>
+
+  <!-- ① 登录 -->
+  <div class="card" id="card-login">
+    <h2><span class="step-no">1</span>登录小蜥抱抱账号</h2>
+    <div class="row">
+      <div><label>用户名</label><input type="text" id="f-user" autocomplete="username" /></div>
+      <div><label>密码</label><input type="password" id="f-pass" autocomplete="current-password" /></div>
+    </div>
+    <div class="captcha-row hidden" id="captcha-row" style="margin-top:6px">
+      <div style="flex:1"><label>验证码(点击图片刷新)</label><input type="text" id="f-captcha" autocomplete="off" /></div>
+      <img id="captcha-img" alt="验证码" title="点击刷新" style="margin-bottom:2px" />
+    </div>
+    <button id="btn-login">登录</button>
+    <span class="msg" id="login-msg"></span>
+  </div>
+
+  <!-- ② 上传 -->
+  <div class="card hidden" id="card-upload">
+    <h2><span class="step-no">2</span>上传 dida365 导出文件</h2>
+    <div class="drop" id="drop">点击选择 <b>dida365-export-*.json</b>,或把文件拖到这里</div>
+    <input type="file" id="file" accept=".json,application/json" class="hidden" />
+    <details>
+      <summary>还没有导出文件?查看抓取脚本用法</summary>
+      <div>在电脑浏览器打开 <b>https://dida365.com/webapp/</b> 并登录 → F12 → Console → 粘贴运行下面脚本 → 自动下载导出文件:</div>
+      <div class="snippet" id="grab-snippet">加载中……</div>
+      <button class="secondary" id="btn-copy-snippet">复制脚本</button>
+    </details>
+  </div>
+
+  <!-- ③ 预览 + 同步 -->
+  <div class="card hidden" id="card-sync">
+    <h2><span class="step-no">3</span>预览并同步</h2>
+    <div class="stats" id="stats"></div>
+    <div class="opts">
+      <label><input type="checkbox" id="opt-done" checked />包含已完成任务</label>
+      <label><input type="checkbox" id="opt-items" checked />导入任务内检查清单(子任务)</label>
+    </div>
+    <button id="btn-sync">开始同步</button>
+    <div class="log hidden" id="log" style="margin-top:14px"></div>
+    <div class="msg" id="sync-msg"></div>
+  </div>
+
+  <div class="sub" style="margin-top:8px">同步完成后到 <a href="/" target="_blank">待办页</a> 查看;根节点「📥 滴答清单」下按清单分组</div>
+</div>
+
+<script src="sync-core.js"></script>
+<script>
+'use strict'
+const { makeApi, runSync } = window.DidaSync
+
+const $ = (id) => document.getElementById(id)
+const state = { token: null, exportData: null }
+const api = makeApi('', () => state.token)
+
+/* ---------- ① 登录(验证码按需出现) ---------- */
+async function loadCaptcha() {
+  const data = await api('/api/captcha')
+  if (data?.enabled) {
+    $('captcha-row').classList.remove('hidden')
+    $('captcha-img').src = data.captcha_image
+    $('captcha-img').dataset.id = data.captcha_id
+  } else {
+    $('captcha-row').classList.add('hidden')
+  }
+}
+
+async function login() {
+  const msg = $('login-msg')
+  msg.textContent = '登录中……'; msg.className = 'msg'
+  try {
+    const data = await api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: $('f-user').value.trim(),
+        password: $('f-pass').value,
+        captcha_id: $('captcha-img').dataset.id || '',
+        captcha_answer: $('f-captcha').value.trim(),
+      }),
+    })
+    state.token = data.access_token
+    $('card-login').classList.add('hidden')
+    $('card-upload').classList.remove('hidden')
+    loadSnippet()
+  } catch (e) {
+    msg.textContent = '登录失败:' + e.message
+    msg.className = 'msg err'
+    if (/captcha/i.test(e.message_text || '')) { $('f-captcha').value = ''; loadCaptcha() }
+  }
+}
+
+/* ---------- ② 文件解析 ---------- */
+function acceptExport(text, name) {
+  let data
+  try { data = JSON.parse(text) } catch { throw new Error('不是有效的 JSON 文件') }
+  const tasks = data?.syncTaskBean?.update ?? data?.tasks
+  if (!Array.isArray(tasks)) throw new Error('文件里找不到任务数据——请用 /dida365-grab.js 脚本导出')
+  state.exportData = {
+    projects: data?.projectProfiles ?? [],
+    tasks,
+  }
+  renderStats()
+  $('card-sync').classList.remove('hidden')
+  log(`已加载 ${name}`, 'ok')
+}
+
+function renderStats() {
+  const { projects, tasks } = state.exportData
+  const done = tasks.filter((t) => t.status === 2).length
+  const withItems = tasks.filter((t) => Array.isArray(t.items) && t.items.length > 0).length
+  const items = tasks.reduce((n, t) => n + (t.items?.length || 0), 0)
+  $('stats').innerHTML = [
+    [projects.length, '个清单'], [tasks.length, '条任务'], [done, '条已完成'],
+    [withItems, '条带清单'], [items, '条子项'],
+  ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('')
+}
+
+/* ---------- ③ 同步 ---------- */
+function log(text, cls = '') {
+  const el = $('log')
+  el.classList.remove('hidden')
+  const line = document.createElement('div')
+  if (cls) line.className = cls
+  line.textContent = text
+  el.appendChild(line)
+  el.scrollTop = el.scrollHeight
+}
+
+async function sync() {
+  const btn = $('btn-sync')
+  btn.disabled = true
+  const msg = $('sync-msg')
+  msg.textContent = ''
+  try {
+    const { todoCount, itemCount, errorCount } = await runSync(state.exportData, {
+      baseUrl: '',
+      token: state.token,
+      includeDone: $('opt-done').checked,
+      includeItems: $('opt-items').checked,
+      log,
+    })
+    msg.className = 'msg ok'
+    msg.textContent = `完成:导入 ${todoCount} 条待办、${itemCount} 条子项${errorCount ? `,${errorCount} 条失败(见日志)` : ''}。去待办页查看 →`
+  } catch (e) {
+    log('同步中断:' + e.message, 'err')
+    msg.className = 'msg err'
+    msg.textContent = '同步中断:' + e.message + '(可直接重试,会自动清理重建)'
+  } finally {
+    btn.disabled = false
+  }
+}
+
+/* ---------- 事件绑定 ---------- */
+$('btn-login').addEventListener('click', login)
+$('f-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') login() })
+$('captcha-img').addEventListener('click', loadCaptcha)
+
+const drop = $('drop'), fileInput = $('file')
+drop.addEventListener('click', () => fileInput.click())
+drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over') })
+drop.addEventListener('dragleave', () => drop.classList.remove('over'))
+drop.addEventListener('drop', (e) => {
+  e.preventDefault(); drop.classList.remove('over')
+  if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0])
+})
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) readFile(fileInput.files[0]) })
+
+function readFile(f) {
+  const r = new FileReader()
+  r.onload = () => {
+    try { acceptExport(r.result, f.name) } catch (e) { alert('文件解析失败:' + e.message) }
+  }
+  r.readAsText(f)
+}
+
+async function loadSnippet() {
+  try {
+    const res = await fetch('/dida365-grab.js')
+    $('grab-snippet').textContent = await res.text()
+  } catch { $('grab-snippet').textContent = '// 请直接访问 /dida365-grab.js 获取脚本' }
+}
+$('btn-copy-snippet').addEventListener('click', async () => {
+  await navigator.clipboard.writeText($('grab-snippet').textContent)
+  $('btn-copy-snippet').textContent = '已复制 ✓'
+  setTimeout(() => { $('btn-copy-snippet').textContent = '复制脚本' }, 1500)
+})
+
+$('btn-sync').addEventListener('click', sync)
+
+// 登录页初始化:探测验证码是否启用
+loadCaptcha().catch(() => {})
+</script>
+</body>
+</html>
