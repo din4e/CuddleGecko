@@ -22,6 +22,7 @@ import type { Todo, TodoSort, TodoListParams } from '../types'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
 import TodoCard from '../components/TodoCard'
+import TodoSubtaskList from '../components/TodoSubtaskList'
 import TodoTree from '../components/TodoTreeRow'
 import { buildTodoTree } from '../lib/buildTodoTree'
 import { usePomodoroStore } from '../stores/pomodoro'
@@ -436,8 +437,27 @@ export default function TodosPage() {
   }
 
   // Group todos by date for timeline/grouped views
-  const pendingTodos = todos.filter((t) => t.status === 'pending')
-  const doneTodos = todos.filter((t) => t.status === 'done')
+  // Flat-view nesting: children render inside their parent's card, so the
+  // flat lists keep only top-level todos (parent absent from the current list
+  // → the child surfaces at top level, same rule as buildTodoTree).
+  const childrenByParent = useMemo(() => {
+    const m = new Map<number, Todo[]>()
+    for (const t of todos) {
+      if (t.parent_id == null) continue
+      const arr = m.get(t.parent_id) ?? []
+      arr.push(t)
+      m.set(t.parent_id, arr)
+    }
+    return m
+  }, [todos])
+  const presentIds = useMemo(() => new Set(todos.map((t) => t.id)), [todos])
+  const isTopLevel = useCallback(
+    (t: Todo) => t.parent_id == null || !presentIds.has(t.parent_id),
+    [presentIds],
+  )
+
+  const pendingTodos = todos.filter((t) => t.status === 'pending' && isTopLevel(t))
+  const doneTodos = todos.filter((t) => t.status === 'done' && isTopLevel(t))
 
   // Manual reordering (only meaningful when sort === 'manual'). Positions are
   // expressed as "move to right after afterId" (or to the top when null),
@@ -502,16 +522,18 @@ export default function TodosPage() {
     }
     return groups
   }, [pendingTodos, t])
+  // pendingTodos is already top-level-only (see its derivation).
 
   const timelineGroups = useMemo(() => {
     const map = new Map<string, Todo[]>()
     for (const todo of todos) {
+      if (!isTopLevel(todo)) continue
       const key = todo.due_time ? formatDay(todo.due_time) : t('todos.noDueDate')
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(todo)
     }
     return Array.from(map.entries()).map(([date, items]) => ({ date, items }))
-  }, [todos, t])
+  }, [todos, isTopLevel, t])
 
   const viewButtons: { key: TodoView; icon: typeof ListChecks; label: string }[] = [
     { key: 'timeline', icon: AlignJustify, label: t('todos.viewTimeline') },
@@ -540,6 +562,15 @@ export default function TodosPage() {
       parentTitle={todo.parent_id ? todoTitleById.get(todo.parent_id) : undefined}
       onStartPomodoro={handleStartPomodoro}
       onAddChild={openCreateChild}
+      subtasks={view !== 'tree' ? (
+        <TodoSubtaskList
+          todo={todo}
+          childrenByParent={childrenByParent}
+          onToggle={(sub) => void handleToggle(sub.id)}
+          onEdit={openEdit}
+          onAddChild={openCreateChild}
+        />
+      ) : undefined}
     />
   )
 
