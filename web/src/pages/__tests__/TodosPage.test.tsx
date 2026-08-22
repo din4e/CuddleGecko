@@ -120,11 +120,12 @@ function renderPage() {
 describe('TodosPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    const store = new Map<string, string>()
     vi.stubGlobal('localStorage', {
-      getItem: vi.fn(() => null),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-      clear: vi.fn(),
+      getItem: vi.fn((key: string) => store.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => void store.set(key, value)),
+      removeItem: vi.fn((key: string) => void store.delete(key)),
+      clear: vi.fn(() => store.clear()),
     })
     mockedList.mockResolvedValue(mockPage<Todo>([]))
     mockedStats.mockResolvedValue({ data: { total: 0, pending: 0, overdue: 0, deferred: 0, done_today: 0, done_this_week: 0 } })
@@ -162,6 +163,7 @@ describe('TodosPage', () => {
   })
 
   it('renders done todo with completed section', async () => {
+    localStorage.setItem('todoView', 'grouped')
     mockedList.mockResolvedValue(mockPage<Todo>([
       { id: 2, title: 'Done task', status: 'done', priority: 'low', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
     ]))
@@ -184,6 +186,7 @@ describe('TodosPage', () => {
   })
 
   it('filters by status when clicking pending button', async () => {
+    localStorage.setItem('todoView', 'grouped')
     const user = userEvent.setup()
     renderPage()
     await waitFor(() => {

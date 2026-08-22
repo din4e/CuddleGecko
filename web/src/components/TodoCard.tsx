@@ -32,6 +32,7 @@ export interface TodoCardProps {
   formatDate: (dateStr: string | null) => string
   parentTitle?: string
   onStartPomodoro?: (todo: Todo) => void
+  onAddChild?: (todo: Todo) => void
 }
 
 const TodoCard = memo(function TodoCard({
@@ -51,6 +52,7 @@ const TodoCard = memo(function TodoCard({
   formatDate,
   parentTitle,
   onStartPomodoro,
+  onAddChild,
 }: TodoCardProps) {
   const { t } = useTranslation()
   const [editingTitle, setEditingTitle] = useState(false)
@@ -72,17 +74,17 @@ const TodoCard = memo(function TodoCard({
 
   return (
     <Card
-      className={`${todo.status === 'done' ? 'opacity-60' : ''} ${compact ? 'p-2' : ''}`}
+      className={`group relative gap-0 py-0 ${todo.status === 'done' ? 'opacity-60' : ''}`}
       style={todo.color ? { borderLeftColor: todo.color, borderLeftWidth: '3px' } : undefined}
     >
-      <CardContent className={`${compact ? 'p-2 space-y-1' : 'p-3 space-y-2'}`}>
-        <div className="flex items-start gap-2">
+      <CardContent className={compact ? 'p-1.5 pr-16' : 'p-2 space-y-1'}>
+        <div className="flex items-start gap-1.5">
           {selectable && (
             <input
               type="checkbox"
               checked={selected}
               onChange={() => onSelectToggle?.(todo.id)}
-              className="mt-1 h-4 w-4 shrink-0 cursor-pointer"
+              className="mt-1 h-3.5 w-3.5 shrink-0 cursor-pointer"
               aria-label={todo.title}
             />
           )}
@@ -92,8 +94,8 @@ const TodoCard = memo(function TodoCard({
             className="mt-0.5 shrink-0 cursor-pointer bg-transparent border-none"
           >
             {todo.status === 'done'
-              ? <CheckCircle2 className="h-5 w-5 text-green-500" />
-              : <Circle className="h-5 w-5 text-muted-foreground hover:text-primary" />}
+              ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+              : <Circle className="h-4 w-4 text-muted-foreground hover:text-primary" />}
           </button>
           <div className="flex-1 min-w-0">
             {editingTitle ? (
@@ -112,26 +114,26 @@ const TodoCard = memo(function TodoCard({
             ) : (
               <span
                 onDoubleClick={startRename}
-                className={`text-sm font-medium cursor-text ${todo.status === 'done' ? 'line-through text-muted-foreground' : ''}`}
+                className={`text-sm font-medium leading-snug cursor-text ${todo.status === 'done' ? 'line-through text-muted-foreground' : ''}`}
                 title={todo.title}
               >
                 {todo.title}
               </span>
             )}
             {todo.description && !compact && (
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{todo.description}</p>
+              <p className="text-[11px] leading-snug text-muted-foreground line-clamp-1">{todo.description}</p>
             )}
           </div>
-          {todo.pinned && (
-            <Star className="h-4 w-4 shrink-0 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
-          )}
-          <Badge variant="secondary" className={`text-xs shrink-0 ${priorityConfig[todo.priority]?.bg || ''}`}>
-            <span className={priorityConfig[todo.priority]?.color}>{priorityLabel}</span>
-          </Badge>
         </div>
 
         {!compact && (
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            {todo.pinned && (
+              <Star className="h-3 w-3 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
+            )}
+            <Badge variant="secondary" className={`px-1 py-0 text-[10px] leading-none shrink-0 ${priorityConfig[todo.priority]?.bg || ''}`}>
+              <span className={priorityConfig[todo.priority]?.color}>{priorityLabel}</span>
+            </Badge>
             {parentTitle && (
               <span className="flex items-center gap-0.5 text-muted-foreground/80">
                 <CornerDownRight className="h-3 w-3" />
@@ -163,8 +165,10 @@ const TodoCard = memo(function TodoCard({
               </span>
             )}
             {todo.amount != null && todo.amount > 0 && (
-              <Badge variant="outline" className={todo.amount_type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                {todo.amount_type === 'income' ? '+' : '-'}{todo.amount}
+              <Badge variant="outline" className="px-1 py-0 text-[10px] leading-none">
+                <span className={todo.amount_type === 'income' ? 'text-green-600' : 'text-red-600'}>
+                  {todo.amount_type === 'income' ? '+' : '-'}{todo.amount}
+                </span>
               </Badge>
             )}
             {todo.contact_ids?.length > 0 && contactNames && (
@@ -174,7 +178,7 @@ const TodoCard = memo(function TodoCard({
         )}
 
         {!compact && (todo.item_total ?? 0) > 0 && (
-          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={todo.item_done ?? 0} aria-valuemin={0} aria-valuemax={todo.item_total ?? 0}>
+          <div className="h-1 w-full rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={todo.item_done ?? 0} aria-valuemin={0} aria-valuemax={todo.item_total ?? 0}>
             <div
               className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${Math.round(((todo.item_done ?? 0) / (todo.item_total ?? 1)) * 100)}%` }}
@@ -187,7 +191,7 @@ const TodoCard = memo(function TodoCard({
             {todo.tags.map((tag) => (
               <span
                 key={tag.id}
-                className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                className="px-1 py-px rounded text-[10px] font-medium leading-tight"
                 style={{ backgroundColor: (tag.color || '#9ca3af') + '22', color: tag.color || '#6b7280' }}
               >
                 {tag.name}
@@ -195,34 +199,38 @@ const TodoCard = memo(function TodoCard({
             ))}
           </div>
         )}
-
-        {!compact && (
-          <div className="flex items-center gap-1 pt-1">
-            {onStartPomodoro && (
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onStartPomodoro(todo)} aria-label={t('todos.pomoStart')} title={t('todos.pomoStart')}>
-                <Timer className="h-3 w-3 mr-0.5" />
-                {!!todo.pomodoro_count && <span className="tabular-nums">{todo.pomodoro_count}</span>}
-              </Button>
-            )}
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onTogglePin(todo)} aria-label={t('todos.pinAria')}>
-              <Star className={`h-3.5 w-3.5 ${todo.pinned ? 'fill-amber-400 text-amber-500' : 'text-muted-foreground'}`} />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onSync(todo)} aria-label={syncLabel}>
-              <ArrowRight className="h-3 w-3 mr-1" />
-              {syncLabel}
-            </Button>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onDuplicate(todo)} aria-label={t('todos.duplicate')}>
-              <Copy className="h-3 w-3" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onEdit(todo)} aria-label={t('todos.editTodo')}>
-              <Pencil className="h-3 w-3" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-destructive" onClick={() => onDelete(todo)} aria-label={t('todos.deleteAria')}>
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
-        )}
       </CardContent>
+
+      {/* Action toolbar — floating top-right so it costs no row height.
+          Hover-reveal on md+; always visible on touch/small screens. */}
+      <div className="absolute right-1 top-1 flex items-center gap-0.5 rounded-md border bg-background/95 px-0.5 shadow-sm opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+        {onStartPomodoro && (
+          <Button variant="ghost" size="sm" className="h-5 gap-0.5 px-1 text-[10px]" onClick={() => onStartPomodoro(todo)} aria-label={t('todos.pomoStart')} title={t('todos.pomoStart')}>
+            <Timer className="h-3 w-3" />
+            {!!todo.pomodoro_count && <span className="tabular-nums">{todo.pomodoro_count}</span>}
+          </Button>
+        )}
+        {onAddChild && (
+          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onAddChild(todo)} aria-label={t('todos.addChild')} title={t('todos.addChild')}>
+            <CornerDownRight className="h-3 w-3" />
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onTogglePin(todo)} aria-label={t('todos.pinAria')} title={t('todos.pinAria')}>
+          <Star className={`h-3 w-3 ${todo.pinned ? 'fill-amber-400 text-amber-500' : 'text-muted-foreground'}`} />
+        </Button>
+        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onSync(todo)} aria-label={syncLabel} title={syncLabel}>
+          <ArrowRight className="h-3 w-3" />
+        </Button>
+        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onDuplicate(todo)} aria-label={t('todos.duplicate')} title={t('todos.duplicate')}>
+          <Copy className="h-3 w-3" />
+        </Button>
+        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onEdit(todo)} aria-label={t('todos.editTodo')} title={t('todos.editTodo')}>
+          <Pencil className="h-3 w-3" />
+        </Button>
+        <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" onClick={() => onDelete(todo)} aria-label={t('todos.deleteAria')} title={t('todos.deleteAria')}>
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </div>
     </Card>
   )
 })
