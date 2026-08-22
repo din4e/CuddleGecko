@@ -19,6 +19,7 @@ import { Avatar, AvatarFallback } from '../components/ui/avatar'
 import {
   Heart,
   Network,
+  Dumbbell,
   Tag,
   Bell,
   LayoutDashboard,
@@ -49,6 +50,7 @@ const navKeys = [
   { to: '/graph', label: 'nav.network', icon: Network },
   { to: '/events', label: 'nav.events', icon: Calendar },
   { to: '/todos', label: 'nav.todos', icon: ListChecks },
+  { to: '/fitness', label: 'nav.fitness', icon: Dumbbell },
   { to: '/finance', label: 'nav.finance', icon: Wallet },
   { to: '/ai', label: 'nav.ai', icon: Bot },
   { to: '/tags', label: 'nav.tags', icon: Tag },

@@ -1,7 +1,7 @@
 import { useState, useDeferredValue } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, TrendingUp, TrendingDown, Minus, Activity, Flame, Timer, CheckCircle2, Pencil, Trash2 } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, Minus, Activity, Flame, Timer, CheckCircle2, Pencil, Trash2, Flame as StreakFlame } from 'lucide-react'
 import ListPageHeader from '../components/ListPageHeader'
 import EmptyState from '../components/EmptyState'
 import { ListSkeleton } from '../components/ListSkeleton'
@@ -14,8 +14,13 @@ import { WorkoutCard } from '../components/WorkoutCard'
 import { WorkoutFormDialog } from '../components/WorkoutFormDialog'
 import { BodyRecordFormDialog } from '../components/BodyRecordFormDialog'
 import { BodyMetricsChart } from '../components/BodyMetricsChart'
+import { WorkoutHistoryChart } from '../components/WorkoutHistoryChart'
+import { FitnessGoalCard } from '../components/FitnessGoalCard'
+import { ExerciseLibraryPanel, WorkoutTemplatesPanel } from '../components/FitnessLibraryTab'
 import { useWorkoutsList, useWorkoutStats } from '../hooks/api/useWorkouts'
 import { useBodyMetricsList, useBodyMetricSummary, useDeleteBodyMetric } from '../hooks/api/useBodyMetrics'
+import { useWorkoutTemplates, useInstantiateTemplate } from '../hooks/api/useWorkoutTemplates'
+import { dateAfterForRange, BODY_CHART_METRICS, type BodyChartMetric } from '../lib/fitness'
 import { bmi } from '../types'
 import type { Workout, WorkoutType, WorkoutStatus, BodyMetric } from '../types'
 
@@ -24,6 +29,18 @@ const STATUSES: WorkoutStatus[] = ['planned', 'in_progress', 'completed', 'skipp
 
 function cap(s: string) {
   return s.split('_').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('')
+}
+// chartMetricLabel maps a chart metric to its camelCase i18n key ('bp' → bloodPressure).
+const METRIC_LABEL_KEYS: Record<BodyChartMetric, string> = {
+  weight: 'fitness.weight',
+  body_fat: 'fitness.bodyFat',
+  muscle_mass: 'fitness.muscleMass',
+  bp: 'fitness.bloodPressure',
+  resting_hr: 'fitness.restingHr',
+  sleep_hours: 'fitness.sleepHours',
+  steps: 'fitness.steps',
+  energy: 'fitness.energy',
+  mood: 'fitness.mood',
 }
 function fmtDate(iso: string | null): string {
   if (!iso) return ''
@@ -60,10 +77,17 @@ export default function FitnessPage() {
   const [bodyDialogOpen, setBodyDialogOpen] = useState(false)
   const [editingMetric, setEditingMetric] = useState<BodyMetric | null>(null)
   const [deleteMetricId, setDeleteMetricId] = useState<number | null>(null)
-  const { data: bodyPage } = useBodyMetricsList()
+  const [chartMetric, setChartMetric] = useState<BodyChartMetric>('weight')
+  const [chartRange, setChartRange] = useState<'30d' | '90d' | '1y' | 'all'>('all')
+  const { data: bodyPage } = useBodyMetricsList(dateAfterForRange(chartRange))
   const { data: summary } = useBodyMetricSummary()
   const deleteMetric = useDeleteBodyMetric()
   const metrics = bodyPage?.items ?? []
+
+  // --- Templates (create-from-template on Workouts tab) ---
+  const { data: templates } = useWorkoutTemplates()
+  const instantiate = useInstantiateTemplate()
+  const [templateId, setTemplateId] = useState('')
 
   const completionRate = stats && stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0
 
@@ -85,6 +109,7 @@ export default function FitnessPage() {
         <TabsList>
           <TabsTrigger value="workouts">{t('fitness.tabWorkouts')}</TabsTrigger>
           <TabsTrigger value="body">{t('fitness.tabBody')}</TabsTrigger>
+          <TabsTrigger value="library">{t('fitness.tabLibrary')}</TabsTrigger>
         </TabsList>
 
         {/* ---------------- Workouts ---------------- */}
@@ -95,7 +120,16 @@ export default function FitnessPage() {
             <StatCard icon={<Timer className="h-4 w-4 text-purple-500" />} label={t('fitness.statsMinutes')} value={`${stats?.total_minutes ?? 0} ${t('fitness.minutesShort')}`} />
             <StatCard icon={<Flame className="h-4 w-4 text-orange-500" />} label={t('fitness.statsCalories')} value={`${Math.round(stats?.total_calories ?? 0)}`} />
           </div>
-          <div className="text-xs text-muted-foreground">{t('fitness.completionRate')}: {completionRate}%</div>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span>{t('fitness.completionRate')}: {completionRate}%</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 font-medium text-orange-600 dark:bg-orange-500/15 dark:text-orange-400">
+              <StreakFlame className="h-3 w-3" />
+              {t('fitness.streakWeeks')}: {stats?.streak_weeks ?? 0}
+            </span>
+          </div>
+
+          <WorkoutHistoryChart bucket="week" limit={12} />
+          <FitnessGoalCard />
 
           <div className="flex flex-wrap items-center gap-2">
             <Input placeholder={t('fitness.name')} value={q} onChange={(e) => setQ(e.target.value)} className="h-9 max-w-xs" />
@@ -111,7 +145,23 @@ export default function FitnessPage() {
               <option value="scheduled">{t('fitness.scheduledAt')}</option>
               <option value="created">{t('fitness.recordedAt')}</option>
             </select>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              <select
+                className={selectCls}
+                value={templateId}
+                onChange={async (e) => {
+                  const id = e.target.value
+                  setTemplateId(id)
+                  if (id) {
+                    await instantiate.mutateAsync({ id: parseInt(id, 10) })
+                    setTemplateId('')
+                  }
+                }}
+                aria-label={t('fitness.createFromTemplate')}
+              >
+                <option value="">{t('fitness.createFromTemplate')}</option>
+                {templates?.map((tpl) => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
+              </select>
               <Button onClick={openNewWorkout}><Plus className="h-4 w-4 mr-1" />{t('fitness.newWorkout')}</Button>
             </div>
           </div>
@@ -143,14 +193,27 @@ export default function FitnessPage() {
             <StatCard icon={<Timer className="h-4 w-4 text-gray-500" />} label={t('fitness.totalRecords')} value={summary?.count ?? 0} />
           </div>
 
-          {metrics.length > 0 && (
-            <Card>
-              <CardContent className="p-4">
-                <p className="mb-2 text-sm font-medium">{t('fitness.weightTrend')}</p>
-                <BodyMetricsChart metrics={metrics} />
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardContent className="space-y-2 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium">{t('fitness.metricTrend')}</p>
+                <div className="flex items-center gap-2">
+                  <select className={selectCls} value={chartMetric} onChange={(e) => setChartMetric(e.target.value as BodyChartMetric)} aria-label={t('fitness.metric')}>
+                    {BODY_CHART_METRICS.map((m) => (
+                      <option key={m} value={m}>{t(METRIC_LABEL_KEYS[m])}</option>
+                    ))}
+                  </select>
+                  <select className={selectCls} value={chartRange} onChange={(e) => setChartRange(e.target.value as typeof chartRange)} aria-label={t('fitness.dateRange')}>
+                    <option value="30d">{t('fitness.range30d')}</option>
+                    <option value="90d">{t('fitness.range90d')}</option>
+                    <option value="1y">{t('fitness.range1y')}</option>
+                    <option value="all">{t('fitness.rangeAll')}</option>
+                  </select>
+                </div>
+              </div>
+              {metrics.length > 0 && <BodyMetricsChart metrics={metrics} metric={chartMetric} />}
+            </CardContent>
+          </Card>
 
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">{t('fitness.tabBody')}</h2>
@@ -183,6 +246,12 @@ export default function FitnessPage() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* ---------------- Library & templates ---------------- */}
+        <TabsContent value="library" className="space-y-6 pt-4">
+          <ExerciseLibraryPanel />
+          <WorkoutTemplatesPanel />
         </TabsContent>
       </Tabs>
 

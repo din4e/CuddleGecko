@@ -8,6 +8,9 @@ import { useRemindersList } from '../hooks/api/useReminders'
 import { useEventsList } from '../hooks/api/useEvents'
 import { useTodosList, useTodoStats } from '../hooks/api/useTodos'
 import { useTransactionsMonthly } from '../hooks/api/useTransactions'
+import { useWorkoutsList } from '../hooks/api/useWorkouts'
+import { useBodyMetricSummary } from '../hooks/api/useBodyMetrics'
+import { bmi } from '../types'
 import { StatGridSkeleton } from '../components/ListSkeleton'
 import { useContactsList } from '../hooks/api/useContacts'
 import {
@@ -24,6 +27,11 @@ import {
   Clock,
   AlertCircle,
   ArrowRight,
+  Dumbbell,
+  Scale,
+  TrendingUp as TrendUpIcon,
+  TrendingDown as TrendDownIcon,
+  Minus as MinusIcon,
 } from 'lucide-react'
 
 interface MonthBucket {
@@ -142,6 +150,11 @@ export default function DashboardPage() {
   // and the current-month tiles.
   const { data: monthlyData, isPending: monthlyLoading } = useTransactionsMonthly(6)
   const { data: contactsData } = useContactsList({ page: 1, page_size: 1 })
+  // Fitness cards: nearest planned/in-progress workout + weight snapshot.
+  const { data: workoutsUpcoming } = useWorkoutsList({ status: 'planned', sort: 'scheduled', order: 'asc', page: 1, page_size: 1 })
+  const { data: workoutsInProgress } = useWorkoutsList({ status: 'in_progress', sort: 'scheduled', order: 'asc', page: 1, page_size: 1 })
+  const { data: bodySummary } = useBodyMetricSummary()
+  const upcomingWorkout = workoutsInProgress?.items?.[0] ?? workoutsUpcoming?.items?.[0] ?? null
 
   const reminders: Reminder[] = remindersData?.items ?? []
   const events: Event[] = eventsData?.items ?? []
@@ -350,6 +363,84 @@ export default function DashboardPage() {
                   </li>
                 ))}
               </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Fitness: upcoming workout + weight snapshot */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Dumbbell className="h-4 w-4 text-orange-500" />
+              {t('dashboard.upcomingWorkout')}
+            </CardTitle>
+            <Link to="/fitness" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+              {t('dashboard.viewAll')} <ArrowRight className="h-3 w-3" />
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {upcomingWorkout ? (
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{upcomingWorkout.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(upcomingWorkout.scheduled_at || upcomingWorkout.created_at).toLocaleString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                    {upcomingWorkout.location && ` · ${upcomingWorkout.location}`}
+                  </div>
+                </div>
+                {upcomingWorkout.status === 'in_progress' && (
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-600 dark:bg-blue-500/15 dark:text-blue-400">
+                    {t('fitness.statusInProgress')}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noData')}</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Scale className="h-4 w-4 text-purple-500" />
+              {t('dashboard.weightSnapshot')}
+            </CardTitle>
+            <Link to="/fitness" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+              {t('dashboard.viewAll')} <ArrowRight className="h-3 w-3" />
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {bodySummary?.latest_weight != null ? (
+              <div className="flex items-end justify-between gap-2">
+                <div>
+                  <span className="text-2xl font-bold tabular-nums">{bodySummary.latest_weight}</span>
+                  <span className="ml-1 text-sm text-muted-foreground">kg</span>
+                  {bodySummary.latest?.height != null && (
+                    <div className="text-xs text-muted-foreground">
+                      {t('fitness.bmi')}: {bmi(bodySummary.latest_weight, bodySummary.latest.height).toFixed(1)}
+                    </div>
+                  )}
+                </div>
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  {bodySummary.weight_trend === 'up' ? (
+                    <TrendUpIcon className="h-4 w-4 text-green-500" />
+                  ) : bodySummary.weight_trend === 'down' ? (
+                    <TrendDownIcon className="h-4 w-4 text-red-500" />
+                  ) : (
+                    <MinusIcon className="h-4 w-4" />
+                  )}
+                  {t(`fitness.trend${bodySummary.weight_trend === 'none' ? 'None' : bodySummary.weight_trend.charAt(0).toUpperCase() + bodySummary.weight_trend.slice(1)}`)}
+                </span>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noData')}</p>
             )}
           </CardContent>
         </Card>

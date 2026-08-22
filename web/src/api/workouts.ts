@@ -7,6 +7,10 @@ import type {
   PaginatedData,
   WorkoutListParams,
   WorkoutUpdateInput,
+  WorkoutHistoryBucket,
+  WorkoutPR,
+  SetLog,
+  SetLogInput,
 } from '../types'
 
 function buildParams(params?: WorkoutListParams) {
@@ -27,6 +31,14 @@ export const workoutsApi = {
 
   stats: () =>
     request.get<WorkoutStats>('/workouts/stats').then((data) => ({ data })),
+
+  history: (bucket: 'week' | 'month' = 'week', limit = 12) =>
+    request
+      .get<WorkoutHistoryBucket[]>('/workouts/history', { params: { bucket, limit } })
+      .then((data) => ({ data })),
+
+  prs: () =>
+    request.get<WorkoutPR[]>('/workouts/prs').then((data) => ({ data })),
 
   create: (data: Partial<Workout>) =>
     request.post<Workout>('/workouts', data).then((d) => ({ data: d })),
@@ -59,4 +71,24 @@ export const workoutsApi = {
 
   deleteExercise: (workoutId: number, exerciseId: number) =>
     request.delete<void>(`/workouts/${workoutId}/exercises/${exerciseId}`).then(() => {}),
+
+  // --- Set logs (per-exercise, PRs derive from these) ---
+
+  listSets: (workoutId: number, exerciseId: number, signal?: AbortSignal) =>
+    request
+      .get<SetLog[]>(`/workouts/${workoutId}/exercises/${exerciseId}/sets`, { signal })
+      .then((data) => ({ data })),
+
+  createSet: (workoutId: number, exerciseId: number, data: SetLogInput) =>
+    request
+      .post<SetLog>(`/workouts/${workoutId}/exercises/${exerciseId}/sets`, data)
+      .then((d) => ({ data: d })),
+
+  updateSet: (workoutId: number, exerciseId: number, setId: number, data: SetLogInput) =>
+    request
+      .put<SetLog>(`/workouts/${workoutId}/exercises/${exerciseId}/sets/${setId}`, data)
+      .then((d) => ({ data: d })),
+
+  deleteSet: (workoutId: number, exerciseId: number, setId: number) =>
+    request.delete<void>(`/workouts/${workoutId}/exercises/${exerciseId}/sets/${setId}`).then(() => {}),
 }

@@ -349,6 +349,8 @@ export interface WorkoutStats {
   this_week: number
   total_minutes: number
   total_calories: number
+  /** Consecutive weeks with at least one completed workout. */
+  streak_weeks?: number
 }
 
 export interface BodyMetricSummary {
@@ -359,6 +361,8 @@ export interface BodyMetricSummary {
   count: number
   first_at: string | null
   last_at: string | null
+  /** Per-metric latest/prev/trend for keys like body_fat, muscle_mass, … */
+  metrics?: Partial<Record<'body_fat' | 'muscle_mass' | 'resting_hr' | 'systolic' | 'diastolic' | 'sleep_hours' | 'steps' | 'energy' | 'mood', BodyMetricStat>>
 }
 
 /** Query parameters for listing workouts. */
@@ -417,4 +421,112 @@ export function bmi(weightKg?: number | null, heightCm?: number | null): number 
   if (!weightKg || !heightCm || weightKg <= 0 || heightCm <= 0) return 0
   const m = heightCm / 100
   return weightKg / (m * m)
+}
+
+// --- Fitness enhancements (history / PRs / library / templates / set logs / goals) ---
+
+export type WorkoutHistoryBucket = {
+  bucket: string
+  count: number
+  minutes: number
+  calories: number
+}
+
+export type WorkoutPR = {
+  exercise: string
+  best_weight: number
+  best_e1rm: number
+  best_set_at: string
+}
+
+export interface ExerciseLibraryItem {
+  id: number
+  name: string
+  category: string
+  muscle_groups: string[]
+  equipment: string
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export type ExerciseLibraryInput = Partial<Omit<ExerciseLibraryItem, 'id' | 'created_at' | 'updated_at'>>
+
+export interface WorkoutTemplateItem {
+  id: number
+  name: string
+  category: string
+  sets: number | null
+  reps: number | null
+  weight: number | null
+  distance: number | null
+  duration_sec: number | null
+  rest_sec: number | null
+  sort_order: number
+}
+
+export interface WorkoutTemplate {
+  id: number
+  name: string
+  type: WorkoutType
+  notes: string
+  items: WorkoutTemplateItem[]
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkoutTemplateInput {
+  name?: string
+  type?: WorkoutType
+  notes?: string
+  items?: Array<Omit<WorkoutTemplateItem, 'id'>>
+}
+
+export interface SetLog {
+  id: number
+  set_index: number
+  reps: number | null
+  weight: number | null
+  distance: number | null
+  duration_sec: number | null
+  done: boolean
+  notes: string
+}
+
+export interface SetLogInput {
+  reps?: number | null
+  weight?: number | null
+  distance?: number | null
+  duration_sec?: number | null
+  done?: boolean
+  notes?: string
+}
+
+export type FitnessGoalType = 'weekly_workouts' | 'weight_target'
+export type FitnessGoalStatus = 'active' | 'done'
+
+export interface FitnessGoal {
+  id: number
+  type: FitnessGoalType
+  target_value: number
+  deadline: string | null
+  status: FitnessGoalStatus
+  current_value: number
+  created_at: string
+  updated_at: string
+}
+
+export interface FitnessGoalInput {
+  type?: FitnessGoalType
+  target_value?: number
+  deadline?: string | null
+  status?: FitnessGoalStatus
+}
+
+export type BodyMetricTrend = 'up' | 'down' | 'flat' | 'none'
+
+export interface BodyMetricStat {
+  latest: number | null
+  prev: number | null
+  trend: BodyMetricTrend
 }
