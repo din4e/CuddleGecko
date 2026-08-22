@@ -1,5 +1,5 @@
-const ICON_LIGHT = '/icon.png?v=3'
-const ICON_DARK = '/icon_dark.png?v=3'
+const ICON_LIGHT = '/icon.png?v=4'
+const ICON_DARK = '/icon_dark.png?v=4'
 
 const ICON_LINKS = 'link[rel="icon"], link[rel="apple-touch-icon"]'
 
