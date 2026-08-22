@@ -7,10 +7,11 @@ import type { BodyMetric, BodyMetricInput, BodyMetricSummary, PaginatedData } fr
 const scope = 'body-metrics'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
 
-export function useBodyMetricsList() {
+export function useBodyMetricsList(dateAfter?: string) {
   return useQuery<PaginatedData<BodyMetric>>({
-    queryKey: [...allKey(), 'list'] as const,
-    queryFn: ({ signal }) => bodyMetricsApi.list({ page_size: 200 }, signal).then((r) => r.data),
+    queryKey: [...allKey(), 'list', dateAfter ?? 'all'] as const,
+    queryFn: ({ signal }) =>
+      bodyMetricsApi.list({ page_size: 100000, ...(dateAfter ? { date_after: dateAfter } : {}) }, signal).then((r) => r.data),
   })
 }
 

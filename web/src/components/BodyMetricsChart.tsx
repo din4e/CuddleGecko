@@ -1,29 +1,30 @@
 import { useTranslation } from 'react-i18next'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import type { BodyMetric } from '../types'
+import { toBodyChartData, type BodyChartMetric } from '../lib/fitness'
 
-function fmtDate(iso: string): string {
-  const d = new Date(iso)
-  return `${d.getMonth() + 1}/${d.getDate()}`
+// metric → i18n label key (the 'a' series; bp renders systolic+diastolic).
+const LABEL_KEYS: Record<BodyChartMetric, { a: string; b?: string }> = {
+  weight: { a: 'fitness.weight' },
+  body_fat: { a: 'fitness.bodyFat' },
+  muscle_mass: { a: 'fitness.muscleMass' },
+  bp: { a: 'fitness.systolic', b: 'fitness.diastolic' },
+  resting_hr: { a: 'fitness.restingHr' },
+  sleep_hours: { a: 'fitness.sleepHours' },
+  steps: { a: 'fitness.steps' },
+  energy: { a: 'fitness.energy' },
+  mood: { a: 'fitness.mood' },
 }
 
-// chartData reverses the (newest-first) list into chronological order and drops
-// the time portion so the X axis reads as short dates.
-function chartData(metrics: BodyMetric[]) {
-  return [...metrics]
-    .filter((m) => m.weight != null || m.body_fat != null)
-    .reverse()
-    .map((m) => ({
-      date: fmtDate(m.recorded_at),
-      weight: m.weight,
-      bodyFat: m.body_fat,
-    }))
-}
+const B_COLOR = '#3b82f6'
+const A_COLOR = '#f97316'
 
-export function BodyMetricsChart({ metrics }: { metrics: BodyMetric[] }) {
+export function BodyMetricsChart({ metrics, metric = 'weight' }: { metrics: Parameters<typeof toBodyChartData>[0]; metric?: BodyChartMetric }) {
   const { t } = useTranslation()
-  const data = chartData(metrics)
+  const data = toBodyChartData(metrics, metric)
   if (data.length === 0) return null
+
+  const dual = metric === 'bp'
+  const labels = LABEL_KEYS[metric]
 
   return (
     <div className="h-64 w-full">
@@ -31,30 +32,29 @@ export function BodyMetricsChart({ metrics }: { metrics: BodyMetric[] }) {
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
           <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="currentColor" className="text-muted-foreground" />
-          <YAxis yAxisId="weight" tick={{ fontSize: 12 }} stroke="currentColor" className="text-muted-foreground" />
-          <YAxis yAxisId="bodyFat" orientation="right" tick={{ fontSize: 12 }} stroke="currentColor" className="text-muted-foreground" />
+          <YAxis tick={{ fontSize: 12 }} stroke="currentColor" className="text-muted-foreground" />
           <Tooltip />
           <Legend />
           <Line
-            yAxisId="weight"
             type="monotone"
-            dataKey="weight"
-            name={t('fitness.weight')}
-            stroke="#3b82f6"
+            dataKey="a"
+            name={t(labels.a)}
+            stroke={A_COLOR}
             strokeWidth={2}
             dot={{ r: 3 }}
             connectNulls
           />
-          <Line
-            yAxisId="bodyFat"
-            type="monotone"
-            dataKey="bodyFat"
-            name={t('fitness.bodyFat')}
-            stroke="#f97316"
-            strokeWidth={2}
-            dot={{ r: 3 }}
-            connectNulls
-          />
+          {dual && (
+            <Line
+              type="monotone"
+              dataKey="b"
+              name={t(labels.b ?? '')}
+              stroke={B_COLOR}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              connectNulls
+            />
+          )}
         </LineChart>
       </ResponsiveContainer>
     </div>

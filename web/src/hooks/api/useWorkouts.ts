@@ -7,6 +7,10 @@ import type {
   WorkoutExercise,
   WorkoutExerciseInput,
   WorkoutStats,
+  WorkoutHistoryBucket,
+  WorkoutPR,
+  SetLog,
+  SetLogInput,
   PaginatedData,
   WorkoutListParams,
   WorkoutUpdateInput,
@@ -133,4 +137,57 @@ export function useDeleteWorkoutExercise(workoutId: number) {
     },
     onError: mutationErrorToast,
   })
+}
+
+// --- History / PRs / set logs ---
+
+export function useWorkoutHistory(bucket: 'week' | 'month' = 'week', limit = 12) {
+  return useQuery<WorkoutHistoryBucket[]>({
+    queryKey: [...allKey(), 'history', bucket, limit] as const,
+    queryFn: () => workoutsApi.history(bucket, limit).then((r) => r.data),
+  })
+}
+
+export function useWorkoutPrs() {
+  return useQuery<WorkoutPR[]>({
+    queryKey: [...allKey(), 'prs'] as const,
+    queryFn: () => workoutsApi.prs().then((r) => r.data),
+  })
+}
+
+const setsKey = (workoutId: number, exerciseId: number) => [...allKey(), 'sets', workoutId, exerciseId] as const
+
+export function useSetLogs(workoutId: number, exerciseId: number, enabled: boolean) {
+  return useQuery<SetLog[]>({
+    queryKey: setsKey(workoutId, exerciseId),
+    queryFn: ({ signal }) => workoutsApi.listSets(workoutId, exerciseId, signal).then((r) => r.data),
+    enabled,
+  })
+}
+
+export function useSetLogMutations(workoutId: number, exerciseId: number) {
+  const qc = useQueryClient()
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: setsKey(workoutId, exerciseId) })
+    // PRs derive from set logs, and the workout card shows progress.
+    qc.invalidateQueries({ queryKey: [...allKey(), 'prs'] })
+    qc.invalidateQueries({ queryKey: allKey() })
+  }
+  const create = useMutation({
+    mutationFn: (input: SetLogInput) => workoutsApi.createSet(workoutId, exerciseId, input),
+    onSuccess: invalidate,
+    onError: mutationErrorToast,
+  })
+  const update = useMutation({
+    mutationFn: ({ setId, data }: { setId: number; data: SetLogInput }) =>
+      workoutsApi.updateSet(workoutId, exerciseId, setId, data),
+    onSuccess: invalidate,
+    onError: mutationErrorToast,
+  })
+  const remove = useMutation({
+    mutationFn: (setId: number) => workoutsApi.deleteSet(workoutId, exerciseId, setId),
+    onSuccess: invalidate,
+    onError: mutationErrorToast,
+  })
+  return { create, update, remove }
 }

@@ -62,6 +62,40 @@ vi.mock('../../api/workouts', () => ({
     updateExercise: vi.fn(),
     toggleExercise: vi.fn(),
     deleteExercise: vi.fn(),
+    history: vi.fn(),
+    prs: vi.fn(),
+    listSets: vi.fn(),
+    createSet: vi.fn(),
+    updateSet: vi.fn(),
+    deleteSet: vi.fn(),
+  },
+}))
+
+vi.mock('../../api/workoutTemplates', () => ({
+  workoutTemplatesApi: {
+    list: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    instantiate: vi.fn(),
+  },
+}))
+
+vi.mock('../../api/fitnessGoals', () => ({
+  fitnessGoalsApi: {
+    list: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+}))
+
+vi.mock('../../api/exerciseLibrary', () => ({
+  exerciseLibraryApi: {
+    list: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
 }))
 
@@ -77,6 +111,8 @@ vi.mock('../../api/bodyMetrics', () => ({
 
 import { workoutsApi } from '../../api/workouts'
 import { bodyMetricsApi } from '../../api/bodyMetrics'
+import { workoutTemplatesApi } from '../../api/workoutTemplates'
+import { fitnessGoalsApi } from '../../api/fitnessGoals'
 
 const sampleWorkout: Workout = {
   id: 1, user_id: 1, workspace_id: 1, name: '晨跑 5 公里', type: 'cardio',
@@ -119,6 +155,10 @@ describe('FitnessPage', () => {
     vi.mocked(workoutsApi.stats).mockResolvedValue({ data: sampleStats })
     vi.mocked(bodyMetricsApi.list).mockResolvedValue({ data: { items: [], total: 0, page: 1, page_size: 100 } })
     vi.mocked(bodyMetricsApi.summary).mockResolvedValue({ data: emptySummary })
+    vi.mocked(workoutsApi.history).mockResolvedValue({ data: [] })
+    vi.mocked(workoutsApi.prs).mockResolvedValue({ data: [] })
+    vi.mocked(workoutTemplatesApi.list).mockResolvedValue({ data: [] })
+    vi.mocked(fitnessGoalsApi.list).mockResolvedValue({ data: [] })
   })
 
   it('renders the title and the seeded workout on the workouts tab', async () => {
