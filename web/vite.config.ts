@@ -17,6 +17,19 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Rollup's default splitting gives every module shared by two lazy
+        // pages its own chunk — lucide icons alone produced ~50 sub-1KB
+        // files that each cost a round trip on plain-HTTP LAN deploys
+        // (no HTTP/2 without TLS). Keep icons in one chunk instead.
+        manualChunks(id) {
+          if (id.includes('node_modules/lucide-react')) return 'lucide'
+        },
+      },
+    },
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,

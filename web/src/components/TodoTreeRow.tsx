@@ -118,7 +118,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
       <div
         tabIndex={0}
         onKeyDown={handleRowKey}
-        className="group flex items-center gap-1.5 rounded-md px-1 py-0.5 hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="group flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         style={{ paddingLeft: depth * 18 + 4 }}
       >
         {/* selection checkbox (bulk mode) */}

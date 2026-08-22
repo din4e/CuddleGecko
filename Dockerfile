@@ -6,7 +6,10 @@ WORKDIR /app
 
 # CGO toolchain for mattn/go-sqlite3 (unconditionally imported by pkg/database,
 # so CGO stays on even when production runs on MySQL).
-RUN apk add --no-cache gcc musl-dev
+# Alpine's default CDN stalls badly on CN networks (gcc alone can take 20min);
+# swap to the Aliyun mirror, same pattern as GOPROXY below.
+RUN sed -i 's#https://dl-cdn.alpinelinux.org#https://mirrors.aliyun.com#' /etc/apk/repositories \
+    && apk add --no-cache gcc musl-dev
 
 COPY go.mod go.sum ./
 # Use a CN-accessible mirror first; proxy.golang.org can be flaky on some networks.
