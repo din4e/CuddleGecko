@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 )
@@ -19,17 +20,19 @@ type RelationRepository interface {
 }
 
 type GraphNode struct {
-	ID                 uint     `json:"id"`
-	Name               string   `json:"name"`
-	RelationshipLabels []string `json:"relationship_labels"`
-	AvatarEmoji        string   `json:"avatar_emoji"`
-	AvatarURL          string   `json:"avatar_url"`
+	ID                 uint       `json:"id"`
+	Name               string     `json:"name"`
+	RelationshipLabels []string   `json:"relationship_labels"`
+	AvatarEmoji        string     `json:"avatar_emoji"`
+	AvatarURL          string     `json:"avatar_url"`
+	LastInteractionAt  *time.Time `json:"last_interaction_at,omitempty"`
 }
 
 type GraphEdge struct {
-	Source       uint   `json:"source"`
-	Target       uint   `json:"target"`
-	RelationType string `json:"relation_type"`
+	Source       uint       `json:"source"`
+	Target       uint       `json:"target"`
+	RelationType string     `json:"relation_type"`
+	CreatedAt    *time.Time `json:"created_at,omitempty"`
 }
 
 type GraphData struct {
@@ -38,12 +41,13 @@ type GraphData struct {
 }
 
 type RelationService struct {
-	relationRepo RelationRepository
-	contactRepo  ContactRepository
+	relationRepo    RelationRepository
+	contactRepo     ContactRepository
+	interactionRepo InteractionRepository
 }
 
-func NewRelationService(relationRepo RelationRepository, contactRepo ContactRepository) *RelationService {
-	return &RelationService{relationRepo: relationRepo, contactRepo: contactRepo}
+func NewRelationService(relationRepo RelationRepository, contactRepo ContactRepository, interactionRepo InteractionRepository) *RelationService {
+	return &RelationService{relationRepo: relationRepo, contactRepo: contactRepo, interactionRepo: interactionRepo}
 }
 
 func (s *RelationService) Create(ctx context.Context, userID, workspaceID, contactIDA uint, relation *model.ContactRelation) (*model.ContactRelation, error) {
@@ -77,24 +81,42 @@ func (s *RelationService) GetGraphData(ctx context.Context, userID, workspaceID 
 		return nil, err
 	}
 
+	// Per-contact last interaction time — powers the temporal coloring on the frontend.
+	lastInt := map[uint]time.Time{}
+	if s.interactionRepo != nil {
+		if m, err := s.interactionRepo.LastByContact(ctx, workspaceID); err == nil {
+			lastInt = m
+		}
+	}
+
 	nodes := make([]GraphNode, len(contacts))
 	for i, c := range contacts {
-		nodes[i] = GraphNode{
+		n := GraphNode{
 			ID:                 c.ID,
 			Name:               c.Name,
 			RelationshipLabels: c.RelationshipLabels,
 			AvatarEmoji:        c.AvatarEmoji,
 			AvatarURL:          c.AvatarURL,
 		}
+		if t, ok := lastInt[c.ID]; ok && !t.IsZero() {
+			tt := t
+			n.LastInteractionAt = &tt
+		}
+		nodes[i] = n
 	}
 
 	edges := make([]GraphEdge, len(relations))
 	for i, r := range relations {
-		edges[i] = GraphEdge{
+		e := GraphEdge{
 			Source:       r.ContactIDA,
 			Target:       r.ContactIDB,
 			RelationType: r.RelationType,
 		}
+		if !r.CreatedAt.IsZero() {
+			ct := r.CreatedAt
+			e.CreatedAt = &ct
+		}
+		edges[i] = e
 	}
 
 	return &GraphData{Nodes: nodes, Edges: edges}, nil

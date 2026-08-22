@@ -43,8 +43,7 @@ type updateTransactionRequest struct {
 func (h *TransactionHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page, pageSize := parsePagination(c, 20)
 
 	var txType *string
 	if v := c.Query("type"); v != "" {
@@ -66,6 +65,25 @@ func (h *TransactionHandler) List(c *gin.Context) {
 	}
 
 	response.OKPaginated(c, txs, total, page, pageSize)
+}
+
+func (h *TransactionHandler) MonthlyTrend(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	months, _ := strconv.Atoi(c.DefaultQuery("months", "6"))
+	if months < 1 {
+		months = 1
+	} else if months > 24 {
+		months = 24
+	}
+
+	trend, err := h.svc.Monthly(c.Request.Context(), userID, workspaceID, months)
+	if err != nil {
+		response.InternalError(c, "failed to get transaction trend")
+		return
+	}
+
+	response.OK(c, trend)
 }
 
 func (h *TransactionHandler) Summary(c *gin.Context) {

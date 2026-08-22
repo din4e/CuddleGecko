@@ -48,6 +48,7 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 
 	userRepo := repository.NewUserRepo(db)
 	contactRepo := repository.NewContactRepo(db)
+	taggingRepo := repository.NewTaggingRepo(db)
 	tagRepo := repository.NewTagRepo(db)
 	interactionRepo := repository.NewInteractionRepo(db)
 	reminderRepo := repository.NewReminderRepo(db)
@@ -67,11 +68,11 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
 	authSvc := service.NewAuthService(userRepo, jwtCfg, workspaceSvc)
 	captchaSvc := service.NewCaptchaService(config.CaptchaConfig{}, settingRepo)
-	contactSvc := service.NewContactService(contactRepo)
+	contactSvc := service.NewContactService(contactRepo, taggingRepo)
 	tagSvc := service.NewTagService(tagRepo)
 	interactionSvc := service.NewInteractionService(interactionRepo)
 	reminderSvc := service.NewReminderService(reminderRepo)
-	relationSvc := service.NewRelationService(relationRepo, contactRepo)
+	relationSvc := service.NewRelationService(relationRepo, contactRepo, interactionRepo)
 	eventSvc := service.NewEventService(eventRepo)
 	hub := realtime.NewHub()
 	defer hub.Close()
@@ -83,10 +84,10 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 		service.WithExportNotifier(hub), service.WithTransactionRepo(transactionRepo), service.WithEventRepo(eventRepo),
 		service.WithWorkoutRepos(workoutRepo, workoutExerciseRepo, bodyMetricRepo))
 	userSettingSvc := service.NewUserSettingService(userSettingRepo)
-	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, transactionSvc, aiSvc, workspaceSvc)
+	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, transactionSvc, aiSvc, workspaceSvc, nil, nil)
 
 	avatarDir := t.TempDir()
-	handlers := NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarDir, config.AIConfig{}, userSettingSvc)
+	handlers := NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarDir, config.AIConfig{}, userSettingSvc, nil, nil)
 	handlers.WS = NewWSHandler(hub, jwtCfg, workspaceSvc, gin.TestMode, []string{})
 
 	r := gin.New()

@@ -40,6 +40,7 @@ func main() {
 	userRepo := repository.NewUserRepo(db)
 	contactRepo := repository.NewContactRepo(db)
 	tagRepo := repository.NewTagRepo(db)
+	taggingRepo := repository.NewTaggingRepo(db)
 	interactionRepo := repository.NewInteractionRepo(db)
 	reminderRepo := repository.NewReminderRepo(db)
 	relationRepo := repository.NewRelationRepo(db)
@@ -48,6 +49,9 @@ func main() {
 	workoutRepo := repository.NewWorkoutRepo(db)
 	workoutExerciseRepo := repository.NewWorkoutExerciseRepo(db)
 	bodyMetricRepo := repository.NewBodyMetricRepo(db)
+	habitRepo := repository.NewHabitRepo(db)
+	habitLogRepo := repository.NewHabitLogRepo(db)
+	pomodoroRepo := repository.NewPomodoroRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
 	aiRepo := repository.NewAIRepo(db)
 	workspaceRepo := repository.NewWorkspaceRepo(db)
@@ -58,11 +62,11 @@ func main() {
 	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
 	authSvc := service.NewAuthService(userRepo, &cfg.JWT, workspaceSvc)
 	captchaSvc := service.NewCaptchaService(cfg.Captcha, settingRepo)
-	contactSvc := service.NewContactService(contactRepo)
+	contactSvc := service.NewContactService(contactRepo, taggingRepo)
 	tagSvc := service.NewTagService(tagRepo)
 	interactionSvc := service.NewInteractionService(interactionRepo)
 	reminderSvc := service.NewReminderService(reminderRepo)
-	relationSvc := service.NewRelationService(relationRepo, contactRepo)
+	relationSvc := service.NewRelationService(relationRepo, contactRepo, interactionRepo)
 	eventSvc := service.NewEventService(eventRepo)
 	// The realtime hub fans todo mutations out to connected WS clients. Built
 	// before the todo service so it can be wired in as the change notifier.
@@ -74,13 +78,15 @@ func main() {
 	workoutSetLogRepo := repository.NewWorkoutSetLogRepo(db)
 	fitnessGoalRepo := repository.NewFitnessGoalRepo(db)
 	fitnessSvc := service.NewFitnessService(exerciseLibraryRepo, workoutTemplateRepo, workoutSetLogRepo, fitnessGoalRepo, workoutSvc)
+	habitSvc := service.NewHabitService(habitRepo, habitLogRepo)
+	pomodoroSvc := service.NewPomodoroService(pomodoroRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
 	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo, service.WithExportNotifier(hub), service.WithTransactionRepo(transactionRepo), service.WithEventRepo(eventRepo), service.WithWorkoutRepos(workoutRepo, workoutExerciseRepo, bodyMetricRepo))
 	userSettingSvc := service.NewUserSettingService(userSettingRepo)
 
 	// MCP Server
-	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, fitnessSvc, transactionSvc, aiSvc, workspaceSvc)
+	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, fitnessSvc, transactionSvc, aiSvc, workspaceSvc, habitSvc, pomodoroSvc)
 
 	// Ensure avatar directory exists
 	avatarDir := cfg.Server.AvatarDir
@@ -93,7 +99,7 @@ func main() {
 	}
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, fitnessSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, fitnessSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc, habitSvc, pomodoroSvc)
 	handlers.WS = handler.NewWSHandler(hub, &cfg.JWT, workspaceSvc, cfg.Server.Mode, cfg.CORS.AllowOrigins)
 
 	// Router

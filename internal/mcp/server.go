@@ -32,6 +32,8 @@ type MCPServer struct {
 	transactionSvc *service.TransactionService
 	aiSvc          *service.AIService
 	workspaceSvc   *service.WorkspaceService
+	habitSvc       *service.HabitService
+	pomodoroSvc    *service.PomodoroService
 
 	tools    map[string]toolDef
 	toolList []Tool
@@ -51,6 +53,8 @@ func NewServer(
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
 	workspaceSvc *service.WorkspaceService,
+	habitSvc *service.HabitService,
+	pomodoroSvc *service.PomodoroService,
 ) *MCPServer {
 	s := &MCPServer{
 		contactSvc:     contactSvc,
@@ -65,6 +69,8 @@ func NewServer(
 		transactionSvc: transactionSvc,
 		aiSvc:          aiSvc,
 		workspaceSvc:   workspaceSvc,
+		habitSvc:       habitSvc,
+		pomodoroSvc:    pomodoroSvc,
 		tools:          make(map[string]toolDef),
 	}
 
@@ -73,6 +79,8 @@ func NewServer(
 	s.registerTodoTools()
 	s.registerWorkoutTools()
 	s.registerFitnessTools()
+	s.registerHabitTools()
+	s.registerPomodoroTools()
 	s.registerTagTools()
 	s.registerTransactionTools()
 	s.registerInteractionTools()

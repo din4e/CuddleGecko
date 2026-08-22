@@ -25,7 +25,7 @@ func (r *ContactRepo) Create(ctx context.Context, contact *model.Contact) error 
 
 func (r *ContactRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Contact, error) {
 	var contact model.Contact
-	err := r.db.WithContext(ctx).Preload("Tags").
+	err := r.db.WithContext(ctx).
 		Where("id = ? AND workspace_id = ?", id, workspaceID).
 		First(&contact).Error
 	if err != nil {
@@ -36,7 +36,7 @@ func (r *ContactRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model
 
 func (r *ContactRepo) GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Contact, error) {
 	var contacts []model.Contact
-	err := r.db.WithContext(ctx).Preload("Tags").
+	err := r.db.WithContext(ctx).
 		Where("id IN ? AND workspace_id = ?", ids, workspaceID).
 		Find(&contacts).Error
 	if err != nil {
@@ -57,8 +57,11 @@ func (r *ContactRepo) List(ctx context.Context, workspaceID uint, page, pageSize
 	}
 
 	if len(tagIDs) > 0 {
-		query = query.Joins("JOIN contact_tags ON contact_tags.contact_id = contacts.id").
-			Where("contact_tags.tag_id IN ?", tagIDs)
+		// EXISTS avoids duplicate contact rows when multiple selected tags match.
+		query = query.Where(
+			"EXISTS (SELECT 1 FROM taggings WHERE taggings.workspace_id = ? AND taggings.target_type = ? AND taggings.target_id = contacts.id AND taggings.tag_id IN ?)",
+			workspaceID, model.TagTargetContact, tagIDs,
+		)
 	}
 
 	if err := query.Model(&model.Contact{}).Count(&total).Error; err != nil {
@@ -67,7 +70,7 @@ func (r *ContactRepo) List(ctx context.Context, workspaceID uint, page, pageSize
 
 	page, pageSize = clampPage(page, pageSize)
 	offset := (page - 1) * pageSize
-	err := query.Preload("Tags").Offset(offset).Limit(pageSize).
+	err := query.Offset(offset).Limit(pageSize).
 		Order("created_at DESC").
 		Find(&contacts).Error
 	if err != nil {
@@ -103,26 +106,51 @@ func (r *ContactRepo) Update(ctx context.Context, contact *model.Contact) error 
 	return nil
 }
 
+// ReplaceTags swaps the polymorphic tag associations of a contact in one
+// transaction. Used by JSON import to restore tag links after re-creating
+// contacts (by name → freshly-created tag id).
+func (r *ContactRepo) ReplaceTags(ctx context.Context, contactID uint, tags []model.Tag) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("target_type = ? AND target_id = ?", model.TagTargetContact, contactID).
+			Delete(&model.Tagging{}).Error; err != nil {
+			return fmt.Errorf("clear contact taggings: %w", err)
+		}
+		for _, t := range tags {
+			tagging := model.Tagging{WorkspaceID: t.WorkspaceID, TagID: t.ID, TargetType: model.TagTargetContact, TargetID: contactID}
+			if err := tx.Create(&tagging).Error; err != nil {
+				return fmt.Errorf("restore contact tagging: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
+// GetTags returns the tags attached to a contact through the polymorphic
+// tagging table.
+func (r *ContactRepo) GetTags(ctx context.Context, workspaceID, contactID uint) ([]model.Tag, error) {
+	var taggings []model.Tagging
+	if err := r.db.WithContext(ctx).
+		Where("workspace_id = ? AND target_type = ? AND target_id = ?", workspaceID, model.TagTargetContact, contactID).
+		Find(&taggings).Error; err != nil {
+		return nil, fmt.Errorf("load contact taggings: %w", err)
+	}
+	if len(taggings) == 0 {
+		return nil, nil
+	}
+	tagIDs := make([]uint, len(taggings))
+	for i, tg := range taggings {
+		tagIDs[i] = tg.TagID
+	}
+	var tags []model.Tag
+	if err := r.db.WithContext(ctx).Where("id IN ?", tagIDs).Find(&tags).Error; err != nil {
+		return nil, fmt.Errorf("load contact tags: %w", err)
+	}
+	return tags, nil
+}
+
 func (r *ContactRepo) Delete(ctx context.Context, workspaceID, id uint) error {
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Contact{}).Error; err != nil {
 		return fmt.Errorf("delete contact: %w", err)
 	}
 	return nil
-}
-
-func (r *ContactRepo) ReplaceTags(ctx context.Context, contactID uint, tags []model.Tag) error {
-	contact := model.Contact{ID: contactID}
-	if err := r.db.WithContext(ctx).Model(&contact).Association("Tags").Replace(tags); err != nil {
-		return fmt.Errorf("replace contact tags: %w", err)
-	}
-	return nil
-}
-
-func (r *ContactRepo) GetTags(ctx context.Context, contactID uint) ([]model.Tag, error) {
-	var tags []model.Tag
-	contact := model.Contact{ID: contactID}
-	if err := r.db.WithContext(ctx).Model(&contact).Association("Tags").Find(&tags); err != nil {
-		return nil, fmt.Errorf("get contact tags: %w", err)
-	}
-	return tags, nil
 }

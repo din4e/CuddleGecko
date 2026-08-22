@@ -5,25 +5,46 @@ import AppLayout from './layouts/AppLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import {
+  loadAIChatPage,
+  loadCalendarPage,
+  loadContactDetailPage,
+  loadContactsPage,
+  loadDashboardPage,
+  loadEventsPage,
+  loadFinancePage,
+  loadGraphPage,
+  loadHabitsPage,
+  loadPomodoroPage,
+  loadRemindersPage,
+  loadSettingsPage,
+  loadTagsPage,
+  loadTerminalPage,
+  loadTodosPage,
+} from './lib/pageLoaders'
 
-const DashboardPage = lazy(() => import('./pages/DashboardPage'))
-const ContactsPage = lazy(() => import('./pages/ContactsPage'))
-const ContactDetailPage = lazy(() => import('./pages/ContactDetailPage'))
-const GraphPage = lazy(() => import('./pages/GraphPage'))
-const EventsPage = lazy(() => import('./pages/EventsPage'))
-const FinancePage = lazy(() => import('./pages/FinancePage'))
-const TagsPage = lazy(() => import('./pages/TagsPage'))
-const RemindersPage = lazy(() => import('./pages/RemindersPage'))
-const SettingsPage = lazy(() => import('./pages/SettingsPage'))
-const AIChatPage = lazy(() => import('./pages/AIChatPage'))
-const TodosPage = lazy(() => import('./pages/TodosPage'))
+const DashboardPage = lazy(loadDashboardPage)
+const ContactsPage = lazy(loadContactsPage)
+const ContactDetailPage = lazy(loadContactDetailPage)
+const GraphPage = lazy(loadGraphPage)
+const EventsPage = lazy(loadEventsPage)
+const FinancePage = lazy(loadFinancePage)
+const TagsPage = lazy(loadTagsPage)
+const RemindersPage = lazy(loadRemindersPage)
+const SettingsPage = lazy(loadSettingsPage)
+const AIChatPage = lazy(loadAIChatPage)
+const TodosPage = lazy(loadTodosPage)
+const HabitsPage = lazy(loadHabitsPage)
+const PomodoroPage = lazy(loadPomodoroPage)
+const CalendarPage = lazy(loadCalendarPage)
 const FitnessPage = lazy(() => import('./pages/FitnessPage'))
-const TerminalPage = lazy(() => import('./pages/TerminalPage'))
+const TerminalPage = lazy(loadTerminalPage)
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center h-[50vh]">
-      <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+    <div className="flex h-[50vh] flex-col items-center justify-center gap-3 text-sm text-muted-foreground" role="status" aria-live="polite">
+      <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <span>Loading page</span>
     </div>
   )
 }
@@ -54,6 +75,9 @@ export default function App() {
           <Route path="events" element={<Suspense fallback={<PageLoader />}><EventsPage /></Suspense>} />
           <Route path="todos" element={<Suspense fallback={<PageLoader />}><TodosPage /></Suspense>} />
           <Route path="fitness" element={<Suspense fallback={<PageLoader />}><FitnessPage /></Suspense>} />
+          <Route path="habits" element={<Suspense fallback={<PageLoader />}><HabitsPage /></Suspense>} />
+          <Route path="pomodoro" element={<Suspense fallback={<PageLoader />}><PomodoroPage /></Suspense>} />
+          <Route path="calendar" element={<Suspense fallback={<PageLoader />}><CalendarPage /></Suspense>} />
           <Route path="finance" element={<Suspense fallback={<PageLoader />}><FinancePage /></Suspense>} />
           <Route path="tags" element={<Suspense fallback={<PageLoader />}><TagsPage /></Suspense>} />
           <Route path="reminders" element={<Suspense fallback={<PageLoader />}><RemindersPage /></Suspense>} />

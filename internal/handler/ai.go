@@ -95,8 +95,7 @@ func (h *AIHandler) TestConnection(c *gin.Context) {
 
 func (h *AIHandler) ListConversations(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page, pageSize := parsePagination(c, 20)
 
 	conversations, total, err := h.svc.ListConversations(c.Request.Context(), userID, page, pageSize)
 	if err != nil {
@@ -334,9 +333,9 @@ func (h *AIHandler) ListPresets(c *gin.Context) {
 func (h *AIHandler) EnvProviderStatus(c *gin.Context) {
 	configured := h.aiCfg.APIKey != "" && h.aiCfg.BaseURL != ""
 	response.OK(c, gin.H{
-		"configured":     configured,
-		"provider_type":  h.aiCfg.ProviderType,
-		"model":          h.aiCfg.Model,
-		"base_url":       h.aiCfg.BaseURL,
+		"configured":    configured,
+		"provider_type": h.aiCfg.ProviderType,
+		"model":         h.aiCfg.Model,
+		"base_url":      h.aiCfg.BaseURL,
 	})
 }
