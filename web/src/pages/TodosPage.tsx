@@ -94,7 +94,7 @@ export default function TodosPage() {
   const [sort, setSort] = useState<TodoSort>('due_date')
   const [order, setOrder] = useState<'asc' | 'desc'>('asc')
   const [view, setView] = useState<TodoView>(
-    () => (localStorage.getItem('todoView') as TodoView) || 'grouped',
+    () => (localStorage.getItem('todoView') as TodoView) || 'tree',
   )
   const [dialogOpen, setDialogOpen] = useState(false)
   const [page, setPage] = useState(1)
@@ -290,9 +290,22 @@ export default function TodosPage() {
   }, [t])
 
   // Kanban: dropping a card on the opposite-status column toggles it.
+  const [dragOverCol, setDragOverCol] = useState<'pending' | 'done' | null>(null)
+  const handleColumnDragOver = (e: React.DragEvent, col: 'pending' | 'done') => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverCol(col)
+  }
+  const handleColumnDragLeave = (e: React.DragEvent, col: 'pending' | 'done') => {
+    // Only clear when actually leaving the column, not while moving between its children.
+    if (dragOverCol === col && !e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setDragOverCol(null)
+    }
+  }
   const handleColumnDrop = (targetStatus: 'pending' | 'done') => {
     const id = dragId
     setDragId(null)
+    setDragOverCol(null)
     if (id == null) return
     const todo = todos.find((it) => it.id === id)
     if (todo && todo.status !== targetStatus) handleToggle(id)
@@ -526,11 +539,12 @@ export default function TodosPage() {
       formatDate={formatDate}
       parentTitle={todo.parent_id ? todoTitleById.get(todo.parent_id) : undefined}
       onStartPomodoro={handleStartPomodoro}
+      onAddChild={openCreateChild}
     />
   )
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{t('todos.title')}</h1>
@@ -567,29 +581,14 @@ export default function TodosPage() {
         </div>
       </div>
 
-      {/* Productivity overview */}
+      {/* Productivity overview — one compact inline strip instead of a card grid */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-          <div className="rounded-lg border p-2">
-            <div className="text-xs text-muted-foreground">{t('todos.statPending')}</div>
-            <div className="text-lg font-semibold">{stats.pending}</div>
-          </div>
-          <div className="rounded-lg border p-2">
-            <div className="text-xs text-muted-foreground">{t('todos.statOverdue')}</div>
-            <div className={`text-lg font-semibold ${stats.overdue > 0 ? 'text-red-600 dark:text-red-400' : ''}`}>{stats.overdue}</div>
-          </div>
-          <div className="rounded-lg border p-2">
-            <div className="text-xs text-muted-foreground">{t('todos.statDeferred')}</div>
-            <div className={`text-lg font-semibold ${stats.deferred > 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>{stats.deferred}</div>
-          </div>
-          <div className="rounded-lg border p-2">
-            <div className="text-xs text-muted-foreground">{t('todos.statDoneToday')}</div>
-            <div className="text-lg font-semibold text-green-600 dark:text-green-400">{stats.done_today}</div>
-          </div>
-          <div className="rounded-lg border p-2">
-            <div className="text-xs text-muted-foreground">{t('todos.statDoneThisWeek')}</div>
-            <div className="text-lg font-semibold">{stats.done_this_week}</div>
-          </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span>{t('todos.statPending')} <b className="text-sm font-semibold text-foreground">{stats.pending}</b></span>
+          <span>{t('todos.statOverdue')} <b className={`text-sm font-semibold ${stats.overdue > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>{stats.overdue}</b></span>
+          <span>{t('todos.statDeferred')} <b className={`text-sm font-semibold ${stats.deferred > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>{stats.deferred}</b></span>
+          <span>{t('todos.statDoneToday')} <b className="text-sm font-semibold text-green-600 dark:text-green-400">{stats.done_today}</b></span>
+          <span>{t('todos.statDoneThisWeek')} <b className="text-sm font-semibold text-foreground">{stats.done_this_week}</b></span>
         </div>
       )}
 
@@ -601,7 +600,7 @@ export default function TodosPage() {
             value={quickTitle}
             onChange={(e) => setQuickTitle(e.target.value)}
             placeholder={t('todos.quickAdd')}
-            className="h-9 pl-8"
+            className="h-8 pl-8"
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleQuickAdd() } }}
           />
         </div>
@@ -609,7 +608,7 @@ export default function TodosPage() {
           type="datetime-local"
           value={quickDue}
           onChange={(e) => setQuickDue(e.target.value)}
-          className="h-9 w-44"
+          className="h-8 w-40"
           aria-label={t('todos.dueTime')}
         />
         <Button size="sm" onClick={handleQuickAdd} disabled={!quickTitle.trim() || createTodo.isPending}>
@@ -618,19 +617,85 @@ export default function TodosPage() {
         </Button>
       </div>
 
-      {/* Smart-list switcher */}
-      <div className="flex flex-wrap border rounded-md overflow-hidden w-fit">
-        {(['all', 'today', 'next7', 'overdue', 'pending', 'completed', 'trash'] as SmartList[]).map((s) => (
-          <Button
-            key={s}
-            variant={smartList === s ? 'default' : 'ghost'}
-            size="sm"
-            className="h-7 px-2.5 text-xs rounded-none"
-            onClick={() => { setSmartList(s); setPage(1) }}
-          >
-            {t(`todos.${s === 'next7' ? 'next7' : s}`)}
-          </Button>
-        ))}
+      {/* Smart-list switcher + filters in one toolbar row (wraps on narrow screens) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex border rounded-md overflow-hidden w-fit">
+          {(['all', 'today', 'next7', 'overdue', 'pending', 'completed', 'trash'] as SmartList[]).map((s) => (
+            <Button
+              key={s}
+              variant={smartList === s ? 'default' : 'ghost'}
+              size="sm"
+              className="h-7 px-2.5 text-xs rounded-none"
+              onClick={() => { setSmartList(s); setPage(1) }}
+            >
+              {t(`todos.${s === 'next7' ? 'next7' : s}`)}
+            </Button>
+          ))}
+        </div>
+
+        <div className="relative min-w-[160px] flex-1 max-w-xs">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            ref={searchRef}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder={t('todos.searchPlaceholder')}
+            className="h-7 pl-8 pr-7"
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => setSearchInput('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={t('todos.clearSearch')}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <select
+          value={priorityFilter}
+          onChange={(e) => { setPriorityFilter(e.target.value as typeof priorityFilter); setPage(1) }}
+          className="h-7 rounded-md border bg-background px-1.5 text-xs"
+          aria-label={t('todos.priority')}
+        >
+          <option value="">{t('todos.allPriorities')}</option>
+          <option value="high">{t('todos.high')}</option>
+          <option value="normal">{t('todos.normal')}</option>
+          <option value="low">{t('todos.low')}</option>
+        </select>
+        <select
+          value={tagFilter}
+          onChange={(e) => { setTagFilter(e.target.value); setPage(1) }}
+          className="h-7 rounded-md border bg-background px-1.5 text-xs"
+          aria-label={t('todos.tags')}
+        >
+          <option value="">{t('todos.allTags')}</option>
+          {tags.map((tag) => (
+            <option key={tag.id} value={String(tag.id)}>{tag.name}</option>
+          ))}
+        </select>
+        <select
+          value={sort}
+          onChange={(e) => { setSort(e.target.value as TodoSort); setPage(1) }}
+          className="h-7 rounded-md border bg-background px-1.5 text-xs"
+          aria-label={t('todos.sort')}
+        >
+          <option value="due_date">{t('todos.sortDueDate')}</option>
+          <option value="priority">{t('todos.sortPriority')}</option>
+          <option value="title">{t('todos.sortTitle')}</option>
+          <option value="created">{t('todos.sortCreated')}</option>
+          <option value="manual">{t('todos.sortManual')}</option>
+        </select>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 w-7 p-0"
+          onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+          title={order === 'asc' ? t('todos.ascending') : t('todos.descending')}
+        >
+          <ArrowDownUp className={`h-3.5 w-3.5 transition-transform ${order === 'desc' ? 'rotate-180' : ''}`} />
+        </Button>
       </div>
 
       {/* Bulk action bar */}
@@ -649,73 +714,6 @@ export default function TodosPage() {
           <Button size="sm" variant="ghost" onClick={exitSelection}>{t('common.cancel')}</Button>
         </div>
       )}
-
-      {/* Filter / search / sort toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            ref={searchRef}
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder={t('todos.searchPlaceholder')}
-            className="h-8 pl-8 pr-8"
-          />
-          {searchInput && (
-            <button
-              type="button"
-              onClick={() => setSearchInput('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={t('todos.clearSearch')}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-        <select
-          value={priorityFilter}
-          onChange={(e) => { setPriorityFilter(e.target.value as typeof priorityFilter); setPage(1) }}
-          className="h-8 rounded-md border bg-background px-2 text-sm"
-          aria-label={t('todos.priority')}
-        >
-          <option value="">{t('todos.allPriorities')}</option>
-          <option value="high">{t('todos.high')}</option>
-          <option value="normal">{t('todos.normal')}</option>
-          <option value="low">{t('todos.low')}</option>
-        </select>
-        <select
-          value={tagFilter}
-          onChange={(e) => { setTagFilter(e.target.value); setPage(1) }}
-          className="h-8 rounded-md border bg-background px-2 text-sm"
-          aria-label={t('todos.tags')}
-        >
-          <option value="">{t('todos.allTags')}</option>
-          {tags.map((tag) => (
-            <option key={tag.id} value={String(tag.id)}>{tag.name}</option>
-          ))}
-        </select>
-        <select
-          value={sort}
-          onChange={(e) => { setSort(e.target.value as TodoSort); setPage(1) }}
-          className="h-8 rounded-md border bg-background px-2 text-sm"
-          aria-label={t('todos.sort')}
-        >
-          <option value="due_date">{t('todos.sortDueDate')}</option>
-          <option value="priority">{t('todos.sortPriority')}</option>
-          <option value="title">{t('todos.sortTitle')}</option>
-          <option value="created">{t('todos.sortCreated')}</option>
-          <option value="manual">{t('todos.sortManual')}</option>
-        </select>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 w-8 p-0"
-          onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
-          title={order === 'asc' ? t('todos.ascending') : t('todos.descending')}
-        >
-          <ArrowDownUp className={`h-4 w-4 transition-transform ${order === 'desc' ? 'rotate-180' : ''}`} />
-        </Button>
-      </div>
 
       {/* Content */}
       {smartList === 'trash' ? (
@@ -742,8 +740,8 @@ export default function TodosPage() {
         <EmptyState message={t('todos.noTodos')} />
       ) : sort === 'manual' && view !== 'kanban' && view !== 'tree' ? (
         /* Manual-order flat list with move controls */
-        <div className="space-y-6">
-          <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="space-y-1.5">
             {pendingTodos.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">{t('todos.noTodos')}</p>
             ) : (
@@ -764,8 +762,8 @@ export default function TodosPage() {
           </div>
           {doneTodos.length > 0 && smartList === 'all' && (
             <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">{t('todos.completed')} ({doneTodos.length})</h3>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
+              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {doneTodos.map((todo) => renderTodoCard(todo))}
               </div>
             </div>
@@ -805,14 +803,14 @@ export default function TodosPage() {
         /* Timeline View */
         <div className="relative pl-6">
           <div className="absolute left-2 top-0 bottom-0 w-px bg-border" />
-          <div className="space-y-6">
+          <div className="space-y-3">
             {timelineGroups.map(({ date, items }) => (
               <div key={date}>
-                <div className="relative flex items-center gap-2 mb-3">
+                <div className="relative flex items-center gap-2 mb-1.5">
                   <div className="absolute -left-[18px] w-3 h-3 rounded-full bg-primary border-2 border-background" />
                   <span className="text-sm font-medium text-muted-foreground">{date}</span>
                 </div>
-                <div className="space-y-2 ml-2">
+                <div className="space-y-1.5 ml-2">
                   {items.map((todo) => renderTodoCard(todo))}
                 </div>
               </div>
@@ -821,19 +819,19 @@ export default function TodosPage() {
         </div>
       ) : view === 'grouped' ? (
         /* Date-grouped View */
-        <div className="space-y-6">
+        <div className="space-y-3">
           {groupedTodos.filter((g) => g.items.length > 0).map((group) => (
             <div key={group.key}>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">{group.label}</h3>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{group.label}</h3>
+              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {group.items.map((todo) => renderTodoCard(todo))}
               </div>
             </div>
           ))}
           {doneTodos.length > 0 && smartList === 'all' && (
             <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">{t('todos.completed')} ({doneTodos.length})</h3>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
+              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {doneTodos.map((todo) => renderTodoCard(todo))}
               </div>
             </div>
@@ -841,15 +839,16 @@ export default function TodosPage() {
         </div>
       ) : (
         /* Kanban View — drag a card to the other column to toggle its status */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+            <h3 className="text-sm font-medium mb-1.5 flex items-center gap-2">
               <Circle className="h-4 w-4 text-muted-foreground" />
               {t('todos.pending')} ({pendingTodos.length})
             </h3>
             <div
-              className="space-y-2 min-h-[200px] bg-muted/30 rounded-lg p-3"
-              onDragOver={(e) => e.preventDefault()}
+              className={`space-y-1.5 min-h-[200px] bg-muted/30 rounded-lg p-2 transition-shadow ${dragOverCol === 'pending' ? 'ring-2 ring-primary/60 bg-primary/5' : 'ring-2 ring-transparent'}`}
+              onDragOver={(e) => handleColumnDragOver(e, 'pending')}
+              onDragLeave={(e) => handleColumnDragLeave(e, 'pending')}
               onDrop={() => handleColumnDrop('pending')}
             >
               {pendingTodos.length === 0 ? (
@@ -859,9 +858,12 @@ export default function TodosPage() {
                   <div
                     key={todo.id}
                     draggable
-                    onDragStart={() => setDragId(todo.id)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'move'
+                      setDragId(todo.id)
+                    }}
                     onDragEnd={() => setDragId(null)}
-                    className={dragId === todo.id ? 'opacity-50' : ''}
+                    className={`cursor-grab transition-all ${dragId === todo.id ? 'opacity-40 rotate-2 scale-[0.97] shadow-lg' : 'hover:shadow-sm'}`}
                   >
                     {renderTodoCard(todo, true)}
                   </div>
@@ -870,13 +872,14 @@ export default function TodosPage() {
             </div>
           </div>
           <div>
-            <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+            <h3 className="text-sm font-medium mb-1.5 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-green-500" />
               {t('todos.done')} ({doneTodos.length})
             </h3>
             <div
-              className="space-y-2 min-h-[200px] bg-muted/30 rounded-lg p-3"
-              onDragOver={(e) => e.preventDefault()}
+              className={`space-y-1.5 min-h-[200px] bg-muted/30 rounded-lg p-2 transition-shadow ${dragOverCol === 'done' ? 'ring-2 ring-primary/60 bg-primary/5' : 'ring-2 ring-transparent'}`}
+              onDragOver={(e) => handleColumnDragOver(e, 'done')}
+              onDragLeave={(e) => handleColumnDragLeave(e, 'done')}
               onDrop={() => handleColumnDrop('done')}
             >
               {doneTodos.length === 0 ? (
@@ -886,9 +889,12 @@ export default function TodosPage() {
                   <div
                     key={todo.id}
                     draggable
-                    onDragStart={() => setDragId(todo.id)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'move'
+                      setDragId(todo.id)
+                    }}
                     onDragEnd={() => setDragId(null)}
-                    className={dragId === todo.id ? 'opacity-50' : ''}
+                    className={`cursor-grab transition-all ${dragId === todo.id ? 'opacity-40 rotate-2 scale-[0.97] shadow-lg' : 'hover:shadow-sm'}`}
                   >
                     {renderTodoCard(todo, true)}
                   </div>
