@@ -815,6 +815,54 @@ func remapParent(pid *uint, oldToNew map[uint]uint) *uint {
 
 // ExportTodosCSV renders the workspace's todos as a flat CSV (spreadsheet-friendly)
 // — one row per todo, tags joined by "; ". Nil parent_id → empty (root).
+
+// csvSafe neutralizes spreadsheet formula injection: a cell starting with
+// =, +, -, @ or a tab/CR would execute as a formula in Excel/WPS when the
+// exported file is opened, so prefix it with a single quote (Excel renders
+// the quote-invisible and keeps the cell literal).
+func csvSafe(s string) string {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '-', '+':
+		// Numeric cells (amounts, ids) are safe — only neutralize when the
+		// rest isn't a plain number.
+		if isNumeric(s[1:]) {
+			return s
+		}
+		return "'" + s
+	case '=', '@', '\t', '\r':
+		return "'" + s
+	}
+	return s
+}
+
+func isNumeric(s string) bool {
+	if s == "" {
+		return false
+	}
+	dot := false
+	for i := 0; i < len(s); i++ {
+		switch {
+		case s[i] >= '0' && s[i] <= '9':
+		case s[i] == '.' && !dot:
+			dot = true
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// csvWriteRow writes a row with every cell passed through csvSafe.
+func csvWriteRow(w *csv.Writer, cells []string) {
+	for i, c := range cells {
+		cells[i] = csvSafe(c)
+	}
+	_ = w.Write(cells)
+}
+
 func (s *ExportService) ExportTodosCSV(ctx context.Context, workspaceID uint) (string, error) {
 	todos, _, err := s.todoRepo.List(ctx, workspaceID, model.TodoListQuery{Page: 1, PageSize: 100000})
 	if err != nil {
@@ -822,7 +870,7 @@ func (s *ExportService) ExportTodosCSV(ctx context.Context, workspaceID uint) (s
 	}
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	_ = w.Write([]string{
+	csvWriteRow(w, []string{
 		"id", "title", "description", "status", "priority", "due_time", "start_time",
 		"parent_id", "sort_order", "amount", "amount_type", "color", "repeat",
 		"repeat_interval", "pinned", "completed_at", "tags", "item_done", "item_total", "created_at",
@@ -832,7 +880,7 @@ func (s *ExportService) ExportTodosCSV(ctx context.Context, workspaceID uint) (s
 		for _, tg := range t.Tags {
 			tagNames = append(tagNames, tg.Name)
 		}
-		_ = w.Write([]string{
+		csvWriteRow(w, []string{
 			strconv.FormatUint(uint64(t.ID), 10),
 			t.Title,
 			t.Description,
@@ -890,13 +938,13 @@ func (s *ExportService) ExportContactsCSV(ctx context.Context, workspaceID uint)
 	}
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	_ = w.Write([]string{"id", "name", "nickname", "emails", "phones", "birthday", "notes", "relationships", "tags"})
+	csvWriteRow(w, []string{"id", "name", "nickname", "emails", "phones", "birthday", "notes", "relationships", "tags"})
 	for _, c := range contacts {
 		tagNames := make([]string, 0, len(c.Tags))
 		for _, tg := range c.Tags {
 			tagNames = append(tagNames, tg.Name)
 		}
-		_ = w.Write([]string{
+		csvWriteRow(w, []string{
 			strconv.FormatUint(uint64(c.ID), 10),
 			c.Name,
 			c.Nickname,
@@ -924,13 +972,13 @@ func (s *ExportService) ExportTransactionsCSV(ctx context.Context, workspaceID u
 	}
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	_ = w.Write([]string{"id", "date", "title", "type", "amount", "category", "notes", "contact_ids"})
+	csvWriteRow(w, []string{"id", "date", "title", "type", "amount", "category", "notes", "contact_ids"})
 	for _, tx := range txs {
 		ids := make([]string, 0, len(tx.ContactIDs))
 		for _, id := range tx.ContactIDs {
 			ids = append(ids, strconv.FormatUint(uint64(id), 10))
 		}
-		_ = w.Write([]string{
+		csvWriteRow(w, []string{
 			strconv.FormatUint(uint64(tx.ID), 10),
 			tx.Date.Format(time.RFC3339),
 			tx.Title,
@@ -957,13 +1005,13 @@ func (s *ExportService) ExportEventsCSV(ctx context.Context, workspaceID uint) (
 	}
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	_ = w.Write([]string{"id", "title", "description", "start_time", "end_time", "location", "color", "contact_ids"})
+	csvWriteRow(w, []string{"id", "title", "description", "start_time", "end_time", "location", "color", "contact_ids"})
 	for _, ev := range events {
 		ids := make([]string, 0, len(ev.ContactIDs))
 		for _, id := range ev.ContactIDs {
 			ids = append(ids, strconv.FormatUint(uint64(id), 10))
 		}
-		_ = w.Write([]string{
+		csvWriteRow(w, []string{
 			strconv.FormatUint(uint64(ev.ID), 10),
 			ev.Title,
 			ev.Description,

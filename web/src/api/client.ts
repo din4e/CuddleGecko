@@ -74,28 +74,21 @@ client.interceptors.response.use(
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean }
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
-      const refreshToken = localStorage.getItem('refresh_token')
-      if (refreshToken) {
-        try {
-          const { data: refreshData } = await client.post<ApiResponse<AuthResponse>>('/auth/refresh', {
-            refresh_token: refreshToken,
-          })
-          const tokens = refreshData.data
-          localStorage.setItem('access_token', tokens.access_token)
-          localStorage.setItem('refresh_token', tokens.refresh_token)
-          originalRequest.headers = {
-            ...originalRequest.headers,
-            Authorization: `Bearer ${tokens.access_token}`,
-          }
-          cachedToken = tokens.access_token
-          return client(originalRequest)
-        } catch {
-          localStorage.removeItem('access_token')
-          localStorage.removeItem('refresh_token')
-          cachedToken = null
-          window.location.href = '/login'
+      try {
+        // The refresh token lives in an HttpOnly cookie scoped to /api/auth;
+        // no body needed. (Same-origin requests carry the cookie along.)
+        const { data: refreshData } = await client.post<ApiResponse<AuthResponse>>('/auth/refresh', {})
+        const tokens = refreshData.data
+        localStorage.setItem('access_token', tokens.access_token)
+        originalRequest.headers = {
+          ...originalRequest.headers,
+          Authorization: `Bearer ${tokens.access_token}`,
         }
-      } else {
+        cachedToken = tokens.access_token
+        return client(originalRequest)
+      } catch {
+        localStorage.removeItem('access_token')
+        cachedToken = null
         window.location.href = '/login'
       }
     }

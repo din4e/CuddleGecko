@@ -30,6 +30,15 @@ func main() {
 	if len(cfg.JWT.Secret) < 32 {
 		log.Fatal("JWT secret must be at least 32 characters. Set jwt.secret in config.yaml or CG_JWT_SECRET env var.")
 	}
+	// The committed sample secret passes the length check but is public
+	// knowledge — anyone could mint tokens for any user. Refuse to boot on it
+	// in release mode (debug/dev keeps working via config.yaml).
+	if cfg.JWT.Secret == "change-me-in-production-please-use-at-least-32-chars" {
+		if cfg.Server.Mode == gin.ReleaseMode {
+			log.Fatal("JWT secret is still the committed default — set a unique secret (CG_JWT_SECRET) before deploying.")
+		}
+		log.Println("WARNING: using the committed default JWT secret (dev only); set CG_JWT_SECRET for any real deployment.")
+	}
 
 	db, err := database.Init(&cfg.Database)
 	if err != nil {

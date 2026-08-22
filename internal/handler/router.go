@@ -113,6 +113,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			auth.POST("/register", h.Auth.Register)
 			auth.POST("/login", h.Auth.Login)
 			auth.POST("/refresh", h.Auth.Refresh)
+			auth.POST("/logout", h.Auth.Logout)
 		}
 
 		protected := api.Group("")
@@ -144,8 +145,10 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 		{
 			wsProtected.POST("/upload/avatar", h.Upload.UploadAvatar)
 
-			// MCP endpoint
-			wsProtected.POST("/mcp", mcpServer.HandlePost)
+			// MCP endpoint. Rate-limited like the REST AI routes: tool calls can
+			// drive the same paid LLM endpoints, so an unthrottled client (or a
+			// leaked token) must not be able to burn credits without bound.
+			wsProtected.POST("/mcp", middleware.NewIPRateLimiter(20, time.Minute).Middleware(), mcpServer.HandlePost)
 
 			buddies := wsProtected.Group("/buddies")
 			{
