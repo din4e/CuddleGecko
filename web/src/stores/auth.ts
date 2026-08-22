@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { authApi } from '../api/auth'
-import { setCachedToken } from '../api/client'
+import client, { setCachedToken } from '../api/client'
 import type { User } from '../types'
 
 interface AuthState {
@@ -24,8 +24,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true })
     try {
       const { data } = await authApi.login(username, password, captcha)
+      // Refresh token is set by the server as an HttpOnly cookie — never
+      // persisted to localStorage where XSS could read it at rest.
       localStorage.setItem('access_token', data.access_token)
-      localStorage.setItem('refresh_token', data.refresh_token)
       setCachedToken(data.access_token)
       set({ user: data.user, accessToken: data.access_token, isAuthenticated: true })
     } finally {
@@ -38,7 +39,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const { data } = await authApi.register(username, email, password, captcha)
       localStorage.setItem('access_token', data.access_token)
-      localStorage.setItem('refresh_token', data.refresh_token)
       setCachedToken(data.access_token)
       set({ user: data.user, accessToken: data.access_token, isAuthenticated: true })
     } finally {
@@ -48,7 +48,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    // Revoke the HttpOnly-cookie refresh-token family server-side, then let
+    // the response clear the cookie itself.
+    void client.post('/auth/logout', {}).catch(() => {})
     setCachedToken(null)
     set({ user: null, accessToken: null, isAuthenticated: false })
   },

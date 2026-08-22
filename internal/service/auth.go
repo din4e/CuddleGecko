@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"time"
@@ -97,7 +98,8 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*Au
 }
 
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthResult, error) {
-	rt, err := s.repo.GetRefreshToken(ctx, refreshToken)
+	tokenHash := HashRefreshToken(refreshToken)
+	rt, err := s.repo.GetRefreshToken(ctx, tokenHash)
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
@@ -106,7 +108,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 		return nil, ErrInvalidToken
 	}
 
-	if err := s.repo.RevokeRefreshToken(ctx, refreshToken); err != nil {
+	if err := s.repo.RevokeRefreshToken(ctx, tokenHash); err != nil {
 		// A replay (token already revoked — likely stolen) invalidates the
 		// user's ENTIRE refresh-token family so the attacker's lineage dies too.
 		if errors.Is(err, repository.ErrReplayedToken) {
@@ -124,6 +126,19 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 	return s.generateTokens(ctx, user)
 }
 
+// Logout revokes the whole refresh-token family of the presented token and
+// clears the cookie. Unknown/expired tokens are a no-op (idempotent logout).
+func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
+	rt, err := s.repo.GetRefreshToken(ctx, HashRefreshToken(refreshToken))
+	if err != nil {
+		return nil
+	}
+	return s.repo.RevokeAllUserRefreshTokens(ctx, rt.UserID)
+}
+
+// RefreshTTL exposes the configured refresh-token lifetime (cookie Max-Age).
+func (s *AuthService) RefreshTTL() time.Duration { return s.jwtCfg.RefreshTTL }
+
 func (s *AuthService) GetCurrentUser(ctx context.Context, userID uint) (*model.User, error) {
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
@@ -139,9 +154,11 @@ func (s *AuthService) generateTokens(ctx context.Context, user *model.User) (*Au
 	}
 
 	refreshTokenStr := GenerateRefreshToken()
+	// Only the SHA-256 of the refresh token is stored: a leaked DB file
+	// (e.g. the SQLite data dir) then contains no usable session tokens.
 	rt := &model.RefreshToken{
 		UserID:    user.ID,
-		Token:     refreshTokenStr,
+		Token:     HashRefreshToken(refreshTokenStr),
 		ExpiresAt: time.Now().Add(s.jwtCfg.RefreshTTL),
 	}
 
@@ -163,6 +180,12 @@ func (s *AuthService) generateAccessToken(user *model.User) (string, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.jwtCfg.Secret))
+}
+
+// HashRefreshToken derives the stored/looked-up form of a refresh token.
+func HashRefreshToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func GenerateRefreshToken() string {

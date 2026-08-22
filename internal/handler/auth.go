@@ -34,8 +34,13 @@ type loginRequest struct {
 }
 
 type refreshRequest struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+	RefreshToken string `json:"refresh_token"`
 }
+
+// refreshCookieName carries the refresh token as an HttpOnly cookie so XSS in
+// the SPA cannot read it at rest (the JSON field stays for non-browser
+// clients like the desktop app). Path-scoped to the auth endpoints.
+const refreshCookieName = "cg_refresh"
 
 type authResponse struct {
 	User         interface{} `json:"user"`
@@ -68,6 +73,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	h.setRefreshCookie(c, result.RefreshToken)
 	c.JSON(http.StatusCreated, response.Response{
 		Code: 0,
 		Data: authResponse{
@@ -103,6 +109,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	h.setRefreshCookie(c, result.RefreshToken)
 	response.OK(c, authResponse{
 		User:         result.User,
 		AccessToken:  result.AccessToken,
@@ -112,13 +119,21 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req refreshRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
+	// Body may be empty when the browser relies on the HttpOnly cookie.
+	_ = c.ShouldBindJSON(&req)
+	token := req.RefreshToken
+	if token == "" {
+		token, _ = c.Cookie(refreshCookieName)
+	}
+	if token == "" {
+		response.BadRequest(c, "refresh_token is required")
 		return
 	}
 
-	result, err := h.svc.Refresh(c.Request.Context(), req.RefreshToken)
+	result, err := h.svc.Refresh(c.Request.Context(), token)
 	if err != nil {
+		// Drop the stale cookie along with rejecting the request.
+		h.clearRefreshCookie(c)
 		response.Unauthorized(c, "invalid or expired refresh token")
 		return
 	}
@@ -128,6 +143,35 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		AccessToken:  result.AccessToken,
 		RefreshToken: result.RefreshToken,
 	})
+}
+
+func (h *AuthHandler) setRefreshCookie(c *gin.Context, token string) {
+	maxAge := int(h.svc.RefreshTTL().Seconds())
+	c.SetCookie(refreshCookieName, token, maxAge, "/api/auth", "", isHTTPS(c), true)
+}
+
+func (h *AuthHandler) clearRefreshCookie(c *gin.Context) {
+	c.SetCookie(refreshCookieName, "", -1, "/api/auth", "", isHTTPS(c), true)
+}
+
+// isHTTPS marks the cookie Secure when the request arrived over TLS (directly
+// or via the nginx reverse proxy's X-Forwarded-Proto).
+func isHTTPS(c *gin.Context) bool {
+	return c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
+}
+
+func (h *AuthHandler) Logout(c *gin.Context) {
+	var req refreshRequest
+	_ = c.ShouldBindJSON(&req)
+	token := req.RefreshToken
+	if token == "" {
+		token, _ = c.Cookie(refreshCookieName)
+	}
+	if token != "" {
+		_ = h.svc.Logout(c.Request.Context(), token)
+	}
+	h.clearRefreshCookie(c)
+	response.OK(c, nil)
 }
 
 func (h *AuthHandler) Me(c *gin.Context) {
