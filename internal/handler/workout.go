@@ -537,18 +537,45 @@ func (h *WorkoutHandler) DeleteExercise(c *gin.Context) {
 
 // --- Body metric endpoints ---
 
+func (h *WorkoutHandler) History(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "12"))
+
+	buckets, err := h.svc.History(c.Request.Context(), userID, workspaceID, c.DefaultQuery("bucket", "week"), limit)
+	if err != nil {
+		response.InternalError(c, "failed to compute workout history")
+		return
+	}
+	response.OK(c, buckets)
+}
+
 func (h *WorkoutHandler) ListMetrics(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "100"))
 
-	metrics, total, err := h.svc.ListMetrics(c.Request.Context(), userID, workspaceID, page, pageSize)
+	q := model.BodyMetricListQuery{Page: page, PageSize: pageSize}
+	if t, ok := parseRFC3339Query(c, "date_after"); !ok {
+		response.BadRequest(c, "invalid date_after format")
+		return
+	} else {
+		q.DateAfter = t
+	}
+	if t, ok := parseRFC3339Query(c, "date_before"); !ok {
+		response.BadRequest(c, "invalid date_before format")
+		return
+	} else {
+		q.DateBefore = t
+	}
+
+	metrics, total, err := h.svc.ListMetrics(c.Request.Context(), userID, workspaceID, q)
 	if err != nil {
 		response.InternalError(c, "failed to list body metrics")
 		return
 	}
-	response.OKPaginated(c, metrics, total, page, pageSize)
+	response.OKPaginated(c, metrics, total, q.Page, q.PageSize)
 }
 
 func (h *WorkoutHandler) BodySummary(c *gin.Context) {

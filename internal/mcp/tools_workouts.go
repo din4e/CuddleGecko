@@ -148,7 +148,7 @@ func (s *MCPServer) registerWorkoutTools() {
 			"page_size": map[string]interface{}{"type": "integer", "description": "Page size (default 100)"},
 		},
 	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		metrics, _, err := s.workoutSvc.ListMetrics(ctx, userID, workspaceID, getArgInt(args, "page", 1), getArgInt(args, "page_size", 100))
+		metrics, _, err := s.workoutSvc.ListMetrics(ctx, userID, workspaceID, model.BodyMetricListQuery{Page: getArgInt(args, "page", 1), PageSize: getArgInt(args, "page_size", 100)})
 		return metrics, err
 	})
 

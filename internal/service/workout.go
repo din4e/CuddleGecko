@@ -19,12 +19,14 @@ var (
 // WorkoutRepository handles workout persistence.
 type WorkoutRepository interface {
 	Create(ctx context.Context, w *model.Workout) error
+	CreateWithExercises(ctx context.Context, w *model.Workout, exercises []model.WorkoutExercise) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Workout, error)
 	List(ctx context.Context, workspaceID uint, q model.WorkoutListQuery) ([]model.Workout, int64, error)
 	Update(ctx context.Context, w *model.Workout) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 	Reorder(ctx context.Context, workspaceID, id uint, afterID *uint) error
 	Stats(ctx context.Context, workspaceID uint) (model.WorkoutStats, error)
+	History(ctx context.Context, workspaceID uint, bucket string, limit int) ([]model.WorkoutHistoryBucket, error)
 }
 
 // WorkoutExerciseRepository handles the checklist of movements within a workout.
@@ -43,7 +45,7 @@ type WorkoutExerciseRepository interface {
 type BodyMetricRepository interface {
 	Create(ctx context.Context, m *model.BodyMetric) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.BodyMetric, error)
-	List(ctx context.Context, workspaceID uint, page, pageSize int) ([]model.BodyMetric, int64, error)
+	List(ctx context.Context, workspaceID uint, q model.BodyMetricListQuery) ([]model.BodyMetric, int64, error)
 	Update(ctx context.Context, m *model.BodyMetric) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 	Summary(ctx context.Context, workspaceID uint) (model.BodyMetricSummary, error)
@@ -284,8 +286,16 @@ func (s *WorkoutService) CreateMetric(ctx context.Context, userID, workspaceID u
 	return m, nil
 }
 
-func (s *WorkoutService) ListMetrics(ctx context.Context, userID, workspaceID uint, page, pageSize int) ([]model.BodyMetric, int64, error) {
-	return s.bodyRepo.List(ctx, workspaceID, page, pageSize)
+func (s *WorkoutService) ListMetrics(ctx context.Context, userID, workspaceID uint, q model.BodyMetricListQuery) ([]model.BodyMetric, int64, error) {
+	return s.bodyRepo.List(ctx, workspaceID, q)
+}
+
+// History aggregates completed workouts per week/month for trend charts.
+func (s *WorkoutService) History(ctx context.Context, userID, workspaceID uint, bucket string, limit int) ([]model.WorkoutHistoryBucket, error) {
+	if bucket != "month" {
+		bucket = "week"
+	}
+	return s.repo.History(ctx, workspaceID, bucket, limit)
 }
 
 func (s *WorkoutService) UpdateMetric(ctx context.Context, userID, workspaceID, id uint, m *model.BodyMetric) (*model.BodyMetric, error) {

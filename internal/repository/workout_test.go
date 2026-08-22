@@ -20,7 +20,7 @@ func newWorkoutTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
-	require.NoError(t, db.AutoMigrate(&model.Workout{}, &model.WorkoutExercise{}, &model.BodyMetric{}))
+	require.NoError(t, db.AutoMigrate(&model.Workout{}, &model.WorkoutExercise{}, &model.BodyMetric{}, &model.WorkoutSetLog{}))
 	return db
 }
 
