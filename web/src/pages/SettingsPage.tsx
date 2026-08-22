@@ -161,11 +161,10 @@ export default function SettingsPage() {
     await persistNav({ order: navOrder, hidden })
   }
 
-  // Auto-check once on mount.
-  // mount-trigger: the synchronous 'checking' flag is a one-time UI nicety before the async fetch
+  // Auto-check once on mount (deferred a tick to satisfy set-state-in-effect).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    handleCheckUpdate()
+    const timer = window.setTimeout(() => void handleCheckUpdate(), 0)
+    return () => window.clearTimeout(timer)
   }, [handleCheckUpdate])
 
   const handleExport = async () => {

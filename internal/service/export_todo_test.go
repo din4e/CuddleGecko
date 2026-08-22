@@ -23,7 +23,7 @@ func newExportTestDB(t *testing.T) *gorm.DB {
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
 	require.NoError(t, db.AutoMigrate(
-		&model.Contact{}, &model.Tag{}, &model.Interaction{}, &model.Reminder{},
+		&model.Contact{}, &model.Tag{}, &model.Tagging{}, &model.Interaction{}, &model.Reminder{},
 		&model.ContactRelation{}, &model.Todo{}, &model.TodoItem{}, &model.Transaction{}, &model.Event{},
 	))
 	return db
@@ -438,7 +438,7 @@ func TestExport_ContactTagsRoundTrip(t *testing.T) {
 	contacts2, _, err := contactRepo.List(ctx, 2, 1, 100, "", nil)
 	require.NoError(t, err)
 	require.Len(t, contacts2, 1)
-	tags, err := contactRepo.GetTags(ctx, contacts2[0].ID)
+	tags, err := contactRepo.GetTags(ctx, 2, contacts2[0].ID)
 	require.NoError(t, err)
 	require.Len(t, tags, 1, "contact tag association should survive the round-trip")
 	assert.Equal(t, "vip", tags[0].Name)

@@ -88,8 +88,7 @@ func parseEventFromReq(req interface{}) (*model.Event, error) {
 func (h *EventHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page, pageSize := parsePagination(c, 20)
 
 	var startAfter, endBefore *string
 	if v := c.Query("start_after"); v != "" {

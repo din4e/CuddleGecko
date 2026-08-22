@@ -19,7 +19,7 @@ func newContactTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
-	require.NoError(t, db.AutoMigrate(&model.Contact{}, &model.Tag{}))
+	require.NoError(t, db.AutoMigrate(&model.Contact{}, &model.Tag{}, &model.Tagging{}))
 	return db
 }
 

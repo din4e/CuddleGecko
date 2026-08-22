@@ -23,6 +23,8 @@ type Handlers struct {
 	Todo        *TodoHandler
 	Workout     *WorkoutHandler
 	Fitness     *FitnessHandler
+	Habit       *HabitHandler
+	Pomodoro    *PomodoroHandler
 	Transaction *TransactionHandler
 	AI          *AIHandler
 	Workspace   *WorkspaceHandler
@@ -52,6 +54,8 @@ func NewHandlers(
 	uploadDir string,
 	aiCfg config.AIConfig,
 	userSettingSvc *service.UserSettingService,
+	habitSvc *service.HabitService,
+	pomodoroSvc *service.PomodoroService,
 ) *Handlers {
 	return &Handlers{
 		Auth:        NewAuthHandler(authSvc, captchaSvc),
@@ -67,6 +71,8 @@ func NewHandlers(
 		Todo:        NewTodoHandler(todoSvc),
 		Workout:     NewWorkoutHandler(workoutSvc),
 		Fitness:     NewFitnessHandler(fitnessSvc),
+		Habit:       NewHabitHandler(habitSvc),
+		Pomodoro:    NewPomodoroHandler(pomodoroSvc),
 		Transaction: NewTransactionHandler(transactionSvc),
 		AI:          NewAIHandler(aiSvc, aiCfg),
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
@@ -119,6 +125,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			protected.PUT("/settings/captcha", h.Captcha.UpdateConfig)
 			protected.GET("/settings/nav", h.UserSetting.GetNav)
 			protected.PUT("/settings/nav", h.UserSetting.UpdateNav)
+			protected.GET("/settings/dashboard", h.UserSetting.GetDashboard)
+			protected.PUT("/settings/dashboard", h.UserSetting.UpdateDashboard)
 
 			// Workspace management (no workspace context needed)
 			protected.GET("/workspaces", h.Workspace.List)
@@ -126,7 +134,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			protected.PUT("/workspaces/:id", h.Workspace.Update)
 			protected.DELETE("/workspaces/:id", h.Workspace.Delete)
 			protected.POST("/workspaces/:id/switch", h.Workspace.Switch)
-				protected.GET("/workspaces/default", h.Workspace.GetDefault)
+			protected.GET("/workspaces/default", h.Workspace.GetDefault)
 		}
 
 		// Workspace-scoped routes
@@ -191,6 +199,15 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.POST("/todos/:id/pomodoro", h.Todo.IncrementPomodoro)
 			wsProtected.POST("/todos/:id/restore", h.Todo.Restore)
 			wsProtected.DELETE("/todos/:id", h.Todo.Delete)
+			wsProtected.GET("/habits", h.Habit.List)
+			wsProtected.POST("/habits", h.Habit.Create)
+			wsProtected.PUT("/habits/:id", h.Habit.Update)
+			wsProtected.DELETE("/habits/:id", h.Habit.Delete)
+			wsProtected.POST("/habits/:id/checkin", h.Habit.CheckIn)
+
+			wsProtected.GET("/pomodoros", h.Pomodoro.List)
+			wsProtected.GET("/pomodoros/summary", h.Pomodoro.Summary)
+			wsProtected.POST("/pomodoros", h.Pomodoro.Create)
 
 			// Checklist (subtask) operations on a todo
 			wsProtected.GET("/todos/:id/items", h.Todo.ListItems)

@@ -41,8 +41,7 @@ func (h *InteractionHandler) ListByContact(c *gin.Context) {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page, pageSize := parsePagination(c, 20)
 
 	interactions, total, err := h.svc.ListByContact(c.Request.Context(), userID, workspaceID, uint(contactID), page, pageSize)
 	if err != nil {

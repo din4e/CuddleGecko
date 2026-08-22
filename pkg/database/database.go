@@ -63,12 +63,16 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		&model.WorkspaceMember{},
 		&model.Contact{},
 		&model.Tag{},
+		&model.Tagging{},
 		&model.Interaction{},
 		&model.Reminder{},
 		&model.ContactRelation{},
 		&model.Event{},
 		&model.Todo{},
 		&model.TodoItem{},
+		&model.Habit{},
+		&model.HabitLog{},
+		&model.PomodoroSession{},
 		&model.Workout{},
 		&model.WorkoutExercise{},
 		&model.BodyMetric{},
@@ -87,7 +91,29 @@ func Init(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("auto migrate: %w", err)
 	}
 
+	if err := migrateContactTags(db, cfg.Driver); err != nil {
+		return nil, fmt.Errorf("migrate contact tags: %w", err)
+	}
+
 	return db, nil
+}
+
+// migrateContactTags copies legacy contact_tags rows into the polymorphic
+// taggings table (target_type = 'contact'), once. The unique index on taggings
+// makes it idempotent. No-op when the legacy table doesn't exist (fresh installs).
+func migrateContactTags(db *gorm.DB, driver string) error {
+	if !db.Migrator().HasTable("contact_tags") {
+		return nil
+	}
+	stmt := "INSERT OR IGNORE INTO taggings (workspace_id, tag_id, target_type, target_id, created_at) " +
+		"SELECT c.workspace_id, ct.tag_id, 'contact', ct.contact_id, CURRENT_TIMESTAMP " +
+		"FROM contact_tags ct JOIN contacts c ON c.id = ct.contact_id"
+	if driver != "sqlite" {
+		stmt = "INSERT IGNORE INTO taggings (workspace_id, tag_id, target_type, target_id, created_at) " +
+			"SELECT c.workspace_id, ct.tag_id, 'contact', ct.contact_id, CURRENT_TIMESTAMP " +
+			"FROM contact_tags ct JOIN contacts c ON c.id = ct.contact_id"
+	}
+	return db.Exec(stmt).Error
 }
 
 func configurePool(driver string, sqlDB *sql.DB) {

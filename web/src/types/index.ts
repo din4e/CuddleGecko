@@ -74,12 +74,14 @@ export interface GraphNode {
   relationship_labels: string[]
   avatar_emoji: string
   avatar_url: string
+  last_interaction_at?: string
 }
 
 export interface GraphEdge {
   source: number
   target: number
   relation_type: string
+  created_at?: string
 }
 
 export interface GraphData {
@@ -220,6 +222,48 @@ export interface TodoUpdateInput extends Partial<Omit<Todo, 'due_time' | 'amount
   clear_due_time?: boolean
   clear_start_time?: boolean
   clear_amount?: boolean
+}
+
+export interface Habit {
+  id: number
+  user_id: number
+  workspace_id: number
+  name: string
+  color: string
+  emoji: string
+  frequency: string
+  archived: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+  // virtual (service-enriched)
+  today_done: boolean
+  streak: number
+  best: number
+  rate_30: number
+  recent: string[] // checked-in dates YYYY-MM-DD within the heatmap window
+}
+
+export type PomodoroKind = 'focus' | 'break'
+
+export interface PomodoroSession {
+  id: number
+  user_id: number
+  workspace_id: number
+  todo_id: number | null
+  duration_seconds: number
+  kind: PomodoroKind
+  completed: boolean
+  started_at: string
+  ended_at: string
+  created_at: string
+}
+
+export interface PomodoroSummary {
+  today_count: number
+  today_seconds: number
+  total_count: number
+  total_seconds: number
 }
 
 export interface Todo {

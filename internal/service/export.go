@@ -202,6 +202,16 @@ func (s *ExportService) ExportJSON(ctx context.Context, workspaceID uint) (strin
 	if err != nil {
 		return "", fmt.Errorf("export contacts: %w", err)
 	}
+	// Hydrate tag associations: the repo List no longer preloads Tags (they
+	// live in the polymorphic tagging table), but the export format and the
+	// import restore path both read Contact.Tags.
+	for i := range contacts {
+		cTags, err := s.contactRepo.GetTags(ctx, workspaceID, contacts[i].ID)
+		if err != nil {
+			return "", fmt.Errorf("export contact tags: %w", err)
+		}
+		contacts[i].Tags = cTags
+	}
 
 	tags, _, err := s.tagRepo.List(ctx, workspaceID, 1, 10000)
 	if err != nil {
@@ -439,7 +449,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 			assoc := make([]model.Tag, 0, len(c.Tags))
 			for _, tg := range c.Tags {
 				if id, ok := contactTagNameToID[tg.Name]; ok {
-					assoc = append(assoc, model.Tag{ID: id})
+					assoc = append(assoc, model.Tag{ID: id, WorkspaceID: newContact.WorkspaceID})
 				}
 			}
 			if len(assoc) > 0 {
