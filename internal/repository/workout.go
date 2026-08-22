@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -106,11 +107,35 @@ func (r *WorkoutRepo) Update(ctx context.Context, w *model.Workout) error {
 	return nil
 }
 
-// Delete soft-deletes a workout along with its exercises.
+// CreateWithExercises creates a workout and its exercise checklist in one
+// transaction, used by template instantiation.
+func (r *WorkoutRepo) CreateWithExercises(ctx context.Context, w *model.Workout, exercises []model.WorkoutExercise) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(w).Error; err != nil {
+			return fmt.Errorf("create workout: %w", err)
+		}
+		for i := range exercises {
+			exercises[i].ID = 0
+			exercises[i].WorkoutID = w.ID
+			exercises[i].SortOrder = i + 1
+			if err := tx.Create(&exercises[i]).Error; err != nil {
+				return fmt.Errorf("create workout exercise: %w", err)
+			}
+		}
+		w.ItemTotal = len(exercises)
+		w.ItemDone = 0
+		return nil
+	})
+}
+
+// Delete soft-deletes a workout along with its exercises and set logs.
 func (r *WorkoutRepo) Delete(ctx context.Context, workspaceID, id uint) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("workout_id = ?", id).Delete(&model.WorkoutExercise{}).Error; err != nil {
 			return fmt.Errorf("delete workout exercises: %w", err)
+		}
+		if err := tx.Where("workout_id = ?", id).Delete(&model.WorkoutSetLog{}).Error; err != nil {
+			return fmt.Errorf("delete workout set logs: %w", err)
 		}
 		res := tx.Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Workout{})
 		if res.Error != nil {
@@ -226,7 +251,115 @@ func (r *WorkoutRepo) Stats(ctx context.Context, workspaceID uint) (model.Workou
 	stats.ThisWeek = row.ThisWeek
 	stats.TotalMinutes = row.TotalMinutes
 	stats.TotalCalories = row.TotalCalories
+
+	// Streak: one query for completion timestamps, consecutive-week math in Go.
+	var times []time.Time
+	if err := r.db.WithContext(ctx).Model(&model.Workout{}).
+		Where("workspace_id = ? AND status = ? AND completed_at IS NOT NULL", workspaceID, model.WorkoutStatusCompleted).
+		Order("completed_at DESC").Limit(10000).
+		Pluck("completed_at", &times).Error; err != nil {
+		return stats, fmt.Errorf("workout streak times: %w", err)
+	}
+	stats.StreakWeeks = streakWeeks(times, time.Now())
 	return stats, nil
+}
+
+// streakWeeks counts consecutive weeks (ISO weeks, Monday-based) that each
+// contain at least one completion, counting back from the current week. If the
+// current week has no completion yet, the streak may still be alive from last
+// week, so counting starts there.
+func streakWeeks(times []time.Time, now time.Time) int {
+	weeks := make(map[string]bool, len(times))
+	for _, t := range times {
+		y, w := t.ISOWeek()
+		weeks[isoWeekKey(y, w)] = true
+	}
+
+	y, w := now.ISOWeek()
+	streak := 0
+	if !weeks[isoWeekKey(y, w)] {
+		// Current week still open — fall back to last week without breaking.
+		now = now.AddDate(0, 0, -7)
+		y, w = now.ISOWeek()
+		if !weeks[isoWeekKey(y, w)] {
+			return 0
+		}
+	}
+	for {
+		if !weeks[isoWeekKey(y, w)] {
+			break
+		}
+		streak++
+		now = now.AddDate(0, 0, -7)
+		y, w = now.ISOWeek()
+	}
+	return streak
+}
+
+func isoWeekKey(year, week int) string {
+	return fmt.Sprintf("%04d-W%02d", year, week)
+}
+
+// History aggregates completed workouts per ISO week ("2026-W33") or month
+// ("2026-08"). One query fetches the raw rows; bucketing happens in Go so the
+// grouping works identically on SQLite and MySQL (no dialect-specific date
+// formatting in GROUP BY).
+func (r *WorkoutRepo) History(ctx context.Context, workspaceID uint, bucket string, limit int) ([]model.WorkoutHistoryBucket, error) {
+	if limit <= 0 {
+		limit = 12
+	}
+	if limit > 104 {
+		limit = 104
+	}
+
+	var rows []model.Workout
+	if err := r.db.WithContext(ctx).Model(&model.Workout{}).
+		Select("scheduled_at", "duration_min", "calories").
+		Where("workspace_id = ? AND status = ? AND scheduled_at IS NOT NULL", workspaceID, model.WorkoutStatusCompleted).
+		Order("scheduled_at DESC").Limit(10000).Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("workout history: %w", err)
+	}
+
+	byKey := make(map[string]*model.WorkoutHistoryBucket)
+	for i := range rows {
+		w := &rows[i]
+		if w.ScheduledAt == nil {
+			continue
+		}
+		var key string
+		if bucket == "month" {
+			key = w.ScheduledAt.Format("2006-01")
+		} else {
+			y, wk := w.ScheduledAt.ISOWeek()
+			key = isoWeekKey(y, wk)
+		}
+		b, ok := byKey[key]
+		if !ok {
+			b = &model.WorkoutHistoryBucket{Bucket: key}
+			byKey[key] = b
+		}
+		b.Count++
+		if w.DurationMin != nil {
+			b.Minutes += int64(*w.DurationMin)
+		}
+		if w.Calories != nil {
+			b.Calories += *w.Calories
+		}
+	}
+
+	keys := make([]string, 0, len(byKey))
+	for k := range byKey {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	if len(keys) > limit {
+		keys = keys[len(keys)-limit:]
+	}
+	out := make([]model.WorkoutHistoryBucket, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, *byKey[k])
+	}
+	return out, nil
 }
 
 // -------------------------------------------------------------------
@@ -360,6 +493,9 @@ func (r *WorkoutExerciseRepo) DeleteExercise(ctx context.Context, workoutID, exe
 			Delete(&model.WorkoutExercise{}).Error; err != nil {
 			return fmt.Errorf("delete exercise: %w", err)
 		}
+		if err := tx.Where("exercise_id = ?", exerciseID).Delete(&model.WorkoutSetLog{}).Error; err != nil {
+			return fmt.Errorf("delete exercise set logs: %w", err)
+		}
 		if err := tx.Model(&model.Workout{}).Where("id = ?", workoutID).
 			UpdateColumn("item_total", gorm.Expr("item_total - 1")).Error; err != nil {
 			return fmt.Errorf("decrement item_total: %w", err)
@@ -449,9 +585,15 @@ func (r *BodyMetricRepo) GetByID(ctx context.Context, workspaceID, id uint) (*mo
 	return &m, nil
 }
 
-func (r *BodyMetricRepo) List(ctx context.Context, workspaceID uint, page, pageSize int) ([]model.BodyMetric, int64, error) {
-	page, pageSize = clampPage(page, pageSize)
+func (r *BodyMetricRepo) List(ctx context.Context, workspaceID uint, q model.BodyMetricListQuery) ([]model.BodyMetric, int64, error) {
+	q.Page, q.PageSize = clampPage(q.Page, q.PageSize)
 	query := r.db.WithContext(ctx).Model(&model.BodyMetric{}).Where("workspace_id = ?", workspaceID)
+	if q.DateAfter != nil {
+		query = query.Where("recorded_at >= ?", *q.DateAfter)
+	}
+	if q.DateBefore != nil {
+		query = query.Where("recorded_at <= ?", *q.DateBefore)
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -459,9 +601,9 @@ func (r *BodyMetricRepo) List(ctx context.Context, workspaceID uint, page, pageS
 	}
 
 	var metrics []model.BodyMetric
-	offset := (page - 1) * pageSize
+	offset := (q.Page - 1) * q.PageSize
 	if err := query.Order("recorded_at DESC, id DESC").
-		Limit(pageSize).Offset(offset).Find(&metrics).Error; err != nil {
+		Limit(q.PageSize).Offset(offset).Find(&metrics).Error; err != nil {
 		return nil, 0, fmt.Errorf("list body metrics: %w", err)
 	}
 	return metrics, total, nil
@@ -532,7 +674,83 @@ func (r *BodyMetricRepo) Summary(ctx context.Context, workspaceID uint) (model.B
 	}
 
 	sum.WeightTrend = bodyWeightTrend(sum.LatestWeight, sum.PrevWeight)
+	sum.Metrics = bodyMetricTrends(r.db.WithContext(ctx), workspaceID)
 	return sum, nil
+}
+
+// trendFlatDeltas maps each body metric to the delta below which the trend is
+// reported flat, so noise (a 0.05kg body-fat wiggle) doesn't flip the arrow.
+var trendFlatDeltas = map[string]float64{
+	"weight": 0.1, "body_fat": 0.1, "muscle_mass": 0.1, "sleep_hours": 0.1,
+	"resting_hr": 1, "systolic": 1, "diastolic": 1, "steps": 50, "energy": 0, "mood": 0,
+}
+
+// bodyMetricTrends walks the most recent records (newest first) and, per
+// metric, captures the latest and previous non-null values, then classifies
+// the direction. One extra query total.
+func bodyMetricTrends(db *gorm.DB, workspaceID uint) map[string]model.MetricTrend {
+	var rows []model.BodyMetric
+	if err := db.Where("workspace_id = ?", workspaceID).
+		Order("recorded_at DESC, id DESC").Limit(200).Find(&rows).Error; err != nil {
+		return nil
+	}
+
+	getters := map[string]func(m *model.BodyMetric) *float64{
+		"body_fat":    func(m *model.BodyMetric) *float64 { return m.BodyFat },
+		"muscle_mass": func(m *model.BodyMetric) *float64 { return m.MuscleMass },
+		"resting_hr":  func(m *model.BodyMetric) *float64 { return floatOf(m.RestingHR) },
+		"systolic":    func(m *model.BodyMetric) *float64 { return floatOf(m.Systolic) },
+		"diastolic":   func(m *model.BodyMetric) *float64 { return floatOf(m.Diastolic) },
+		"sleep_hours": func(m *model.BodyMetric) *float64 { return m.SleepHours },
+		"steps":       func(m *model.BodyMetric) *float64 { return floatOf(m.Steps) },
+		"energy":      func(m *model.BodyMetric) *float64 { return floatOf(m.Energy) },
+		"mood":        func(m *model.BodyMetric) *float64 { return floatOf(m.Mood) },
+	}
+
+	trends := make(map[string]model.MetricTrend, len(getters))
+	for key, get := range getters {
+		var latest, prev *float64
+		for i := range rows {
+			v := get(&rows[i])
+			if v == nil {
+				continue
+			}
+			if latest == nil {
+				val := *v
+				latest = &val
+				continue
+			}
+			val := *v
+			prev = &val
+			break
+		}
+		trends[key] = model.MetricTrend{Latest: latest, Prev: prev, Trend: trendFor(latest, prev, trendFlatDeltas[key])}
+	}
+	return trends
+}
+
+// floatOf widens an optional int so int-typed metrics share the trend helpers.
+func floatOf(p *int) *float64 {
+	if p == nil {
+		return nil
+	}
+	v := float64(*p)
+	return &v
+}
+
+func trendFor(latest, prev *float64, flatDelta float64) string {
+	if latest == nil || prev == nil {
+		return "none"
+	}
+	d := *latest - *prev
+	switch {
+	case d > flatDelta:
+		return "up"
+	case d < -flatDelta:
+		return "down"
+	default:
+		return "flat"
+	}
 }
 
 // bodyWeightTrend classifies the latest-vs-previous weight delta. A change under

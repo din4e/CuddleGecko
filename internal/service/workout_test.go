@@ -20,7 +20,7 @@ func newWorkoutSvcTestDB(t *testing.T) (*WorkoutService, *gorm.DB) {
 	sqlDB, _ := db.DB()
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
-	require.NoError(t, db.AutoMigrate(&model.Workout{}, &model.WorkoutExercise{}, &model.BodyMetric{}))
+	require.NoError(t, db.AutoMigrate(&model.Workout{}, &model.WorkoutExercise{}, &model.BodyMetric{}, &model.WorkoutSetLog{}))
 	svc := NewWorkoutService(repository.NewWorkoutRepo(db), repository.NewWorkoutExerciseRepo(db), repository.NewBodyMetricRepo(db))
 	return svc, db
 }
@@ -101,7 +101,7 @@ func TestWorkoutService_BodyMetricFlow(t *testing.T) {
 	_, err = svc.CreateMetric(ctx, 1, 1, &model.BodyMetric{RecordedAt: t1, Weight: floatPtr(69.0), Height: floatPtr(175)})
 	require.NoError(t, err)
 
-	metrics, total, err := svc.ListMetrics(ctx, 1, 1, 1, 50)
+	metrics, total, err := svc.ListMetrics(ctx, 1, 1, model.BodyMetricListQuery{Page: 1, PageSize: 50})
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), total)
 	assert.Len(t, metrics, 2)

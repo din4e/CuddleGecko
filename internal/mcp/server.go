@@ -28,6 +28,7 @@ type MCPServer struct {
 	eventSvc       *service.EventService
 	todoSvc        *service.TodoService
 	workoutSvc     *service.WorkoutService
+	fitnessSvc     *service.FitnessService
 	transactionSvc *service.TransactionService
 	aiSvc          *service.AIService
 	workspaceSvc   *service.WorkspaceService
@@ -46,6 +47,7 @@ func NewServer(
 	eventSvc *service.EventService,
 	todoSvc *service.TodoService,
 	workoutSvc *service.WorkoutService,
+	fitnessSvc *service.FitnessService,
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
 	workspaceSvc *service.WorkspaceService,
@@ -59,6 +61,7 @@ func NewServer(
 		eventSvc:       eventSvc,
 		todoSvc:        todoSvc,
 		workoutSvc:     workoutSvc,
+		fitnessSvc:     fitnessSvc,
 		transactionSvc: transactionSvc,
 		aiSvc:          aiSvc,
 		workspaceSvc:   workspaceSvc,
@@ -69,6 +72,7 @@ func NewServer(
 	s.registerEventTools()
 	s.registerTodoTools()
 	s.registerWorkoutTools()
+	s.registerFitnessTools()
 	s.registerTagTools()
 	s.registerTransactionTools()
 	s.registerInteractionTools()

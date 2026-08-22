@@ -22,6 +22,7 @@ type Handlers struct {
 	Event       *EventHandler
 	Todo        *TodoHandler
 	Workout     *WorkoutHandler
+	Fitness     *FitnessHandler
 	Transaction *TransactionHandler
 	AI          *AIHandler
 	Workspace   *WorkspaceHandler
@@ -43,6 +44,7 @@ func NewHandlers(
 	eventSvc *service.EventService,
 	todoSvc *service.TodoService,
 	workoutSvc *service.WorkoutService,
+	fitnessSvc *service.FitnessService,
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
 	workspaceSvc *service.WorkspaceService,
@@ -64,6 +66,7 @@ func NewHandlers(
 		Event:       NewEventHandler(eventSvc),
 		Todo:        NewTodoHandler(todoSvc),
 		Workout:     NewWorkoutHandler(workoutSvc),
+		Fitness:     NewFitnessHandler(fitnessSvc),
 		Transaction: NewTransactionHandler(transactionSvc),
 		AI:          NewAIHandler(aiSvc, aiCfg),
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
@@ -223,6 +226,30 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.POST("/body-metrics", h.Workout.CreateMetric)
 			wsProtected.PUT("/body-metrics/:id", h.Workout.UpdateMetric)
 			wsProtected.DELETE("/body-metrics/:id", h.Workout.DeleteMetric)
+
+			// Fitness extras: per-set logs, PRs, exercise library, templates, goals
+			wsProtected.GET("/workouts/history", h.Workout.History)
+			wsProtected.GET("/workouts/prs", h.Fitness.PRs)
+			wsProtected.GET("/workouts/:id/exercises/:exerciseId/sets", h.Fitness.ListSetLogs)
+			wsProtected.POST("/workouts/:id/exercises/:exerciseId/sets", h.Fitness.CreateSetLog)
+			wsProtected.PUT("/workouts/:id/exercises/:exerciseId/sets/:setId", h.Fitness.UpdateSetLog)
+			wsProtected.DELETE("/workouts/:id/exercises/:exerciseId/sets/:setId", h.Fitness.DeleteSetLog)
+
+			wsProtected.GET("/exercise-library", h.Fitness.ListLibrary)
+			wsProtected.POST("/exercise-library", h.Fitness.CreateLibraryItem)
+			wsProtected.PUT("/exercise-library/:id", h.Fitness.UpdateLibraryItem)
+			wsProtected.DELETE("/exercise-library/:id", h.Fitness.DeleteLibraryItem)
+
+			wsProtected.GET("/workout-templates", h.Fitness.ListTemplates)
+			wsProtected.POST("/workout-templates", h.Fitness.CreateTemplate)
+			wsProtected.PUT("/workout-templates/:id", h.Fitness.UpdateTemplate)
+			wsProtected.DELETE("/workout-templates/:id", h.Fitness.DeleteTemplate)
+			wsProtected.POST("/workout-templates/:id/instantiate", h.Fitness.InstantiateTemplate)
+
+			wsProtected.GET("/fitness-goals", h.Fitness.ListGoals)
+			wsProtected.POST("/fitness-goals", h.Fitness.CreateGoal)
+			wsProtected.PUT("/fitness-goals/:id", h.Fitness.UpdateGoal)
+			wsProtected.DELETE("/fitness-goals/:id", h.Fitness.DeleteGoal)
 
 			wsProtected.GET("/transactions", h.Transaction.List)
 			wsProtected.GET("/transactions/summary", h.Transaction.Summary)

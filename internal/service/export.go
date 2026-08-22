@@ -327,7 +327,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, workspaceID uint) (strin
 	// Body / health records. Optional.
 	var bodyMetrics []model.BodyMetric
 	if s.bodyMetricRepo != nil {
-		bodyMetrics, _, err = s.bodyMetricRepo.List(ctx, workspaceID, 1, 100000)
+		bodyMetrics, _, err = s.bodyMetricRepo.List(ctx, workspaceID, model.BodyMetricListQuery{Page: 1, PageSize: 100000})
 		if err != nil {
 			return "", fmt.Errorf("export body metrics: %w", err)
 		}

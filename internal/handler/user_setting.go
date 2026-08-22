@@ -12,7 +12,7 @@ import (
 const navSettingKey = "nav"
 
 // defaultNavOrder is the default sidebar order for customizable nav items (by route path).
-var defaultNavOrder = []string{"/graph", "/events", "/todos", "/finance", "/ai", "/tags", "/reminders"}
+var defaultNavOrder = []string{"/graph", "/events", "/todos", "/fitness", "/finance", "/ai", "/tags", "/reminders"}
 
 type UserSettingHandler struct {
 	svc *service.UserSettingService

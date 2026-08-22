@@ -106,6 +106,14 @@ const (
 	WorkoutSortManual    = "manual"
 )
 
+// BodyMetricListQuery captures filter + paging options for body metrics.
+type BodyMetricListQuery struct {
+	DateAfter  *time.Time // recorded_at >=
+	DateBefore *time.Time // recorded_at <=
+	Page       int
+	PageSize   int
+}
+
 // WorkoutStats is a fitness overview for a workspace.
 type WorkoutStats struct {
 	Total         int64   `json:"total"`
@@ -116,17 +124,28 @@ type WorkoutStats struct {
 	ThisWeek      int64   `json:"this_week"`
 	TotalMinutes  int64   `json:"total_minutes"`
 	TotalCalories float64 `json:"total_calories"`
+	StreakWeeks   int     `json:"streak_weeks"`
+}
+
+// MetricTrend is the latest-vs-previous reading of one body metric.
+type MetricTrend struct {
+	Latest *float64 `json:"latest"`
+	Prev   *float64 `json:"prev"`
+	Trend  string   `json:"trend"` // up|down|flat|none
 }
 
 // BodyMetricSummary is an overview derived from the latest body records.
 type BodyMetricSummary struct {
-	Latest       *BodyMetric `json:"latest"`
-	LatestWeight *float64    `json:"latest_weight"`
-	PrevWeight   *float64    `json:"prev_weight"`
-	WeightTrend  string      `json:"weight_trend"` // up|down|flat|none
-	Count        int64       `json:"count"`
-	FirstAt      *time.Time  `json:"first_at"`
-	LastAt       *time.Time  `json:"last_at"`
+	Latest       *BodyMetric              `json:"latest"`
+	LatestWeight *float64                 `json:"latest_weight"`
+	PrevWeight   *float64                 `json:"prev_weight"`
+	WeightTrend  string                   `json:"weight_trend"` // up|down|flat|none
+	Count        int64                    `json:"count"`
+	FirstAt      *time.Time               `json:"first_at"`
+	LastAt       *time.Time               `json:"last_at"`
+	// Per-metric latest/prev/trend for every tracked body metric (weight is in
+	// the top-level fields for backward compatibility).
+	Metrics map[string]MetricTrend `json:"metrics,omitempty"`
 }
 
 // BMI computes the body-mass index from weight (kg) and height (cm). Returns 0
