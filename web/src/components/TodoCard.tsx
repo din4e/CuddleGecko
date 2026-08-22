@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Circle, Clock, CalendarClock, ListTodo, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer } from 'lucide-react'
 import { Button } from './ui/button'
@@ -33,6 +33,8 @@ export interface TodoCardProps {
   parentTitle?: string
   onStartPomodoro?: (todo: Todo) => void
   onAddChild?: (todo: Todo) => void
+  /** Nested subtask renderer (flat views); rendered inside the card body. */
+  subtasks?: ReactNode
 }
 
 const TodoCard = memo(function TodoCard({
@@ -53,6 +55,7 @@ const TodoCard = memo(function TodoCard({
   parentTitle,
   onStartPomodoro,
   onAddChild,
+  subtasks,
 }: TodoCardProps) {
   const { t } = useTranslation()
   const [editingTitle, setEditingTitle] = useState(false)
@@ -200,6 +203,7 @@ const TodoCard = memo(function TodoCard({
           </div>
         )}
       </CardContent>
+      {subtasks}
 
       {/* Action toolbar — floating top-right so it costs no row height.
           Hover-reveal on md+; always visible on touch/small screens. */}
