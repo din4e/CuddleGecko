@@ -65,6 +65,16 @@ vi.mock('../../api/todos', () => ({
   },
 }))
 
+vi.mock('../../api/settings', () => ({
+  settingsApi: {
+    getKanban: vi.fn().mockResolvedValue([
+      { id: 'status-pending', label: 'pending', kind: 'status', value: 'pending' },
+      { id: 'status-done', label: 'done', kind: 'status', value: 'done' },
+    ]),
+    updateKanban: vi.fn().mockResolvedValue(undefined),
+  },
+}))
+
 vi.mock('../../api/contacts', () => ({
   contactsApi: {
     list: vi.fn(),
@@ -215,8 +225,10 @@ describe('TodosPage', () => {
 
     await user.click(screen.getByTitle('看板'))
     await waitFor(() => {
-      expect(screen.getByText(/待办状态 \(1\)/)).toBeInTheDocument()
-      expect(screen.getByText(/已完成 \(1\)/)).toBeInTheDocument()
+      // Cards render in their columns and the add-column entry exists.
+      expect(screen.getByText('Task A')).toBeInTheDocument()
+      expect(screen.getByText('Task B')).toBeInTheDocument()
+      expect(screen.getByText('todos.kanbanAddColumn')).toBeInTheDocument()
     })
   })
 

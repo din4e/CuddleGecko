@@ -9,6 +9,7 @@ import { parseQuickAdd } from '../lib/quickAdd'
 import { buildICS } from '../lib/ics'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -16,13 +17,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../components/ui/dialog'
-import { Plus, Trash2, CheckCircle2, Circle, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, Flame, Tag } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Todo, TodoSort, TodoListParams } from '../types'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
 import TodoCard from '../components/TodoCard'
 import TodoSubtaskList from '../components/TodoSubtaskList'
+import { bucketByColumns, matchesColumn } from '../lib/kanban'
+import { useKanbanColumns } from '../hooks/api/useKanbanColumns'
+import type { KanbanColumn } from '../api/settings'
 import TodoTree from '../components/TodoTreeRow'
 import { buildTodoTree, type TodoNode } from '../lib/buildTodoTree'
 import { usePomodoroStore } from '../stores/pomodoro'
@@ -290,26 +294,50 @@ export default function TodosPage() {
     }
   }, [t])
 
-  // Kanban: dropping a card on the opposite-status column toggles it.
-  const [dragOverCol, setDragOverCol] = useState<'pending' | 'done' | null>(null)
-  const handleColumnDragOver = (e: React.DragEvent, col: 'pending' | 'done') => {
+  // Kanban: columns are user-defined predicates (status / priority / tag);
+  // dropping a card applies the column's predicate to the todo.
+  const { columns: kanbanColumns, addColumn, removeColumn } = useKanbanColumns()
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null)
+  const [addColumnOpen, setAddColumnOpen] = useState(false)
+  const [newColLabel, setNewColLabel] = useState('')
+  const [newColKind, setNewColKind] = useState<'status' | 'priority' | 'tag'>('status')
+  const [newColValue, setNewColValue] = useState('pending')
+  const handleColumnDragOver = (e: React.DragEvent, col: string) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setDragOverCol(col)
   }
-  const handleColumnDragLeave = (e: React.DragEvent, col: 'pending' | 'done') => {
+  const handleColumnDragLeave = (e: React.DragEvent, col: string) => {
     // Only clear when actually leaving the column, not while moving between its children.
     if (dragOverCol === col && !e.currentTarget.contains(e.relatedTarget as Node | null)) {
       setDragOverCol(null)
     }
   }
-  const handleColumnDrop = (targetStatus: 'pending' | 'done') => {
+  const handleColumnDrop = (col: KanbanColumn) => {
     const id = dragId
     setDragId(null)
     setDragOverCol(null)
     if (id == null) return
     const todo = todos.find((it) => it.id === id)
-    if (todo && todo.status !== targetStatus) handleToggle(id)
+    if (!todo || matchesColumn(todo, col)) return
+    if (col.kind === 'status') {
+      if (todo.status !== col.value) handleToggle(id)
+    } else if (col.kind === 'priority') {
+      updateTodo.mutate({ id, data: { priority: col.value as Todo['priority'] } })
+    } else {
+      const tag = tags.find((tg) => String(tg.id) === col.value || tg.name === col.value)
+      if (!tag) return
+      const next = [...(todo.tags ?? [])]
+      if (!next.some((tg) => tg.id === tag.id)) next.push(tag)
+      replaceTags.mutate({ todoId: id, tagIds: next.map((tg) => tg.id) })
+    }
+  }
+  const submitNewColumn = () => {
+    const label = newColLabel.trim()
+    if (!label || !newColValue) return
+    addColumn({ id: `${newColKind}-${newColValue}-${Date.now()}`, label, kind: newColKind, value: newColValue })
+    setNewColLabel('')
+    setAddColumnOpen(false)
   }
 
   // Inline rename: the backend Update overwrites scalar fields, so we resend the
@@ -901,70 +929,133 @@ export default function TodosPage() {
           )}
         </div>
       ) : (
-        /* Kanban View — drag a card to the other column to toggle its status */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <h3 className="text-sm font-medium mb-1.5 flex items-center gap-2">
-              <Circle className="h-4 w-4 text-muted-foreground" />
-              {t('todos.pending')} ({pendingTodos.length})
-            </h3>
-            <div
-              className={`space-y-1.5 min-h-[200px] bg-muted/30 rounded-lg p-2 transition-shadow ${dragOverCol === 'pending' ? 'ring-2 ring-primary/60 bg-primary/5' : 'ring-2 ring-transparent'}`}
-              onDragOver={(e) => handleColumnDragOver(e, 'pending')}
-              onDragLeave={(e) => handleColumnDragLeave(e, 'pending')}
-              onDrop={() => handleColumnDrop('pending')}
-            >
-              {pendingTodos.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">{t('todos.noTodos')}</p>
-              ) : (
-                pendingTodos.map((todo) => (
-                  <div
-                    key={todo.id}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.effectAllowed = 'move'
-                      setDragId(todo.id)
-                    }}
-                    onDragEnd={() => setDragId(null)}
-                    className={`cursor-grab transition-all ${dragId === todo.id ? 'opacity-40 rotate-2 scale-[0.97] shadow-lg' : 'hover:shadow-sm'}`}
-                  >
-                    {renderTodoCard(todo, true)}
+        /* Kanban View — user-defined columns; drag a card onto a column to
+           apply the column's predicate (status / priority / tag). */
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {(() => {
+            const { byColumn, unmatched } = bucketByColumns(
+              todos.filter((td) => td.status === 'pending' || td.status === 'done'),
+              kanbanColumns,
+            )
+            return (
+              <>
+                {kanbanColumns.map((col) => {
+                  const items = byColumn.get(col.id) ?? []
+                  const icon = col.kind === 'status' && col.value === 'done'
+                    ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    : col.kind === 'priority' ? <Flame className="h-4 w-4 text-orange-500" /> : <Tag className="h-4 w-4 text-blue-500" />
+                  return (
+                    <div key={col.id} className="min-w-[240px] flex-1">
+                      <h3 className="group/col text-sm font-medium mb-1.5 flex items-center gap-2">
+                        {icon}
+                        <span className="truncate">{col.label}</span>
+                        <span className="text-muted-foreground">({items.length})</span>
+                        <button
+                          type="button"
+                          className="ml-auto text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/col:opacity-100"
+                          onClick={() => removeColumn(col.id)}
+                          aria-label={t('todos.kanbanRemoveColumn')}
+                          title={t('todos.kanbanRemoveColumn')}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </h3>
+                      <div
+                        className={`space-y-1.5 min-h-[200px] bg-muted/30 rounded-lg p-2 transition-shadow ${dragOverCol === col.id ? 'ring-2 ring-primary/60 bg-primary/5' : 'ring-2 ring-transparent'}`}
+                        onDragOver={(e) => handleColumnDragOver(e, col.id)}
+                        onDragLeave={(e) => handleColumnDragLeave(e, col.id)}
+                        onDrop={() => handleColumnDrop(col)}
+                      >
+                        {items.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-8">{t('todos.noTodos')}</p>
+                        ) : (
+                          items.map((todo) => (
+                            <div
+                              key={todo.id}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.effectAllowed = 'move'
+                                setDragId(todo.id)
+                              }}
+                              onDragEnd={() => setDragId(null)}
+                              className={`cursor-grab transition-all ${dragId === todo.id ? 'opacity-40 rotate-2 scale-[0.97] shadow-lg' : 'hover:shadow-sm'}`}
+                            >
+                              {renderTodoCard(todo, true)}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                {unmatched.length > 0 && (
+                  <div className="min-w-[200px]">
+                    <h3 className="text-sm font-medium mb-1.5 flex items-center gap-2 text-muted-foreground">
+                      {t('todos.kanbanOther')} ({unmatched.length})
+                    </h3>
+                    <div className="space-y-1.5 min-h-[100px] bg-muted/20 rounded-lg p-2 border-2 border-dashed">
+                      {unmatched.map((todo) => (
+                        <div key={todo.id} className="opacity-80">{renderTodoCard(todo, true)}</div>
+                      ))}
+                    </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-          <div>
-            <h3 className="text-sm font-medium mb-1.5 flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-              {t('todos.done')} ({doneTodos.length})
-            </h3>
-            <div
-              className={`space-y-1.5 min-h-[200px] bg-muted/30 rounded-lg p-2 transition-shadow ${dragOverCol === 'done' ? 'ring-2 ring-primary/60 bg-primary/5' : 'ring-2 ring-transparent'}`}
-              onDragOver={(e) => handleColumnDragOver(e, 'done')}
-              onDragLeave={(e) => handleColumnDragLeave(e, 'done')}
-              onDrop={() => handleColumnDrop('done')}
-            >
-              {doneTodos.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">{t('todos.noTodos')}</p>
-              ) : (
-                doneTodos.map((todo) => (
-                  <div
-                    key={todo.id}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.effectAllowed = 'move'
-                      setDragId(todo.id)
-                    }}
-                    onDragEnd={() => setDragId(null)}
-                    className={`cursor-grab transition-all ${dragId === todo.id ? 'opacity-40 rotate-2 scale-[0.97] shadow-lg' : 'hover:shadow-sm'}`}
-                  >
-                    {renderTodoCard(todo, true)}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+                )}
+                {/* Add column */}
+                <div className="min-w-[180px]">
+                  {addColumnOpen ? (
+                    <div className="rounded-lg border p-2 space-y-2 bg-background">
+                      <Input
+                        autoFocus
+                        placeholder={t('todos.kanbanColumnLabel')}
+                        value={newColLabel}
+                        onChange={(e) => setNewColLabel(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && submitNewColumn()}
+                        className="h-7 text-sm"
+                      />
+                      <Select value={newColKind} onValueChange={(v) => { setNewColKind(v as typeof newColKind); setNewColValue(v === 'status' ? 'pending' : v === 'priority' ? 'high' : String(tags[0]?.id ?? '')) }}>
+                        <SelectTrigger className="h-7 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="status">{t('todos.kanbanKindStatus')}</SelectItem>
+                          <SelectItem value="priority">{t('todos.kanbanKindPriority')}</SelectItem>
+                          <SelectItem value="tag">{t('todos.kanbanKindTag')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={newColValue} onValueChange={(v) => v && setNewColValue(v)}>
+                        <SelectTrigger className="h-7 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {newColKind === 'status' && <>
+                            <SelectItem value="pending">{t('todos.pending')}</SelectItem>
+                            <SelectItem value="done">{t('todos.done')}</SelectItem>
+                          </>}
+                          {newColKind === 'priority' && <>
+                            <SelectItem value="high">{t('todos.high')}</SelectItem>
+                            <SelectItem value="normal">{t('todos.normal')}</SelectItem>
+                            <SelectItem value="low">{t('todos.low')}</SelectItem>
+                          </>}
+                          {newColKind === 'tag' && tags.map((tg) => (
+                            <SelectItem key={tg.id} value={String(tg.id)}>{tg.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="flex gap-1.5">
+                        <Button size="sm" className="h-7 text-xs" disabled={!newColLabel.trim() || !newColValue} onClick={submitNewColumn}>{t('common.confirm')}</Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddColumnOpen(false)}>{t('common.cancel')}</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setAddColumnOpen(true)}
+                      className="flex min-h-[200px] w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed text-sm text-muted-foreground hover:border-primary/50 hover:text-primary"
+                    >
+                      <Plus className="h-4 w-4" />
+                      {t('todos.kanbanAddColumn')}
+                    </button>
+                  )}
+                </div>
+              </>
+            )
+          })()}
         </div>
       )}
 
