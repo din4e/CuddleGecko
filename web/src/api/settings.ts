@@ -16,6 +16,17 @@ export interface DashboardConfig {
   hidden: string[]
 }
 
+export interface KanbanColumn {
+  id: string
+  label: string
+  kind: 'status' | 'priority' | 'tag'
+  value: string
+}
+
+export interface KanbanConfig {
+  columns: KanbanColumn[]
+}
+
 export const settingsApi = {
   getCaptcha: () => request.get<CaptchaConfig>('/settings/captcha'),
   updateCaptcha: (config: Partial<CaptchaConfig>) =>
@@ -24,4 +35,6 @@ export const settingsApi = {
   updateNav: (config: NavConfig) => request.put<NavConfig>('/settings/nav', config),
   getDashboard: () => request.get<DashboardConfig>('/settings/dashboard'),
   updateDashboard: (config: DashboardConfig) => request.put<DashboardConfig>('/settings/dashboard', config),
+  getKanban: () => request.get<KanbanConfig>('/settings/kanban'),
+  updateKanban: (config: KanbanConfig) => request.put<KanbanConfig>('/settings/kanban', config),
 }

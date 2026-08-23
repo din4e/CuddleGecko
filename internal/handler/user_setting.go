@@ -67,6 +67,67 @@ func (h *UserSettingHandler) UpdateNav(c *gin.Context) {
 	response.OK(c, navConfigResponse{Order: req.Order, Hidden: req.Hidden})
 }
 
+const kanbanSettingKey = "kanban"
+
+// Kanban column config: each column is a saved predicate over todos
+// (status / priority / tag). Stored as opaque JSON from the frontend; only
+// structural validity is checked here.
+type kanbanConfigRequest struct {
+	Columns []kanbanColumn `json:"columns"`
+}
+
+type kanbanColumn struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Kind  string `json:"kind"`  // status | priority | tag
+	Value string `json:"value"`
+}
+
+var validKanbanKinds = map[string]bool{"status": true, "priority": true, "tag": true}
+
+// GetKanban returns the user's kanban column layout (default: pending/done).
+func (h *UserSettingHandler) GetKanban(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	out := kanbanConfigRequest{Columns: []kanbanColumn{
+		{ID: "status-pending", Label: "pending", Kind: "status", Value: "pending"},
+		{ID: "status-done", Label: "done", Kind: "status", Value: "done"},
+	}}
+	val, found, err := h.svc.Get(c.Request.Context(), userID, kanbanSettingKey)
+	if err == nil && found {
+		var stored kanbanConfigRequest
+		if json.Unmarshal([]byte(val), &stored) == nil && len(stored.Columns) > 0 {
+			out = stored
+		}
+	}
+	response.OK(c, out)
+}
+
+// UpdateKanban saves the user's kanban column layout.
+func (h *UserSettingHandler) UpdateKanban(c *gin.Context) {
+	var req kanbanConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "invalid request body")
+		return
+	}
+	if len(req.Columns) > 20 {
+		response.BadRequest(c, "too many kanban columns")
+		return
+	}
+	for _, col := range req.Columns {
+		if !validKanbanKinds[col.Kind] || col.Value == "" || col.Label == "" || col.ID == "" {
+			response.BadRequest(c, "invalid kanban column")
+			return
+		}
+	}
+	userID := middleware.GetUserID(c)
+	b, _ := json.Marshal(req)
+	if err := h.svc.Set(c.Request.Context(), userID, kanbanSettingKey, string(b)); err != nil {
+		response.InternalError(c, "failed to save kanban config")
+		return
+	}
+	response.OK(c, req)
+}
+
 const dashboardSettingKey = "dashboard"
 
 // defaultDashboardOrder is the default order of customizable dashboard widgets.

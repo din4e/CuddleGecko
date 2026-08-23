@@ -126,6 +126,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			protected.PUT("/settings/captcha", h.Captcha.UpdateConfig)
 			protected.GET("/settings/nav", h.UserSetting.GetNav)
 			protected.PUT("/settings/nav", h.UserSetting.UpdateNav)
+			protected.GET("/settings/kanban", h.UserSetting.GetKanban)
+			protected.PUT("/settings/kanban", h.UserSetting.UpdateKanban)
 			protected.GET("/settings/dashboard", h.UserSetting.GetDashboard)
 			protected.PUT("/settings/dashboard", h.UserSetting.UpdateDashboard)
 
