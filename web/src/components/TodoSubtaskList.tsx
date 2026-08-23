@@ -19,9 +19,9 @@ export interface TodoSubtaskListProps {
  * top-level cards and their descendant chains).
  */
 export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEdit, onAddChild }: TodoSubtaskListProps) {
+  const { t } = useTranslation()
   const children = childrenByParent.get(todo.id)
   if (!children?.length) return null
-  const { t } = useTranslation()
 
   return (
     <div className="mt-1 space-y-1 border-l-2 border-border pl-2">

@@ -23,9 +23,19 @@ export interface TodoTreeHandlers {
   selectable?: boolean
   selectedIds?: Set<number>
   onSelectToggle?: (id: number) => void
+  /** Drag & drop reparenting. dragId is the id being dragged (null = none). */
+  dragId?: number | null
+  dragSubtreeSize?: number
+  onDragIdChange?: (id: number | null) => void
 }
 
+/** dropZone describes where over a row the pointer is releasing. */
+type DropZone = 'before' | 'child' | 'after'
+
 interface RowProps extends TodoTreeHandlers {
+  /** Ancestor todo ids of this row (its parent chain) — used to refuse drops
+   *  that would place a node into its own subtree (cycle). */
+  ancestorIds: Set<number>
   node: TodoNode
   siblings: TodoNode[]
   index: number
@@ -50,6 +60,7 @@ export default function TodoTree({
           index={i}
           parentId={null}
           grandparentId={null}
+          ancestorIds={new Set()}
           depth={0}
           {...handlers}
         />
@@ -65,14 +76,25 @@ export default function TodoTree({
 // useMemo / state. Data-changing props (collapsed, selectedIds, nodes) still
 // re-render rows, which is correct.
 const TreeRow = memo(function TreeRow(props: RowProps) {
-  const { node, siblings, index, parentId, grandparentId, depth } = props
+  const { node, siblings, index, parentId, grandparentId, depth, ancestorIds } = props
   const {
     collapsed, onToggleCollapse, onToggle, onRename, onEdit, onDelete, onMove, onAddChild, formatDate,
     selectable, selectedIds, onSelectToggle, onStartPomodoro,
+    dragId, onDragIdChange,
   } = props
+  const [dropZone, setDropZone] = useState<DropZone | null>(null)
   const todo = node.todo
   const hasChildren = node.children.length > 0
   const isOpen = !collapsed.has(todo.id)
+  const isDragged = dragId === todo.id
+  // Dropping onto a descendant of the dragged node would create a cycle —
+  // i.e. the dragged id appears in THIS row's ancestor chain.
+  const canDropHere =
+    dragId != null && dragId !== todo.id && !ancestorIds.has(dragId)
+  const prevSiblingId = index > 0 ? siblings[index - 1].todo.id : null
+  const lastChildId = node.children.length
+    ? node.children[node.children.length - 1].todo.id
+    : null
 
   const prevSibling = index > 0 ? siblings[index - 1] : null
   const nextSibling = index < siblings.length - 1 ? siblings[index + 1] : null
@@ -113,12 +135,69 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
 
   const dueOverdue = todo.status === 'pending' && todo.due_time && new Date(todo.due_time) < new Date()
 
+  // Tri-zone drop target: top quarter = previous sibling, middle = child
+  // (reparenting — the whole dragged subtree follows, the backend only
+  // rewrites parent_id), bottom quarter = next sibling.
+  const resolveDropZone = (e: React.DragEvent): DropZone => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const rel = (e.clientY - rect.top) / rect.height
+    if (rel < 0.25) return 'before'
+    if (rel > 0.75) return 'after'
+    return 'child'
+  }
+
+  const commitDrop = () => {
+    if (dragId == null || !dropZone) return
+    if (dropZone === 'child') {
+      // Append as the LAST child of this row.
+      onMove(dragId, todo.id, lastChildId)
+    } else if (dropZone === 'before') {
+      onMove(dragId, parentId, prevSiblingId)
+    } else {
+      onMove(dragId, parentId, todo.id)
+    }
+    setDropZone(null)
+  }
+
   return (
     <div>
       <div
         tabIndex={0}
         onKeyDown={handleRowKey}
-        className="group flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        draggable={dragId === undefined ? false : true}
+        onDragStart={(e) => {
+          if (dragId === undefined || !onDragIdChange) return
+          e.stopPropagation()
+          e.dataTransfer.effectAllowed = 'move'
+          e.dataTransfer.setData('text/plain', String(todo.id))
+          onDragIdChange(todo.id)
+        }}
+        onDragEnd={() => {
+          setDropZone(null)
+          onDragIdChange?.(null)
+        }}
+        onDragOver={(e) => {
+          if (!canDropHere) return
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          setDropZone(resolveDropZone(e))
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropZone(null)
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          commitDrop()
+          onDragIdChange?.(null)
+        }}
+        className={cn(
+          'group flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+          isDragged && 'opacity-40',
+          dropZone === 'child' && 'ring-2 ring-primary/70 bg-primary/5',
+          dropZone === 'before' && 'border-t-2 border-primary',
+          dropZone === 'after' && 'border-b-2 border-primary',
+        )}
         style={{ paddingLeft: depth * 18 + 4 }}
       >
         {/* selection checkbox (bulk mode) */}
@@ -263,6 +342,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             parentId={todo.id}
             grandparentId={parentId}
             depth={depth + 1}
+            ancestorIds={new Set(ancestorIds).add(todo.id)}
             collapsed={collapsed}
             onToggleCollapse={onToggleCollapse}
             onToggle={onToggle}
@@ -272,6 +352,8 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             onMove={onMove}
             onAddChild={onAddChild}
             onStartPomodoro={onStartPomodoro}
+            dragId={dragId}
+            onDragIdChange={onDragIdChange}
             formatDate={formatDate}
             selectable={selectable}
             selectedIds={selectedIds}
