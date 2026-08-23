@@ -8,8 +8,8 @@ import { Badge } from '../components/ui/badge'
 import AvatarDisplay from '../components/AvatarDisplay'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Markdown } from '../components/Markdown'
+import { Textarea } from '../components/ui/textarea'
 import {
-  Send,
   Plus,
   Trash2,
   Bot,
@@ -23,6 +23,8 @@ import {
   MessageSquare,
   PanelLeftClose,
   PanelLeft,
+  Send,
+  Square,
 } from 'lucide-react'
 
 type MentionTab = 'contact' | 'event' | 'tag'
@@ -60,7 +62,13 @@ export default function AIChatPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const stickToBottomRef = useRef(true)
+  // Stream rendering: tokens accumulate in a ref and flush on a short timer,
+  // so Markdown isn't re-parsed on every single SSE token.
+  const streamBufRef = useRef('')
+  const streamFlushTimer = useRef<number | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const mentionRef = useRef<HTMLDivElement>(null)
   const mentionDataLoadedRef = useRef(false)
   // AbortController for the in-flight chat stream, so navigating away or
@@ -168,7 +176,7 @@ export default function AIChatPage() {
     return conv.id
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value
     setInput(val)
 
@@ -330,7 +338,13 @@ export default function AIChatPage() {
                 if (obj.error) continue
                 if (obj.c != null) {
                   fullContent += obj.c
-                  setStreamContent(fullContent)
+                  streamBufRef.current = fullContent
+                  if (streamFlushTimer.current == null) {
+                    streamFlushTimer.current = window.setTimeout(() => {
+                      streamFlushTimer.current = null
+                      setStreamContent(streamBufRef.current)
+                    }, 90)
+                  }
                 }
               } catch {
                 /* ignore a malformed token */
@@ -341,12 +355,20 @@ export default function AIChatPage() {
 
         setMessages((prev) => [...prev, createLocalMessage(convId, 'assistant', fullContent)])
     } catch (err) {
-      // An abort (conversation switch / unmount) isn't a failure — don't show
-      // the error bubble; let the finally clean up.
-      if (!(err instanceof Error && err.name === 'AbortError')) {
+      // Abort = user pressed Stop (or switched conversation / unmounted).
+      // Keep whatever partial content already streamed in as the answer.
+      if (err instanceof Error && err.name === 'AbortError') {
+        const partial = streamBufRef.current
+        if (partial) setMessages((prev) => [...prev, createLocalMessage(convId, 'assistant', partial)])
+      } else {
         setMessages((prev) => [...prev, createLocalMessage(convId, 'assistant', t('ai.sendFailed'))])
       }
     } finally {
+      if (streamFlushTimer.current != null) {
+        window.clearTimeout(streamFlushTimer.current)
+        streamFlushTimer.current = null
+      }
+      streamBufRef.current = ''
       setStreaming(false)
       setStreamContent('')
       loadConversations()
@@ -360,8 +382,19 @@ export default function AIChatPage() {
   }, [])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamContent])
+    // Follow the stream only when the user is already at (or near) the
+    // bottom; scrolling the inner container directly never drags the outer
+    // AppLayout scroll container along.
+    if (!stickToBottomRef.current) return
+    const el = listRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [messages, streamContent, analyzing])
+
+  const handleListScroll = useCallback(() => {
+    const el = listRef.current
+    if (!el) return
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  }, [])
 
   const filter = useDeferredValue(mentionFilter).toLowerCase()
 
@@ -404,8 +437,8 @@ export default function AIChatPage() {
   const hasActiveConv = activeConvId !== null || messages.length > 0
 
   return (
-    <div className="flex flex-1 min-h-0">
-      <div className={`shrink-0 flex flex-col bg-card transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-12' : 'w-52'}`}>
+    <div className="flex h-full min-h-0 overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div className={`shrink-0 flex flex-col border-r bg-sidebar/60 transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-12' : 'w-52'}`}>
         <div className={`flex items-center gap-1 border-b ${sidebarCollapsed ? 'justify-center px-1 py-1.5' : 'px-2 py-2'}`}>
           {!sidebarCollapsed && (
             <Button onClick={handleNewChat} className="flex-1 justify-center gap-1.5 h-7 text-xs" size="sm">
@@ -496,7 +529,11 @@ export default function AIChatPage() {
           </Button>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div
+          ref={listRef}
+          onScroll={handleListScroll}
+          className="flex-1 overflow-auto"
+        >
           {!hasActiveConv ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 px-6">
               <div className="rounded-2xl bg-primary/10 p-3">
@@ -538,13 +575,18 @@ export default function AIChatPage() {
                 <div className="flex justify-start">
                   <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm">
                     <Markdown content={streamContent} />
+                    <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse rounded bg-primary" aria-hidden />
                   </div>
                 </div>
               )}
               {streaming && !streamContent && (
                 <div className="flex justify-start">
-                  <div className="rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-                    {t('ai.thinking')}
+                  <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-muted px-3.5 py-2.5">
+                    <span className="flex gap-1" aria-label={t('ai.thinking')}>
+                      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:0ms]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:150ms]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:300ms]" />
+                    </span>
                   </div>
                 </div>
               )}
@@ -695,16 +737,23 @@ export default function AIChatPage() {
               </div>
             )}
 
-            <div className="flex gap-2">
-              <input
+            <div className="flex items-end gap-2">
+              <Textarea
                 ref={inputRef}
-                className="flex-1 rounded-xl border bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-ring transition-colors outline-none"
+                className="max-h-40 min-h-[38px] flex-1 resize-none rounded-xl border bg-muted/50 px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+                rows={1}
                 aria-label={t('ai.placeholder')}
                 placeholder={t('ai.placeholder')}
                 value={input}
-                onChange={handleInputChange}
+                onChange={(e) => {
+                  handleInputChange(e)
+                  // Auto-grow up to ~6 lines, then scroll inside.
+                  const el = e.currentTarget
+                  el.style.height = 'auto'
+                  el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                     e.preventDefault()
                     void handleSend()
                   }
@@ -712,16 +761,29 @@ export default function AIChatPage() {
                     setMentionPopup(false)
                   }
                 }}
-                disabled={streaming || analyzing}
+                disabled={analyzing}
               />
-              <Button
-                onClick={() => void handleSend()}
-                disabled={streaming || analyzing || (!input.trim() && mentions.length === 0)}
-                size="icon"
-                className="shrink-0 rounded-xl h-9 w-9"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+              {streaming ? (
+                <Button
+                  onClick={() => abortRef.current?.abort()}
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 rounded-xl h-9 w-9 text-destructive hover:text-destructive"
+                  aria-label={t('ai.stop')}
+                  title={t('ai.stop')}
+                >
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => void handleSend()}
+                  disabled={analyzing || (!input.trim() && mentions.length === 0)}
+                  size="icon"
+                  className="shrink-0 rounded-xl h-9 w-9"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
