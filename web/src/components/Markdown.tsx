@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { CodeBlock } from './CodeBlock'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -27,9 +28,7 @@ const components: Components = {
     </a>
   ),
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-  pre: ({ children }) => (
-    <pre className="my-2 overflow-x-auto rounded-lg border border-border bg-background/50 p-3 text-xs">{children}</pre>
-  ),
+  pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   code: ({ className, children }) =>
     isBlockCode(className, children) ? (
       <code className="font-mono text-[0.85em]">{children}</code>
