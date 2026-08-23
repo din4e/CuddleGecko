@@ -24,7 +24,7 @@ import EmptyState from '../components/EmptyState'
 import TodoCard from '../components/TodoCard'
 import TodoSubtaskList from '../components/TodoSubtaskList'
 import TodoTree from '../components/TodoTreeRow'
-import { buildTodoTree } from '../lib/buildTodoTree'
+import { buildTodoTree, type TodoNode } from '../lib/buildTodoTree'
 import { usePomodoroStore } from '../stores/pomodoro'
 import { TodoFormDialog } from '../components/TodoFormDialog'
 import {
@@ -502,6 +502,23 @@ export default function TodosPage() {
   , [])
 
   const todoTree = useMemo(() => buildTodoTree(todos), [todos])
+  // Tree drag & drop: id of the row being dragged (whole subtree follows).
+  const [treeDragId, setTreeDragId] = useState<number | null>(null)
+  const dragSubtreeSize = useMemo(() => {
+    if (treeDragId == null) return 0
+    const find = (nodes: TodoNode[]): TodoNode | null => {
+      for (const n of nodes) {
+        if (n.todo.id === treeDragId) return n
+        const hit = find(n.children)
+        if (hit) return hit
+      }
+      return null
+    }
+    const count = (n: TodoNode): number =>
+      1 + n.children.reduce((acc, c) => acc + count(c), 0)
+    const node = find(todoTree)
+    return node ? count(node) : 0
+  }, [treeDragId, todoTree])
   // id → title for the "nested under <parent>" hint on cards in non-tree views.
   const todoTitleById = useMemo(() => new Map(todos.map((t) => [t.id, t.title])), [todos])
 
@@ -812,9 +829,24 @@ export default function TodosPage() {
             </Button>
           </div>
           <div className="rounded-md border p-1">
+            {treeDragId != null && (
+              <div
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  if (treeDragId != null) void handleTreeMove(treeDragId, null, null)
+                  setTreeDragId(null)
+                }}
+                className="mb-1 rounded-md border-2 border-dashed border-primary/60 bg-primary/5 px-3 py-1.5 text-center text-xs text-primary"
+              >
+                {t('todos.dropAsRoot', { count: dragSubtreeSize })}
+              </div>
+            )}
             <TodoTree
               nodes={todoTree}
               collapsed={collapsed}
+              dragId={treeDragId}
+              onDragIdChange={setTreeDragId}
               onToggleCollapse={toggleCollapse}
               onToggle={handleToggle}
               onRename={handleRename}
