@@ -31,6 +31,8 @@ type TodoRepository interface {
 	PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID uint) (*model.Todo, error)
 	Duplicate(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error)
 	SetPinned(ctx context.Context, workspaceID, id uint, pinned bool) error
+	SetParent(ctx context.Context, workspaceID, id uint, parentID *uint) error
+	UpdateCreatedAt(ctx context.Context, id uint, at time.Time) error
 	IncrementPomodoro(ctx context.Context, workspaceID, id uint) error
 	BulkAction(ctx context.Context, workspaceID uint, ids []uint, action string) (int64, error)
 	ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error)

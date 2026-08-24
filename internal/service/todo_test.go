@@ -127,6 +127,14 @@ func (m *mockTodoRepo) IncrementPomodoro(ctx context.Context, workspaceID, id ui
 	return m.Called(ctx, workspaceID, id).Error(0)
 }
 
+func (m *mockTodoRepo) SetParent(ctx context.Context, workspaceID, id uint, parentID *uint) error {
+	return m.Called(ctx, workspaceID, id, parentID).Error(0)
+}
+
+func (m *mockTodoRepo) UpdateCreatedAt(ctx context.Context, id uint, at time.Time) error {
+	return m.Called(ctx, id, at).Error(0)
+}
+
 func (m *mockTodoRepo) ReplaceTags(ctx context.Context, todoID uint, tags []model.Tag) error {
 	return m.Called(ctx, todoID, tags).Error(0)
 }

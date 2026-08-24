@@ -630,6 +630,28 @@ func (r *TodoRepo) SetPinned(ctx context.Context, workspaceID, id uint, pinned b
 	return nil
 }
 
+// SetParent re-parents a todo in a single UPDATE (external imports link
+// children after all rows exist). parentID nil promotes to top level.
+func (r *TodoRepo) SetParent(ctx context.Context, workspaceID, id uint, parentID *uint) error {
+	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
+		Where("id = ? AND workspace_id = ?", id, workspaceID).
+		UpdateColumn("parent_id", parentID).Error; err != nil {
+		return fmt.Errorf("set todo parent: %w", err)
+	}
+	return nil
+}
+
+// UpdateCreatedAt restores a todo's original creation timestamp in a single
+// UPDATE (imports keep the source platform's created time).
+func (r *TodoRepo) UpdateCreatedAt(ctx context.Context, id uint, at time.Time) error {
+	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
+		Where("id = ?", id).
+		UpdateColumn("created_at", at).Error; err != nil {
+		return fmt.Errorf("update todo created_at: %w", err)
+	}
+	return nil
+}
+
 // IncrementPomodoro atomically bumps a todo's completed-pomodoro count by one.
 func (r *TodoRepo) IncrementPomodoro(ctx context.Context, workspaceID, id uint) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
