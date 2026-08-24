@@ -56,7 +56,7 @@ func TestExport_TodoRoundTrip(t *testing.T) {
 	require.NoError(t, todoRepo.ReplaceTags(ctx, todo.ID, []model.Tag{*tag}))
 	require.NoError(t, todoRepo.CreateItem(ctx, &model.TodoItem{TodoID: todo.ID, Content: "step1", Done: true}))
 
-	jsonStr, err := svc.ExportJSON(ctx, 1)
+	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
 	require.NoError(t, err)
 	require.NotEmpty(t, jsonStr)
 
@@ -118,7 +118,7 @@ func TestExport_TodoNestingRoundTrip(t *testing.T) {
 	require.NoError(t, todoRepo.Move(ctx, 1, child.ID, &parent.ID, nil)) // child under parent
 	require.NoError(t, todoRepo.Move(ctx, 1, grand.ID, &child.ID, nil))  // grand under child
 
-	jsonStr, err := svc.ExportJSON(ctx, 1)
+	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
 	require.NoError(t, err)
 
 	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
@@ -193,7 +193,7 @@ func TestExport_TodosCSVImport(t *testing.T) {
 		"second,,done,low\n"
 	n, err := svc.ImportTodosCSV(ctx, 5, 9, csv)
 	require.NoError(t, err)
-	assert.Equal(t, 2, n, "two non-blank rows imported")
+	assert.Equal(t, ImportStats{Imported: 2, Skipped: 1}, n, "two non-blank rows imported, one skipped")
 
 	todos, _, err := todoRepo.List(ctx, 9, model.TodoListQuery{Page: 1, PageSize: 100})
 	require.NoError(t, err)
@@ -232,7 +232,7 @@ func TestExport_Import_EmitsNotifier(t *testing.T) {
 	assert.Equal(t, uint(1), n.events[0].workspaceID)
 
 	n.events = nil
-	jsonStr, err := svc.ExportJSON(ctx, 1) // export some data
+	jsonStr, err := svc.ExportJSON(ctx, 1, 1) // export some data
 	require.NoError(t, err)
 	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
 	require.NotEmpty(t, n.events, "JSON import should also emit a refresh")
@@ -285,7 +285,7 @@ func TestExport_ContactsCSVImport(t *testing.T) {
 		",skipme,\n"
 	cn, cerr := svc.ImportContactsCSV(ctx, 1, 7, csv)
 	require.NoError(t, cerr)
-	assert.Equal(t, 1, cn, "one non-blank contact imported")
+	assert.Equal(t, ImportStats{Imported: 1, Skipped: 1}, cn, "one non-blank contact imported, one skipped")
 
 	contacts, _, err := contactRepo.List(ctx, 7, 1, 100, "", nil)
 	require.NoError(t, err)
@@ -343,7 +343,7 @@ func TestExport_TransactionsJSONRoundTrip(t *testing.T) {
 		UserID: 1, WorkspaceID: 1, Title: "Salary", Amount: 1000, Type: "income", Date: time.Now(),
 	}))
 
-	jsonStr, err := svc.ExportJSON(ctx, 1)
+	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
 	require.NoError(t, err)
 	require.Contains(t, jsonStr, "Salary", "transactions present in JSON export")
 
@@ -399,7 +399,7 @@ func TestExport_EventsJSONRoundTrip(t *testing.T) {
 		UserID: 1, WorkspaceID: 1, Title: "Dentist", StartTime: time.Now(), Location: "Clinic",
 	}))
 
-	jsonStr, err := svc.ExportJSON(ctx, 1)
+	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
 	require.NoError(t, err)
 	require.Contains(t, jsonStr, "Dentist", "events present in JSON export")
 
@@ -431,7 +431,7 @@ func TestExport_ContactTagsRoundTrip(t *testing.T) {
 	require.NoError(t, contactRepo.Create(ctx, contact))
 	require.NoError(t, contactRepo.ReplaceTags(ctx, contact.ID, []model.Tag{*tag}))
 
-	jsonStr, err := svc.ExportJSON(ctx, 1)
+	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
 	require.NoError(t, err)
 	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
 
@@ -466,7 +466,7 @@ func TestExport_TransactionsCSVImport(t *testing.T) {
 		"badrow,expense,notanumber,x\n"
 	n, err := svc.ImportTransactionsCSV(ctx, 1, 1, csv)
 	require.NoError(t, err)
-	assert.Equal(t, 2, n, "two valid rows (blank-title and bad-amount skipped)")
+	assert.Equal(t, ImportStats{Imported: 2, Skipped: 2}, n, "two valid rows (blank-title and bad-amount skipped)")
 
 	txs, _, err := txRepo.List(ctx, 1, 1, 100, nil, nil, "")
 	require.NoError(t, err)

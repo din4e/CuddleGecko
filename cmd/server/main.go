@@ -91,7 +91,15 @@ func main() {
 	pomodoroSvc := service.NewPomodoroService(pomodoroRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
-	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo, service.WithExportNotifier(hub), service.WithTransactionRepo(transactionRepo), service.WithEventRepo(eventRepo), service.WithWorkoutRepos(workoutRepo, workoutExerciseRepo, bodyMetricRepo))
+	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo,
+		service.WithExportNotifier(hub),
+		service.WithTransactionRepo(transactionRepo),
+		service.WithEventRepo(eventRepo),
+		service.WithWorkoutRepos(workoutRepo, workoutExerciseRepo, bodyMetricRepo),
+		service.WithHabitRepos(habitRepo, habitLogRepo),
+		service.WithPomodoroRepo(pomodoroRepo),
+		service.WithFitnessRepos(exerciseLibraryRepo, workoutTemplateRepo, workoutSetLogRepo, fitnessGoalRepo),
+		service.WithAIRepo(aiRepo))
 	userSettingSvc := service.NewUserSettingService(userSettingRepo)
 
 	// MCP Server
