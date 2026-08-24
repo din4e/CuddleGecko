@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { AppAdapters } from './adapter'
+import type { AppAdapters, TodoImportResult } from './adapter'
 import type { AuthResponse, User, Contact, Tag, Interaction, Reminder, ContactRelation, GraphData, Event, Transaction, TransactionSummary, AIProvider, AIConversation, AIMessage, Workspace, Todo } from '@/types'
 
 function createHTTPAdapters(): AppAdapters {
@@ -67,6 +67,9 @@ function createHTTPAdapters(): AppAdapters {
       importTodosCSV: (data) => request.post<{ imported: number }>('/import/todos', { data }).then((r) => r.imported ?? 0),
       importContactsCSV: (data) => request.post<{ imported: number }>('/import/contacts', { data }).then((r) => r.imported ?? 0),
       importTransactionsCSV: (data) => request.post<{ imported: number }>('/import/transactions', { data }).then((r) => r.imported ?? 0),
+      importTodosFromPlatform: (platform, data) => request.post<TodoImportResult>(`/import/todos/${platform}`, { data }).then((r) => r ?? { imported: 0, skipped: 0 }),
+      exportModule: (module, format) => request.post<string>(`/data/export/${module}`, { format }),
+      importModule: (module, format, data) => request.post<TodoImportResult>(`/data/import/${module}`, { data, format }).then((r) => r ?? { imported: 0, skipped: 0 }),
     },
 
     event: {

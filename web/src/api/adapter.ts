@@ -63,6 +63,14 @@ export interface ExportAdapter {
   importTodosCSV(data: string): Promise<number>
   importContactsCSV(data: string): Promise<number>
   importTransactionsCSV(data: string): Promise<number>
+  importTodosFromPlatform(platform: string, data: string): Promise<TodoImportResult>
+  exportModule(module: string, format: 'csv' | 'json'): Promise<string>
+  importModule(module: string, format: 'csv' | 'json', data: string): Promise<TodoImportResult>
+}
+
+export interface TodoImportResult {
+  imported: number
+  skipped: number
 }
 
 export interface EventAdapter {
