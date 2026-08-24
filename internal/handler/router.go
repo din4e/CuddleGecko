@@ -314,8 +314,13 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.POST("/export/events", h.Export.ExportEventsCSV)
 			wsProtected.POST("/import", h.Export.Import)
 			wsProtected.POST("/import/todos", h.Export.ImportTodosCSV)
+			wsProtected.POST("/import/todos/:platform", h.Export.ImportTodosFromPlatform)
 			wsProtected.POST("/import/contacts", h.Export.ImportContactsCSV)
 			wsProtected.POST("/import/transactions", h.Export.ImportTransactionsCSV)
+
+			// Unified per-module import/export (all modules, csv|json).
+			wsProtected.POST("/data/export/:module", h.Export.ExportModule)
+			wsProtected.POST("/data/import/:module", h.Export.ImportModule)
 		}
 	}
 }
