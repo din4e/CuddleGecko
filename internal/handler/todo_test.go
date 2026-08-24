@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"github.com/din4e/cuddlegecko/internal/service"
@@ -122,6 +123,14 @@ func (m *mockTodoSvcRepo) SetPinned(ctx context.Context, workspaceID, id uint, p
 
 func (m *mockTodoSvcRepo) IncrementPomodoro(ctx context.Context, workspaceID, id uint) error {
 	return m.Called(ctx, workspaceID, id).Error(0)
+}
+
+func (m *mockTodoSvcRepo) SetParent(ctx context.Context, workspaceID, id uint, parentID *uint) error {
+	return m.Called(ctx, workspaceID, id, parentID).Error(0)
+}
+
+func (m *mockTodoSvcRepo) UpdateCreatedAt(ctx context.Context, id uint, at time.Time) error {
+	return m.Called(ctx, id, at).Error(0)
 }
 
 func (m *mockTodoSvcRepo) ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error) {
