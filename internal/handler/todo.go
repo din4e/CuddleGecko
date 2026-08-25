@@ -90,6 +90,15 @@ func (h *TodoHandler) List(c *gin.Context) {
 	if v := c.Query("started"); v == "1" || v == "true" {
 		q.Started = true
 	}
+	if v := c.Query("roots_only"); v == "1" || v == "true" {
+		q.RootsOnly = true
+	}
+	if raw := c.Query("parent_id"); raw != "" {
+		if id, err := strconv.ParseUint(raw, 10, 32); err == nil {
+			parentID := uint(id)
+			q.ParentID = &parentID
+		}
+	}
 	for _, raw := range c.QueryArray("tag_id") {
 		if id, err := strconv.ParseUint(raw, 10, 32); err == nil {
 			q.TagIDs = append(q.TagIDs, uint(id))

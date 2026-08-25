@@ -286,6 +286,32 @@ func TestTodoHandler_List_InvalidDueBefore(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+func TestTodoHandler_List_ParentFilterAndRootsOnly(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	parentID := uint(7)
+	repo.On("List", mock.Anything, uint(1), mock.MatchedBy(func(q model.TodoListQuery) bool {
+		return q.ParentID != nil && *q.ParentID == parentID && !q.RootsOnly
+	})).Return([]model.Todo{}, int64(0), nil)
+	repo.On("List", mock.Anything, uint(1), mock.MatchedBy(func(q model.TodoListQuery) bool {
+		return q.RootsOnly && q.ParentID == nil
+	})).Return([]model.Todo{}, int64(0), nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos?parent_id=7", nil)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/todos?roots_only=true", nil)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
 func TestTodoHandler_BulkAction(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)
