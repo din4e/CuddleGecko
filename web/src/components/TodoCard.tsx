@@ -1,4 +1,4 @@
-import { memo, useState, type ReactNode } from 'react'
+import { memo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Ban, CheckCircle2, Circle, Clock, CalendarClock, ListTodo, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer } from 'lucide-react'
 import { Button } from './ui/button'
@@ -63,6 +63,16 @@ const TodoCard = memo(function TodoCard({
   const { t } = useTranslation()
   const [editingTitle, setEditingTitle] = useState(false)
   const [draft, setDraft] = useState('')
+  // Single click on the title opens the detail drawer; double-click renames.
+  // The two are disambiguated by delaying the click action long enough for a
+  // second click to cancel it.
+  const titleClickTimer = useRef<number | null>(null)
+  const cancelPendingTitleClick = () => {
+    if (titleClickTimer.current != null) {
+      window.clearTimeout(titleClickTimer.current)
+      titleClickTimer.current = null
+    }
+  }
 
   const priorityLabel = t(`todos.${todo.priority}`)
   const syncLabel = t('todos.syncToEvent')
@@ -123,7 +133,17 @@ const TodoCard = memo(function TodoCard({
               />
             ) : (
               <span
-                onDoubleClick={startRename}
+                onClick={() => {
+                  cancelPendingTitleClick()
+                  titleClickTimer.current = window.setTimeout(() => {
+                    titleClickTimer.current = null
+                    onEdit(todo)
+                  }, 250)
+                }}
+                onDoubleClick={() => {
+                  cancelPendingTitleClick()
+                  startRename()
+                }}
                 className={`text-sm font-medium leading-snug cursor-text ${closed ? 'line-through text-muted-foreground' : ''}`}
                 title={todo.title}
               >

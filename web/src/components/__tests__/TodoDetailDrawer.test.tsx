@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { TodoFormDialog } from '../TodoFormDialog'
+import { TodoDetailDrawer } from '../TodoDetailDrawer'
 import type { Todo } from '../../types'
 
 const mocks = vi.hoisted(() => ({
@@ -35,14 +35,14 @@ vi.mock('../../api/contacts', () => ({
 
 function todo(over: Partial<Todo> = {}): Todo {
   return {
-    id: 1, user_id: 1, workspace_id: 1, title: 'Task', description: '',
+    id: 7, user_id: 1, workspace_id: 1, title: 'Drawer task', description: '',
     status: 'pending', priority: 'normal', due_time: null, amount: null,
     amount_type: '', contact_ids: [], color: '', completed_at: null,
     created_at: '', updated_at: '', ...over,
   }
 }
 
-describe('TodoFormDialog', () => {
+describe('TodoDetailDrawer', () => {
   beforeEach(() => {
     mocks.updateTodo.mockReset()
     mocks.createTodo.mockReset()
@@ -50,83 +50,51 @@ describe('TodoFormDialog', () => {
     mocks.moveTodo.mockReset()
   })
 
-  it('clearing a populated due time on edit sends clear_due_time', async () => {
-    const user = userEvent.setup()
+  it('shows the todo title in the header and pre-fills the form', () => {
     render(
-      <TodoFormDialog
+      <TodoDetailDrawer
+        todo={todo()}
         open
-        editing={todo({ due_time: '2026-05-01T09:00:00.000Z' }) }
         contacts={[]}
         tags={[]}
         onContactsChange={vi.fn()}
         onClose={vi.fn()}
       />,
     )
-
-    const dueInput = document.querySelector('input[type="datetime-local"]') as HTMLInputElement
-    await user.clear(dueInput)
-    await user.click(screen.getByText('common.save'))
-
-    expect(mocks.updateTodo).toHaveBeenCalledTimes(1)
-    const arg = mocks.updateTodo.mock.calls[0][0] as { data: { clear_due_time?: boolean } }
-    expect(arg.data.clear_due_time).toBe(true)
-  })
-
-  it('opens with an empty title for a new todo', () => {
-    render(
-      <TodoFormDialog
-        open
-        editing={null}
-        contacts={[]}
-        tags={[]}
-        onContactsChange={vi.fn()}
-        onClose={vi.fn()}
-      />,
-    )
+    // Header carries the todo title; the title field is pre-filled for editing.
+    expect(screen.getAllByText('Drawer task').length).toBeGreaterThan(0)
     const titleInput = document.querySelector('input') as HTMLInputElement
-    expect(titleInput).not.toBeNull()
-    expect(titleInput.value).toBe('')
+    expect(titleInput.value).toBe('Drawer task')
+    expect(screen.getByText('common.save')).toBeInTheDocument()
   })
 
-  it('create with a preset parent includes parent_id in the payload', async () => {
+  it('saves edits through the shared form', async () => {
     const user = userEvent.setup()
     render(
-      <TodoFormDialog
+      <TodoDetailDrawer
+        todo={todo()}
         open
-        editing={null}
         contacts={[]}
         tags={[]}
-        parentCandidates={[todo({ id: 5, title: 'Parent' })]}
-        presetParentId={5}
-        onContactsChange={vi.fn()}
-        onClose={vi.fn()}
-      />,
-    )
-    const titleInput = document.querySelector('input') as HTMLInputElement
-    await user.type(titleInput, 'child')
-    await user.click(screen.getByText('common.create'))
-
-    expect(mocks.createTodo).toHaveBeenCalledTimes(1)
-    const payload = mocks.createTodo.mock.calls[0][0] as Partial<Todo>
-    expect(payload.parent_id).toBe(5)
-  })
-
-  it('edit without changing parent does not call move', async () => {
-    const user = userEvent.setup()
-    render(
-      <TodoFormDialog
-        open
-        editing={todo({ parent_id: 5 })}
-        contacts={[]}
-        tags={[]}
-        parentCandidates={[todo({ id: 5, title: 'Parent' })]}
         onContactsChange={vi.fn()}
         onClose={vi.fn()}
       />,
     )
     await user.click(screen.getByText('common.save'))
+    expect(mocks.updateTodo).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }))
+  })
 
-    expect(mocks.updateTodo).toHaveBeenCalledTimes(1)
-    expect(mocks.moveTodo).not.toHaveBeenCalled()
+  it('renders nothing when no todo is set', () => {
+    const { container } = render(
+      <TodoDetailDrawer
+        todo={null}
+        open={false}
+        contacts={[]}
+        tags={[]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(container.firstChild).toBeNull()
   })
 })

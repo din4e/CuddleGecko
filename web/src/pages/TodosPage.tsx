@@ -32,6 +32,7 @@ import KanbanBoard, { type KanbanLane } from '../components/KanbanBoard'
 import { buildLazyTree, descendantIds, type TodoNode } from '../lib/buildTodoTree'
 import { usePomodoroStore } from '../stores/pomodoro'
 import { TodoFormDialog } from '../components/TodoFormDialog'
+import { TodoDetailDrawer } from '../components/TodoDetailDrawer'
 import {
   useTodosInfinite,
   useTodoChildrenMap,
@@ -107,6 +108,8 @@ export default function TodosPage() {
     () => (localStorage.getItem('todoView') as TodoView) || 'tree',
   )
   const [dialogOpen, setDialogOpen] = useState(false)
+  // Detail drawer (right slide-over): the editing surface for existing todos.
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<Todo | null>(null)
   // When creating via "add child" in the tree, this presets the new todo's parent.
   const [presetParent, setPresetParent] = useState<Todo | null>(null)
@@ -198,7 +201,7 @@ export default function TodosPage() {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const el = e.target as HTMLElement | null
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
-      if (dialogOpen || confirmDelete || shortcutsOpen) return
+      if (dialogOpen || drawerOpen || confirmDelete || shortcutsOpen) return
       switch (e.key) {
         case 'n': case 'N':
           e.preventDefault(); openCreate(); break
@@ -213,12 +216,12 @@ export default function TodosPage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [dialogOpen, confirmDelete, shortcutsOpen, openCreate])
+  }, [dialogOpen, drawerOpen, confirmDelete, shortcutsOpen, openCreate])
 
   const openEdit = useCallback((todo: Todo) => {
     setEditing(todo)
     setPresetParent(null)
-    setDialogOpen(true)
+    setDrawerOpen(true)
   }, [])
 
   const handleQuickAdd = async () => {
@@ -1131,17 +1134,28 @@ export default function TodosPage() {
         />
       ) : null}
 
-      {/* Create/Edit Dialog */}
+      {/* Create Dialog (editing lives in the detail drawer below) */}
       <TodoFormDialog
-        key={editing?.id ?? presetParent?.id ?? 'new'}
+        key={presetParent?.id ?? 'new'}
         open={dialogOpen}
-        editing={editing}
+        editing={null}
         contacts={contacts}
         tags={tags}
         parentCandidates={todos}
         presetParentId={presetParent?.id ?? null}
         onContactsChange={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
         onClose={() => { setDialogOpen(false); setPresetParent(null) }}
+      />
+
+      {/* Detail Drawer — right slide-over for viewing/editing a todo */}
+      <TodoDetailDrawer
+        todo={editing}
+        open={drawerOpen}
+        contacts={contacts}
+        tags={tags}
+        parentCandidates={todos}
+        onContactsChange={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
+        onClose={() => setDrawerOpen(false)}
       />
 
       {/* Delete Confirm Dialog */}

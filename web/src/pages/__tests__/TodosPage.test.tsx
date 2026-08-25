@@ -253,6 +253,24 @@ describe('TodosPage', () => {
     await waitFor(() => expect(screen.getByText('Child')).toBeInTheDocument())
   })
 
+  it('opens the detail drawer on single title click (double-click still renames)', async () => {
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 1, title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+    ]))
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Buy milk')).toBeInTheDocument()
+    })
+
+    // Single click opens the right-side drawer (fires after the 250ms
+    // double-click disambiguation window).
+    await user.click(screen.getByText('Buy milk'))
+    await waitFor(() => {
+      expect(screen.getByText('common.save')).toBeInTheDocument()
+    }, { timeout: 2000 })
+  })
+
   it('creates a todo via the quick-add bar on Enter', async () => {
     const user = userEvent.setup()
     renderPage()
