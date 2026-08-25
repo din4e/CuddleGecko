@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, ArrowRight, Ban, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
@@ -111,6 +111,15 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(todo.title)
   const [showItems, setShowItems] = useState(false)
+  // Single click on the title opens the detail drawer; double-click renames.
+  // The delayed click lets a second click cancel it before the drawer opens.
+  const titleClickTimer = useRef<number | null>(null)
+  const cancelPendingTitleClick = () => {
+    if (titleClickTimer.current != null) {
+      window.clearTimeout(titleClickTimer.current)
+      titleClickTimer.current = null
+    }
+  }
   const startEdit = () => {
     setDraft(todo.title)
     setEditing(true)
@@ -256,7 +265,17 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
           />
         ) : (
           <span
-            onDoubleClick={startEdit}
+            onClick={() => {
+              cancelPendingTitleClick()
+              titleClickTimer.current = window.setTimeout(() => {
+                titleClickTimer.current = null
+                onEdit(todo)
+              }, 250)
+            }}
+            onDoubleClick={() => {
+              cancelPendingTitleClick()
+              startEdit()
+            }}
             className={cn(
               'min-w-0 flex-1 truncate text-sm',
               todo.status !== 'pending' && 'text-muted-foreground line-through',
