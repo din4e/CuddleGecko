@@ -11,6 +11,7 @@ import type { KanbanColumn } from '../api/settings'
 export const DEFAULT_KANBAN_COLUMNS: KanbanColumn[] = [
   { id: 'status-pending', label: 'pending', kind: 'status', value: 'pending' },
   { id: 'status-done', label: 'done', kind: 'status', value: 'done' },
+  { id: 'status-abandoned', label: 'abandoned', kind: 'status', value: 'abandoned' },
 ]
 
 export function matchesColumn(todo: Todo, col: KanbanColumn): boolean {

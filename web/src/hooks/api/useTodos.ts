@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { todosApi } from '../../api/todos'
 import { rootKey } from './keys'
-import type { Todo, TodoItem, TodoStats, PaginatedData, TodoListParams, TodoUpdateInput } from '../../types'
+import type { Todo, TodoItem, TodoStats, PaginatedData, TodoListParams, TodoStatus, TodoUpdateInput } from '../../types'
 
 const scope = 'todos'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
@@ -82,14 +82,46 @@ export function useToggleTodoStatus() {
           items: old.items?.map((t) => {
             if (t.id !== id) return t
             if (t.status === 'pending' && t.repeat) return t
-            const done = t.status === 'done'
-            return { ...t, status: done ? 'pending' : 'done', completed_at: done ? null : new Date().toISOString() }
+            // The server flips pending→done and any closed state→pending.
+            const next = t.status === 'pending' ? 'done' : 'pending'
+            return { ...t, status: next, completed_at: next === 'done' ? new Date().toISOString() : null }
           }),
         })
       }
       return { previous: new Map(previous) }
     },
     onError: (_err, _id, ctx) => {
+      ctx?.previous.forEach((data, key) => qc.setQueryData(key, data))
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: allKey() })
+    },
+  })
+}
+
+// Optimistically set an explicit status (pending / done / abandoned) in every
+// cached list page; rollback on error, reconcile via refetch on settle.
+export function useSetTodoStatus() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status }: { id: number; status: TodoStatus }) => todosApi.setStatus(id, status),
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
+      const previous = qc.getQueriesData<PaginatedData<Todo>>({ queryKey: [...allKey(), 'list'] })
+      for (const [key, old] of previous) {
+        if (!old) continue
+        qc.setQueryData(key, {
+          ...old,
+          items: old.items?.map((t) =>
+            t.id === id
+              ? { ...t, status, completed_at: status === 'done' ? t.completed_at ?? new Date().toISOString() : null }
+              : t,
+          ),
+        })
+      }
+      return { previous: new Map(previous) }
+    },
+    onError: (_err, _vars, ctx) => {
       ctx?.previous.forEach((data, key) => qc.setQueryData(key, data))
     },
     onSettled: () => {

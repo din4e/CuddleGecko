@@ -12,7 +12,7 @@ type Todo struct {
 	WorkspaceID uint           `gorm:"index;not null;default:0;index:idx_todo_ws_status_due" json:"workspace_id"`
 	Title       string         `gorm:"size:200;not null" json:"title"`
 	Description string         `gorm:"type:longtext" json:"description"`
-	Status      string         `gorm:"size:20;not null;default:'pending';index:idx_todo_ws_status_due" json:"status"`   // pending / done
+	Status      string         `gorm:"size:20;not null;default:'pending';index:idx_todo_ws_status_due" json:"status"`   // pending / done / abandoned
 	Priority    string         `gorm:"size:20;not null;default:'normal'" json:"priority"` // low / normal / high
 	Pinned       bool           `gorm:"not null;default:false" json:"pinned"`
 	DueTime     *time.Time     `gorm:"index:idx_todo_ws_status_due" json:"due_time"`
@@ -55,7 +55,7 @@ type TodoItem struct {
 // It powers the TickTick-style smart lists (Today / Next 7 days / Overdue),
 // search box, and sort menu.
 type TodoListQuery struct {
-	Status    string     // "pending" | "done" | "" (all)
+	Status    string     // "pending" | "done" | "abandoned" | "" (all)
 	Priority  string     // "low" | "normal" | "high" | "" (all)
 	Search    string     // case-insensitive substring match on title
 	DueBefore *time.Time // include todos due at or before this time

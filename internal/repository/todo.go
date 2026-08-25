@@ -95,8 +95,9 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQ
 }
 
 // todoOrderClause builds the ORDER BY clause for the requested sort key.
-// Pending tasks always surface before done ones, and priority acts as a
-// secondary tiebreaker — mirroring TickTick's default task ordering.
+// Pending tasks always surface before closed ones (done or abandoned), and
+// priority acts as a secondary tiebreaker — mirroring TickTick's default task
+// ordering.
 func todoOrderClause(sort, order string) string {
 	dir := "ASC"
 	if strings.EqualFold(order, "desc") {
@@ -104,7 +105,7 @@ func todoOrderClause(sort, order string) string {
 	}
 
 	const (
-		pendingFirst  = "CASE WHEN status = 'done' THEN 1 ELSE 0 END"
+		pendingFirst  = "CASE WHEN status = 'pending' THEN 0 ELSE 1 END"
 		pinnedFirst   = "CASE WHEN pinned THEN 0 ELSE 1 END"
 		priorityRank  = "CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 WHEN 'low' THEN 2 ELSE 3 END"
 		dueNullsLast  = "due_time IS NULL"

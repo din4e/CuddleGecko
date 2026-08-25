@@ -60,7 +60,7 @@ describe('TodoTree', () => {
     const user = userEvent.setup()
     const onToggle = vi.fn()
     render(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onToggle })} />)
-    await user.click(screen.getByRole('button', { name: 'todos.toggleDone' }))
+    await user.click(screen.getByRole('button', { name: 'todos.markDone' }))
     expect(onToggle).toHaveBeenCalledWith(1)
   })
 

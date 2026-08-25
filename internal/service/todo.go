@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -132,6 +133,14 @@ func (s *TodoService) Create(ctx context.Context, userID, workspaceID uint, todo
 	if todo.Status == "" {
 		todo.Status = "pending"
 	}
+	if err := validateTodoStatus(todo.Status); err != nil {
+		return nil, err
+	}
+	// Only done tasks carry a completion timestamp (it powers done-today stats).
+	if todo.Status == "done" && todo.CompletedAt == nil {
+		now := time.Now()
+		todo.CompletedAt = &now
+	}
 	if todo.Priority == "" {
 		todo.Priority = "normal"
 	}
@@ -158,6 +167,9 @@ func (s *TodoService) List(ctx context.Context, userID, workspaceID uint, q mode
 }
 
 func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Todo, clear TodoClear) (*model.Todo, error) {
+	if err := validateTodoStatus(updates.Status); err != nil {
+		return nil, err
+	}
 	todo, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrTodoNotFound
@@ -168,7 +180,7 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 	}
 	todo.Description = updates.Description
 	if updates.Status != "" {
-		todo.Status = updates.Status
+		applyStatus(todo, updates.Status)
 	}
 	if updates.Priority != "" {
 		todo.Priority = updates.Priority
@@ -235,11 +247,50 @@ func (s *TodoService) ToggleStatus(ctx context.Context, userID, workspaceID, id 
 	return todo, nil
 }
 
+// SetStatus explicitly sets a todo's status (pending / done / abandoned) — the
+// endpoint behind the edit dialog's status picker, the card's abandon action
+// and kanban drops onto arbitrary status columns. Unlike ToggleStatus it never
+// advances recurring tasks; the client keeps using the toggle for the
+// complete-a-recurring-task flow.
+func (s *TodoService) SetStatus(ctx context.Context, userID, workspaceID, id uint, status string) (*model.Todo, error) {
+	if status == "" {
+		return nil, fmt.Errorf("%w: status is required", ErrInvalidTodo)
+	}
+	if err := validateTodoStatus(status); err != nil {
+		return nil, err
+	}
+	todo, err := s.repo.GetByID(ctx, workspaceID, id)
+	if err != nil {
+		return nil, ErrTodoNotFound
+	}
+
+	applyStatus(todo, status)
+
+	if err := s.repo.Update(ctx, todo); err != nil {
+		return nil, err
+	}
+	s.notify(ctx, workspaceID, todo.ID, TodoUpdated)
+	return todo, nil
+}
+
+// applyStatus sets the status and keeps completed_at in sync: only done tasks
+// carry a completion timestamp (done-today / done-this-week stats read it), and
+// re-completing an already-done task keeps its original completion time.
+func applyStatus(todo *model.Todo, status string) {
+	todo.Status = status
+	if status == "done" {
+		if todo.CompletedAt == nil {
+			now := time.Now()
+			todo.CompletedAt = &now
+		}
+		return
+	}
+	todo.CompletedAt = nil
+}
+
 // markDone completes a todo in place.
 func markDone(todo *model.Todo) {
-	todo.Status = "done"
-	now := time.Now()
-	todo.CompletedAt = &now
+	applyStatus(todo, "done")
 }
 
 func (s *TodoService) SyncToEvent(ctx context.Context, userID, workspaceID, id uint) (*model.Event, error) {

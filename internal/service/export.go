@@ -879,7 +879,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 			}
 		}
 		status := te.Status
-		if status == "" {
+		if status != "done" && status != "abandoned" {
 			status = "pending"
 		}
 		priority := te.Priority

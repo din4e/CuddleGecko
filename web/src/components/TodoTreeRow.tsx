@@ -1,7 +1,7 @@
 import { memo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
+  ArrowLeft, ArrowRight, Ban, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
   Circle, ListTodo, Pencil, Plus, Timer, Trash2,
 } from 'lucide-react'
 import type { Todo } from '../types'
@@ -227,9 +227,11 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
         </button>
 
         {/* toggle done */}
-        <button type="button" className="p-0.5" onClick={() => onToggle(todo.id)} aria-label={t('todos.toggleDone')}>
+        <button type="button" className="p-0.5" onClick={() => onToggle(todo.id)} aria-label={todo.status === 'pending' ? t('todos.markDone') : t('todos.markPending')}>
           {todo.status === 'done' ? (
             <CheckCircle2 className="h-4 w-4 text-primary" />
+          ) : todo.status === 'abandoned' ? (
+            <Ban className="h-4 w-4 text-muted-foreground" />
           ) : (
             <Circle className="h-4 w-4 text-muted-foreground" />
           )}
@@ -253,7 +255,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             onDoubleClick={startEdit}
             className={cn(
               'min-w-0 flex-1 truncate text-sm',
-              todo.status === 'done' && 'text-muted-foreground line-through',
+              todo.status !== 'pending' && 'text-muted-foreground line-through',
             )}
           >
             {todo.title}
@@ -261,7 +263,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
         )}
 
         {/* compact meta */}
-        {todo.priority === 'high' && todo.status !== 'done' && (
+        {todo.priority === 'high' && todo.status === 'pending' && (
           <span className="text-[10px] font-semibold text-destructive">!{todo.priority[0].toUpperCase()}</span>
         )}
         {todo.due_time && (

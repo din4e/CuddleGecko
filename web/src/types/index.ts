@@ -193,7 +193,7 @@ export interface Workspace {
   updated_at: string
 }
 
-export type TodoStatus = 'pending' | 'done'
+export type TodoStatus = 'pending' | 'done' | 'abandoned'
 export type TodoPriority = 'low' | 'normal' | 'high'
 export type AmountType = '' | 'income' | 'expense'
 export type TodoSort = 'due_date' | 'priority' | 'title' | 'created' | 'manual'

@@ -13,6 +13,7 @@ var (
 	ErrInvalidTransaction = errors.New("invalid transaction")
 	ErrInvalidEvent       = errors.New("invalid event")
 	ErrInvalidReminder    = errors.New("invalid reminder")
+	ErrInvalidTodo        = errors.New("invalid todo")
 )
 
 // These validators live in the service layer (not the HTTP handler) so they
@@ -61,5 +62,17 @@ func validateReminderStatus(status model.ReminderStatus) error {
 		return nil
 	default:
 		return fmt.Errorf("%w: status must be 'pending', 'done', or 'snoozed'", ErrInvalidReminder)
+	}
+}
+
+// validateTodoStatus checks a todo status is a known value. Empty means "leave
+// unchanged" on create/update (the handler binding treats it as omitted), so it
+// is accepted here; SetStatus rejects it separately.
+func validateTodoStatus(status string) error {
+	switch status {
+	case "", "pending", "done", "abandoned":
+		return nil
+	default:
+		return fmt.Errorf("%w: status must be 'pending', 'done', or 'abandoned'", ErrInvalidTodo)
 	}
 }

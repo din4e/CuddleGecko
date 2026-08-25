@@ -37,8 +37,9 @@ describe('kanban column predicates', () => {
     expect(unmatched.map((t) => t.id)).toEqual([3])
   })
 
-  it('default columns are the classic pending/done board', () => {
-    expect(DEFAULT_KANBAN_COLUMNS).toHaveLength(2)
-    expect(DEFAULT_KANBAN_COLUMNS[0].kind).toBe('status')
+  it('default columns are the classic pending/done/abandoned board', () => {
+    expect(DEFAULT_KANBAN_COLUMNS).toHaveLength(3)
+    expect(DEFAULT_KANBAN_COLUMNS.every((c) => c.kind === 'status')).toBe(true)
+    expect(DEFAULT_KANBAN_COLUMNS.map((c) => c.value)).toEqual(['pending', 'done', 'abandoned'])
   })
 })

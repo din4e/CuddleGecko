@@ -25,8 +25,8 @@ const didaFixture = `"Date: 2026-08-24+0000"
 
 // TestImportTodosFromPlatform_Dida covers the 滴答清单 CSV import: status and
 // priority mapping, tag creation (tags column + list name), parent/child
-// linking via taskId/parentId, abandoned-row skipping, and orphans (child of
-// an abandoned parent) staying top-level.
+// linking via taskId/parentId, abandoned rows importing with the abandoned
+// status, and orphans (child of an abandoned parent) staying top-level.
 func TestImportTodosFromPlatform_Dida(t *testing.T) {
 	db := newExportTestDB(t)
 	contactRepo := repository.NewContactRepo(db)
@@ -41,12 +41,12 @@ func TestImportTodosFromPlatform_Dida(t *testing.T) {
 
 	res, err := svc.ImportTodosFromPlatform(ctx, 2, 3, "dida", didaFixture)
 	require.NoError(t, err)
-	assert.Equal(t, 4, res.Imported)
-	assert.Equal(t, 1, res.Skipped, "only the abandoned task counts as skipped; its child imports top-level")
+	assert.Equal(t, 5, res.Imported)
+	assert.Equal(t, 0, res.Skipped, "abandoned rows import with the abandoned status")
 
 	todos, _, err := todoRepo.List(ctx, 3, model.TodoListQuery{Page: 1, PageSize: 100})
 	require.NoError(t, err)
-	require.Len(t, todos, 4)
+	require.Len(t, todos, 5)
 	byTitle := make(map[string]model.Todo, len(todos))
 	for _, td := range todos {
 		byTitle[td.Title] = td
@@ -68,8 +68,13 @@ func TestImportTodosFromPlatform_Dida(t *testing.T) {
 	require.NotNil(t, done.CompletedAt)
 	assert.Equal(t, "normal", done.Priority)
 
-	orphan := byTitle["孤儿子任务"]
-	assert.Nil(t, orphan.ParentID, "parent was abandoned → stays top-level")
+	abandoned := byTitle["已放弃的"]
+	assert.Equal(t, "abandoned", abandoned.Status)
+	assert.Nil(t, abandoned.CompletedAt, "only done tasks carry a completion time")
+
+	abandonedChild := byTitle["孤儿子任务"]
+	require.NotNil(t, abandonedChild.ParentID)
+	assert.Equal(t, abandoned.ID, *abandonedChild.ParentID, "child links to its abandoned parent now that it imports")
 
 	// Tags: "重要" from the tags column, "工作"/"生活" list names.
 	tags, _, err := tagRepo.List(ctx, 3, 1, 100)

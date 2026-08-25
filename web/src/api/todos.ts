@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { Todo, TodoItem, Tag, TodoStats, Event, PaginatedData, TodoListParams, TodoUpdateInput } from '../types'
+import type { Todo, TodoItem, TodoStatus, Tag, TodoStats, Event, PaginatedData, TodoListParams, TodoUpdateInput } from '../types'
 
 function buildParams(params?: TodoListParams) {
   const out: Record<string, unknown> = { page: params?.page ?? 1, page_size: params?.page_size ?? 50 }
@@ -36,6 +36,9 @@ export const todosApi = {
 
   toggleStatus: (id: number) =>
     request.patch<Todo>(`/todos/${id}/toggle`).then((data) => ({ data })),
+
+  setStatus: (id: number, status: TodoStatus) =>
+    request.patch<Todo>(`/todos/${id}/status`, { status }).then((data) => ({ data })),
 
   reorder: (id: number, afterId: number | null) =>
     request.patch<void>(`/todos/${id}/reorder`, { after_id: afterId }).then(() => {}),
