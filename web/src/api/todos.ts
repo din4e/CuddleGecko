@@ -4,7 +4,7 @@ import type { Todo, TodoItem, TodoStatus, Tag, TodoStats, Event, PaginatedData, 
 function buildParams(params?: TodoListParams) {
   const out: Record<string, unknown> = { page: params?.page ?? 1, page_size: params?.page_size ?? 50 }
   const keys: (keyof TodoListParams)[] = [
-    'status', 'priority', 'q', 'due_before', 'due_after', 'tag_id', 'started', 'sort', 'order', 'overdue', 'parent_id',
+    'status', 'priority', 'q', 'due_before', 'due_after', 'tag_id', 'started', 'sort', 'order', 'overdue', 'parent_id', 'roots_only',
   ]
   for (const key of keys) {
     const value = params?.[key]

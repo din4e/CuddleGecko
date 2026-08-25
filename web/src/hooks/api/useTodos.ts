@@ -1,4 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQueries, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
+import type { InfiniteData } from '@tanstack/react-query'
 import { todosApi } from '../../api/todos'
 import { rootKey } from './keys'
 import type { Todo, TodoItem, TodoStats, PaginatedData, TodoListParams, TodoStatus, TodoUpdateInput } from '../../types'
@@ -14,6 +16,90 @@ export function useTodosList(params: TodoListParams = {}) {
     queryFn: ({ signal }) => todosApi.list({ page, page_size, ...filters }, signal).then((r) => r.data),
     placeholderData: (prev) => prev,
   })
+}
+
+// Accumulating "load more" list for the main views (timeline / grouped / kanban
+// / manual). Pagination lives in the pageParams, not the key, so the key stays
+// stable while pages stack up. Shares the 'list' key family with useTodosList
+// so root-key invalidation and the optimistic updates below cover both.
+export function useTodosInfinite(params: TodoListParams = {}) {
+  const { page: _page, page_size = 50, ...filters } = params
+  const queryKey = [...allKey(), 'list', { ...filters, page_size }] as const
+  return useInfiniteQuery<PaginatedData<Todo>, Error, InfiniteData<PaginatedData<Todo>>, typeof queryKey, number>({
+    queryKey,
+    queryFn: ({ pageParam, signal }) =>
+      todosApi.list({ ...filters, page: pageParam, page_size }, signal).then((r) => r.data),
+    initialPageParam: 1,
+    // The server echoes the page in each chunk; total comes from the first one.
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((n, p) => n + p.items.length, 0)
+      return loaded < (allPages[0]?.total ?? 0) ? lastPage.page + 1 : undefined
+    },
+    placeholderData: (prev) => prev,
+  })
+}
+
+/** Per-parent children slice consumed by the lazy tree. */
+export interface TodoChildrenState {
+  items: Todo[]
+  total: number
+  /** Initial load finished (children may still be refetching). */
+  loaded: boolean
+  hasMore: boolean
+  loadMore: () => void
+}
+
+const CHILDREN_BASE_PAGE = 100
+const CHILDREN_MAX_MULT = 16 // page_size caps at 1600 — enough for any sane parent
+
+// Children of each expanded tree node, one query per parent. useQueries can't
+// run infinite queries, so "load more" grows the single page exponentially
+// (100 → 200 → 400 …) instead of stacking pages. Queries live in the shared
+// 'list' key family (filtered by parent_id) so mutations, WS-triggered
+// invalidations and optimistic patches apply automatically.
+export function useTodoChildrenMap(parentIds: number[], filters: TodoListParams = {}): Map<number, TodoChildrenState> {
+  const { page: _page, ...rest } = filters
+  const [multByParent, setMultByParent] = useState<Record<number, number>>({})
+  return useQueries({
+    queries: parentIds.map((parentId) => {
+      const mult = Math.min(multByParent[parentId] ?? 1, CHILDREN_MAX_MULT)
+      const page_size = CHILDREN_BASE_PAGE * mult
+      return {
+        queryKey: [...allKey(), 'list', { ...rest, page_size, page: 1, parent_id: parentId }] as const,
+        queryFn: ({ signal }: { signal?: AbortSignal }) =>
+          todosApi.list({ ...rest, parent_id: parentId, page: 1, page_size }, signal).then((r) => r.data),
+        placeholderData: (prev: PaginatedData<Todo> | undefined) => prev,
+      }
+    }),
+    combine: (queries) => {
+      const map = new Map<number, TodoChildrenState>()
+      queries.forEach((q, i) => {
+        const parentId = parentIds[i]
+        const items = q.data?.items ?? []
+        map.set(parentId, {
+          items,
+          total: q.data?.total ?? 0,
+          loaded: !q.isPending,
+          hasMore: items.length < (q.data?.total ?? 0) && (multByParent[parentId] ?? 1) < CHILDREN_MAX_MULT,
+          loadMore: () => setMultByParent((prev) => ({ ...prev, [parentId]: Math.min((prev[parentId] ?? 1) * 2, CHILDREN_MAX_MULT) })),
+        })
+      })
+      return map
+    },
+  })
+}
+
+// A cached 'list' entry is either a plain page (useTodosList) or stacked pages
+// (useTodosInfinite / children). Optimistic updates must patch both shapes;
+// rollbacks restore the original object so they stay shape-agnostic.
+function patchTodoItems<T>(data: T, fn: (t: Todo) => Todo): T {
+  if (data == null) return data
+  if (typeof data === 'object' && 'pages' in data) {
+    const inf = data as unknown as InfiniteData<PaginatedData<Todo>>
+    return { ...data, pages: inf.pages.map((p) => ({ ...p, items: (p.items ?? []).map(fn) })) } as T
+  }
+  const page = data as unknown as PaginatedData<Todo>
+  return { ...page, items: (page.items ?? []).map(fn) } as T
 }
 
 export function useTodoStats() {
@@ -71,22 +157,18 @@ export function useToggleTodoStatus() {
     mutationFn: (id: number) => todosApi.toggleStatus(id),
     onMutate: async (id: number) => {
       await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
-      // Snapshot every cached list page, then flip the field per key. (v5's
-      // setQueriesData updater receives only `old` — no query arg — so we use
-      // getQueriesData pairs instead.)
-      const previous = qc.getQueriesData<PaginatedData<Todo>>({ queryKey: [...allKey(), 'list'] })
+      // Snapshot every cached list entry (paged + infinite), then flip the field
+      // per key. (v5's setQueriesData updater receives only `old` — no query
+      // arg — so we use getQueriesData pairs instead.)
+      const previous = qc.getQueriesData({ queryKey: [...allKey(), 'list'] })
       for (const [key, old] of previous) {
-        if (!old) continue
-        qc.setQueryData(key, {
-          ...old,
-          items: old.items?.map((t) => {
-            if (t.id !== id) return t
-            if (t.status === 'pending' && t.repeat) return t
-            // The server flips pending→done and any closed state→pending.
-            const next = t.status === 'pending' ? 'done' : 'pending'
-            return { ...t, status: next, completed_at: next === 'done' ? new Date().toISOString() : null }
-          }),
-        })
+        qc.setQueryData(key, patchTodoItems(old, (t) => {
+          if (t.id !== id) return t
+          if (t.status === 'pending' && t.repeat) return t
+          // The server flips pending→done and any closed state→pending.
+          const next = t.status === 'pending' ? 'done' : 'pending'
+          return { ...t, status: next, completed_at: next === 'done' ? new Date().toISOString() : null }
+        }))
       }
       return { previous: new Map(previous) }
     },
@@ -107,17 +189,13 @@ export function useSetTodoStatus() {
     mutationFn: ({ id, status }: { id: number; status: TodoStatus }) => todosApi.setStatus(id, status),
     onMutate: async ({ id, status }) => {
       await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
-      const previous = qc.getQueriesData<PaginatedData<Todo>>({ queryKey: [...allKey(), 'list'] })
+      const previous = qc.getQueriesData({ queryKey: [...allKey(), 'list'] })
       for (const [key, old] of previous) {
-        if (!old) continue
-        qc.setQueryData(key, {
-          ...old,
-          items: old.items?.map((t) =>
-            t.id === id
-              ? { ...t, status, completed_at: status === 'done' ? t.completed_at ?? new Date().toISOString() : null }
-              : t,
-          ),
-        })
+        qc.setQueryData(key, patchTodoItems(old, (t) =>
+          t.id === id
+            ? { ...t, status, completed_at: status === 'done' ? t.completed_at ?? new Date().toISOString() : null }
+            : t,
+        ))
       }
       return { previous: new Map(previous) }
     },
@@ -164,13 +242,9 @@ export function useTogglePin() {
     mutationFn: (id: number) => todosApi.togglePin(id),
     onMutate: async (id: number) => {
       await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
-      const previous = qc.getQueriesData<PaginatedData<Todo>>({ queryKey: [...allKey(), 'list'] })
+      const previous = qc.getQueriesData({ queryKey: [...allKey(), 'list'] })
       for (const [key, old] of previous) {
-        if (!old) continue
-        qc.setQueryData(key, {
-          ...old,
-          items: old.items?.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)),
-        })
+        qc.setQueryData(key, patchTodoItems(old, (t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)))
       }
       return { previous: new Map(previous) }
     },
