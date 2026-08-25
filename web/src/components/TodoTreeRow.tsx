@@ -2,7 +2,7 @@ import { memo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, ArrowRight, Ban, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
-  Circle, ListTodo, Pencil, Plus, Timer, Trash2,
+  Circle, ListTodo, Loader2, Pencil, Plus, Timer, Trash2,
 } from 'lucide-react'
 import type { Todo } from '../types'
 import type { TodoNode } from '../lib/buildTodoTree'
@@ -10,8 +10,8 @@ import { cn } from '@/lib/utils'
 import { TodoChecklist } from './TodoChecklist'
 
 export interface TodoTreeHandlers {
-  collapsed: Set<number>
-  onToggleCollapse: (id: number) => void
+  expanded: Set<number>
+  onToggleExpand: (id: number) => void
   onToggle: (id: number) => void
   onRename: (id: number, title: string) => void
   onEdit: (todo: Todo) => void
@@ -27,6 +27,8 @@ export interface TodoTreeHandlers {
   dragId?: number | null
   dragSubtreeSize?: number
   onDragIdChange?: (id: number | null) => void
+  /** Lazy tree: grow this node's children page (useTodoChildrenMap). */
+  onLoadChildren?: (id: number) => void
 }
 
 /** dropZone describes where over a row the pointer is releasing. */
@@ -71,21 +73,23 @@ export default function TodoTree({
 
 // Memoized so an incidental TodosPage re-render (dialog open, search typing,
 // selection-mode toggle, …) doesn't re-render every visible row. Effective as
-// long as the shared props (handlers, formatDate, collapsed/selectedIds Sets,
+// long as the shared props (handlers, formatDate, expanded/selectedIds Sets,
 // the tree nodes) keep stable identity — TodosPage wraps those in useCallback /
-// useMemo / state. Data-changing props (collapsed, selectedIds, nodes) still
+// useMemo / state. Data-changing props (expanded, selectedIds, nodes) still
 // re-render rows, which is correct.
 const TreeRow = memo(function TreeRow(props: RowProps) {
   const { node, siblings, index, parentId, grandparentId, depth, ancestorIds } = props
   const {
-    collapsed, onToggleCollapse, onToggle, onRename, onEdit, onDelete, onMove, onAddChild, formatDate,
+    expanded, onToggleExpand, onToggle, onRename, onEdit, onDelete, onMove, onAddChild, formatDate,
     selectable, selectedIds, onSelectToggle, onStartPomodoro,
-    dragId, onDragIdChange,
+    dragId, onDragIdChange, onLoadChildren,
   } = props
   const [dropZone, setDropZone] = useState<DropZone | null>(null)
   const todo = node.todo
-  const hasChildren = node.children.length > 0
-  const isOpen = !collapsed.has(todo.id)
+  // Lazy tree: the server-reported child count keeps the caret visible for
+  // collapsed nodes whose children haven't been fetched yet.
+  const hasChildren = node.children.length > 0 || (todo.child_count ?? 0) > 0
+  const isOpen = expanded.has(todo.id)
   const isDragged = dragId === todo.id
   // Dropping onto a descendant of the dragged node would create a cycle —
   // i.e. the dragged id appears in THIS row's ancestor chain.
@@ -216,7 +220,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
           type="button"
           className="p-0.5 text-muted-foreground disabled:opacity-0"
           disabled={!hasChildren}
-          onClick={() => hasChildren && onToggleCollapse(todo.id)}
+          onClick={() => hasChildren && onToggleExpand(todo.id)}
           aria-label={hasChildren ? (isOpen ? t('todos.collapse') : t('todos.expand')) : undefined}
         >
           {hasChildren ? (
@@ -334,6 +338,28 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
         </div>
       )}
 
+      {isOpen && node.childrenLoading && (
+        <div
+          style={{ paddingLeft: depth * 18 + 24 }}
+          className="flex items-center gap-1 py-0.5 text-xs text-muted-foreground"
+        >
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {t('todos.loadingChildren')}
+        </div>
+      )}
+
+      {isOpen && !node.childrenLoading && node.childrenHasMore && onLoadChildren && (
+        <div style={{ paddingLeft: depth * 18 + 24 }} className="py-0.5">
+          <button
+            type="button"
+            onClick={() => onLoadChildren(todo.id)}
+            className="rounded px-1 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            {t('todos.loadMoreChildren')}
+          </button>
+        </div>
+      )}
+
       {isOpen &&
         node.children.map((child, i) => (
           <TreeRow
@@ -345,8 +371,8 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             grandparentId={parentId}
             depth={depth + 1}
             ancestorIds={new Set(ancestorIds).add(todo.id)}
-            collapsed={collapsed}
-            onToggleCollapse={onToggleCollapse}
+            expanded={expanded}
+            onToggleExpand={onToggleExpand}
             onToggle={onToggle}
             onRename={onRename}
             onEdit={onEdit}
@@ -360,6 +386,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             selectable={selectable}
             selectedIds={selectedIds}
             onSelectToggle={onSelectToggle}
+            onLoadChildren={onLoadChildren}
           />
         ))}
     </div>

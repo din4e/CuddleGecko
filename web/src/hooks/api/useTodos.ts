@@ -22,7 +22,9 @@ export function useTodosList(params: TodoListParams = {}) {
 // / manual). Pagination lives in the pageParams, not the key, so the key stays
 // stable while pages stack up. Shares the 'list' key family with useTodosList
 // so root-key invalidation and the optimistic updates below cover both.
-export function useTodosInfinite(params: TodoListParams = {}) {
+export function useTodosInfinite(params: TodoListParams = {}, options?: { enabled?: boolean }) {
+  // page is deliberately stripped: pagination lives in pageParams, never the key.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { page: _page, page_size = 50, ...filters } = params
   const queryKey = [...allKey(), 'list', { ...filters, page_size }] as const
   return useInfiniteQuery<PaginatedData<Todo>, Error, InfiniteData<PaginatedData<Todo>>, typeof queryKey, number>({
@@ -36,6 +38,7 @@ export function useTodosInfinite(params: TodoListParams = {}) {
       return loaded < (allPages[0]?.total ?? 0) ? lastPage.page + 1 : undefined
     },
     placeholderData: (prev) => prev,
+    enabled: options?.enabled,
   })
 }
 
@@ -58,6 +61,8 @@ const CHILDREN_MAX_MULT = 16 // page_size caps at 1600 — enough for any sane p
 // 'list' key family (filtered by parent_id) so mutations, WS-triggered
 // invalidations and optimistic patches apply automatically.
 export function useTodoChildrenMap(parentIds: number[], filters: TodoListParams = {}): Map<number, TodoChildrenState> {
+  // Children pages always start at 1 (load-more grows page_size) — strip page.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { page: _page, ...rest } = filters
   const [multByParent, setMultByParent] = useState<Record<number, number>>({})
   return useQueries({

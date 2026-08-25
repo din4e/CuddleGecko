@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import TodosPage from '../TodosPage'
-import type { Todo, Contact, Tag, PaginatedData } from '../../types'
+import type { Todo, Contact, Tag, PaginatedData, TodoListParams } from '../../types'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -232,21 +232,25 @@ describe('TodosPage', () => {
     })
   })
 
-  it('switches to tree view showing nested rows', async () => {
-    mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, sort_order: 0, completed_at: null, created_at: '', updated_at: '' },
-      { id: 2, title: 'Child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' },
-    ]))
+  it('tree view lazily loads children on expand', async () => {
+    const root = { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const child = { id: 2, title: 'Child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    // Param-aware mock: roots_only returns just the root; a parent_id query
+    // returns that parent's children (lazy expand).
+    mockedList.mockImplementation(async (params?: TodoListParams) =>
+      params?.parent_id === 1
+        ? mockPage<Todo>([child])
+        : mockPage<Todo>([root]),
+    )
     const user = userEvent.setup()
     renderPage()
-    await waitFor(() => expect(screen.getByText('Child')).toBeInTheDocument())
+    // Default view is tree; the root renders, the child is not fetched yet.
+    await waitFor(() => expect(screen.getByText('Root')).toBeInTheDocument())
+    expect(screen.queryByText('Child')).not.toBeInTheDocument()
 
-    await user.click(screen.getByTitle('todos.viewTree'))
-    // Both the root and its nested child render (subtree expanded by default).
-    await waitFor(() => {
-      expect(screen.getByText('Root')).toBeInTheDocument()
-      expect(screen.getByText('Child')).toBeInTheDocument()
-    })
+    // Expanding the root fetches its children (parent_id=1).
+    await user.click(screen.getByRole('button', { name: 'todos.expand' }))
+    await waitFor(() => expect(screen.getByText('Child')).toBeInTheDocument())
   })
 
   it('creates a todo via the quick-add bar on Enter', async () => {
