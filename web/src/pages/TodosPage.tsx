@@ -9,7 +9,6 @@ import { parseQuickAdd } from '../lib/quickAdd'
 import { buildICS } from '../lib/ics'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -17,18 +16,20 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../components/ui/dialog'
-import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, Flame, Tag } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Todo, TodoSort, TodoListParams } from '../types'
+import type { Todo, TodoSort, TodoListParams, TodoUpdateInput } from '../types'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
 import TodoCard from '../components/TodoCard'
 import TodoSubtaskList from '../components/TodoSubtaskList'
-import { bucketByColumns, matchesColumn } from '../lib/kanban'
+import TodoSortableGroups from '../components/TodoSortableGroups'
+import { matchesColumn } from '../lib/kanban'
 import { useKanbanColumns } from '../hooks/api/useKanbanColumns'
 import type { KanbanColumn } from '../api/settings'
 import TodoTree from '../components/TodoTreeRow'
-import { buildTodoTree, type TodoNode } from '../lib/buildTodoTree'
+import KanbanBoard, { type KanbanLane } from '../components/KanbanBoard'
+import { buildTodoTree, descendantIds, type TodoNode } from '../lib/buildTodoTree'
 import { usePomodoroStore } from '../stores/pomodoro'
 import { TodoFormDialog } from '../components/TodoFormDialog'
 import {
@@ -36,6 +37,7 @@ import {
   useCreateTodo,
   useUpdateTodo,
   useToggleTodoStatus,
+  useSetTodoStatus,
   useReorderTodo,
   useMoveTodo,
   useTogglePin,
@@ -52,7 +54,7 @@ import {
 type TodoView = 'timeline' | 'grouped' | 'kanban' | 'tree'
 
 // TickTick-style smart lists. Each maps to a set of backend list params.
-type SmartList = 'all' | 'today' | 'next7' | 'overdue' | 'pending' | 'completed' | 'trash'
+type SmartList = 'all' | 'today' | 'next7' | 'overdue' | 'pending' | 'completed' | 'abandoned' | 'trash'
 
 function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
@@ -72,6 +74,8 @@ function smartListParams(list: SmartList): TodoListParams {
       return { status: 'pending', started: true }
     case 'completed':
       return { status: 'done' }
+    case 'abandoned':
+      return { status: 'abandoned' }
     case 'trash':
       return {} // trash uses a separate fetch; these params are unused
     default:
@@ -108,7 +112,6 @@ export default function TodosPage() {
   const [presetParent, setPresetParent] = useState<Todo | null>(null)
   const pageSize = 50
   const [confirmDelete, setConfirmDelete] = useState<Todo | null>(null)
-  const [dragId, setDragId] = useState<number | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   // Tree-view collapse state: ids in the set are collapsed (default: all expanded).
   const [collapsed, setCollapsed] = useState<Set<number>>(() => {
@@ -155,6 +158,7 @@ export default function TodosPage() {
   const createTodo = useCreateTodo()
   const updateTodo = useUpdateTodo()
   const toggleTodo = useToggleTodoStatus()
+  const setStatusTodo = useSetTodoStatus()
   const reorderTodo = useReorderTodo()
   const moveTodo = useMoveTodo()
   const pinTodo = useTogglePin()
@@ -261,6 +265,17 @@ export default function TodosPage() {
     }
   }, [pinTodo])
 
+  // Explicit status change (done / abandoned / back to pending) — everything
+  // except the plain pending↔done flip, which keeps using the toggle so
+  // completing a recurring task still advances it.
+  const handleSetStatus = useCallback(async (id: number, status: Todo['status']) => {
+    try {
+      await setStatusTodo.mutateAsync({ id, status })
+    } catch {
+      // ignore — the optimistic update rolls back
+    }
+  }, [setStatusTodo])
+
   const handleRestore = useCallback(async (id: number) => {
     try {
       await restoreTodo.mutateAsync(id)
@@ -294,77 +309,109 @@ export default function TodosPage() {
     }
   }, [t])
 
-  // Kanban: columns are user-defined predicates (status / priority / tag);
-  // dropping a card applies the column's predicate to the todo.
-  const { columns: kanbanColumns, addColumn, removeColumn } = useKanbanColumns()
-  const [dragOverCol, setDragOverCol] = useState<string | null>(null)
-  const [addColumnOpen, setAddColumnOpen] = useState(false)
-  const [newColLabel, setNewColLabel] = useState('')
-  const [newColKind, setNewColKind] = useState<'status' | 'priority' | 'tag'>('status')
-  const [newColValue, setNewColValue] = useState('pending')
-  const handleColumnDragOver = (e: React.DragEvent, col: string) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverCol(col)
-  }
-  const handleColumnDragLeave = (e: React.DragEvent, col: string) => {
-    // Only clear when actually leaving the column, not while moving between its children.
-    if (dragOverCol === col && !e.currentTarget.contains(e.relatedTarget as Node | null)) {
-      setDragOverCol(null)
-    }
-  }
-  const handleColumnDrop = (col: KanbanColumn) => {
-    const id = dragId
-    setDragId(null)
-    setDragOverCol(null)
-    if (id == null) return
-    const todo = todos.find((it) => it.id === id)
-    if (!todo || matchesColumn(todo, col)) return
-    if (col.kind === 'status') {
-      if (todo.status !== col.value) handleToggle(id)
-    } else if (col.kind === 'priority') {
-      updateTodo.mutate({ id, data: { priority: col.value as Todo['priority'] } })
-    } else {
-      const tag = tags.find((tg) => String(tg.id) === col.value || tg.name === col.value)
-      if (!tag) return
-      const next = [...(todo.tags ?? [])]
-      if (!next.some((tg) => tg.id === tag.id)) next.push(tag)
-      replaceTags.mutate({ todoId: id, tagIds: next.map((tg) => tg.id) })
-    }
-  }
-  const submitNewColumn = () => {
-    const label = newColLabel.trim()
-    if (!label || !newColValue) return
-    addColumn({ id: `${newColKind}-${newColValue}-${Date.now()}`, label, kind: newColKind, value: newColValue })
-    setNewColLabel('')
-    setAddColumnOpen(false)
-  }
-
   // Inline rename: the backend Update overwrites scalar fields, so we resend the
   // full payload with only the title changed to avoid wiping other fields.
+  // fullUpdateData builds that payload for every mutation that only changes a
+  // field or two (rename, reschedule, kanban priority drops).
+  const fullUpdateData = useCallback((todo: Todo, overrides: Partial<TodoUpdateInput> = {}): TodoUpdateInput => ({
+    title: todo.title,
+    description: todo.description,
+    priority: todo.priority,
+    status: todo.status,
+    due_time: todo.due_time,
+    amount: todo.amount,
+    amount_type: todo.amount_type,
+    contact_ids: todo.contact_ids,
+    color: todo.color,
+    repeat: todo.repeat,
+    ...overrides,
+  }), [])
+
+  // Drag-to-reschedule (timeline / grouped views): move the due date to the
+  // target day — or clear it when dropping on the no-date group — preserving
+  // the time of day; dates on undated tasks default to 09:00.
+  const handleReschedule = useCallback((todo: Todo, target: Date | null) => {
+    if (target == null) {
+      updateTodo.mutate({ id: todo.id, data: fullUpdateData(todo, { clear_due_time: true }) })
+      return
+    }
+    const next = new Date(target)
+    if (todo.due_time) {
+      const src = new Date(todo.due_time)
+      next.setHours(src.getHours(), src.getMinutes(), 0, 0)
+    } else {
+      next.setHours(9, 0, 0, 0)
+    }
+    updateTodo.mutate({ id: todo.id, data: fullUpdateData(todo, { due_time: next.toISOString() }) })
+  }, [updateTodo, fullUpdateData])
+
+  // Kanban: columns are user-defined predicates (status / priority / tag);
+  // dropping a card applies the column's predicate to the todo — plus the
+  // swimlane's (priority) when swimlanes are on.
+  const { columns: kanbanColumns, addColumn, removeColumn, setColumns: setKanbanColumns } = useKanbanColumns()
+  const handleKanbanDrop = (todo: Todo, col: KanbanColumn, lane?: KanbanLane) => {
+    const colMatch = matchesColumn(todo, col)
+    const laneMatch = !lane || todo.priority === lane.value
+    if (colMatch && laneMatch) return
+    if (!colMatch) {
+      if (col.kind === 'status') {
+        // The plain pending→done flip keeps the toggle (recurring tasks advance
+        // to their next occurrence there); any other transition is explicit.
+        if (todo.status === 'pending' && col.value === 'done') {
+          handleToggle(todo.id)
+        } else {
+          handleSetStatus(todo.id, col.value as Todo['status'])
+        }
+      } else if (col.kind === 'priority') {
+        // Full payload — a partial update would wipe the description/contacts/
+        // color/repeat fields (the backend replaces scalars wholesale).
+        updateTodo.mutate({ id: todo.id, data: fullUpdateData(todo, { priority: col.value as Todo['priority'] }) })
+      } else {
+        const tag = tags.find((tg) => String(tg.id) === col.value || tg.name === col.value)
+        if (!tag) return
+        const next = [...(todo.tags ?? [])]
+        if (!next.some((tg) => tg.id === tag.id)) next.push(tag)
+        replaceTags.mutate({ todoId: todo.id, tagIds: next.map((tg) => tg.id) })
+      }
+    }
+    if (!laneMatch) updateTodo.mutate({ id: todo.id, data: fullUpdateData(todo, { priority: lane.value as Todo['priority'] }) })
+  }
+  const handleKanbanColumnsReorder = useCallback((next: KanbanColumn[]) => {
+    setKanbanColumns(next)
+  }, [setKanbanColumns])
+  const handleKanbanReorder = useCallback((id: number, afterId: number | null) => {
+    reorderTodo.mutate({ id, afterId })
+  }, [reorderTodo])
+  // Quick-create inside a column carries the column's predicate (status /
+  // priority applied at create; tag applied right after via replaceTags).
+  const handleKanbanCreate = useCallback(async (title: string, col: KanbanColumn, lane?: KanbanLane) => {
+    try {
+      const priority = (lane?.value ?? (col.kind === 'priority' ? col.value : undefined)) as Todo['priority'] | undefined
+      if (col.kind === 'tag') {
+        const tag = tags.find((tg) => String(tg.id) === col.value || tg.name === col.value)
+        const created = await createTodo.mutateAsync({ title, priority })
+        if (tag && created) replaceTags.mutate({ todoId: created.data.id, tagIds: [tag.id] })
+      } else {
+        await createTodo.mutateAsync({
+          title,
+          priority,
+          status: col.kind === 'status' ? (col.value as Todo['status']) : undefined,
+        })
+      }
+    } catch {
+      toast.error(t('todos.createFailed'))
+    }
+  }, [createTodo, replaceTags, tags, t])
+
   const handleRename = useCallback(async (id: number, title: string) => {
     const todo = todos.find((it) => it.id === id)
     if (!todo) return
     try {
-      await updateTodo.mutateAsync({
-        id,
-        data: {
-          title,
-          description: todo.description,
-          priority: todo.priority,
-          status: todo.status,
-          due_time: todo.due_time,
-          amount: todo.amount,
-          amount_type: todo.amount_type,
-          contact_ids: todo.contact_ids,
-          color: todo.color,
-          repeat: todo.repeat,
-        },
-      })
+      await updateTodo.mutateAsync({ id, data: fullUpdateData(todo, { title }) })
     } catch {
       toast.error(t('todos.renameFailed'))
     }
-  }, [todos, updateTodo, t])
+  }, [todos, updateTodo, fullUpdateData, t])
 
   const handleSync = useCallback(async (todo: Todo) => {
     try {
@@ -486,6 +533,7 @@ export default function TodosPage() {
 
   const pendingTodos = todos.filter((t) => t.status === 'pending' && isTopLevel(t))
   const doneTodos = todos.filter((t) => t.status === 'done' && isTopLevel(t))
+  const abandonedTodos = todos.filter((t) => t.status === 'abandoned' && isTopLevel(t))
 
   // Manual reordering (only meaningful when sort === 'manual'). Positions are
   // expressed as "move to right after afterId" (or to the top when null),
@@ -520,6 +568,15 @@ export default function TodosPage() {
       toast.error(t('todos.reorderFailed'))
     }
   }, [moveTodo, t])
+
+  // Drop-on-card nesting (flat views + kanban): make the dragged todo the last
+  // child of the target. Guarded against cycles client-side so an illegal drop
+  // just no-ops instead of flashing an error toast (the backend would reject
+  // it anyway).
+  const handleNest = useCallback((id: number, parentId: number) => {
+    if (id === parentId || descendantIds(todos, id).has(parentId)) return
+    void handleTreeMove(id, parentId, null)
+  }, [todos, handleTreeMove])
   const toggleCollapse = useCallback((id: number) =>
     setCollapsed((prev) => {
       const next = new Set(prev)
@@ -550,13 +607,26 @@ export default function TodosPage() {
   // id → title for the "nested under <parent>" hint on cards in non-tree views.
   const todoTitleById = useMemo(() => new Map(todos.map((t) => [t.id, t.title])), [todos])
 
+  // Smart date groups for the grouped view. `target` is the due date a card
+  // takes when dragged into the group (drop-to-reschedule): today/tomorrow map
+  // to themselves, 本周 to the end of this week, 稍后 to next Monday, and the
+  // no-date group clears the due time.
   const groupedTodos = useMemo(() => {
-    const groups: { key: string; label: string; items: Todo[] }[] = [
-      { key: 'today', label: t('todos.today'), items: [] },
-      { key: 'tomorrow', label: t('todos.tomorrow'), items: [] },
-      { key: 'thisWeek', label: t('todos.thisWeek'), items: [] },
-      { key: 'later', label: t('todos.later'), items: [] },
-      { key: 'noDue', label: t('todos.noDueDate'), items: [] },
+    const now = new Date()
+    const today = startOfDay(now)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const weekEnd = new Date(now)
+    weekEnd.setDate(weekEnd.getDate() + (7 - weekEnd.getDay()))
+    weekEnd.setHours(23, 59, 59, 0)
+    const nextMonday = startOfDay(weekEnd)
+    nextMonday.setDate(nextMonday.getDate() + 1)
+    const groups: { key: string; label: string; target: Date | null; items: Todo[] }[] = [
+      { key: 'today', label: t('todos.today'), target: today, items: [] },
+      { key: 'tomorrow', label: t('todos.tomorrow'), target: tomorrow, items: [] },
+      { key: 'thisWeek', label: t('todos.thisWeek'), target: weekEnd, items: [] },
+      { key: 'later', label: t('todos.later'), target: nextMonday, items: [] },
+      { key: 'noDue', label: t('todos.noDueDate'), target: null, items: [] },
     ]
     for (const todo of pendingTodos) {
       if (!todo.due_time) { groups[4].items.push(todo); continue }
@@ -569,15 +639,20 @@ export default function TodosPage() {
   }, [pendingTodos, t])
   // pendingTodos is already top-level-only (see its derivation).
 
+  // Timeline groups keyed by calendar day; `target` reschedules a dropped card
+  // to that day (the trailing no-date group clears the due time).
   const timelineGroups = useMemo(() => {
-    const map = new Map<string, Todo[]>()
+    const map = new Map<string, { label: string; target: Date | null; items: Todo[] }>()
     for (const todo of todos) {
       if (!isTopLevel(todo)) continue
-      const key = todo.due_time ? formatDay(todo.due_time) : t('todos.noDueDate')
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(todo)
+      const d = todo.due_time ? new Date(todo.due_time) : null
+      const key = d ? d.toDateString() : 'none'
+      if (!map.has(key)) {
+        map.set(key, { label: d ? formatDay(todo.due_time!) : t('todos.noDueDate'), target: d ? startOfDay(d) : null, items: [] })
+      }
+      map.get(key)!.items.push(todo)
     }
-    return Array.from(map.entries()).map(([date, items]) => ({ date, items }))
+    return Array.from(map.entries()).map(([key, g]) => ({ key, ...g }))
   }, [todos, isTopLevel, t])
 
   const viewButtons: { key: TodoView; icon: typeof ListChecks; label: string }[] = [
@@ -597,6 +672,7 @@ export default function TodosPage() {
       onSelectToggle={toggleSelect}
       contactNames={getContactNames(todo.contact_ids || [])}
       onToggle={handleToggle}
+      onSetStatus={handleSetStatus}
       onTogglePin={handleTogglePin}
       onSync={handleSync}
       onEdit={openEdit}
@@ -696,7 +772,7 @@ export default function TodosPage() {
       {/* Smart-list switcher + filters in one toolbar row (wraps on narrow screens) */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex border rounded-md overflow-hidden w-fit">
-          {(['all', 'today', 'next7', 'overdue', 'pending', 'completed', 'trash'] as SmartList[]).map((s) => (
+          {(['all', 'today', 'next7', 'overdue', 'pending', 'completed', 'abandoned', 'trash'] as SmartList[]).map((s) => (
             <Button
               key={s}
               variant={smartList === s ? 'default' : 'ghost'}
@@ -815,32 +891,48 @@ export default function TodosPage() {
       ) : todos.length === 0 ? (
         <EmptyState message={t('todos.noTodos')} />
       ) : sort === 'manual' && view !== 'kanban' && view !== 'tree' ? (
-        /* Manual-order flat list with move controls */
+        /* Manual-order flat list: drag to reorder (the up/down buttons remain
+           for precise/keyboard moves). */
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            {pendingTodos.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">{t('todos.noTodos')}</p>
-            ) : (
-              pendingTodos.map((todo, i) => (
-                <div key={todo.id} className="flex items-stretch gap-1">
-                  <div className="flex flex-col justify-center">
-                    <button type="button" disabled={i === 0} onClick={() => handleMoveUp(i)} title={t('todos.moveUp')} className="text-muted-foreground hover:text-primary disabled:opacity-30 disabled:hover:text-muted-foreground">
-                      <ChevronUp className="h-4 w-4" />
-                    </button>
-                    <button type="button" disabled={i === pendingTodos.length - 1} onClick={() => handleMoveDown(i)} title={t('todos.moveDown')} className="text-muted-foreground hover:text-primary disabled:opacity-30 disabled:hover:text-muted-foreground">
-                      <ChevronDown className="h-4 w-4" />
-                    </button>
+          {pendingTodos.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">{t('todos.noTodos')}</p>
+          ) : (
+            <TodoSortableGroups
+              groups={[{ key: 'manual', items: pendingTodos }]}
+              itemAreaClass="space-y-1.5"
+              renderCard={(todo) => {
+                const i = pendingTodos.indexOf(todo)
+                return (
+                  <div className="flex items-stretch gap-1">
+                    <div className="flex flex-col justify-center">
+                      <button type="button" disabled={i === 0} onClick={() => handleMoveUp(i)} title={t('todos.moveUp')} className="text-muted-foreground hover:text-primary disabled:opacity-30 disabled:hover:text-muted-foreground">
+                        <ChevronUp className="h-4 w-4" />
+                      </button>
+                      <button type="button" disabled={i === pendingTodos.length - 1} onClick={() => handleMoveDown(i)} title={t('todos.moveDown')} className="text-muted-foreground hover:text-primary disabled:opacity-30 disabled:hover:text-muted-foreground">
+                        <ChevronDown className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-w-0">{renderTodoCard(todo)}</div>
                   </div>
-                  <div className="flex-1 min-w-0">{renderTodoCard(todo)}</div>
-                </div>
-              ))
-            )}
-          </div>
+                )
+              }}
+              onReorder={handleMove}
+              onNest={handleNest}
+            />
+          )}
           {doneTodos.length > 0 && smartList === 'all' && (
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
               <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {doneTodos.map((todo) => renderTodoCard(todo))}
+              </div>
+            </div>
+          )}
+          {abandonedTodos.length > 0 && smartList === 'all' && (
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('todos.abandoned')} ({abandonedTodos.length})</h3>
+              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {abandonedTodos.map((todo) => renderTodoCard(todo))}
               </div>
             </div>
           )}
@@ -891,34 +983,52 @@ export default function TodosPage() {
           </div>
         </div>
       ) : view === 'timeline' ? (
-        /* Timeline View */
+        /* Timeline View — drag a card onto another day to reschedule it
+           (drop on 无日期 clears the due time). */
         <div className="relative pl-6">
           <div className="absolute left-2 top-0 bottom-0 w-px bg-border" />
-          <div className="space-y-3">
-            {timelineGroups.map(({ date, items }) => (
-              <div key={date}>
-                <div className="relative flex items-center gap-2 mb-1.5">
-                  <div className="absolute -left-[18px] w-3 h-3 rounded-full bg-primary border-2 border-background" />
-                  <span className="text-sm font-medium text-muted-foreground">{date}</span>
+          <TodoSortableGroups
+            className="space-y-3"
+            groups={timelineGroups.map((g) => ({
+              key: g.key,
+              label: (
+                <div className="relative flex items-center gap-2">
+                  <span className="absolute -left-[18px] w-3 h-3 rounded-full bg-primary border-2 border-background" />
+                  <span className="text-sm font-medium text-muted-foreground">{g.label}</span>
                 </div>
-                <div className="space-y-1.5 ml-2">
-                  {items.map((todo) => renderTodoCard(todo))}
-                </div>
-              </div>
-            ))}
-          </div>
+              ),
+              items: g.items,
+            }))}
+            itemAreaClass="space-y-1.5 ml-2"
+            renderCard={renderTodoCard}
+            onGroupDrop={(todo, key) => {
+              const g = timelineGroups.find((it) => it.key === key)
+              handleReschedule(todo, g?.target ?? null)
+            }}
+            onNest={handleNest}
+          />
         </div>
       ) : view === 'grouped' ? (
-        /* Date-grouped View */
+        /* Date-grouped View — drag a card into another bucket to reschedule:
+           今天/明天 → that day, 本周 → end of this week, 稍后 → next Monday,
+           无日期 → clear the due time. */
         <div className="space-y-3">
-          {groupedTodos.filter((g) => g.items.length > 0).map((group) => (
-            <div key={group.key}>
-              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{group.label}</h3>
-              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {group.items.map((todo) => renderTodoCard(todo))}
-              </div>
-            </div>
-          ))}
+          <TodoSortableGroups
+            groups={groupedTodos
+              .filter((g) => g.items.length > 0)
+              .map((g) => ({
+                key: g.key,
+                label: <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{g.label}</h3>,
+                items: g.items,
+              }))}
+            itemAreaClass="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            renderCard={renderTodoCard}
+            onGroupDrop={(todo, key) => {
+              const g = groupedTodos.find((it) => it.key === key)
+              handleReschedule(todo, g?.target ?? null)
+            }}
+            onNest={handleNest}
+          />
           {doneTodos.length > 0 && smartList === 'all' && (
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
@@ -927,136 +1037,33 @@ export default function TodosPage() {
               </div>
             </div>
           )}
+          {abandonedTodos.length > 0 && smartList === 'all' && (
+            <div>
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.abandoned')} ({abandonedTodos.length})</h3>
+              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {abandonedTodos.map((todo) => renderTodoCard(todo))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        /* Kanban View — user-defined columns; drag a card onto a column to
-           apply the column's predicate (status / priority / tag). */
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {(() => {
-            const { byColumn, unmatched } = bucketByColumns(
-              todos.filter((td) => td.status === 'pending' || td.status === 'done'),
-              kanbanColumns,
-            )
-            return (
-              <>
-                {kanbanColumns.map((col) => {
-                  const items = byColumn.get(col.id) ?? []
-                  const icon = col.kind === 'status' && col.value === 'done'
-                    ? <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    : col.kind === 'priority' ? <Flame className="h-4 w-4 text-orange-500" /> : <Tag className="h-4 w-4 text-blue-500" />
-                  return (
-                    <div key={col.id} className="min-w-[240px] flex-1">
-                      <h3 className="group/col text-sm font-medium mb-1.5 flex items-center gap-2">
-                        {icon}
-                        <span className="truncate">{col.label}</span>
-                        <span className="text-muted-foreground">({items.length})</span>
-                        <button
-                          type="button"
-                          className="ml-auto text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/col:opacity-100"
-                          onClick={() => removeColumn(col.id)}
-                          aria-label={t('todos.kanbanRemoveColumn')}
-                          title={t('todos.kanbanRemoveColumn')}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </h3>
-                      <div
-                        className={`space-y-1.5 min-h-[200px] bg-muted/30 rounded-lg p-2 transition-shadow ${dragOverCol === col.id ? 'ring-2 ring-primary/60 bg-primary/5' : 'ring-2 ring-transparent'}`}
-                        onDragOver={(e) => handleColumnDragOver(e, col.id)}
-                        onDragLeave={(e) => handleColumnDragLeave(e, col.id)}
-                        onDrop={() => handleColumnDrop(col)}
-                      >
-                        {items.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-8">{t('todos.noTodos')}</p>
-                        ) : (
-                          items.map((todo) => (
-                            <div
-                              key={todo.id}
-                              draggable
-                              onDragStart={(e) => {
-                                e.dataTransfer.effectAllowed = 'move'
-                                setDragId(todo.id)
-                              }}
-                              onDragEnd={() => setDragId(null)}
-                              className={`cursor-grab transition-all ${dragId === todo.id ? 'opacity-40 rotate-2 scale-[0.97] shadow-lg' : 'hover:shadow-sm'}`}
-                            >
-                              {renderTodoCard(todo, true)}
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-                {unmatched.length > 0 && (
-                  <div className="min-w-[200px]">
-                    <h3 className="text-sm font-medium mb-1.5 flex items-center gap-2 text-muted-foreground">
-                      {t('todos.kanbanOther')} ({unmatched.length})
-                    </h3>
-                    <div className="space-y-1.5 min-h-[100px] bg-muted/20 rounded-lg p-2 border-2 border-dashed">
-                      {unmatched.map((todo) => (
-                        <div key={todo.id} className="opacity-80">{renderTodoCard(todo, true)}</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Add column */}
-                <div className="min-w-[180px]">
-                  {addColumnOpen ? (
-                    <div className="rounded-lg border p-2 space-y-2 bg-background">
-                      <Input
-                        autoFocus
-                        placeholder={t('todos.kanbanColumnLabel')}
-                        value={newColLabel}
-                        onChange={(e) => setNewColLabel(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && submitNewColumn()}
-                        className="h-7 text-sm"
-                      />
-                      <Select value={newColKind} onValueChange={(v) => { setNewColKind(v as typeof newColKind); setNewColValue(v === 'status' ? 'pending' : v === 'priority' ? 'high' : String(tags[0]?.id ?? '')) }}>
-                        <SelectTrigger className="h-7 text-sm"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="status">{t('todos.kanbanKindStatus')}</SelectItem>
-                          <SelectItem value="priority">{t('todos.kanbanKindPriority')}</SelectItem>
-                          <SelectItem value="tag">{t('todos.kanbanKindTag')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={newColValue} onValueChange={(v) => v && setNewColValue(v)}>
-                        <SelectTrigger className="h-7 text-sm"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {newColKind === 'status' && <>
-                            <SelectItem value="pending">{t('todos.pending')}</SelectItem>
-                            <SelectItem value="done">{t('todos.done')}</SelectItem>
-                          </>}
-                          {newColKind === 'priority' && <>
-                            <SelectItem value="high">{t('todos.high')}</SelectItem>
-                            <SelectItem value="normal">{t('todos.normal')}</SelectItem>
-                            <SelectItem value="low">{t('todos.low')}</SelectItem>
-                          </>}
-                          {newColKind === 'tag' && tags.map((tg) => (
-                            <SelectItem key={tg.id} value={String(tg.id)}>{tg.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <div className="flex gap-1.5">
-                        <Button size="sm" className="h-7 text-xs" disabled={!newColLabel.trim() || !newColValue} onClick={submitNewColumn}>{t('common.confirm')}</Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddColumnOpen(false)}>{t('common.cancel')}</Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setAddColumnOpen(true)}
-                      className="flex min-h-[200px] w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed text-sm text-muted-foreground hover:border-primary/50 hover:text-primary"
-                    >
-                      <Plus className="h-4 w-4" />
-                      {t('todos.kanbanAddColumn')}
-                    </button>
-                  )}
-                </div>
-              </>
-            )
-          })()}
-        </div>
+        /* Kanban View — GitLab-style board (components/KanbanBoard.tsx):
+           horizontal scrolling columns, cross-column drag applies the column
+           predicate, in-column drag persists sort_order. */
+        <KanbanBoard
+          todos={todos}
+          columns={kanbanColumns}
+          tags={tags}
+          addColumn={addColumn}
+          removeColumn={removeColumn}
+          onColumnsReorder={handleKanbanColumnsReorder}
+          renderCard={(todo) => renderTodoCard(todo, true)}
+          onCardDropColumn={handleKanbanDrop}
+          onReorder={handleKanbanReorder}
+          onNest={handleNest}
+          onCreateInColumn={handleKanbanCreate}
+          selectedIds={selectionMode ? selectedIds : undefined}
+        />
       )}
 
       <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />

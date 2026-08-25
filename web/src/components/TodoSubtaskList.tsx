@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, Circle, CornerDownRight, Plus } from 'lucide-react'
+import { Ban, CheckCircle2, Circle, CornerDownRight, Plus } from 'lucide-react'
 import { Button } from './ui/button'
 import type { Todo } from '../types'
 
@@ -32,15 +32,17 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
               type="button"
               className="shrink-0 text-muted-foreground hover:text-primary"
               onClick={() => onToggle(child)}
-              aria-label={child.status === 'done' ? t('todos.markPending') : t('todos.markDone')}
+              aria-label={child.status === 'pending' ? t('todos.markDone') : t('todos.markPending')}
             >
               {child.status === 'done'
                 ? <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                : <Circle className="h-3.5 w-3.5" />}
+                : child.status === 'abandoned'
+                  ? <Ban className="h-3.5 w-3.5" />
+                  : <Circle className="h-3.5 w-3.5" />}
             </button>
             <button
               type="button"
-              className={`min-w-0 flex-1 truncate text-left text-xs ${child.status === 'done' ? 'text-muted-foreground line-through' : ''}`}
+              className={`min-w-0 flex-1 truncate text-left text-xs ${child.status !== 'pending' ? 'text-muted-foreground line-through' : ''}`}
               onClick={() => onEdit(child)}
               title={child.title}
             >

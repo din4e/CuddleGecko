@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { useTodosList, useToggleTodoStatus, useTogglePin } from '../useTodos'
+import { useTodosList, useToggleTodoStatus, useTogglePin, useSetTodoStatus } from '../useTodos'
 import { todosApi } from '../../../api/todos'
 import type { Todo, PaginatedData } from '../../../types'
 
@@ -17,6 +17,7 @@ vi.mock('../../../api/todos', () => ({
   todosApi: {
     list: vi.fn(),
     toggleStatus: vi.fn(),
+    setStatus: vi.fn(),
     togglePin: vi.fn(),
   },
 }))
@@ -145,6 +146,50 @@ describe('useToggleTodoStatus (optimistic)', () => {
     expect(toggled).toHaveBeenCalledWith(7) // request still sent
     const cached = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'pending' }])
     expect(cached?.items.find((t) => t.id === 7)?.status).toBe('pending') // but no local flip
+  })
+})
+
+describe('useSetTodoStatus (optimistic)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('abandons a todo across every cached list page and rolls back on failure', async () => {
+    let serverStatus = 'pending'
+    const mockedList = vi.mocked(todosApi.list)
+    mockedList.mockImplementation(async () => ({
+      data: page([makeTodo({ id: 1, status: serverStatus as Todo['status'] })]),
+    }) as never)
+    const setStatus = vi.mocked(todosApi.setStatus)
+    setStatus.mockImplementation(async (_id: number, status: Todo['status']) => {
+      serverStatus = status
+      return { data: undefined } as never
+    })
+
+    const { Wrapper, queryClient } = createWrapper()
+    const list = renderHook(() => useTodosList({}), { wrapper: Wrapper })
+    await waitFor(() => expect(list.result.current.data).toBeDefined())
+    // Seed a second (inactive) cached page containing the same todo.
+    queryClient.setQueryData(
+      ['todos', 'default', 'list', { page: 1, page_size: 50, status: 'done' }],
+      page([makeTodo({ id: 1, status: 'pending' })]),
+    )
+
+    const setter = renderHook(() => useSetTodoStatus(), { wrapper: Wrapper })
+    await act(async () => { await setter.result.current.mutateAsync({ id: 1, status: 'abandoned' }) })
+
+    expect(setStatus).toHaveBeenCalledWith(1, 'abandoned')
+    await waitFor(() => {
+      const a = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50 }])
+      expect(a?.items.find((t) => t.id === 1)?.status).toBe('abandoned')
+    })
+    const b = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'done' }])
+    expect(b?.items.find((t) => t.id === 1)?.status).toBe('abandoned')
+
+    // Failure path: a rejected request restores the previous status everywhere.
+    setStatus.mockRejectedValue(new Error('network') as never)
+    await act(async () => {
+      await setter.result.current.mutateAsync({ id: 1, status: 'pending' }).catch(() => {})
+    })
+    expect(b?.items.find((t) => t.id === 1)?.status).toBe('abandoned') // rolled back to the pre-mutation value
   })
 })
 

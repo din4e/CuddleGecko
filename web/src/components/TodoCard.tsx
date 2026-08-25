@@ -1,6 +1,6 @@
 import { memo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, Circle, Clock, CalendarClock, ListTodo, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer } from 'lucide-react'
+import { Ban, CheckCircle2, Circle, Clock, CalendarClock, ListTodo, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
@@ -23,6 +23,8 @@ export interface TodoCardProps {
   selected?: boolean
   onSelectToggle?: (id: number) => void
   onToggle: (id: number) => void
+  /** Explicit status change (abandon / restore / done without recurring advance). */
+  onSetStatus?: (id: number, status: Todo['status']) => void
   onTogglePin: (todo: Todo) => void
   onSync: (todo: Todo) => void
   onEdit: (todo: Todo) => void
@@ -45,6 +47,7 @@ const TodoCard = memo(function TodoCard({
   selected = false,
   onSelectToggle,
   onToggle,
+  onSetStatus,
   onTogglePin,
   onSync,
   onEdit,
@@ -64,6 +67,8 @@ const TodoCard = memo(function TodoCard({
   const priorityLabel = t(`todos.${todo.priority}`)
   const syncLabel = t('todos.syncToEvent')
   const repeatLabel = repeatLabelOf(t, todo.repeat)
+  const closed = todo.status !== 'pending'
+  const abandonTitle = todo.status === 'abandoned' ? t('todos.markPending') : t('todos.markAbandoned')
 
   const startRename = () => {
     setDraft(todo.title)
@@ -77,7 +82,7 @@ const TodoCard = memo(function TodoCard({
 
   return (
     <Card
-      className={`group relative gap-0 py-0 ${todo.status === 'done' ? 'opacity-60' : ''}`}
+      className={`group relative gap-0 py-0 ${closed ? 'opacity-60' : ''}`}
       style={todo.color ? { borderLeftColor: todo.color, borderLeftWidth: '3px' } : undefined}
     >
       <CardContent className={compact ? 'p-1.5 pr-16' : 'p-2 space-y-1'}>
@@ -93,12 +98,14 @@ const TodoCard = memo(function TodoCard({
           )}
           <button
             onClick={() => onToggle(todo.id)}
-            aria-label={todo.status === 'done' ? t('todos.markPending') : t('todos.markDone')}
+            aria-label={todo.status === 'pending' ? t('todos.markDone') : t('todos.markPending')}
             className="mt-0.5 shrink-0 cursor-pointer bg-transparent border-none"
           >
             {todo.status === 'done'
               ? <CheckCircle2 className="h-4 w-4 text-green-500" />
-              : <Circle className="h-4 w-4 text-muted-foreground hover:text-primary" />}
+              : todo.status === 'abandoned'
+                ? <Ban className="h-4 w-4 text-muted-foreground" />
+                : <Circle className="h-4 w-4 text-muted-foreground hover:text-primary" />}
           </button>
           <div className="flex-1 min-w-0">
             {editingTitle ? (
@@ -117,7 +124,7 @@ const TodoCard = memo(function TodoCard({
             ) : (
               <span
                 onDoubleClick={startRename}
-                className={`text-sm font-medium leading-snug cursor-text ${todo.status === 'done' ? 'line-through text-muted-foreground' : ''}`}
+                className={`text-sm font-medium leading-snug cursor-text ${closed ? 'line-through text-muted-foreground' : ''}`}
                 title={todo.title}
               >
                 {todo.title}
@@ -212,6 +219,18 @@ const TodoCard = memo(function TodoCard({
           <Button variant="ghost" size="sm" className="h-5 gap-0.5 px-1 text-[10px]" onClick={() => onStartPomodoro(todo)} aria-label={t('todos.pomoStart')} title={t('todos.pomoStart')}>
             <Timer className="h-3 w-3" />
             {!!todo.pomodoro_count && <span className="tabular-nums">{todo.pomodoro_count}</span>}
+          </Button>
+        )}
+        {onSetStatus && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 w-5 p-0"
+            onClick={() => onSetStatus(todo.id, todo.status === 'abandoned' ? 'pending' : 'abandoned')}
+            aria-label={abandonTitle}
+            title={abandonTitle}
+          >
+            <Ban className={`h-3 w-3 ${todo.status === 'abandoned' ? 'text-destructive' : 'text-muted-foreground'}`} />
           </Button>
         )}
         {onAddChild && (

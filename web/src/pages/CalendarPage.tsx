@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
-import { ChevronLeft, ChevronRight, CalendarDays, LayoutGrid, Circle, CheckCircle2, Flag } from 'lucide-react'
+import { Ban, ChevronLeft, ChevronRight, CalendarDays, LayoutGrid, Circle, CheckCircle2, Flag } from 'lucide-react'
 import EmptyState from '../components/EmptyState'
 import type { Event, Todo } from '../types'
 import { useEventsList } from '../hooks/api/useEvents'
@@ -118,10 +118,10 @@ export default function CalendarPage() {
                       </div>
                     ))}
                     {tds.slice(0, 3).map((td) => (
-                      <div key={`t${td.id}`} className={`truncate rounded px-1 text-[10px] flex items-center gap-0.5 ${td.status === 'done' ? 'line-through opacity-60' : ''}`}
+                      <div key={`t${td.id}`} className={`truncate rounded px-1 text-[10px] flex items-center gap-0.5 ${td.status !== 'pending' ? 'line-through opacity-60' : ''}`}
                         style={{ backgroundColor: (td.color || '#22c55e') + '22', color: td.color || '#16a34a' }}
                         title={td.title}>
-                        {td.status === 'done' ? <CheckCircle2 className="h-2.5 w-2.5 shrink-0" /> : <Circle className="h-2.5 w-2.5 shrink-0" />}
+                        {td.status === 'done' ? <CheckCircle2 className="h-2.5 w-2.5 shrink-0" /> : td.status === 'abandoned' ? <Ban className="h-2.5 w-2.5 shrink-0" /> : <Circle className="h-2.5 w-2.5 shrink-0" />}
                         <span className="truncate">{td.title}</span>
                       </div>
                     ))}

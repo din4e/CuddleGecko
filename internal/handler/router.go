@@ -196,6 +196,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.POST("/todos/bulk", h.Todo.BulkAction)
 			wsProtected.PUT("/todos/:id", h.Todo.Update)
 			wsProtected.PATCH("/todos/:id/toggle", h.Todo.ToggleStatus)
+			wsProtected.PATCH("/todos/:id/status", h.Todo.SetStatus)
 			wsProtected.PATCH("/todos/:id/pin", h.Todo.TogglePin)
 			wsProtected.PATCH("/todos/:id/reorder", h.Todo.Reorder)
 			wsProtected.PATCH("/todos/:id/move", h.Todo.Move)

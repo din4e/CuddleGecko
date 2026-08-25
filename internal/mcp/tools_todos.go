@@ -11,7 +11,7 @@ func (s *MCPServer) registerTodoTools() {
 	s.registerTool("list_todos", "List todos with optional filters (status, priority, search, sort).", map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
-			"status":   map[string]interface{}{"type": "string", "description": "Filter by status: pending or done"},
+			"status":   map[string]interface{}{"type": "string", "description": "Filter by status: pending, done or abandoned"},
 			"priority": map[string]interface{}{"type": "string", "description": "Filter by priority: low, normal or high"},
 			"q":        map[string]interface{}{"type": "string", "description": "Case-insensitive substring match on title"},
 			"sort":     map[string]interface{}{"type": "string", "description": "Sort key: due_date (default), priority, title or created"},
@@ -40,7 +40,7 @@ func (s *MCPServer) registerTodoTools() {
 		"properties": map[string]interface{}{
 			"title":        map[string]interface{}{"type": "string", "description": "Todo title"},
 			"description":  map[string]interface{}{"type": "string", "description": "Todo description"},
-			"status":       map[string]interface{}{"type": "string", "description": "Status: pending or done (default pending)"},
+			"status":       map[string]interface{}{"type": "string", "description": "Status: pending, done or abandoned (default pending)"},
 			"priority":     map[string]interface{}{"type": "string", "description": "Priority: low, normal, high (default normal)"},
 			"due_time":     map[string]interface{}{"type": "string", "description": "Due time (RFC3339)"},
 			"amount":       map[string]interface{}{"type": "number", "description": "Associated amount"},
@@ -80,7 +80,7 @@ func (s *MCPServer) registerTodoTools() {
 			"id":             map[string]interface{}{"type": "integer", "description": "Todo ID"},
 			"title":          map[string]interface{}{"type": "string", "description": "Todo title"},
 			"description":    map[string]interface{}{"type": "string", "description": "Todo description"},
-			"status":         map[string]interface{}{"type": "string", "description": "Status: pending or done"},
+			"status":         map[string]interface{}{"type": "string", "description": "Status: pending, done or abandoned"},
 			"priority":       map[string]interface{}{"type": "string", "description": "Priority: low, normal, high"},
 			"due_time":       map[string]interface{}{"type": "string", "description": "Due time (RFC3339)"},
 			"clear_due_time": map[string]interface{}{"type": "boolean", "description": "Clear the due time"},
@@ -113,7 +113,7 @@ func (s *MCPServer) registerTodoTools() {
 		return s.todoSvc.Update(ctx, userID, workspaceID, id, updates, clear)
 	})
 
-	s.registerTool("toggle_todo", "Toggle a todo between pending and done.", map[string]interface{}{
+	s.registerTool("toggle_todo", "Toggle a todo between pending and done (a closed task — done or abandoned — returns to pending).", map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
 			"id": map[string]interface{}{"type": "integer", "description": "Todo ID"},
@@ -122,6 +122,18 @@ func (s *MCPServer) registerTodoTools() {
 	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
 		id := toUint(getArg(args, "id"))
 		return s.todoSvc.ToggleStatus(ctx, userID, workspaceID, id)
+	})
+
+	s.registerTool("set_todo_status", "Set a todo's status explicitly (pending, done or abandoned). Unlike toggle_todo this never advances recurring tasks.", map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"id":     map[string]interface{}{"type": "integer", "description": "Todo ID"},
+			"status": map[string]interface{}{"type": "string", "description": "New status: pending, done or abandoned"},
+		},
+		"required": []string{"id", "status"},
+	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+		id := toUint(getArg(args, "id"))
+		return s.todoSvc.SetStatus(ctx, userID, workspaceID, id, toString(getArg(args, "status")))
 	})
 
 	s.registerTool("sync_todo_to_event", "Sync a todo to create a corresponding event.", map[string]interface{}{

@@ -22,7 +22,7 @@ type TodoImportResult struct {
 type externalTodo struct {
 	Title       string
 	Description string
-	Status      string // pending / done
+	Status      string // pending / done / abandoned
 	Priority    string // low / normal / high
 	StartTime   *time.Time
 	DueTime     *time.Time
@@ -139,7 +139,7 @@ func (s *ExportService) ImportTodosFromPlatform(ctx context.Context, userID, wor
 	}
 
 	// Second pass: link children to parents now that all IDs exist. Children
-	// whose parent was skipped (abandoned in the source) stay top-level.
+	// whose parent row was absent or skipped (e.g. empty title) stay top-level.
 	for _, et := range todos {
 		if et.ParentExtID == "" || et.ExternalID == "" {
 			continue
@@ -176,7 +176,7 @@ func didaParseTime(s string) *time.Time {
 
 // parseDidaCSV parses a 滴答清单 (TickTick) CSV backup. The file starts with
 // meta lines ("Date:", "Version:", "Status:") before the real header row.
-// Status: 0 → pending, 2 → done, -1 → abandoned (skipped). Priority: 5 → high,
+// Status: 0 → pending, 2 → done, -1 → abandoned. Priority: 5 → high,
 // 3 → normal, else → low. List name and Tags column both become tag names.
 func parseDidaCSV(csvString string) ([]externalTodo, int, error) {
 	r := csv.NewReader(strings.NewReader(csvString))
@@ -225,10 +225,6 @@ func parseDidaCSV(csvString string) ([]externalTodo, int, error) {
 			continue
 		}
 		status := field(rec, "Status")
-		if status == "-1" { // abandoned
-			skipped++
-			continue
-		}
 		et := externalTodo{
 			Title:       field(rec, "Title"),
 			Description: field(rec, "Content"),
@@ -239,10 +235,13 @@ func parseDidaCSV(csvString string) ([]externalTodo, int, error) {
 			ExternalID:  field(rec, "taskId"),
 			ParentExtID: field(rec, "parentId"),
 		}
-		if status == "2" {
+		switch status {
+		case "2":
 			et.Status = "done"
 			et.CompletedAt = didaParseTime(field(rec, "Completed Time"))
-		} else {
+		case "-1":
+			et.Status = "abandoned"
+		default:
 			et.Status = "pending"
 		}
 		if v, err := strconv.ParseInt(field(rec, "Order"), 10, 64); err == nil {

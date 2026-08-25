@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -196,6 +197,7 @@ func setupTodoRouter(todoSvc *service.TodoService) *gin.Engine {
 		api.POST("/todos/bulk", h.BulkAction)
 		api.PUT("/todos/:id", h.Update)
 		api.PATCH("/todos/:id/toggle", h.ToggleStatus)
+		api.PATCH("/todos/:id/status", h.SetStatus)
 		api.PATCH("/todos/:id/pin", h.TogglePin)
 		api.PATCH("/todos/:id/reorder", h.Reorder)
 		api.PATCH("/todos/:id/move", h.Move)
@@ -514,6 +516,53 @@ func TestTodoHandler_ToggleStatus(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestTodoHandler_SetStatus(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	existing := &model.Todo{ID: 1, Status: "pending"}
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("PATCH", "/api/todos/1/status", strings.NewReader(`{"status":"abandoned"}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestTodoHandler_SetStatus_Invalid(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("PATCH", "/api/todos/1/status", strings.NewReader(`{"status":"bogus"}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	repo.AssertNotCalled(t, "GetByID", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestTodoHandler_SetStatus_MissingStatus(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("PATCH", "/api/todos/1/status", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code, "binding requires status")
 }
 
 func TestTodoHandler_SyncToEvent(t *testing.T) {

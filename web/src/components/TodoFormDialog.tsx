@@ -11,7 +11,7 @@ import BuddyPicker from './BuddyPicker'
 import { TodoChecklist } from './TodoChecklist'
 import { useCreateTodo, useUpdateTodo, useReplaceTodoTags, useMoveTodo } from '../hooks/api/useTodos'
 import { descendantIds } from '../lib/buildTodoTree'
-import type { Todo, Contact, Tag, TodoUpdateInput } from '../types'
+import type { Todo, Contact, Tag, TodoStatus, TodoUpdateInput } from '../types'
 
 const COLORS = [
   { value: '', label: 'Default' },
@@ -52,6 +52,7 @@ export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates
 
   const [formTitle, setFormTitle] = useState(editing?.title ?? '')
   const [formDesc, setFormDesc] = useState(editing?.description ?? '')
+  const [formStatus, setFormStatus] = useState<TodoStatus>(editing?.status ?? 'pending')
   const [formPriority, setFormPriority] = useState<'low' | 'normal' | 'high'>(editing?.priority ?? 'normal')
   const [formDueTime, setFormDueTime] = useState(editing?.due_time ? isoToLocalInput(editing.due_time) : '')
   const [formStartTime, setFormStartTime] = useState(editing?.start_time ? isoToLocalInput(editing.start_time) : '')
@@ -75,6 +76,7 @@ export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates
       const data: TodoUpdateInput = {
         title: formTitle.trim(),
         description: formDesc,
+        status: formStatus,
         priority: formPriority,
         due_time: formDueTime ? new Date(formDueTime).toISOString() : null,
         start_time: formStartTime ? new Date(formStartTime).toISOString() : null,
@@ -95,6 +97,7 @@ export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates
       const payload: Partial<Todo> = {
         title: formTitle.trim(),
         description: formDesc,
+        status: formStatus === 'pending' ? undefined : formStatus,
         priority: formPriority,
         due_time: formDueTime ? new Date(formDueTime).toISOString() : undefined,
         start_time: formStartTime ? new Date(formStartTime).toISOString() : undefined,
@@ -127,7 +130,7 @@ export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates
       }
     }
     onClose()
-  }, [editing, formTitle, formDesc, formPriority, formDueTime, formStartTime, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
+  }, [editing, formTitle, formDesc, formStatus, formPriority, formDueTime, formStartTime, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -162,6 +165,23 @@ export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates
             </div>
           )}
           {editing && <TodoChecklist todoId={editing.id} />}
+          <div className="space-y-1.5">
+            <Label>{t('todos.status')}</Label>
+            <div className="flex gap-1">
+              {(['pending', 'done', 'abandoned'] as const).map((s) => (
+                <Button
+                  key={s}
+                  type="button"
+                  variant={formStatus === s ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex-1 text-xs"
+                  onClick={() => setFormStatus(s)}
+                >
+                  {t(`todos.${s}`)}
+                </Button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>{t('todos.priority')}</Label>

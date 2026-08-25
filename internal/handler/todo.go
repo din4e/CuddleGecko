@@ -294,7 +294,7 @@ func (h *TodoHandler) Create(c *gin.Context) {
 
 	result, err := h.svc.Create(c.Request.Context(), userID, workspaceID, todo)
 	if err != nil {
-		if errors.Is(err, service.ErrTodoInvalidParent) {
+		if errors.Is(err, service.ErrTodoInvalidParent) || errors.Is(err, service.ErrInvalidTodo) {
 			response.BadRequest(c, err.Error())
 			return
 		}
@@ -362,6 +362,10 @@ func (h *TodoHandler) Update(c *gin.Context) {
 			response.NotFound(c, "todo not found")
 			return
 		}
+		if errors.Is(err, service.ErrInvalidTodo) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		response.InternalError(c, "failed to update todo")
 		return
 	}
@@ -385,6 +389,42 @@ func (h *TodoHandler) ToggleStatus(c *gin.Context) {
 			return
 		}
 		response.InternalError(c, "failed to toggle todo")
+		return
+	}
+
+	response.OK(c, result)
+}
+
+type setTodoStatusRequest struct {
+	Status string `json:"status" binding:"required"`
+}
+
+// SetStatus explicitly sets a todo's status: pending / done / abandoned.
+func (h *TodoHandler) SetStatus(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid todo id")
+		return
+	}
+
+	var req setTodoStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	result, err := h.svc.SetStatus(c.Request.Context(), userID, workspaceID, uint(id), req.Status)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrTodoNotFound):
+			response.NotFound(c, "todo not found")
+		case errors.Is(err, service.ErrInvalidTodo):
+			response.BadRequest(c, err.Error())
+		default:
+			response.InternalError(c, "failed to set todo status")
+		}
 		return
 	}
 
