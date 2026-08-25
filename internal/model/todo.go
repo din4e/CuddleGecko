@@ -33,6 +33,10 @@ type Todo struct {
 	ItemDone   int            `gorm:"not null;default:0" json:"item_done"`
 	// Pomodoros completed on this todo (25-min focus sessions).
 	PomodoroCount int         `gorm:"not null;default:0" json:"pomodoro_count"`
+	// Live count of direct children (computed subquery, read-only — never a
+	// stored column). Lets the lazy tree show the expand caret before the
+	// children have been fetched.
+	ChildCount  int64          `gorm:"->" json:"child_count"`
 	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
@@ -63,6 +67,8 @@ type TodoListQuery struct {
 	Overdue   bool       // pending todos whose due_time is in the past
 	Started   bool       // hide tasks whose start_time is still in the future
 	TagIDs    []uint     // only todos tagged with any of these
+	ParentID  *uint      // only direct children of this todo
+	RootsOnly bool       // only top-level todos (parent_id IS NULL) — lazy tree roots
 	Sort      string     // due_date (default) | priority | title | created
 	Order     string     // asc (default) | desc
 	Page      int

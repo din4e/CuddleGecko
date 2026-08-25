@@ -67,6 +67,46 @@ func TestTodoRepo_ItemCounts(t *testing.T) {
 	assert.Equal(t, 0, parent.ItemDone, "item_done after deleting the only done item")
 }
 
+// --- Lazy tree: roots_only / parent_id filters + child_count ---
+
+func TestTodoRepo_List_RootsOnlyParentAndChildCount(t *testing.T) {
+	repo := NewTodoRepo(newTodoTestDB(t))
+	ctx := context.Background()
+
+	root := mustCreateTodo(t, repo, 1, "root")
+	child := mustCreateTodo(t, repo, 1, "child")
+	grandchild := mustCreateTodo(t, repo, 1, "grandchild")
+	mustCreateTodo(t, repo, 1, "standalone")
+	require.NoError(t, repo.SetParent(ctx, 1, child.ID, &root.ID))
+	require.NoError(t, repo.SetParent(ctx, 1, grandchild.ID, &child.ID))
+	// Soft-delete a child so its parent's count drops.
+	deleted := mustCreateTodo(t, repo, 1, "deleted-child")
+	require.NoError(t, repo.SetParent(ctx, 1, deleted.ID, &root.ID))
+	require.NoError(t, repo.Delete(ctx, 1, deleted.ID))
+	// Other-workspace child must not leak into counts.
+	other := mustCreateTodo(t, repo, 2, "other-ws-child")
+	require.NoError(t, repo.SetParent(ctx, 2, other.ID, &root.ID))
+
+	// Roots only: two top-level todos, each reporting its direct child count.
+	roots, total, err := repo.List(ctx, 1, model.TodoListQuery{RootsOnly: true})
+	require.NoError(t, err)
+	assert.EqualValues(t, 2, total)
+	require.Len(t, roots, 2)
+	byTitle := map[string]int64{}
+	for _, todo := range roots {
+		byTitle[todo.Title] = todo.ChildCount
+	}
+	assert.Equal(t, map[string]int64{"root": 1, "standalone": 0}, byTitle, "child_count = live direct children")
+
+	// Parent filter: direct children of root, grandchildren excluded.
+	children, total, err := repo.List(ctx, 1, model.TodoListQuery{ParentID: &root.ID})
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, total)
+	require.Len(t, children, 1)
+	assert.Equal(t, "child", children[0].Title)
+	assert.Equal(t, int64(1), children[0].ChildCount, "grandchild counted on its parent")
+}
+
 // --- Reorder renumbers the workspace ---
 
 func TestTodoRepo_Reorder(t *testing.T) {

@@ -78,6 +78,12 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQ
 		// matches more than one of the requested tags.
 		query = query.Where("id IN (SELECT todo_id FROM todo_tags WHERE tag_id IN ?)", q.TagIDs)
 	}
+	if q.RootsOnly {
+		query = query.Where("parent_id IS NULL")
+	}
+	if q.ParentID != nil {
+		query = query.Where("parent_id = ?", *q.ParentID)
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -86,7 +92,13 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQ
 
 	var todos []model.Todo
 	offset := (q.Page - 1) * q.PageSize
-	if err := query.Order(todoOrderClause(q.Sort, q.Order)).Preload("Tags").
+	// child_count is a correlated scalar subquery (works on both SQLite and
+	// MySQL); Select must come after Count so it doesn't pollute the COUNT.
+	// The subquery filters soft-deleted rows manually — GORM's automatic
+	// deleted_at clause only applies to the outer query.
+	if err := query.
+		Select("todos.*, (SELECT COUNT(*) FROM todos c WHERE c.parent_id = todos.id AND c.workspace_id = ? AND c.deleted_at IS NULL) AS child_count", workspaceID).
+		Order(todoOrderClause(q.Sort, q.Order)).Preload("Tags").
 		Limit(q.PageSize).Offset(offset).
 		Find(&todos).Error; err != nil {
 		return nil, 0, fmt.Errorf("list todos: %w", err)
