@@ -3,6 +3,18 @@ import type { Todo } from '../types'
 export interface TodoNode {
   todo: Todo
   children: TodoNode[]
+  /** Lazy tree: this node's children slice is still being fetched. */
+  childrenLoading?: boolean
+  /** Lazy tree: the children slice is truncated — a per-node "load more"
+   *  grows the page size (see useTodoChildrenMap). */
+  childrenHasMore?: boolean
+}
+
+/** Structural slice shape produced by useTodoChildrenMap per expanded node. */
+export interface LazyChildrenSlice {
+  items: Todo[]
+  loaded: boolean
+  hasMore: boolean
 }
 
 /**
@@ -36,6 +48,26 @@ export function buildTodoTree(todos: Todo[]): TodoNode[] {
     return arr.map((todo) => ({ todo, children: build(todo.id) }))
   }
   return build(null)
+}
+
+/**
+ * buildLazyTree assembles the lazy tree view: roots come from the roots_only
+ * query, children from per-parent slices fetched on expand. Sibling order is
+ * the server's (it applies the toolbar sort), so no client-side reordering.
+ * A node whose slice is missing (not expanded / not yet fetched) simply has
+ * no children here — the caret visibility comes from todo.child_count.
+ */
+export function buildLazyTree(roots: Todo[], slices: Map<number, LazyChildrenSlice>): TodoNode[] {
+  const build = (todo: Todo): TodoNode => {
+    const slice = slices.get(todo.id)
+    return {
+      todo,
+      children: (slice?.items ?? []).map(build),
+      childrenLoading: slice != null && !slice.loaded,
+      childrenHasMore: slice?.hasMore ?? false,
+    }
+  }
+  return roots.map(build)
 }
 
 /** flattenTree depth-first; handy for keyboard nav / "select all in subtree". */

@@ -27,8 +27,8 @@ const node = (todo: Todo, children: TodoNode[] = []): TodoNode => ({ todo, child
 
 function handlers(overrides: Partial<TodoTreeHandlers> = {}): TodoTreeHandlers {
   return {
-    collapsed: new Set<number>(),
-    onToggleCollapse: vi.fn(),
+    expanded: new Set<number>(),
+    onToggleExpand: vi.fn(),
     onToggle: vi.fn(),
     onRename: vi.fn(),
     onEdit: vi.fn(),
@@ -43,17 +43,46 @@ function handlers(overrides: Partial<TodoTreeHandlers> = {}): TodoTreeHandlers {
 describe('TodoTree', () => {
   it('renders roots and nested children', () => {
     const tree = [node(makeTodo(1), [node(makeTodo(2))])]
-    render(<TodoTree nodes={tree} {...handlers()} />)
+    render(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
     expect(screen.getByText('todo-1')).toBeInTheDocument()
     expect(screen.getByText('todo-2')).toBeInTheDocument()
   })
 
-  it('collapses children via the caret', async () => {
+  it('toggles expand via the caret', async () => {
     const user = userEvent.setup()
-    const onToggleCollapse = vi.fn()
-    render(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onToggleCollapse })} />)
-    await user.click(screen.getByRole('button', { name: 'todos.collapse' }))
-    expect(onToggleCollapse).toHaveBeenCalledWith(1)
+    const onToggleExpand = vi.fn()
+    render(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onToggleExpand })} />)
+    await user.click(screen.getByRole('button', { name: 'todos.expand' }))
+    expect(onToggleExpand).toHaveBeenCalledWith(1)
+  })
+
+  it('shows the caret from child_count for nodes whose children are not loaded', async () => {
+    const user = userEvent.setup()
+    const onToggleExpand = vi.fn()
+    // Lazy tree: server says the node has a child, but the slice isn't fetched.
+    render(<TodoTree nodes={[node(makeTodo(1, { child_count: 1 }))]} {...handlers({ onToggleExpand })} />)
+    await user.click(screen.getByRole('button', { name: 'todos.expand' }))
+    expect(onToggleExpand).toHaveBeenCalledWith(1)
+  })
+
+  it('renders a loading row while an expanded node\u2019s children are fetching', () => {
+    const tree = [{ todo: makeTodo(1), children: [], childrenLoading: true }]
+    render(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
+    expect(screen.getByText('todos.loadingChildren')).toBeInTheDocument()
+  })
+
+  it('offers per-node load-more when the children slice is truncated', async () => {
+    const user = userEvent.setup()
+    const onLoadChildren = vi.fn()
+    const tree = [{ todo: makeTodo(1), children: [node(makeTodo(2))], childrenHasMore: true }]
+    render(
+      <TodoTree
+        nodes={tree}
+        {...handlers({ expanded: new Set([1]), onLoadChildren })}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'todos.loadMoreChildren' }))
+    expect(onLoadChildren).toHaveBeenCalledWith(1)
   })
 
   it('toggles done via the circle button', async () => {
@@ -78,7 +107,7 @@ describe('TodoTree', () => {
     const user = userEvent.setup()
     const onMove = vi.fn()
     // todo-1 > todo-2: outdenting todo-2 makes it a root placed after todo-1.
-    render(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onMove })} />)
+    render(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onMove, expanded: new Set([1]) })} />)
     const outdentBtns = screen.getAllByRole('button', { name: 'todos.outdent' })
     await user.click(outdentBtns[outdentBtns.length - 1]) // todo-2's outdent (todo-1's is disabled)
     expect(onMove).toHaveBeenCalledWith(2, null, 1)
@@ -143,7 +172,7 @@ describe('TodoTree', () => {
 
   it('Shift+Tab outdents the row to the grandparent', () => {
     const onMove = vi.fn()
-    render(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onMove })} />)
+    render(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onMove, expanded: new Set([1]) })} />)
     fireEvent.keyDown(screen.getByText('todo-2'), { key: 'Tab', shiftKey: true })
     expect(onMove).toHaveBeenCalledWith(2, null, 1)
   })

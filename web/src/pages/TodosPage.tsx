@@ -19,21 +19,22 @@ import {
 import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Todo, TodoSort, TodoListParams, TodoUpdateInput } from '../types'
-import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
 import TodoCard from '../components/TodoCard'
 import TodoSubtaskList from '../components/TodoSubtaskList'
 import TodoSortableGroups from '../components/TodoSortableGroups'
+import LoadMoreBar from '../components/LoadMoreBar'
 import { matchesColumn } from '../lib/kanban'
 import { useKanbanColumns } from '../hooks/api/useKanbanColumns'
 import type { KanbanColumn } from '../api/settings'
 import TodoTree from '../components/TodoTreeRow'
 import KanbanBoard, { type KanbanLane } from '../components/KanbanBoard'
-import { buildTodoTree, descendantIds, type TodoNode } from '../lib/buildTodoTree'
+import { buildLazyTree, descendantIds, type TodoNode } from '../lib/buildTodoTree'
 import { usePomodoroStore } from '../stores/pomodoro'
 import { TodoFormDialog } from '../components/TodoFormDialog'
 import {
-  useTodosList,
+  useTodosInfinite,
+  useTodoChildrenMap,
   useCreateTodo,
   useUpdateTodo,
   useToggleTodoStatus,
@@ -106,40 +107,43 @@ export default function TodosPage() {
     () => (localStorage.getItem('todoView') as TodoView) || 'tree',
   )
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<Todo | null>(null)
   // When creating via "add child" in the tree, this presets the new todo's parent.
   const [presetParent, setPresetParent] = useState<Todo | null>(null)
   const pageSize = 50
   const [confirmDelete, setConfirmDelete] = useState<Todo | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
-  // Tree-view collapse state: ids in the set are collapsed (default: all expanded).
-  const [collapsed, setCollapsed] = useState<Set<number>>(() => {
+  // Lazy tree expand state: ids in the set are expanded (default: all
+  // collapsed — children are fetched per node on first expand).
+  const [expanded, setExpanded] = useState<Set<number>>(() => {
     try {
-      const raw = localStorage.getItem('todoTreeCollapsed')
+      const raw = localStorage.getItem('todoTreeExpanded')
       return raw ? new Set<number>(JSON.parse(raw)) : new Set()
     } catch {
       return new Set()
     }
   })
+  const [expandingAll, setExpandingAll] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   // Debounce the search box so typing doesn't fire a request per keystroke.
+  // Filter changes swap the query key, which resets pagination to page 1.
   useEffect(() => {
-    const handle = setTimeout(() => {
-      setQ(searchInput.trim())
-      setPage(1)
-    }, 300)
+    const handle = setTimeout(() => setQ(searchInput.trim()), 300)
     return () => clearTimeout(handle)
   }, [searchInput])
 
-  // Persist the chosen view mode + tree collapse state across reloads.
+  // Persist the chosen view mode + tree expand state across reloads.
   useEffect(() => {
     localStorage.setItem('todoView', view)
   }, [view])
   useEffect(() => {
-    localStorage.setItem('todoTreeCollapsed', JSON.stringify([...collapsed]))
-  }, [collapsed])
+    localStorage.setItem('todoTreeExpanded', JSON.stringify([...expanded]))
+  }, [expanded])
+  // One-time cleanup of the pre-lazy-tree collapse-state key.
+  useEffect(() => {
+    localStorage.removeItem('todoTreeCollapsed')
+  }, [])
 
   const listParams: TodoListParams = {
     ...smartListParams(smartList),
@@ -148,10 +152,14 @@ export default function TodosPage() {
     q: q || undefined,
     sort,
     order,
-    page: view === 'tree' ? 1 : page,
-    page_size: view === 'tree' ? 1000 : pageSize,
+    page_size: pageSize,
   }
-  const { data, isPending: loading } = useTodosList(listParams)
+  // Flat views (timeline / grouped / kanban / manual) share one accumulating
+  // "load more" query; the lazy tree fetches roots only and pulls children per
+  // expanded node. Only the active view's query is enabled.
+  const flatQuery = useTodosInfinite(listParams, { enabled: view !== 'tree' && smartList !== 'trash' })
+  const rootQuery = useTodosInfinite({ ...listParams, roots_only: true }, { enabled: view === 'tree' })
+  const childrenMap = useTodoChildrenMap(view === 'tree' ? [...expanded] : [], listParams)
   const { data: stats } = useTodoStats()
   const { data: trashTodos } = useTodoTrash(smartList === 'trash')
   const restoreTodo = useRestoreTodo()
@@ -172,8 +180,12 @@ export default function TodosPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const replaceTags = useReplaceTodoTags()
 
-  const todos = useMemo(() => data?.items ?? [], [data])
-  const total = data?.total ?? 0
+  const todos = useMemo(() => {
+    const data = view === 'tree' ? rootQuery.data : flatQuery.data
+    return data?.pages.flatMap((p) => p.items) ?? []
+  }, [view, rootQuery.data, flatQuery.data])
+  const total = (view === 'tree' ? rootQuery.data : flatQuery.data)?.pages[0]?.total ?? 0
+  const loading = view === 'tree' ? rootQuery.isPending : flatQuery.isPending
 
   const openCreate = useCallback(() => { setEditing(null); setPresetParent(null); setDialogOpen(true) }, [])
   const openCreateChild = useCallback((parent: Todo) => { setEditing(null); setPresetParent(parent); setDialogOpen(true) }, [])
@@ -577,8 +589,8 @@ export default function TodosPage() {
     if (id === parentId || descendantIds(todos, id).has(parentId)) return
     void handleTreeMove(id, parentId, null)
   }, [todos, handleTreeMove])
-  const toggleCollapse = useCallback((id: number) =>
-    setCollapsed((prev) => {
+  const toggleExpand = useCallback((id: number) =>
+    setExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -586,7 +598,42 @@ export default function TodosPage() {
     })
   , [])
 
-  const todoTree = useMemo(() => buildTodoTree(todos), [todos])
+  const todoTree = useMemo(() => buildLazyTree(todos, childrenMap), [todos, childrenMap])
+
+  // Iterative "expand all" for the lazy tree: expand every loaded node the
+  // server says has children; as children slices arrive the effect re-runs and
+  // descends further, until nothing new is expandable and nothing is loading.
+  // Expansion is driven by data arrival (each slice landing grows the tree), so
+  // an effect is the only place it can react — setState here is intentional.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!expandingAll) return
+    const toExpand: number[] = []
+    let pending = 0
+    const walk = (nodes: TodoNode[]) => {
+      for (const n of nodes) {
+        if ((n.todo.child_count ?? 0) > 0) {
+          if (expanded.has(n.todo.id)) {
+            if (!childrenMap.get(n.todo.id)?.loaded) pending++
+          } else {
+            toExpand.push(n.todo.id)
+          }
+        }
+        walk(n.children)
+      }
+    }
+    walk(todoTree)
+    if (toExpand.length > 0) {
+      setExpanded((prev) => {
+        const next = new Set(prev)
+        toExpand.forEach((id) => next.add(id))
+        return next
+      })
+    } else if (pending === 0) {
+      setExpandingAll(false)
+    }
+  }, [expandingAll, todoTree, expanded, childrenMap])
+  /* eslint-enable react-hooks/set-state-in-effect */
   // Tree drag & drop: id of the row being dragged (whole subtree follows).
   const [treeDragId, setTreeDragId] = useState<number | null>(null)
   const dragSubtreeSize = useMemo(() => {
@@ -778,7 +825,7 @@ export default function TodosPage() {
               variant={smartList === s ? 'default' : 'ghost'}
               size="sm"
               className="h-7 px-2.5 text-xs rounded-none"
-              onClick={() => { setSmartList(s); setPage(1) }}
+              onClick={() => setSmartList(s)}
             >
               {t(`todos.${s === 'next7' ? 'next7' : s}`)}
             </Button>
@@ -807,7 +854,7 @@ export default function TodosPage() {
         </div>
         <select
           value={priorityFilter}
-          onChange={(e) => { setPriorityFilter(e.target.value as typeof priorityFilter); setPage(1) }}
+          onChange={(e) => setPriorityFilter(e.target.value as typeof priorityFilter)}
           className="h-7 rounded-md border bg-background px-1.5 text-xs"
           aria-label={t('todos.priority')}
         >
@@ -818,7 +865,7 @@ export default function TodosPage() {
         </select>
         <select
           value={tagFilter}
-          onChange={(e) => { setTagFilter(e.target.value); setPage(1) }}
+          onChange={(e) => setTagFilter(e.target.value)}
           className="h-7 rounded-md border bg-background px-1.5 text-xs"
           aria-label={t('todos.tags')}
         >
@@ -829,7 +876,7 @@ export default function TodosPage() {
         </select>
         <select
           value={sort}
-          onChange={(e) => { setSort(e.target.value as TodoSort); setPage(1) }}
+          onChange={(e) => setSort(e.target.value as TodoSort)}
           className="h-7 rounded-md border bg-background px-1.5 text-xs"
           aria-label={t('todos.sort')}
         >
@@ -938,13 +985,14 @@ export default function TodosPage() {
           )}
         </div>
       ) : view === 'tree' ? (
-        /* Tree View — outliner rows nested by parent_id */
+        /* Tree View — outliner rows nested by parent_id. Children load lazily
+           on first expand (roots come from the roots_only query). */
         <div className="space-y-2">
           <div className="flex justify-end gap-1">
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCollapsed(new Set())}>
-              {t('todos.expandAll')}
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={expandingAll} onClick={() => setExpandingAll(true)}>
+              {expandingAll ? t('todos.expanding') : t('todos.expandAll')}
             </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCollapsed(new Set(todos.map((x) => x.id)))}>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setExpanded(new Set()); setExpandingAll(false) }}>
               {t('todos.collapseAll')}
             </Button>
           </div>
@@ -964,10 +1012,10 @@ export default function TodosPage() {
             )}
             <TodoTree
               nodes={todoTree}
-              collapsed={collapsed}
+              expanded={expanded}
+              onToggleExpand={toggleExpand}
               dragId={treeDragId}
               onDragIdChange={setTreeDragId}
-              onToggleCollapse={toggleCollapse}
               onToggle={handleToggle}
               onRename={handleRename}
               onEdit={openEdit}
@@ -979,6 +1027,7 @@ export default function TodosPage() {
               selectable={selectionMode}
               selectedIds={selectedIds}
               onSelectToggle={toggleSelect}
+              onLoadChildren={(id) => childrenMap.get(id)?.loadMore()}
             />
           </div>
         </div>
@@ -1066,7 +1115,21 @@ export default function TodosPage() {
         />
       )}
 
-      <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
+      {smartList !== 'trash' && view === 'tree' ? (
+        <LoadMoreBar
+          loaded={todos.length}
+          total={total}
+          loading={rootQuery.isFetching}
+          onMore={() => void rootQuery.fetchNextPage()}
+        />
+      ) : smartList !== 'trash' ? (
+        <LoadMoreBar
+          loaded={todos.length}
+          total={total}
+          loading={flatQuery.isFetching}
+          onMore={() => void flatQuery.fetchNextPage()}
+        />
+      ) : null}
 
       {/* Create/Edit Dialog */}
       <TodoFormDialog

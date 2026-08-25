@@ -21,8 +21,9 @@ const todos = [base(1, 'Root A'), base(2, 'Child A1', 1), base(3, 'Grandchild', 
 const nodes: TodoNode[] = buildTodoTree(todos)
 
 const handlers = {
-  collapsed: new Set<number>(),
-  onToggleCollapse: vi.fn(),
+  // All nodes expanded so the nested rows are visible for drop targeting.
+  expanded: new Set<number>(todos.map((t) => t.id)),
+  onToggleExpand: vi.fn(),
   onToggle: vi.fn(),
   onRename: vi.fn(),
   onEdit: vi.fn(),
