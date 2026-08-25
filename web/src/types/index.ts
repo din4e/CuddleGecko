@@ -211,6 +211,8 @@ export interface TodoListParams {
   sort?: TodoSort
   order?: 'asc' | 'desc'
   parent_id?: number | null
+  /** Only top-level todos (parent_id IS NULL) — lazy tree roots. */
+  roots_only?: boolean
   page?: number
   page_size?: number
 }
@@ -291,6 +293,9 @@ export interface Todo {
   item_total?: number
   item_done?: number
   pomodoro_count?: number
+  // Server-computed count of live direct children — drives the lazy tree's
+  // expand caret before the children have been fetched.
+  child_count?: number
   created_at: string
   updated_at: string
 }
