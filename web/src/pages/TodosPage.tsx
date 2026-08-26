@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { lazy, Suspense, useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { useContactsList } from '../hooks/api/useContacts'
@@ -28,11 +28,9 @@ import { matchesColumn } from '../lib/kanban'
 import { useKanbanColumns } from '../hooks/api/useKanbanColumns'
 import type { KanbanColumn } from '../api/settings'
 import TodoTree from '../components/TodoTreeRow'
-import KanbanBoard, { type KanbanLane } from '../components/KanbanBoard'
+import { type KanbanLane } from '../components/KanbanBoard'
 import { buildLazyTree, descendantIds, type TodoNode } from '../lib/buildTodoTree'
 import { usePomodoroStore } from '../stores/pomodoro'
-import { TodoFormDialog } from '../components/TodoFormDialog'
-import { TodoDetailDrawer } from '../components/TodoDetailDrawer'
 import {
   useTodosInfinite,
   useTodoChildrenMap,
@@ -54,6 +52,12 @@ import {
 } from '../hooks/api/useTodos'
 
 type TodoView = 'timeline' | 'grouped' | 'kanban' | 'tree'
+
+// The tree/list experience is the default path. Load editing and board-only
+// UI only after the user asks for it, keeping the first Todo render lean.
+const KanbanBoard = lazy(() => import('../components/KanbanBoard'))
+const TodoFormDialog = lazy(() => import('../components/TodoFormDialog').then((m) => ({ default: m.TodoFormDialog })))
+const TodoDetailDrawer = lazy(() => import('../components/TodoDetailDrawer').then((m) => ({ default: m.TodoDetailDrawer })))
 
 // TickTick-style smart lists. Each maps to a set of backend list params.
 type SmartList = 'all' | 'today' | 'next7' | 'overdue' | 'pending' | 'completed' | 'abandoned' | 'trash'
@@ -161,7 +165,7 @@ export default function TodosPage() {
   // "load more" query; the lazy tree fetches roots only and pulls children per
   // expanded node. Only the active view's query is enabled.
   const flatQuery = useTodosInfinite(listParams, { enabled: view !== 'tree' && smartList !== 'trash' })
-  const rootQuery = useTodosInfinite({ ...listParams, roots_only: true }, { enabled: view === 'tree' })
+  const rootQuery = useTodosInfinite({ ...listParams, roots_only: true }, { enabled: view === 'tree' && smartList !== 'trash' })
   const childrenMap = useTodoChildrenMap(view === 'tree' ? [...expanded] : [], listParams)
   const { data: stats } = useTodoStats()
   const { data: trashTodos } = useTodoTrash(smartList === 'trash')
@@ -189,6 +193,16 @@ export default function TodosPage() {
   }, [view, rootQuery.data, flatQuery.data])
   const total = (view === 'tree' ? rootQuery.data : flatQuery.data)?.pages[0]?.total ?? 0
   const loading = view === 'tree' ? rootQuery.isPending : flatQuery.isPending
+
+  // Every loaded todo: in the tree view `todos` holds only roots — children
+  // live in the per-parent slices. Lookups that must reach them (rename, the
+  // parent-title hint, the nest cycle guard) go through this map instead.
+  const todoByIdLoaded = useMemo(() => {
+    const m = new Map<number, Todo>()
+    for (const t of todos) m.set(t.id, t)
+    for (const slice of childrenMap.values()) for (const t of slice.items) m.set(t.id, t)
+    return m
+  }, [todos, childrenMap])
 
   const openCreate = useCallback(() => { setEditing(null); setPresetParent(null); setDialogOpen(true) }, [])
   const openCreateChild = useCallback((parent: Todo) => { setEditing(null); setPresetParent(parent); setDialogOpen(true) }, [])
@@ -363,7 +377,7 @@ export default function TodosPage() {
   // Kanban: columns are user-defined predicates (status / priority / tag);
   // dropping a card applies the column's predicate to the todo — plus the
   // swimlane's (priority) when swimlanes are on.
-  const { columns: kanbanColumns, addColumn, removeColumn, setColumns: setKanbanColumns } = useKanbanColumns()
+  const { columns: kanbanColumns, addColumn, removeColumn, setColumns: setKanbanColumns } = useKanbanColumns(view === 'kanban')
   const handleKanbanDrop = (todo: Todo, col: KanbanColumn, lane?: KanbanLane) => {
     const colMatch = matchesColumn(todo, col)
     const laneMatch = !lane || todo.priority === lane.value
@@ -419,14 +433,16 @@ export default function TodosPage() {
   }, [createTodo, replaceTags, tags, t])
 
   const handleRename = useCallback(async (id: number, title: string) => {
-    const todo = todos.find((it) => it.id === id)
+    // Search every loaded todo, not just the current list — tree-view children
+    // come from the per-parent slices and aren't part of `todos`.
+    const todo = todoByIdLoaded.get(id)
     if (!todo) return
     try {
       await updateTodo.mutateAsync({ id, data: fullUpdateData(todo, { title }) })
     } catch {
       toast.error(t('todos.renameFailed'))
     }
-  }, [todos, updateTodo, fullUpdateData, t])
+  }, [todoByIdLoaded, updateTodo, fullUpdateData, t])
 
   const handleSync = useCallback(async (todo: Todo) => {
     try {
@@ -589,9 +605,9 @@ export default function TodosPage() {
   // just no-ops instead of flashing an error toast (the backend would reject
   // it anyway).
   const handleNest = useCallback((id: number, parentId: number) => {
-    if (id === parentId || descendantIds(todos, id).has(parentId)) return
+    if (id === parentId || descendantIds([...todoByIdLoaded.values()], id).has(parentId)) return
     void handleTreeMove(id, parentId, null)
-  }, [todos, handleTreeMove])
+  }, [todoByIdLoaded, handleTreeMove])
   const toggleExpand = useCallback((id: number) =>
     setExpanded((prev) => {
       const next = new Set(prev)
@@ -655,7 +671,7 @@ export default function TodosPage() {
     return node ? count(node) : 0
   }, [treeDragId, todoTree])
   // id → title for the "nested under <parent>" hint on cards in non-tree views.
-  const todoTitleById = useMemo(() => new Map(todos.map((t) => [t.id, t.title])), [todos])
+  const todoTitleById = useMemo(() => new Map([...todoByIdLoaded.values()].map((t) => [t.id, t.title])), [todoByIdLoaded])
 
   // Smart date groups for the grouped view. `target` is the due date a card
   // takes when dragged into the group (drop-to-reschedule): today/tomorrow map
@@ -733,7 +749,11 @@ export default function TodosPage() {
       parentTitle={todo.parent_id ? todoTitleById.get(todo.parent_id) : undefined}
       onStartPomodoro={handleStartPomodoro}
       onAddChild={openCreateChild}
-      subtasks={view !== 'tree' ? (
+      // Compact (kanban) cards omit the inline subtask list: a root with 100+
+      // children would bloat every cell, and the drag overlay would render the
+      // whole subtree — a giant overlay whose center breaks the tri-zone
+      // drop detection (nest/reorder aiming). Hierarchy lives in the tree view.
+      subtasks={view !== 'tree' && !compact ? (
         <TodoSubtaskList
           todo={todo}
           childrenByParent={childrenByParent}
@@ -748,9 +768,9 @@ export default function TodosPage() {
   return (
     <div className="space-y-2">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold">{t('todos.title')}</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant={selectionMode ? 'default' : 'outline'} size="sm" className="h-7 px-2.5 text-xs" onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}>
             <CheckSquare className="h-4 w-4 mr-1" />
             {selectionMode ? t('common.cancel') : t('todos.select')}
@@ -795,7 +815,7 @@ export default function TodosPage() {
       )}
 
       {/* Quick add bar */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Plus className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -810,10 +830,10 @@ export default function TodosPage() {
           type="datetime-local"
           value={quickDue}
           onChange={(e) => setQuickDue(e.target.value)}
-          className="h-8 w-40"
+          className="h-8 w-full sm:w-40"
           aria-label={t('todos.dueTime')}
         />
-        <Button size="sm" onClick={handleQuickAdd} disabled={!quickTitle.trim() || createTodo.isPending}>
+        <Button size="sm" className="self-end sm:self-auto" onClick={handleQuickAdd} disabled={!quickTitle.trim() || createTodo.isPending}>
           <Plus className="h-4 w-4 mr-1" />
           {t('common.create')}
         </Button>
@@ -821,13 +841,13 @@ export default function TodosPage() {
 
       {/* Smart-list switcher + filters in one toolbar row (wraps on narrow screens) */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex border rounded-md overflow-hidden w-fit">
+        <div className="flex max-w-full overflow-x-auto rounded-md border">
           {(['all', 'today', 'next7', 'overdue', 'pending', 'completed', 'abandoned', 'trash'] as SmartList[]).map((s) => (
             <Button
               key={s}
               variant={smartList === s ? 'default' : 'ghost'}
               size="sm"
-              className="h-7 px-2.5 text-xs rounded-none"
+              className="h-7 shrink-0 rounded-none px-2.5 text-xs"
               onClick={() => setSmartList(s)}
             >
               {t(`todos.${s === 'next7' ? 'next7' : s}`)}
@@ -944,9 +964,7 @@ export default function TodosPage() {
         /* Manual-order flat list: drag to reorder (the up/down buttons remain
            for precise/keyboard moves). */
         <div className="space-y-3">
-          {pendingTodos.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">{t('todos.noTodos')}</p>
-          ) : (
+          {pendingTodos.length > 0 && (
             <TodoSortableGroups
               groups={[{ key: 'manual', items: pendingTodos }]}
               itemAreaClass="space-y-1.5"
@@ -968,9 +986,13 @@ export default function TodosPage() {
               }}
               onReorder={handleMove}
               onNest={handleNest}
+              renderOverlayCard={(todo) => renderTodoCard(todo, true)}
             />
           )}
-          {doneTodos.length > 0 && smartList === 'all' && (
+          {pendingTodos.length === 0 && smartList !== 'completed' && smartList !== 'abandoned' && (
+            <p className="text-sm text-muted-foreground text-center py-8">{t('todos.noTodos')}</p>
+          )}
+          {doneTodos.length > 0 && (smartList === 'all' || smartList === 'completed') && (
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
               <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -978,7 +1000,7 @@ export default function TodosPage() {
               </div>
             </div>
           )}
-          {abandonedTodos.length > 0 && smartList === 'all' && (
+          {abandonedTodos.length > 0 && (smartList === 'all' || smartList === 'abandoned') && (
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('todos.abandoned')} ({abandonedTodos.length})</h3>
               <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1053,6 +1075,7 @@ export default function TodosPage() {
             }))}
             itemAreaClass="space-y-1.5 ml-2"
             renderCard={renderTodoCard}
+            renderOverlayCard={(todo) => renderTodoCard(todo, true)}
             onGroupDrop={(todo, key) => {
               const g = timelineGroups.find((it) => it.key === key)
               handleReschedule(todo, g?.target ?? null)
@@ -1065,23 +1088,25 @@ export default function TodosPage() {
            今天/明天 → that day, 本周 → end of this week, 稍后 → next Monday,
            无日期 → clear the due time. */
         <div className="space-y-3">
-          <TodoSortableGroups
-            groups={groupedTodos
-              .filter((g) => g.items.length > 0)
-              .map((g) => ({
-                key: g.key,
-                label: <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{g.label}</h3>,
-                items: g.items,
-              }))}
-            itemAreaClass="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-            renderCard={renderTodoCard}
-            onGroupDrop={(todo, key) => {
-              const g = groupedTodos.find((it) => it.key === key)
-              handleReschedule(todo, g?.target ?? null)
-            }}
-            onNest={handleNest}
-          />
-          {doneTodos.length > 0 && smartList === 'all' && (
+          {smartList !== 'completed' && smartList !== 'abandoned' && (
+            <TodoSortableGroups
+              groups={groupedTodos
+                .map((g) => ({
+                  key: g.key,
+                  label: <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{g.label}</h3>,
+                  items: g.items,
+                }))}
+              itemAreaClass="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+              renderCard={renderTodoCard}
+              renderOverlayCard={(todo) => renderTodoCard(todo, true)}
+              onGroupDrop={(todo, key) => {
+                const g = groupedTodos.find((it) => it.key === key)
+                handleReschedule(todo, g?.target ?? null)
+              }}
+              onNest={handleNest}
+            />
+          )}
+          {doneTodos.length > 0 && (smartList === 'all' || smartList === 'completed') && (
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
               <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1089,7 +1114,7 @@ export default function TodosPage() {
               </div>
             </div>
           )}
-          {abandonedTodos.length > 0 && smartList === 'all' && (
+          {abandonedTodos.length > 0 && (smartList === 'all' || smartList === 'abandoned') && (
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.abandoned')} ({abandonedTodos.length})</h3>
               <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1102,20 +1127,22 @@ export default function TodosPage() {
         /* Kanban View — GitLab-style board (components/KanbanBoard.tsx):
            horizontal scrolling columns, cross-column drag applies the column
            predicate, in-column drag persists sort_order. */
-        <KanbanBoard
-          todos={todos}
-          columns={kanbanColumns}
-          tags={tags}
-          addColumn={addColumn}
-          removeColumn={removeColumn}
-          onColumnsReorder={handleKanbanColumnsReorder}
-          renderCard={(todo) => renderTodoCard(todo, true)}
-          onCardDropColumn={handleKanbanDrop}
-          onReorder={handleKanbanReorder}
-          onNest={handleNest}
-          onCreateInColumn={handleKanbanCreate}
-          selectedIds={selectionMode ? selectedIds : undefined}
-        />
+        <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+          <KanbanBoard
+            todos={todos}
+            columns={kanbanColumns}
+            tags={tags}
+            addColumn={addColumn}
+            removeColumn={removeColumn}
+            onColumnsReorder={handleKanbanColumnsReorder}
+            renderCard={(todo) => renderTodoCard(todo, true)}
+            onCardDropColumn={handleKanbanDrop}
+            onReorder={handleKanbanReorder}
+            onNest={handleNest}
+            onCreateInColumn={handleKanbanCreate}
+            selectedIds={selectionMode ? selectedIds : undefined}
+          />
+        </Suspense>
       )}
 
       {smartList !== 'trash' && view === 'tree' ? (
@@ -1135,28 +1162,36 @@ export default function TodosPage() {
       ) : null}
 
       {/* Create Dialog (editing lives in the detail drawer below) */}
-      <TodoFormDialog
-        key={presetParent?.id ?? 'new'}
-        open={dialogOpen}
-        editing={null}
-        contacts={contacts}
-        tags={tags}
-        parentCandidates={todos}
-        presetParentId={presetParent?.id ?? null}
-        onContactsChange={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
-        onClose={() => { setDialogOpen(false); setPresetParent(null) }}
-      />
+      {dialogOpen && (
+        <Suspense fallback={null}>
+          <TodoFormDialog
+            key={presetParent?.id ?? 'new'}
+            open
+            editing={null}
+            contacts={contacts}
+            tags={tags}
+            parentCandidates={todos}
+            presetParentId={presetParent?.id ?? null}
+            onContactsChange={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
+            onClose={() => { setDialogOpen(false); setPresetParent(null) }}
+          />
+        </Suspense>
+      )}
 
       {/* Detail Drawer — right slide-over for viewing/editing a todo */}
-      <TodoDetailDrawer
-        todo={editing}
-        open={drawerOpen}
-        contacts={contacts}
-        tags={tags}
-        parentCandidates={todos}
-        onContactsChange={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
-        onClose={() => setDrawerOpen(false)}
-      />
+      {drawerOpen && editing && (
+        <Suspense fallback={null}>
+          <TodoDetailDrawer
+            todo={editing}
+            open
+            contacts={contacts}
+            tags={tags}
+            parentCandidates={todos}
+            onContactsChange={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
+            onClose={() => setDrawerOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* Delete Confirm Dialog */}
       <Dialog open={!!confirmDelete} onOpenChange={() => setConfirmDelete(null)}>

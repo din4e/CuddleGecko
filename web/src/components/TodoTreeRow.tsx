@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, ArrowRight, Ban, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
@@ -120,6 +120,9 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
       titleClickTimer.current = null
     }
   }
+  useEffect(() => () => {
+    if (titleClickTimer.current != null) window.clearTimeout(titleClickTimer.current)
+  }, [])
   const startEdit = () => {
     setDraft(todo.title)
     setEditing(true)
@@ -264,7 +267,8 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             className="min-w-0 flex-1 rounded-sm bg-transparent px-1 outline-none ring-1 ring-primary"
           />
         ) : (
-          <span
+          <button
+            type="button"
             onClick={() => {
               cancelPendingTitleClick()
               titleClickTimer.current = window.setTimeout(() => {
@@ -277,12 +281,12 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
               startEdit()
             }}
             className={cn(
-              'min-w-0 flex-1 truncate text-sm',
+              'min-w-0 flex-1 truncate text-left text-sm',
               todo.status !== 'pending' && 'text-muted-foreground line-through',
             )}
           >
             {todo.title}
-          </span>
+          </button>
         )}
 
         {/* compact meta */}

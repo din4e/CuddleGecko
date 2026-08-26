@@ -31,6 +31,10 @@ export interface SortableTodoGroup {
 export interface TodoSortableGroupsProps {
   groups: SortableTodoGroup[]
   renderCard: (todo: Todo) => ReactNode
+  /** Renderer for the floating drag preview. Cards carrying big inline
+   *  subtask lists should render a light variant here — an oversized overlay
+   *  breaks tri-zone drop detection (its center no longer tracks the cursor). */
+  renderOverlayCard?: (todo: Todo) => ReactNode
   /** Cross-group drop — apply the target group's meaning to the todo (e.g.
    *  reschedule its due date). Omit to disable cross-group dragging. */
   onGroupDrop?: (todo: Todo, groupKey: string) => void
@@ -64,6 +68,7 @@ const groupId = (key: string) => `group:${key}`
 export default function TodoSortableGroups({
   groups,
   renderCard,
+  renderOverlayCard,
   onGroupDrop,
   onReorder,
   onNest,
@@ -83,6 +88,10 @@ export default function TodoSortableGroups({
     Object.fromEntries(groups.map((g) => [g.key, g.items.map((t) => t.id)])),
   )
   const dragging = useRef(false)
+  // `byGroup` intentionally changes during a cross-group preview. Keep the
+  // authoritative source separately so drag end can still distinguish a real
+  // cross-group drop from a same-group reorder.
+  const sourceGroup = useRef<string | null>(null)
   useEffect(() => {
     if (dragging.current) return
     setByGroup(Object.fromEntries(groups.map((g) => [g.key, g.items.map((t) => t.id)])))
@@ -116,6 +125,7 @@ export default function TodoSortableGroups({
 
   const handleDragStart = (e: DragStartEvent) => {
     dragging.current = true
+    sourceGroup.current = findGroupOfCard(String(e.active.id))
     setActiveId(Number(String(e.active.id).slice(1)))
   }
 
@@ -166,11 +176,12 @@ export default function TodoSortableGroups({
     setActiveId(null)
     setNestTarget(null)
     const { active, over } = e
+    const from = sourceGroup.current ?? findGroupOfCard(String(active.id))
+    sourceGroup.current = null
     if (!over) return
     const id = Number(String(active.id).slice(1))
     const todo = todoById.get(id)
     const to = overGroup(over)
-    const from = findGroupOfCard(String(active.id))
     if (!todo || !to || !from) return
 
     // Middle-of-a-card drop: reparent the dragged todo under the hovered card
@@ -207,6 +218,7 @@ export default function TodoSortableGroups({
 
   const handleDragCancel = () => {
     dragging.current = false
+    sourceGroup.current = null
     setActiveId(null)
     setNestTarget(null)
     setByGroup(Object.fromEntries(groups.map((g) => [g.key, g.items.map((t) => t.id)])))
@@ -240,7 +252,9 @@ export default function TodoSortableGroups({
       </div>
       <DragOverlay dropAnimation={null}>
         {activeTodo ? (
-          <div className="rotate-2 scale-[0.97] shadow-lg opacity-90 w-64 cursor-grabbing">{renderCard(activeTodo)}</div>
+          <div className="rotate-2 scale-[0.97] shadow-lg opacity-90 w-64 cursor-grabbing">
+            {(renderOverlayCard ?? renderCard)(activeTodo)}
+          </div>
         ) : null}
       </DragOverlay>
     </DndContext>
@@ -264,7 +278,7 @@ function GroupArea({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: groupId(groupKey) })
   return (
-    <SortableContext items={itemIds} strategy={rectSortingStrategy}>
+    <SortableContext id={groupId(groupKey)} items={itemIds} strategy={rectSortingStrategy}>
       <div
         ref={setNodeRef}
         className={`${itemAreaClass} rounded-lg transition-colors ring-2 ${isOver ? 'ring-primary/60 bg-primary/5' : 'ring-transparent'}`}

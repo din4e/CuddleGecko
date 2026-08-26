@@ -7,21 +7,22 @@ import { DEFAULT_KANBAN_COLUMNS } from '../../lib/kanban'
  * plain state (not TanStack cache): the board edits it locally on every
  * add/remove and saves fire-and-forget.
  */
-export function useKanbanColumns() {
+export function useKanbanColumns(enabled = true) {
   const [columns, setColumns] = useState<KanbanColumn[]>(DEFAULT_KANBAN_COLUMNS)
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
+    if (!enabled) return
     let alive = true
     settingsApi
       .getKanban()
-      .then((columns) => {
-        if (alive && Array.isArray(columns) && columns.length > 0) setColumns(columns)
+      .then((config) => {
+        if (alive && Array.isArray(config.columns) && config.columns.length > 0) setColumns(config.columns)
       })
       .catch(() => {})
       .finally(() => { if (alive) setLoaded(true) })
     return () => { alive = false }
-  }, [])
+  }, [enabled])
 
   const persist = useCallback((next: KanbanColumn[]) => {
     setColumns(next)
