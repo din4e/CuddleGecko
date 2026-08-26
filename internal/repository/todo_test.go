@@ -107,6 +107,27 @@ func TestTodoRepo_List_RootsOnlyParentAndChildCount(t *testing.T) {
 	assert.Equal(t, int64(1), children[0].ChildCount, "grandchild counted on its parent")
 }
 
+// A child restored alone from the trash (its parent still soft-deleted) must
+// surface as a root — otherwise it matches neither the roots query nor any
+// parent's children query and silently disappears from the lazy tree.
+func TestTodoRepo_List_OrphanedChildSurfacesAsRoot(t *testing.T) {
+	repo := NewTodoRepo(newTodoTestDB(t))
+	ctx := context.Background()
+
+	parent := mustCreateTodo(t, repo, 1, "parent")
+	child := mustCreateTodo(t, repo, 1, "child")
+	require.NoError(t, repo.SetParent(ctx, 1, child.ID, &parent.ID))
+	// Cascade-delete both, then restore only the child.
+	require.NoError(t, repo.Delete(ctx, 1, parent.ID))
+	require.NoError(t, repo.Restore(ctx, 1, child.ID))
+
+	roots, total, err := repo.List(ctx, 1, model.TodoListQuery{RootsOnly: true})
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, total)
+	require.Len(t, roots, 1)
+	assert.Equal(t, "child", roots[0].Title)
+}
+
 // --- Reorder renumbers the workspace ---
 
 func TestTodoRepo_Reorder(t *testing.T) {

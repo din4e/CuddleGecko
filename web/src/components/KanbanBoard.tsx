@@ -703,7 +703,7 @@ function BoardCell({
   }
 
   return (
-    <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+    <SortableContext id={cellDroppableId(cellKey)} items={itemIds} strategy={verticalListSortingStrategy}>
       <div
         ref={setNodeRef}
         style={{ width }}

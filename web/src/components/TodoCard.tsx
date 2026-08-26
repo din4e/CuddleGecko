@@ -1,4 +1,4 @@
-import { memo, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Ban, CheckCircle2, Circle, Clock, CalendarClock, ListTodo, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer } from 'lucide-react'
 import { Button } from './ui/button'
@@ -73,6 +73,9 @@ const TodoCard = memo(function TodoCard({
       titleClickTimer.current = null
     }
   }
+  useEffect(() => () => {
+    if (titleClickTimer.current != null) window.clearTimeout(titleClickTimer.current)
+  }, [])
 
   const priorityLabel = t(`todos.${todo.priority}`)
   const syncLabel = t('todos.syncToEvent')
@@ -132,7 +135,8 @@ const TodoCard = memo(function TodoCard({
                 className="text-sm font-medium w-full bg-transparent border-b border-primary outline-none"
               />
             ) : (
-              <span
+              <button
+                type="button"
                 onClick={() => {
                   cancelPendingTitleClick()
                   titleClickTimer.current = window.setTimeout(() => {
@@ -144,11 +148,11 @@ const TodoCard = memo(function TodoCard({
                   cancelPendingTitleClick()
                   startRename()
                 }}
-                className={`text-sm font-medium leading-snug cursor-text ${closed ? 'line-through text-muted-foreground' : ''}`}
+                className={`block max-w-full text-left text-sm font-medium leading-snug cursor-text ${closed ? 'line-through text-muted-foreground' : ''}`}
                 title={todo.title}
               >
                 {todo.title}
-              </span>
+              </button>
             )}
             {todo.description && !compact && (
               <p className="text-[11px] leading-snug text-muted-foreground line-clamp-1">{todo.description}</p>

@@ -322,7 +322,10 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, presetPare
           </div>
         )}
       </div>
-      <DialogFooter className="sticky bottom-0">
+      {/* Opaque background: this bar sticks over the scrolling form, and the
+          default translucent footer would let fields bleed through beneath the
+          buttons. */}
+      <DialogFooter className="sticky bottom-0 bg-muted">
         <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
         <Button onClick={handleSave} disabled={!formTitle.trim() || createTodo.isPending || updateTodo.isPending}>
           {(createTodo.isPending || updateTodo.isPending) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}

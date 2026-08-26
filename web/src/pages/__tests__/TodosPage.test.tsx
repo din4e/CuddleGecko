@@ -94,6 +94,7 @@ import type { AxiosResponse } from 'axios'
 
 const mockedList = vi.mocked(todosApi.list)
 const mockedCreate = vi.mocked(todosApi.create)
+const mockedUpdate = vi.mocked(todosApi.update)
 const mockedReplaceTags = vi.mocked(todosApi.replaceTags)
 const mockedStats = vi.mocked(todosApi.stats)
 const mockedTrash = vi.mocked(todosApi.listTrash)
@@ -184,6 +185,36 @@ describe('TodosPage', () => {
     })
   })
 
+  it('keeps completed tasks visible in the grouped completed smart list', async () => {
+    localStorage.setItem('todoView', 'grouped')
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 12, title: 'Grouped done task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+    ]))
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Grouped done task')).toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: /^已完成$/ }))
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ status: 'done' }), expect.any(AbortSignal))
+      expect(screen.getByText('Grouped done task')).toBeInTheDocument()
+    })
+  })
+
+  it('keeps completed tasks visible in manual-order view', async () => {
+    localStorage.setItem('todoView', 'grouped')
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 13, title: 'Manual done task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+    ]))
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Manual done task')).toBeInTheDocument())
+
+    await user.selectOptions(screen.getByLabelText('todos.sort'), 'manual')
+    await user.click(screen.getByRole('button', { name: /^已完成$/ }))
+    await waitFor(() => expect(screen.getByText('Manual done task')).toBeInTheDocument())
+  })
+
   it('renders todo with amount and priority', async () => {
     mockedList.mockResolvedValue(mockPage<Todo>([
       { id: 3, title: 'Team lunch', status: 'pending', priority: 'high', due_time: '2026-05-22T14:00:00+08:00', amount: 200, amount_type: 'expense', contact_ids: [], color: '#ff0000', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
@@ -251,6 +282,32 @@ describe('TodosPage', () => {
     // Expanding the root fetches its children (parent_id=1).
     await user.click(screen.getByRole('button', { name: 'todos.expand' }))
     await waitFor(() => expect(screen.getByText('Child')).toBeInTheDocument())
+  })
+
+  it('renames a child row in the tree view', async () => {
+    // Regression: tree-view children live in per-parent slices, not in the
+    // roots-only list — rename must still find them and persist the edit.
+    const root = { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const child = { id: 2, title: 'Child task', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    mockedList.mockImplementation(async (params?: TodoListParams) =>
+      params?.parent_id === 1
+        ? mockPage<Todo>([child])
+        : mockPage<Todo>([root]),
+    )
+    mockedUpdate.mockResolvedValue({ data: child })
+    localStorage.setItem('todoTreeExpanded', JSON.stringify([1]))
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Child task')).toBeInTheDocument())
+
+    await user.dblClick(screen.getByRole('button', { name: 'Child task' }))
+    const input = screen.getByDisplayValue('Child task')
+    await user.clear(input)
+    await user.type(input, 'Renamed child{Enter}')
+
+    await waitFor(() => {
+      expect(mockedUpdate).toHaveBeenCalledWith(2, expect.objectContaining({ title: 'Renamed child' }))
+    })
   })
 
   it('opens the detail drawer on single title click (double-click still renames)', async () => {

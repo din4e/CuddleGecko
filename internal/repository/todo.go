@@ -79,7 +79,13 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQ
 		query = query.Where("id IN (SELECT todo_id FROM todo_tags WHERE tag_id IN ?)", q.TagIDs)
 	}
 	if q.RootsOnly {
-		query = query.Where("parent_id IS NULL")
+		// A child whose parent is soft-deleted (restored alone from the trash)
+		// would otherwise match neither the roots query nor any parent's
+		// children query — invisible. Surface orphaned nodes as roots.
+		query = query.Where(
+			"parent_id IS NULL OR parent_id IN (SELECT id FROM todos p WHERE p.workspace_id = ? AND p.deleted_at IS NOT NULL)",
+			workspaceID,
+		)
 	}
 	if q.ParentID != nil {
 		query = query.Where("parent_id = ?", *q.ParentID)
