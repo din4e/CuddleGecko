@@ -73,6 +73,8 @@ func main() {
 	contacts := []model.Contact{
 		{UserID: user.ID, Name: "小明", Nickname: "明明", Email: []string{"xiaoming@example.com"}, Phone: []string{"13800138001"}, Birthday: birthday(1995, 3, 15), Notes: "大学同学，喜欢打篮球", RelationshipLabels: []string{"friend", "colleague"}},
 		{UserID: user.ID, Name: "小红", Nickname: "红红", Email: []string{"xiaohong@example.com"}, Phone: []string{"13800138002"}, Birthday: birthday(1998, 7, 22), RelationshipLabels: []string{"family"}},
+		// 农历生日示例：存的 Y/M/D 是农历数值（正月初八）
+		{UserID: user.ID, Name: "奶奶", Phone: []string{"13800138004"}, Birthday: birthday(1949, 1, 8), BirthdayCalendar: "lunar", Notes: "农历正月初八生日", RelationshipLabels: []string{"family"}},
 		{UserID: user.ID, Name: "张总", Email: []string{"zhangzong@company.com"}, Phone: []string{"13800138003"}, RelationshipLabels: []string{"colleague", "client"}},
 		{UserID: user.ID, Name: "旺财", Nickname: "旺旺", Notes: "金毛寻回犬，3岁，喜欢游泳", RelationshipLabels: []string{"pet"}},
 		{UserID: user.ID, Name: "咪咪", Notes: "英短蓝猫，很黏人", RelationshipLabels: []string{"pet"}},

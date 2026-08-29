@@ -22,6 +22,7 @@ import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
 import { ListSkeleton } from '../components/ListSkeleton'
 import ListPageHeader from '../components/ListPageHeader'
+import UpcomingBirthdaysCard from '../components/UpcomingBirthdaysCard'
 
 function LabelPicker({ selected, onChange, t }: {
   selected: string[]
@@ -324,6 +325,8 @@ export default function ContactsPage() {
           className="pl-10"
         />
       </div>
+
+      <UpcomingBirthdaysCard days={30} />
 
       {isPending ? (
         <ListSkeleton rows={9} />

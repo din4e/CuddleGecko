@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { contactsApi } from '../../api/contacts'
 import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
-import type { Contact, PaginatedData } from '../../types'
+import type { Contact, PaginatedData, UpcomingBirthday } from '../../types'
 
 const scope = 'contacts'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
@@ -21,6 +21,27 @@ export function useContactsList(params: ListParams) {
     queryKey: [...allKey(), 'list', { page, page_size, search, tag_ids }] as const,
     queryFn: ({ signal }) => contactsApi.list({ page, page_size, search, tag_ids }, signal).then((r) => r.data),
     placeholderData: (prev) => prev,
+  })
+}
+
+export function useUpcomingBirthdays(days = 30) {
+  return useQuery<UpcomingBirthday[]>({
+    queryKey: [...allKey(), 'birthdays', { days }] as const,
+    queryFn: ({ signal }) => contactsApi.birthdays(days, signal).then((r) => r.data),
+    placeholderData: (prev) => prev,
+  })
+}
+
+/** Schedules a reminder at 09:00 on the buddy's next birthday (lunar-aware). */
+export function useCreateBirthdayReminder() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (contactId: number) => contactsApi.createBirthdayReminder(contactId),
+    onSuccess: () => {
+      // The new reminder feeds the reminders list and the dashboard card.
+      qc.invalidateQueries({ queryKey: ['reminders', ...rootKey('reminders').slice(1)] })
+    },
+    onError: mutationErrorToast,
   })
 }
 

@@ -23,12 +23,15 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '../components/ui/dialog'
 import type { Contact, Interaction, Reminder, ContactRelation, InteractionType, Tag } from '../types'
-import { ArrowLeft, Mail, Phone, Calendar, Pencil, Plus, Trash2, X, Upload, Sparkles, Loader2 } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Calendar, Pencil, Plus, Trash2, X, Upload, Sparkles, Loader2, BellPlus } from 'lucide-react'
+import { toast } from 'sonner'
 import AvatarDisplay from '../components/AvatarDisplay'
 import EmojiPicker from '../components/EmojiPicker'
 import BuddyPicker from '../components/BuddyPicker'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { labelColors, presetLabelKeys, getNodeLabelColor } from '../lib/constants'
+import { nextBirthday, lunarFullText, lunarBirthdayToSolar } from '../lib/lunar'
+import { useCreateBirthdayReminder } from '../hooks/api/useContacts'
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof ForceGraph2DType
 
@@ -147,7 +150,7 @@ export default function ContactDetailPage() {
 
   // Edit contact dialog
   const [editOpen, setEditOpen] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', nickname: '', emails: [] as string[], phones: [] as string[], birthday: '', notes: '', relationship_labels: [] as string[], avatar_emoji: '', avatar_url: '' })
+  const [editForm, setEditForm] = useState({ name: '', nickname: '', emails: [] as string[], phones: [] as string[], birthday: '', birthday_calendar: 'solar' as 'solar' | 'lunar', notes: '', relationship_labels: [] as string[], avatar_emoji: '', avatar_url: '' })
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([])
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -165,6 +168,20 @@ export default function ContactDetailPage() {
 
   // Delete confirmation
   const [deleteOpen, setDeleteOpen] = useState(false)
+
+  // Birthday: next occurrence (lunar converted) + one-click birthday reminder.
+  const birthdayReminder = useCreateBirthdayReminder()
+  const birthdayInfo = contact?.birthday ? nextBirthday(contact.birthday, contact.birthday_calendar) : null
+
+  const handleCreateBirthdayReminder = () => {
+    if (!contact) return
+    birthdayReminder.mutate(contact.id, {
+      onSuccess: () => {
+        toast.success(t('contacts.birthdayReminderCreated'))
+        fetchReminders()
+      },
+    })
+  }
 
   const loadData = useCallback(async () => {
     if (!contactId) return
@@ -235,6 +252,7 @@ export default function ContactDetailPage() {
       emails: contact.emails || [],
       phones: contact.phones || [],
       birthday: contact.birthday ? contact.birthday.slice(0, 10) : '',
+      birthday_calendar: contact.birthday_calendar ?? 'solar',
       notes: contact.notes || '',
       relationship_labels: contact.relationship_labels || [],
       avatar_emoji: contact.avatar_emoji || '',
@@ -248,6 +266,7 @@ export default function ContactDetailPage() {
     await contactsApi.update(contact.id, {
       ...editForm,
       birthday: editForm.birthday || null,
+      birthday_calendar: editForm.birthday_calendar,
       avatar_emoji: editForm.avatar_emoji,
       avatar_url: editForm.avatar_url,
     })
@@ -362,7 +381,33 @@ export default function ContactDetailPage() {
           <div className="grid grid-cols-2 gap-4 text-sm">
             {contact.emails?.length > 0 && <div className="flex items-center gap-2"><Mail className="h-4 w-4" />{contact.emails.join(', ')}</div>}
             {contact.phones?.length > 0 && <div className="flex items-center gap-2"><Phone className="h-4 w-4" />{contact.phones.join(', ')}</div>}
-            {contact.birthday && <div className="flex items-center gap-2"><Calendar className="h-4 w-4" />{new Date(contact.birthday).toLocaleDateString()}</div>}
+            {contact.birthday && (
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 shrink-0" />
+                {birthdayInfo?.calendar === 'lunar' ? (
+                  <span>{t('contacts.lunarBirthday', { text: lunarFullText(contact.birthday) ?? '' })}</span>
+                ) : (
+                  <span>{new Date(contact.birthday).toLocaleDateString()}</span>
+                )}
+                {birthdayInfo && (
+                  <span className="text-muted-foreground">
+                    {birthdayInfo.isToday
+                      ? `🎂 ${t('contacts.birthdayToday')}`
+                      : `${birthdayInfo.date.toLocaleDateString()} · ${t('contacts.birthdayInDays', { count: birthdayInfo.daysUntil })}`}
+                  </span>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs"
+                  onClick={handleCreateBirthdayReminder}
+                  disabled={birthdayReminder.isPending}
+                >
+                  <BellPlus className="h-3.5 w-3.5 mr-1" />
+                  {t('contacts.birthdayRemind')}
+                </Button>
+              </div>
+            )}
           </div>
           {contact.notes && <p className="mt-4 text-sm text-muted-foreground">{contact.notes}</p>}
           {(contact.relationship_labels || []).length > 0 && (
@@ -646,7 +691,42 @@ export default function ContactDetailPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-birthday">{t('contacts.birthday')}</Label>
-              <Input id="edit-birthday" type="date" value={editForm.birthday} onChange={(e) => setEditForm({ ...editForm, birthday: e.target.value })} />
+              <div className="flex items-center gap-2">
+                <Input
+                  id="edit-birthday"
+                  type="date"
+                  value={editForm.birthday}
+                  onChange={(e) => setEditForm({ ...editForm, birthday: e.target.value })}
+                  className="flex-1"
+                />
+                <div className="flex gap-1.5" role="group" aria-label={t('contacts.birthdayCalendar')}>
+                  {(['solar', 'lunar'] as const).map((cal) => (
+                    <Badge
+                      key={cal}
+                      variant={editForm.birthday_calendar === cal ? 'default' : 'outline'}
+                      className="cursor-pointer select-none"
+                      aria-pressed={editForm.birthday_calendar === cal}
+                      render={
+                        <button
+                          type="button"
+                          onClick={() => setEditForm({ ...editForm, birthday_calendar: cal })}
+                        />
+                      }
+                    >
+                      {t(`contacts.cal_${cal}`)}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              {editForm.birthday_calendar === 'lunar' && editForm.birthday && (
+                <p className="text-xs text-muted-foreground" data-testid="lunar-hint">
+                  {t('contacts.lunarBirthdayHint', {
+                    full: lunarFullText(editForm.birthday) ?? '',
+                    solar: lunarBirthdayToSolar(editForm.birthday)?.toLocaleDateString() ?? '',
+                    next: nextBirthday(editForm.birthday, 'lunar')?.date.toLocaleDateString() ?? '',
+                  })}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-notes">{t('contacts.notes')}</Label>

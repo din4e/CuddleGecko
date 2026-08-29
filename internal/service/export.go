@@ -669,6 +669,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 		Phone              []string `json:"phones"`
 		Email              []string `json:"emails"`
 		Birthday           string   `json:"birthday"`
+		BirthdayCalendar   string   `json:"birthday_calendar"`
 		Notes              string   `json:"notes"`
 		RelationshipLabels []string `json:"relationship_labels"`
 		Tags               []struct {
@@ -697,6 +698,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 			Phone:              c.Phone,
 			Email:              c.Email,
 			Birthday:           birthday,
+			BirthdayCalendar:   c.BirthdayCalendar,
 			Notes:              c.Notes,
 			RelationshipLabels: c.RelationshipLabels,
 		}
@@ -1319,7 +1321,7 @@ func (s *ExportService) ExportContactsCSV(ctx context.Context, workspaceID uint)
 	}
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	csvWriteRow(w, []string{"id", "name", "nickname", "emails", "phones", "birthday", "notes", "relationships", "tags"})
+	csvWriteRow(w, []string{"id", "name", "nickname", "emails", "phones", "birthday", "birthday_calendar", "notes", "relationships", "tags"})
 	for _, c := range contacts {
 		tagNames := make([]string, 0, len(c.Tags))
 		for _, tg := range c.Tags {
@@ -1332,6 +1334,7 @@ func (s *ExportService) ExportContactsCSV(ctx context.Context, workspaceID uint)
 			strings.Join(c.Email, "; "),
 			strings.Join(c.Phone, "; "),
 			timeToStr(c.Birthday),
+			c.BirthdayCalendar,
 			c.Notes,
 			strings.Join(c.RelationshipLabels, "; "),
 			strings.Join(tagNames, "; "),
@@ -1525,6 +1528,9 @@ func (s *ExportService) ImportContactsCSV(ctx context.Context, userID, workspace
 			c.Notes = n
 		}
 		c.Birthday = csvTime(t.field(row, "birthday"))
+		if cal := t.field(row, "birthday_calendar"); cal == "lunar" {
+			c.BirthdayCalendar = "lunar"
+		}
 		key := strings.ToLower(name) + "|" + firstNonEmpty(c.Email)
 		if seen[key] {
 			stats.Skipped++

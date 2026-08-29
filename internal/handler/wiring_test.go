@@ -69,7 +69,7 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
 	authSvc := service.NewAuthService(userRepo, jwtCfg, workspaceSvc)
 	captchaSvc := service.NewCaptchaService(config.CaptchaConfig{}, settingRepo)
-	contactSvc := service.NewContactService(contactRepo, taggingRepo)
+	contactSvc := service.NewContactService(contactRepo, taggingRepo, reminderRepo)
 	tagSvc := service.NewTagService(tagRepo)
 	interactionSvc := service.NewInteractionService(interactionRepo)
 	reminderSvc := service.NewReminderService(reminderRepo)

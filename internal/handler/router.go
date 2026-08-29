@@ -156,6 +156,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			{
 				buddies.GET("", h.Contact.List)
 				buddies.POST("", h.Contact.Create)
+				buddies.GET("/birthdays", h.Contact.Birthdays)
 				buddies.GET("/:id", h.Contact.GetByID)
 				buddies.PUT("/:id", h.Contact.Update)
 				buddies.DELETE("/:id", h.Contact.Delete)
@@ -164,6 +165,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 				buddies.GET("/:id/interactions", h.Interaction.ListByContact)
 				buddies.POST("/:id/interactions", h.Interaction.Create)
 				buddies.POST("/:id/reminders", h.Reminder.Create)
+				buddies.POST("/:id/birthday-reminder", h.Contact.CreateBirthdayReminder)
 				buddies.GET("/:id/relations", h.Graph.GetRelations)
 				buddies.POST("/:id/relations", h.Graph.CreateRelation)
 			}
