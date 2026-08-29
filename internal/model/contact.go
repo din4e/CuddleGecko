@@ -17,6 +17,7 @@ type Contact struct {
 	Phone              []string       `gorm:"type:longtext;serializer:json" json:"phones"`
 	Email              []string       `gorm:"type:longtext;serializer:json" json:"emails"`
 	Birthday           *time.Time     `json:"birthday"`
+	BirthdayCalendar   string         `gorm:"size:10;default:'solar'" json:"birthday_calendar"` // "solar" | "lunar"; when lunar, Birthday holds the lunar Y/M/D
 	Notes              string         `gorm:"type:longtext" json:"notes"`
 	RelationshipLabels []string       `gorm:"type:longtext;serializer:json" json:"relationship_labels"`
 	Tags               []Tag          `gorm:"-" json:"tags"`

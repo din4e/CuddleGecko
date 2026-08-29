@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 )
@@ -26,9 +27,9 @@ func (s *MCPServer) registerBuddyTools() {
 			return nil, err
 		}
 		return map[string]interface{}{
-			"contacts": contacts,
-			"total":    total,
-			"page":     page,
+			"contacts":  contacts,
+			"total":     total,
+			"page":      page,
 			"page_size": pageSize,
 		}, nil
 	})
@@ -47,13 +48,14 @@ func (s *MCPServer) registerBuddyTools() {
 	s.registerTool("create_buddy", "Create a new contact (buddy).", map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
-			"name":               map[string]interface{}{"type": "string", "description": "Contact name"},
-			"nickname":           map[string]interface{}{"type": "string", "description": "Nickname"},
-			"avatar_emoji":       map[string]interface{}{"type": "string", "description": "Avatar emoji"},
-			"phones":             map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Phone numbers"},
-			"emails":             map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Email addresses"},
-			"birthday":           map[string]interface{}{"type": "string", "description": "Birthday (RFC3339 date)"},
-			"notes":              map[string]interface{}{"type": "string", "description": "Notes about the contact"},
+			"name":                map[string]interface{}{"type": "string", "description": "Contact name"},
+			"nickname":            map[string]interface{}{"type": "string", "description": "Nickname"},
+			"avatar_emoji":        map[string]interface{}{"type": "string", "description": "Avatar emoji"},
+			"phones":              map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Phone numbers"},
+			"emails":              map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Email addresses"},
+			"birthday":            map[string]interface{}{"type": "string", "description": "Birthday (RFC3339 date)"},
+			"birthday_calendar":   map[string]interface{}{"type": "string", "enum": []string{"solar", "lunar"}, "description": "Calendar of the birthday field. 'lunar' means the birthday Y/M/D are a lunar date (农历); the anniversary converts to the Gregorian date each year"},
+			"notes":               map[string]interface{}{"type": "string", "description": "Notes about the contact"},
 			"relationship_labels": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Relationship labels (e.g. friend, family)"},
 		},
 		"required": []string{"name"},
@@ -65,6 +67,7 @@ func (s *MCPServer) registerBuddyTools() {
 			Phone:              toStringSlice(getArg(args, "phones")),
 			Email:              toStringSlice(getArg(args, "emails")),
 			Birthday:           toTimePtr(getArg(args, "birthday")),
+			BirthdayCalendar:   toString(getArg(args, "birthday_calendar")),
 			Notes:              toString(getArg(args, "notes")),
 			RelationshipLabels: toStringSlice(getArg(args, "relationship_labels")),
 		}
@@ -74,14 +77,15 @@ func (s *MCPServer) registerBuddyTools() {
 	s.registerTool("update_buddy", "Update an existing contact (buddy).", map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
-			"id":                 map[string]interface{}{"type": "integer", "description": "Contact ID"},
-			"name":               map[string]interface{}{"type": "string", "description": "Contact name"},
-			"nickname":           map[string]interface{}{"type": "string", "description": "Nickname"},
-			"avatar_emoji":       map[string]interface{}{"type": "string", "description": "Avatar emoji"},
-			"phones":             map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Phone numbers"},
-			"emails":             map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Email addresses"},
-			"birthday":           map[string]interface{}{"type": "string", "description": "Birthday (RFC3339 date)"},
-			"notes":              map[string]interface{}{"type": "string", "description": "Notes about the contact"},
+			"id":                  map[string]interface{}{"type": "integer", "description": "Contact ID"},
+			"name":                map[string]interface{}{"type": "string", "description": "Contact name"},
+			"nickname":            map[string]interface{}{"type": "string", "description": "Nickname"},
+			"avatar_emoji":        map[string]interface{}{"type": "string", "description": "Avatar emoji"},
+			"phones":              map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Phone numbers"},
+			"emails":              map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Email addresses"},
+			"birthday":            map[string]interface{}{"type": "string", "description": "Birthday (RFC3339 date)"},
+			"birthday_calendar":   map[string]interface{}{"type": "string", "enum": []string{"solar", "lunar"}, "description": "Calendar of the birthday field: 'solar' (公历) or 'lunar' (农历)"},
+			"notes":               map[string]interface{}{"type": "string", "description": "Notes about the contact"},
 			"relationship_labels": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Relationship labels"},
 		},
 		"required": []string{"id"},
@@ -94,6 +98,7 @@ func (s *MCPServer) registerBuddyTools() {
 			Phone:              toStringSlice(getArg(args, "phones")),
 			Email:              toStringSlice(getArg(args, "emails")),
 			Birthday:           toTimePtr(getArg(args, "birthday")),
+			BirthdayCalendar:   toString(getArg(args, "birthday_calendar")),
 			Notes:              toString(getArg(args, "notes")),
 			RelationshipLabels: toStringSlice(getArg(args, "relationship_labels")),
 		}
@@ -113,6 +118,30 @@ func (s *MCPServer) registerBuddyTools() {
 			return nil, err
 		}
 		return map[string]interface{}{"success": true, "message": "buddy deleted"}, nil
+	})
+
+	s.registerTool("list_birthdays", "List upcoming birthdays within N days (default 30). Lunar (农历) birthdays are converted to their Gregorian date for the current lunar year.", map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"days": map[string]interface{}{"type": "integer", "description": "Look-ahead window in days (1-365, default 30)"},
+		},
+	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+		days := getArgInt(args, "days", 30)
+		if days < 1 || days > 365 {
+			days = 30
+		}
+		return s.contactSvc.UpcomingBirthdays(ctx, userID, workspaceID, days, time.Now())
+	})
+
+	s.registerTool("create_birthday_reminder", "Schedule a reminder at 09:00 on a buddy's next birthday (lunar-aware). Fails if a pending birthday reminder already exists.", map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"contact_id": map[string]interface{}{"type": "integer", "description": "Contact ID"},
+		},
+		"required": []string{"contact_id"},
+	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+		contactID := toUint(getArg(args, "contact_id"))
+		return s.contactSvc.CreateBirthdayReminder(ctx, userID, workspaceID, contactID, time.Now())
 	})
 
 	s.registerTool("get_buddy_tags", "Get tags assigned to a contact.", map[string]interface{}{

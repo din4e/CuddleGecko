@@ -71,7 +71,7 @@ func main() {
 	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
 	authSvc := service.NewAuthService(userRepo, &cfg.JWT, workspaceSvc)
 	captchaSvc := service.NewCaptchaService(cfg.Captcha, settingRepo)
-	contactSvc := service.NewContactService(contactRepo, taggingRepo)
+	contactSvc := service.NewContactService(contactRepo, taggingRepo, reminderRepo)
 	tagSvc := service.NewTagService(tagRepo)
 	interactionSvc := service.NewInteractionService(interactionRepo)
 	reminderSvc := service.NewReminderService(reminderRepo)

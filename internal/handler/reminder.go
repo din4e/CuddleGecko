@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"github.com/din4e/cuddlegecko/internal/service"
@@ -70,18 +71,52 @@ func (h *ReminderHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// The frontend sends ISO strings; datetime-local pickers and CLI clients
+	// may send "YYYY-MM-DD[ T]HH:MM" or a bare date.
+	remindAt, err := parseFlexibleTime(req.RemindAt)
+	if err != nil {
+		response.BadRequest(c, "invalid remind_at: "+err.Error())
+		return
+	}
+
 	reminder := &model.Reminder{
 		Title:       req.Title,
 		Description: req.Description,
+		RemindAt:    remindAt,
 	}
 
 	result, err := h.svc.Create(c.Request.Context(), userID, workspaceID, uint(contactID), reminder)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidReminder) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		response.InternalError(c, "failed to create reminder")
 		return
 	}
 
 	response.Created(c, result)
+}
+
+// parseFlexibleTime accepts RFC3339 (with or without fractional seconds),
+// "YYYY-MM-DD HH:MM", "YYYY-MM-DDTHH:MM" and bare "YYYY-MM-DD" dates.
+// Shared by remind_at and contact birthday parsing.
+func parseFlexibleTime(s string) (time.Time, error) {
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02T15:04",
+		"2006-01-02 15:04",
+		"2006-01-02",
+	}
+	var lastErr error
+	for _, f := range formats {
+		t, err := time.Parse(f, s)
+		if err == nil {
+			return t, nil
+		}
+		lastErr = err
+	}
+	return time.Time{}, lastErr
 }
 
 func (h *ReminderHandler) Update(c *gin.Context) {

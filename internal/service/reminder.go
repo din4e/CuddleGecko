@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 )
@@ -26,6 +27,9 @@ func NewReminderService(repo ReminderRepository) *ReminderService {
 }
 
 func (s *ReminderService) Create(ctx context.Context, userID, workspaceID, contactID uint, reminder *model.Reminder) (*model.Reminder, error) {
+	if reminder.RemindAt.IsZero() {
+		return nil, fmt.Errorf("%w: remind_at is required", ErrInvalidReminder)
+	}
 	reminder.UserID = userID
 	reminder.WorkspaceID = workspaceID
 	reminder.ContactID = contactID

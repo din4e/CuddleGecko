@@ -20,11 +20,24 @@ export interface Contact {
   phones: string[]
   emails: string[]
   birthday: string | null
+  /** 'solar' (default) | 'lunar' — when lunar, birthday Y/M/D are a lunar date. */
+  birthday_calendar: 'solar' | 'lunar' | null
   notes: string
   relationship_labels: string[]
   tags: Tag[]
   created_at: string
   updated_at: string
+}
+
+/** Buddy birthday with the next occurrence resolved to a Gregorian date. */
+export interface UpcomingBirthday {
+  contact: Contact
+  next_birthday: string
+  days_until: number
+  calendar: 'solar' | 'lunar'
+  is_today: boolean
+  age_turning: number
+  lunar_text?: string
 }
 
 export interface Tag {

@@ -3,6 +3,7 @@ module github.com/din4e/cuddlegecko
 go 1.25.8
 
 require (
+	github.com/6tail/lunar-go v1.4.6
 	github.com/coder/websocket v1.8.15
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1

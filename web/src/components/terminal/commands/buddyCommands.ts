@@ -1,4 +1,5 @@
 import type { AppAdapters } from '@/api/adapter'
+import { nextBirthday, lunarFullText } from '@/lib/lunar'
 import { formatTable, formatDetail, formatSuccess, formatError } from '../formatters'
 import type { CommandArgs } from '../types'
 import { getErrorMessage } from '../types'
@@ -52,7 +53,11 @@ export async function executeGetBuddy(
       ID: contact.id,
       Name: contact.name,
       Nickname: contact.nickname || '-',
-      Birthday: contact.birthday || '-',
+      Birthday: contact.birthday
+        ? (contact.birthday_calendar === 'lunar'
+            ? `Lunar ${lunarFullText(contact.birthday)}${nextBirthday(contact.birthday, 'lunar') ? ` (next: ${nextBirthday(contact.birthday, 'lunar')!.date.toLocaleDateString()})` : ''}`
+            : contact.birthday)
+        : '-',
       Phones: (contact.phones || []).join(', ') || '-',
       Emails: (contact.emails || []).join(', ') || '-',
       Labels: (contact.relationship_labels || []).join(', ') || '-',
@@ -77,6 +82,7 @@ export async function executeCreateBuddy(
     const data: Record<string, unknown> = { name }
     if (args.nickname) data.nickname = args.nickname
     if (args.birthday) data.birthday = args.birthday
+    if (args.calendar) data.birthday_calendar = args.calendar === 'lunar' ? 'lunar' : 'solar'
     if (args.notes) data.notes = args.notes
     if (args.phones) data.phones = (args.phones as string).split(',')
     if (args.emails) data.emails = (args.emails as string).split(',')
@@ -101,6 +107,7 @@ export async function executeUpdateBuddy(
     if (args.name) data.name = args.name
     if (args.nickname) data.nickname = args.nickname
     if (args.birthday) data.birthday = args.birthday
+    if (args.calendar) data.birthday_calendar = args.calendar === 'lunar' ? 'lunar' : 'solar'
     if (args.notes) data.notes = args.notes
     if (args.phones) data.phones = (args.phones as string).split(',')
     if (args.emails) data.emails = (args.emails as string).split(',')

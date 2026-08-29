@@ -99,11 +99,26 @@ func (r *ContactRepo) ListGraphContacts(ctx context.Context, workspaceID uint) (
 
 func (r *ContactRepo) Update(ctx context.Context, contact *model.Contact) error {
 	if err := r.db.WithContext(ctx).Model(&model.Contact{ID: contact.ID}).
-		Select("name", "nickname", "avatar_emoji", "avatar_url", "phone", "email", "birthday", "notes", "relationship_labels").
+		Select("name", "nickname", "avatar_emoji", "avatar_url", "phone", "email", "birthday", "birthday_calendar", "notes", "relationship_labels").
 		Updates(contact).Error; err != nil {
 		return fmt.Errorf("update contact: %w", err)
 	}
 	return nil
+}
+
+// ListWithBirthday returns every contact that has a birthday set. Unpaged by
+// design: the birthday occurrence (especially lunar) is computed in Go, and a
+// personal workspace's contact count fits comfortably in memory.
+func (r *ContactRepo) ListWithBirthday(ctx context.Context, workspaceID uint) ([]model.Contact, error) {
+	var contacts []model.Contact
+	if err := r.db.WithContext(ctx).
+		Select("id, name, nickname, avatar_emoji, avatar_url, birthday, birthday_calendar").
+		Where("workspace_id = ? AND birthday IS NOT NULL", workspaceID).
+		Order("created_at DESC").
+		Find(&contacts).Error; err != nil {
+		return nil, fmt.Errorf("list contacts with birthday: %w", err)
+	}
+	return contacts, nil
 }
 
 // ReplaceTags swaps the polymorphic tag associations of a contact in one
