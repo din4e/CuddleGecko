@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth'
 import { useWorkspaceStore } from '../stores/workspace'
 import { useQueryClient } from '@tanstack/react-query'
 import { startTodoWsSync } from '../lib/wsSync'
+import { refreshAccessToken } from '../api/client'
 import { PomodoroBar } from './PomodoroBar'
 import { Button } from '../components/ui/button'
 import BrandIcon from '../components/BrandIcon'
@@ -137,6 +138,9 @@ export default function AppLayout() {
 
     const controller = startTodoWsSync({
       getToken: () => localStorage.getItem('access_token'),
+      // Reconnects refresh an expiring access token first (HTTP 401 path
+      // can't help a WS handshake), keeping the socket alive on long sessions.
+      refreshToken: refreshAccessToken,
       workspaceId: currentWorkspaceId,
       onTodoChanged: () => {
         qc.invalidateQueries({ queryKey: ['todos'] })

@@ -138,6 +138,10 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
+	// The old token was consumed (rotated) — the browser must receive the new
+	// one, or its next refresh would present the dead cookie and log the user
+	// out. Non-browser clients keep using the JSON field instead.
+	h.setRefreshCookie(c, result.RefreshToken)
 	response.OK(c, authResponse{
 		User:         result.User,
 		AccessToken:  result.AccessToken,

@@ -28,6 +28,7 @@ type UserRepository interface {
 	GetUserByUsername(ctx context.Context, username string) (*model.User, error)
 	GetUserByID(ctx context.Context, id uint) (*model.User, error)
 	CreateRefreshToken(ctx context.Context, token *model.RefreshToken) error
+	DeleteExpiredRefreshTokens(ctx context.Context, userID uint) error
 	GetRefreshToken(ctx context.Context, token string) (*model.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, token string) error
 	RevokeAllUserRefreshTokens(ctx context.Context, userID uint) error
@@ -97,6 +98,14 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*Au
 	return s.generateTokens(ctx, user)
 }
 
+// refreshReplayGrace is how long after a rotation a re-presented (already
+// revoked) token counts as a benign concurrent-refresh race: parallel requests
+// or multiple tabs can hit /auth/refresh with the same cookie seconds apart,
+// and killing the whole family there logs a perfectly legitimate user out.
+// Past the window an old revoked token coming back to life means it was
+// copied — then the family dies.
+const refreshReplayGrace = 30 * time.Second
+
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthResult, error) {
 	tokenHash := HashRefreshToken(refreshToken)
 	rt, err := s.repo.GetRefreshToken(ctx, tokenHash)
@@ -104,15 +113,24 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 		return nil, ErrInvalidToken
 	}
 
-	if rt.Revoked || time.Now().After(rt.ExpiresAt) {
+	if time.Now().After(rt.ExpiresAt) {
+		return nil, ErrInvalidToken
+	}
+
+	if rt.Revoked {
+		// Re-presenting a rotated token. Within the grace window the rotation
+		// winner already minted the successor — reject and let the client retry
+		// with the rotated cookie. Rows revoked before revoked_at existed have
+		// no timestamp: assume benign (availability first).
+		if rt.RevokedAt != nil && time.Since(*rt.RevokedAt) > refreshReplayGrace {
+			_ = s.repo.RevokeAllUserRefreshTokens(ctx, rt.UserID)
+		}
 		return nil, ErrInvalidToken
 	}
 
 	if err := s.repo.RevokeRefreshToken(ctx, tokenHash); err != nil {
-		// A replay (token already revoked — likely stolen) invalidates the
-		// user's ENTIRE refresh-token family so the attacker's lineage dies too.
 		if errors.Is(err, repository.ErrReplayedToken) {
-			_ = s.repo.RevokeAllUserRefreshTokens(ctx, rt.UserID)
+			// Lost the rotation race by microseconds — same benign case above.
 			return nil, ErrInvalidToken
 		}
 		return nil, err
@@ -165,6 +183,9 @@ func (s *AuthService) generateTokens(ctx context.Context, user *model.User) (*Au
 	if err := s.repo.CreateRefreshToken(ctx, rt); err != nil {
 		return nil, err
 	}
+	// Best-effort: rotation mints a row every refresh, so long-lived sessions
+	// accumulate dead rows unless the expired ones are swept here.
+	_ = s.repo.DeleteExpiredRefreshTokens(ctx, user.ID)
 
 	return &AuthResult{
 		User:         user,

@@ -92,7 +92,10 @@ func Load() (*Config, error) {
 
 	v.SetDefault("jwt.secret", "")
 	v.SetDefault("jwt.access_ttl", "15m")
-	v.SetDefault("jwt.refresh_ttl", "168h")
+	// 30 days by default: rotation slides the window on every refresh, so any
+	// use within the window keeps the session alive — this is the "how long
+	// can the user stay away before re-login" knob (env: CG_JWT_REFRESH_TTL).
+	v.SetDefault("jwt.refresh_ttl", "720h")
 
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "json")

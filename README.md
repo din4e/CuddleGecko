@@ -18,7 +18,7 @@ A local-first, self-hosted personal CRM with network graph visualization.
 - **Tag System** — Color-coded tags for contact categorization
 - **Dark Mode** — Green gecko brand theme with light/dark toggle
 - **i18n** — English and Chinese (中文) support
-- **Auth** — JWT + refresh token with automatic retry
+- **Auth** — JWT + rotating refresh token (HttpOnly cookie) with single-flight refresh; the session slides on every visit, so one login stays online for weeks
 
 ## Tech Stack
 
@@ -301,7 +301,10 @@ database:
 jwt:
   secret: "your-secret-key"   # must be >= 32 chars
   access_ttl: 15m
-  refresh_ttl: 168h
+  refresh_ttl: 720h           # session lifetime: max time away before re-login.
+                              # The token rotates (slides) on every visit, so
+                              # active users never see a login prompt. 720h = 30
+                              # days; 2160h = 90 days.
 captcha:
   enabled: true
   length: 4
@@ -312,7 +315,7 @@ ai:
   base_url: ""
 ```
 
-Environment variables with `CG_` prefix (dots become underscores): `CG_SERVER_PORT`, `CG_SERVER_AVATAR_DIR`, `CG_DATABASE_DRIVER`, `CG_DATABASE_MYSQL_DSN`, `CG_CAPTCHA_ENABLED`, `CG_AI_API_KEY`, `CG_AI_MODEL`, etc.
+Environment variables with `CG_` prefix (dots become underscores): `CG_SERVER_PORT`, `CG_SERVER_AVATAR_DIR`, `CG_DATABASE_DRIVER`, `CG_DATABASE_MYSQL_DSN`, `CG_JWT_REFRESH_TTL` (e.g. `2160h` for 90-day sessions), `CG_CAPTCHA_ENABLED`, `CG_AI_API_KEY`, `CG_AI_MODEL`, etc.
 
 The AI configuration can be set via environment variables and acts as a fallback when no AI provider is activated in the database.
 

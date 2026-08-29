@@ -41,8 +41,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.JWT.AccessTTL != 15*time.Minute {
 		t.Errorf("JWT.AccessTTL = %v, want %v", cfg.JWT.AccessTTL, 15*time.Minute)
 	}
-	if cfg.JWT.RefreshTTL != 168*time.Hour {
-		t.Errorf("JWT.RefreshTTL = %v, want %v", cfg.JWT.RefreshTTL, 168*time.Hour)
+	if cfg.JWT.RefreshTTL != 720*time.Hour {
+		t.Errorf("JWT.RefreshTTL = %v, want %v", cfg.JWT.RefreshTTL, 720*time.Hour)
 	}
 
 	// Log defaults
