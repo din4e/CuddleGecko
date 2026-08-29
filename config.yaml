@@ -10,7 +10,10 @@ database:
 jwt:
   secret: "change-me-in-production-please-use-at-least-32-chars"
   access_ttl: 15m
-  refresh_ttl: 168h
+  # Session lifetime: how long a user can stay away before re-login. The
+  # refresh token rotates (slides) on every visit, so active users never see
+  # a login prompt. Env override: CG_JWT_REFRESH_TTL (e.g. 2160h = 90 days).
+  refresh_ttl: 720h
 
 log:
   level: info
