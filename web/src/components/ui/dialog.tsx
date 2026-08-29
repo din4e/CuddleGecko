@@ -53,12 +53,13 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          // max-h + overflow keep tall content (e.g. the todo create form) from
-          // overflowing past the viewport edges — without it the centered box
-          // extends above the screen and the top fields become unreachable.
-          // overflow-x-hidden: a scroll container flips the other axis from
-          // visible to auto, which can surface a spurious horizontal scrollbar.
-          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto overflow-x-hidden rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // Flex column with max-h (not a scroll container itself): tall
+          // content scrolls in the middle while the header and any footer stay
+          // pinned outside the scroll area — a sticky footer inside the scroll
+          // region would permanently cover the last fields at full scroll.
+          // overflow-x-hidden guards against fractional-width children
+          // triggering a spurious horizontal scrollbar.
+          "fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-x-hidden rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
