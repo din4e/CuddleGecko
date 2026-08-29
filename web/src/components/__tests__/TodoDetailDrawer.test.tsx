@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createTodo: vi.fn(),
   replaceTags: vi.fn(),
   moveTodo: vi.fn(),
+  childrenMap: vi.fn(() => new Map()),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -21,7 +22,9 @@ vi.mock('../../hooks/api/useTodos', () => ({
   useReplaceTodoTags: () => ({ mutateAsync: mocks.replaceTags }),
   useMoveTodo: () => ({ mutateAsync: mocks.moveTodo, isPending: false }),
   useTodoItems: () => ({ data: [] }),
-  useCreateTodoItem: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  // Drawer subtask area: empty children slices by default.
+  // Drawer subtask area: empty children slices by default (overridable).
+  useTodoChildrenMap: () => mocks.childrenMap(),  useCreateTodoItem: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useToggleTodoItem: () => ({ mutateAsync: vi.fn() }),
   useDeleteTodoItem: () => ({ mutateAsync: vi.fn() }),
   useUpdateTodoItem: () => ({ mutateAsync: vi.fn() }),
@@ -48,6 +51,8 @@ describe('TodoDetailDrawer', () => {
     mocks.createTodo.mockReset()
     mocks.replaceTags.mockReset()
     mocks.moveTodo.mockReset()
+    mocks.childrenMap.mockReset()
+    mocks.childrenMap.mockReturnValue(new Map())
   })
 
   it('shows the todo title in the header and pre-fills the form', () => {
@@ -82,6 +87,28 @@ describe('TodoDetailDrawer', () => {
     )
     await user.click(screen.getByText('common.save'))
     expect(mocks.updateTodo).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }))
+  })
+
+  it('renders the subtask subtree and toggles a subtask', async () => {
+    const user = userEvent.setup()
+    const sub = { ...todo({ id: 8, title: 'Deep subtask', parent_id: 7 }) }
+    mocks.childrenMap.mockReturnValue(new Map([[7, { items: [sub], total: 1, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
+    const onToggleSubtask = vi.fn()
+    render(
+      <TodoDetailDrawer
+        todo={todo()}
+        open
+        contacts={[]}
+        tags={[]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+        onToggleSubtask={onToggleSubtask}
+      />,
+    )
+    // Subtask area lists the child (to any depth via the recursive loader).
+    expect(screen.getByText('Deep subtask')).toBeInTheDocument()
+    await user.click(screen.getAllByLabelText('todos.markDone')[0])
+    expect(onToggleSubtask).toHaveBeenCalledWith(sub)
   })
 
   it('renders nothing when no todo is set', () => {

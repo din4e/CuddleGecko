@@ -16,7 +16,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../components/ui/dialog'
-import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import type { Todo, TodoSort, TodoListParams, TodoUpdateInput } from '../types'
 import EmptyState from '../components/EmptyState'
@@ -30,6 +36,7 @@ import type { KanbanColumn } from '../api/settings'
 import TodoTree from '../components/TodoTreeRow'
 import { type KanbanLane } from '../components/KanbanBoard'
 import { buildLazyTree, descendantIds, type TodoNode } from '../lib/buildTodoTree'
+import { subtreeProgressFromMap } from '../lib/todoProgress'
 import { usePomodoroStore } from '../stores/pomodoro'
 import {
   useTodosInfinite,
@@ -99,7 +106,12 @@ export default function TodosPage() {
   const contacts = useMemo(() => contactsData?.items ?? [], [contactsData])
   const { data: tagsData } = useTagsList(1, 200)
   const tags = useMemo(() => tagsData?.items ?? [], [tagsData])
-  const [smartList, setSmartList] = useState<SmartList>('all')
+  // TickTick-style landing: first visit opens the Today list; the choice is
+  // remembered so returning users land where they left off.
+  const [smartList, setSmartList] = useState<SmartList>(() => {
+    const saved = localStorage.getItem('todoSmartList') as SmartList | null
+    return saved ?? 'today'
+  })
   const [quickTitle, setQuickTitle] = useState('')
   const [quickDue, setQuickDue] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<'' | 'low' | 'normal' | 'high'>('')
@@ -109,7 +121,7 @@ export default function TodosPage() {
   const [sort, setSort] = useState<TodoSort>('due_date')
   const [order, setOrder] = useState<'asc' | 'desc'>('asc')
   const [view, setView] = useState<TodoView>(
-    () => (localStorage.getItem('todoView') as TodoView) || 'tree',
+    () => (localStorage.getItem('todoView') as TodoView) || 'grouped',
   )
   const [dialogOpen, setDialogOpen] = useState(false)
   // Detail drawer (right slide-over): the editing surface for existing todos.
@@ -140,10 +152,13 @@ export default function TodosPage() {
     return () => clearTimeout(handle)
   }, [searchInput])
 
-  // Persist the chosen view mode + tree expand state across reloads.
+  // Persist the chosen view mode + smart list + tree expand state across reloads.
   useEffect(() => {
     localStorage.setItem('todoView', view)
   }, [view])
+  useEffect(() => {
+    localStorage.setItem('todoSmartList', smartList)
+  }, [smartList])
   useEffect(() => {
     localStorage.setItem('todoTreeExpanded', JSON.stringify([...expanded]))
   }, [expanded])
@@ -166,7 +181,11 @@ export default function TodosPage() {
   // expanded node. Only the active view's query is enabled.
   const flatQuery = useTodosInfinite(listParams, { enabled: view !== 'tree' && smartList !== 'trash' })
   const rootQuery = useTodosInfinite({ ...listParams, roots_only: true }, { enabled: view === 'tree' && smartList !== 'trash' })
-  const childrenMap = useTodoChildrenMap(view === 'tree' ? [...expanded] : [], listParams)
+  // Children are fetched WITHOUT the smart-list filters (only sort/order):
+  // a parent that matches the filter must show its whole subtree — otherwise
+  // a subtask due next week silently vanishes under a "today" parent. The
+  // filters keep applying to the roots themselves.
+  const childrenMap = useTodoChildrenMap(view === 'tree' ? [...expanded] : [], { sort, order })
   const { data: stats } = useTodoStats()
   const { data: trashTodos } = useTodoTrash(smartList === 'trash')
   const restoreTodo = useRestoreTodo()
@@ -206,6 +225,19 @@ export default function TodosPage() {
 
   const openCreate = useCallback(() => { setEditing(null); setPresetParent(null); setDialogOpen(true) }, [])
   const openCreateChild = useCallback((parent: Todo) => { setEditing(null); setPresetParent(parent); setDialogOpen(true) }, [])
+  // Inline child quick-add (card subtask area / tree "+"): create directly,
+  // no dialog. In the tree view the parent auto-expands so the new child is
+  // visible immediately.
+  const handleCreateChild = useCallback(async (parent: Todo, title: string) => {
+    const v = title.trim()
+    if (!v) return
+    try {
+      await createTodo.mutateAsync({ title: v, parent_id: parent.id })
+      setExpanded((prev) => (prev.has(parent.id) ? prev : new Set(prev).add(parent.id)))
+    } catch {
+      toast.error(t('todos.createFailed'))
+    }
+  }, [createTodo, t])
 
   // Global keyboard shortcuts. Ignored while typing in a field or when a
   // dialog is open so they never hijack text entry.
@@ -355,6 +387,20 @@ export default function TodosPage() {
     repeat: todo.repeat,
     ...overrides,
   }), [])
+
+  // One-click "postpone to tomorrow" (TickTick's signature action): tomorrow
+  // at the same clock time, or 09:00 when the task has no due date.
+  const handlePostpone = useCallback((todo: Todo) => {
+    const next = new Date()
+    next.setDate(next.getDate() + 1)
+    if (todo.due_time) {
+      const src = new Date(todo.due_time)
+      next.setHours(src.getHours(), src.getMinutes(), 0, 0)
+    } else {
+      next.setHours(9, 0, 0, 0)
+    }
+    updateTodo.mutate({ id: todo.id, data: fullUpdateData(todo, { due_time: next.toISOString() }) })
+  }, [updateTodo, fullUpdateData])
 
   // Drag-to-reschedule (timeline / grouped views): move the due date to the
   // target day — or clear it when dropping on the no-date group — preserving
@@ -557,6 +603,13 @@ export default function TodosPage() {
     return m
   }, [todos])
   const presentIds = useMemo(() => new Set(todos.map((t) => t.id)), [todos])
+  // Cross-subtask completion roll-up for card chips (incl. kanban): done/total
+  // over every descendant, computed from the loaded children map.
+  const subtaskProgress = useMemo(() => {
+    const m = new Map<number, { done: number; total: number }>()
+    for (const t of todos) m.set(t.id, subtreeProgressFromMap(childrenByParent, t.id))
+    return m
+  }, [todos, childrenByParent])
   const isTopLevel = useCallback(
     (t: Todo) => t.parent_id == null || !presentIds.has(t.parent_id),
     [presentIds],
@@ -747,19 +800,23 @@ export default function TodosPage() {
       onDelete={setConfirmDelete}
       formatDate={formatDate}
       parentTitle={todo.parent_id ? todoTitleById.get(todo.parent_id) : undefined}
+      subtaskProgress={subtaskProgress.get(todo.id)}
       onStartPomodoro={handleStartPomodoro}
       onAddChild={openCreateChild}
-      // Compact (kanban) cards omit the inline subtask list: a root with 100+
-      // children would bloat every cell, and the drag overlay would render the
-      // whole subtree — a giant overlay whose center breaks the tri-zone
-      // drop detection (nest/reorder aiming). Hierarchy lives in the tree view.
-      subtasks={view !== 'tree' && !compact ? (
+      onPostpone={handlePostpone}
+      // Compact (kanban) cards DO get the subtask list, but TodoCard keeps it
+      // collapsed behind the progress chip: the board cell stays lean and a
+      // drag overlay (fresh mount) never carries the expanded list.
+      subtasks={view !== 'tree' ? (
         <TodoSubtaskList
           todo={todo}
           childrenByParent={childrenByParent}
           onToggle={(sub) => void handleToggle(sub.id)}
           onEdit={openEdit}
           onAddChild={openCreateChild}
+          onCreateChild={handleCreateChild}
+          onDelete={setConfirmDelete}
+          onStartPomodoro={handleStartPomodoro}
         />
       ) : undefined}
     />
@@ -767,20 +824,13 @@ export default function TodosPage() {
 
   return (
     <div className="space-y-2">
-      {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      {/* Header — view toggle + one overflow menu; creating lives in the
+          quick-add bar below (fast path) with a "detailed" button for the
+          full form. Keeping one create surface avoids the duplicate
+          "新建" buttons this page used to have. */}
+      <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{t('todos.title')}</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant={selectionMode ? 'default' : 'outline'} size="sm" className="h-7 px-2.5 text-xs" onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}>
-            <CheckSquare className="h-4 w-4 mr-1" />
-            {selectionMode ? t('common.cancel') : t('todos.select')}
-          </Button>
-          <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => setShortcutsOpen(true)} title={t('todos.shortcuts')}>
-            <Keyboard className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={handleExportICS} title={t('todos.exportIcs')}>
-            <Download className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-2">
           {/* View toggle */}
           <div className="flex border rounded-md overflow-hidden">
             {viewButtons.map(({ key, icon: Icon, label }) => (
@@ -796,10 +846,29 @@ export default function TodosPage() {
               </Button>
             ))}
           </div>
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-1" />
-            {t('todos.newTodo')}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="outline" size="sm" className="h-7 w-7 p-0" title={t('common.more')} aria-label={t('common.more')} />
+              }
+            >
+              <MoreVertical className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}>
+                <CheckSquare className="h-4 w-4" />
+                {selectionMode ? t('common.cancel') : t('todos.select')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportICS}>
+                <Download className="h-4 w-4" />
+                {t('todos.exportIcs')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>
+                <Keyboard className="h-4 w-4" />
+                {t('todos.shortcuts')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -837,23 +906,29 @@ export default function TodosPage() {
           <Plus className="h-4 w-4 mr-1" />
           {t('common.create')}
         </Button>
+        {/* The full form (description / tags / contacts / repeat …) stays one
+            click away without a second big "新建" button in the header. */}
+        <Button variant="outline" size="sm" className="h-8 w-9 p-0 self-end sm:self-auto" onClick={openCreate} title={t('todos.advancedCreate')} aria-label={t('todos.advancedCreate')}>
+          <ListPlus className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Smart-list switcher + filters in one toolbar row (wraps on narrow screens) */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex max-w-full overflow-x-auto rounded-md border">
+        {/* Smart lists as one dropdown — the old 8-button segmented bar was
+           the page's biggest source of button clutter. */}
+        <select
+          value={smartList}
+          onChange={(e) => setSmartList(e.target.value as SmartList)}
+          className="h-7 rounded-md border bg-background px-1.5 text-xs"
+          aria-label={t('todos.smartList')}
+        >
           {(['all', 'today', 'next7', 'overdue', 'pending', 'completed', 'abandoned', 'trash'] as SmartList[]).map((s) => (
-            <Button
-              key={s}
-              variant={smartList === s ? 'default' : 'ghost'}
-              size="sm"
-              className="h-7 shrink-0 rounded-none px-2.5 text-xs"
-              onClick={() => setSmartList(s)}
-            >
+            <option key={s} value={s}>
               {t(`todos.${s === 'next7' ? 'next7' : s}`)}
-            </Button>
+            </option>
           ))}
-        </div>
+        </select>
 
         <div className="relative min-w-[160px] flex-1 max-w-xs">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1047,7 +1122,9 @@ export default function TodosPage() {
               onDelete={setConfirmDelete}
               onMove={handleTreeMove}
               onAddChild={openCreateChild}
+              onCreateChild={handleCreateChild}
               onStartPomodoro={handleStartPomodoro}
+              onTogglePin={handleTogglePin}
               formatDate={formatDate}
               selectable={selectionMode}
               selectedIds={selectedIds}
@@ -1189,6 +1266,11 @@ export default function TodosPage() {
             parentCandidates={todos}
             onContactsChange={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
             onClose={() => setDrawerOpen(false)}
+            onToggleSubtask={(sub) => void handleToggle(sub.id)}
+            onDeleteSubtask={setConfirmDelete}
+            onStartPomodoro={handleStartPomodoro}
+            onOpenTodo={openEdit}
+            onCreateChild={handleCreateChild}
           />
         </Suspense>
       )}

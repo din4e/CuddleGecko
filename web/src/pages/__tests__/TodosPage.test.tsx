@@ -152,12 +152,26 @@ describe('TodosPage', () => {
     })
   })
 
+  it('defaults to the Today smart list on first visit', async () => {
+    renderPage()
+    await waitFor(() => {
+      // Today = pending + upper due bound (includes overdue), no lower bound.
+      expect(mockedList).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'pending', due_before: expect.any(String) }),
+        expect.any(AbortSignal),
+      )
+    })
+  })
+
   it('renders page title and controls', async () => {
     renderPage()
     await waitFor(() => {
       expect(screen.getByText('待办')).toBeInTheDocument()
-      expect(screen.getByText('全部')).toBeInTheDocument()
-      expect(screen.getByText('新建待办')).toBeInTheDocument()
+      // One create surface: the quick-add bar (创建) + the detailed-form button.
+      expect(screen.getByRole('button', { name: '创建' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'todos.advancedCreate' })).toBeInTheDocument()
+      // Overflow menu for the less-frequent actions.
+      expect(screen.getByRole('button', { name: 'common.more' })).toBeInTheDocument()
     })
   })
 
@@ -175,6 +189,7 @@ describe('TodosPage', () => {
 
   it('renders done todo with completed section', async () => {
     localStorage.setItem('todoView', 'grouped')
+    localStorage.setItem('todoSmartList', 'all')
     mockedList.mockResolvedValue(mockPage<Todo>([
       { id: 2, title: 'Done task', status: 'done', priority: 'low', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
     ]))
@@ -187,6 +202,7 @@ describe('TodosPage', () => {
 
   it('keeps completed tasks visible in the grouped completed smart list', async () => {
     localStorage.setItem('todoView', 'grouped')
+    localStorage.setItem('todoSmartList', 'all')
     mockedList.mockResolvedValue(mockPage<Todo>([
       { id: 12, title: 'Grouped done task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
     ]))
@@ -194,7 +210,7 @@ describe('TodosPage', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('Grouped done task')).toBeInTheDocument())
 
-    await user.click(screen.getByRole('button', { name: /^已完成$/ }))
+    await user.selectOptions(screen.getByLabelText('todos.smartList'), 'completed')
     await waitFor(() => {
       expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ status: 'done' }), expect.any(AbortSignal))
       expect(screen.getByText('Grouped done task')).toBeInTheDocument()
@@ -203,6 +219,7 @@ describe('TodosPage', () => {
 
   it('keeps completed tasks visible in manual-order view', async () => {
     localStorage.setItem('todoView', 'grouped')
+    localStorage.setItem('todoSmartList', 'all')
     mockedList.mockResolvedValue(mockPage<Todo>([
       { id: 13, title: 'Manual done task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
     ]))
@@ -211,7 +228,7 @@ describe('TodosPage', () => {
     await waitFor(() => expect(screen.getByText('Manual done task')).toBeInTheDocument())
 
     await user.selectOptions(screen.getByLabelText('todos.sort'), 'manual')
-    await user.click(screen.getByRole('button', { name: /^已完成$/ }))
+    await user.selectOptions(screen.getByLabelText('todos.smartList'), 'completed')
     await waitFor(() => expect(screen.getByText('Manual done task')).toBeInTheDocument())
   })
 
@@ -226,7 +243,7 @@ describe('TodosPage', () => {
     expect(screen.getAllByText('高').length).toBeGreaterThan(0)
   })
 
-  it('filters by status when clicking pending button', async () => {
+  it('filters by status when selecting the pending smart list', async () => {
     localStorage.setItem('todoView', 'grouped')
     const user = userEvent.setup()
     renderPage()
@@ -234,8 +251,8 @@ describe('TodosPage', () => {
       expect(screen.getByText('暂无待办')).toBeInTheDocument()
     })
 
-    // Click the "pending" status filter button (translates to '待办状态')
-    await user.click(screen.getByText('待办状态'))
+    // Pick the "pending" smart list in the dropdown
+    await user.selectOptions(screen.getByLabelText('todos.smartList'), 'pending')
     // The API should be called with the raw value 'pending', not the translated text
     expect(mockedList).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'pending', page: 1, page_size: 50 }),
@@ -264,6 +281,7 @@ describe('TodosPage', () => {
   })
 
   it('tree view lazily loads children on expand', async () => {
+    localStorage.setItem('todoView', 'tree')
     const root = { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
     const child = { id: 2, title: 'Child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
     // Param-aware mock: roots_only returns just the root; a parent_id query
@@ -285,6 +303,7 @@ describe('TodosPage', () => {
   })
 
   it('renames a child row in the tree view', async () => {
+    localStorage.setItem('todoView', 'tree')
     // Regression: tree-view children live in per-parent slices, not in the
     // roots-only list — rename must still find them and persist the edit.
     const root = { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
@@ -383,28 +402,30 @@ describe('TodosPage', () => {
     })
   })
 
-  it('opens the keyboard shortcuts help from the header button', async () => {
+  it('opens the keyboard shortcuts help from the overflow menu', async () => {
     const user = userEvent.setup()
     renderPage()
     await waitFor(() => {
       expect(screen.getByText('暂无待办')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByTitle('todos.shortcuts'))
+    await user.click(screen.getByRole('button', { name: 'common.more' }))
+    await user.click(await screen.findByText('todos.shortcuts'))
 
     await waitFor(() => {
       expect(screen.getByText('todos.gotIt')).toBeInTheDocument()
     })
   })
 
-  it('enters selection mode and shows the bulk action bar', async () => {
+  it('enters selection mode from the overflow menu and shows the bulk action bar', async () => {
     const user = userEvent.setup()
     renderPage()
     await waitFor(() => {
       expect(screen.getByText('暂无待办')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByText('todos.select'))
+    await user.click(screen.getByRole('button', { name: 'common.more' }))
+    await user.click(await screen.findByText('todos.select'))
 
     await waitFor(() => {
       expect(screen.getByText('todos.bulkComplete')).toBeInTheDocument()
@@ -419,7 +440,7 @@ describe('TodosPage', () => {
       expect(screen.getByText('暂无待办')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByText('todos.today'))
+    await user.selectOptions(screen.getByLabelText('todos.smartList'), 'today')
 
     await waitFor(() => {
       // "Today" includes overdue: pending + an upper due bound, no lower bound.

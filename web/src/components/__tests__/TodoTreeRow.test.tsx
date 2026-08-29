@@ -131,12 +131,24 @@ describe('TodoTree', () => {
     expect(onMove).toHaveBeenCalledWith(1, null, 2)
   })
 
-  it('add-child hands the row todo to the create flow', async () => {
+  it('add-child hands the row todo to the create flow when no inline handler is given', async () => {
     const user = userEvent.setup()
     const onAddChild = vi.fn()
     render(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onAddChild })} />)
     await user.click(screen.getByRole('button', { name: 'todos.addChild' }))
     expect(onAddChild).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }))
+  })
+
+  it('add-child becomes an inline input that creates children on Enter', async () => {
+    const user = userEvent.setup()
+    const onCreateChild = vi.fn()
+    render(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onCreateChild })} />)
+    await user.click(screen.getByRole('button', { name: 'todos.addChild' }))
+    const input = screen.getByPlaceholderText('todos.addSubtaskPlaceholder')
+    await user.type(input, '快速子任务{Enter}')
+    expect(onCreateChild).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), '快速子任务')
+    // Input stays open with a cleared draft for rapid entry.
+    expect(screen.getByPlaceholderText('todos.addSubtaskPlaceholder')).toHaveValue('')
   })
 
   it('toggles the inline subtask checklist', async () => {
