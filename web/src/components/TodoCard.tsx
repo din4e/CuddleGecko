@@ -1,9 +1,12 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Ban, CheckCircle2, Circle, Clock, CalendarClock, ListTodo, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer } from 'lucide-react'
+import { Ban, CheckCircle2, ChevronDown, Circle, Clock, CalendarClock, ListTodo, ListTree, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
+import { cn } from '../lib/utils'
+import { formatDueLabel } from '../lib/dueLabel'
+import type { SubtreeProgress } from '../lib/todoProgress'
 import type { Todo } from '../types'
 
 const priorityConfig: Record<string, { color: string; bg: string }> = {
@@ -35,8 +38,15 @@ export interface TodoCardProps {
   parentTitle?: string
   onStartPomodoro?: (todo: Todo) => void
   onAddChild?: (todo: Todo) => void
-  /** Nested subtask renderer (flat views); rendered inside the card body. */
+  /** One-click "postpone to tomorrow" (TickTick's signature reschedule). */
+  onPostpone?: (todo: Todo) => void
+  /** Nested subtask renderer (flat views); rendered inside the card body.
+   *  On compact (kanban) cards it exists too but stays collapsed until the
+   *  progress chip is clicked — drag overlays mount fresh, so they never
+   *  carry the expanded list. */
   subtasks?: ReactNode
+  /** Cross-subtask completion roll-up (done/total over all descendants). */
+  subtaskProgress?: SubtreeProgress
 }
 
 const TodoCard = memo(function TodoCard({
@@ -58,11 +68,16 @@ const TodoCard = memo(function TodoCard({
   parentTitle,
   onStartPomodoro,
   onAddChild,
+  onPostpone,
   subtasks,
+  subtaskProgress,
 }: TodoCardProps) {
   const { t } = useTranslation()
   const [editingTitle, setEditingTitle] = useState(false)
   const [draft, setDraft] = useState('')
+  // Compact (kanban) cards hide their subtask list behind the progress chip
+  // so the board and drag overlays stay lean.
+  const [subtasksOpen, setSubtasksOpen] = useState(false)
   // Single click on the title opens the detail drawer; double-click renames.
   // The two are disambiguated by delaying the click action long enough for a
   // second click to cancel it.
@@ -177,7 +192,7 @@ const TodoCard = memo(function TodoCard({
             {todo.due_time && (
               <span className={`flex items-center gap-1 ${todo.status === 'pending' && new Date(todo.due_time) < new Date() ? 'text-red-600 dark:text-red-400 font-medium' : ''}`}>
                 <Clock className="h-3 w-3" />
-                {formatDate(todo.due_time)}
+                {formatDueLabel(todo.due_time, new Date(), t)}
               </span>
             )}
             {todo.start_time && new Date(todo.start_time) > new Date() && (
@@ -190,6 +205,20 @@ const TodoCard = memo(function TodoCard({
               <span className="flex items-center gap-1">
                 <ListTodo className="h-3 w-3" />
                 {todo.item_done ?? 0}/{todo.item_total ?? 0}
+              </span>
+            )}
+            {/* Cross-subtask roll-up over all descendants (not just checklist
+                items) — complements the item_done chip above. */}
+            {subtaskProgress && subtaskProgress.total > 0 && (
+              <span
+                className={cn(
+                  'flex items-center gap-1 tabular-nums',
+                  subtaskProgress.done === subtaskProgress.total ? 'text-green-600 dark:text-green-400' : '',
+                )}
+                title={t('todos.subtaskProgress', { done: subtaskProgress.done, total: subtaskProgress.total })}
+              >
+                <ListTree className="h-3 w-3" />
+                {subtaskProgress.done}/{subtaskProgress.total}
               </span>
             )}
             {todo.repeat && repeatLabel && (
@@ -210,6 +239,9 @@ const TodoCard = memo(function TodoCard({
             )}
           </div>
         )}
+
+        {/* Cross-subtask progress: a chip in the meta row (flat views), and
+            the expand toggle for the collapsed subtask list (kanban). */}
 
         {!compact && (todo.item_total ?? 0) > 0 && (
           <div className="h-1 w-full rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={todo.item_done ?? 0} aria-valuemin={0} aria-valuemax={todo.item_total ?? 0}>
@@ -233,8 +265,26 @@ const TodoCard = memo(function TodoCard({
             ))}
           </div>
         )}
+
+        {/* Kanban: expand/collapse the otherwise-hidden subtask list. */}
+        {compact && subtaskProgress && subtaskProgress.total > 0 && (
+          <button
+            type="button"
+            onClick={() => setSubtasksOpen((v) => !v)}
+            aria-expanded={subtasksOpen}
+            title={t('todos.subtaskProgress', { done: subtaskProgress.done, total: subtaskProgress.total })}
+            className={cn(
+              'mt-1 flex items-center gap-1 rounded px-0.5 text-[10px] tabular-nums hover:bg-muted/60',
+              subtaskProgress.done === subtaskProgress.total ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground',
+            )}
+          >
+            <ListTree className="h-3 w-3" />
+            {subtaskProgress.done}/{subtaskProgress.total}
+            <ChevronDown className={cn('h-3 w-3 transition-transform', subtasksOpen && 'rotate-180')} />
+          </button>
+        )}
       </CardContent>
-      {subtasks}
+      {subtasks && (!compact || subtasksOpen) && subtasks}
 
       {/* Action toolbar — floating top-right so it costs no row height.
           Hover-reveal on md+; always visible on touch/small screens. */}
@@ -243,6 +293,11 @@ const TodoCard = memo(function TodoCard({
           <Button variant="ghost" size="sm" className="h-5 gap-0.5 px-1 text-[10px]" onClick={() => onStartPomodoro(todo)} aria-label={t('todos.pomoStart')} title={t('todos.pomoStart')}>
             <Timer className="h-3 w-3" />
             {!!todo.pomodoro_count && <span className="tabular-nums">{todo.pomodoro_count}</span>}
+          </Button>
+        )}
+        {onPostpone && (
+          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onPostpone(todo)} aria-label={t('todos.postponeToTomorrow')} title={t('todos.postponeToTomorrow')}>
+            <CalendarClock className="h-3 w-3" />
           </Button>
         )}
         {onSetStatus && (
