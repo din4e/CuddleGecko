@@ -22,7 +22,7 @@ export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{editing ? t('todos.editTodo') : t('todos.newTodo')}</DialogTitle>
+          <DialogTitle className="pr-8">{editing ? t('todos.editTodo') : t('todos.newTodo')}</DialogTitle>
         </DialogHeader>
         <TodoForm
           editing={editing}

@@ -136,10 +136,26 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, presetPare
 
   return (
     <>
-      <div className="space-y-4 py-2">
+      {/* flex-1 + overflow: the only scrollable region — DialogContent is a
+          flex column, so the footer below stays pinned and never overlaps the
+          last fields (the old sticky-inside-scroll approach always covered
+          them at full scroll). */}
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-1">
         <div className="space-y-1.5">
           <Label>{t('todos.title_field')} *</Label>
-          <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} maxLength={200} />
+          <Input
+            value={formTitle}
+            onChange={(e) => setFormTitle(e.target.value)}
+            // Fast create flow: focus the title on open, Enter submits.
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && formTitle.trim()) {
+                e.preventDefault()
+                void handleSave()
+              }
+            }}
+            maxLength={200}
+          />
         </div>
         <div className="space-y-1.5">
           <Label>{t('todos.description')}</Label>
@@ -322,10 +338,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, presetPare
           </div>
         )}
       </div>
-      {/* Opaque background: this bar sticks over the scrolling form, and the
-          default translucent footer would let fields bleed through beneath the
-          buttons. */}
-      <DialogFooter className="sticky bottom-0 bg-muted">
+      <DialogFooter>
         <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
         <Button onClick={handleSave} disabled={!formTitle.trim() || createTodo.isPending || updateTodo.isPending}>
           {(createTodo.isPending || updateTodo.isPending) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
