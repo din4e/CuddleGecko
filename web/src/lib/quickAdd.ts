@@ -156,6 +156,10 @@ export function parseQuickAdd(input: string, now: Date = new Date()): ParsedQuic
     base.setHours(time.h, time.m, 0, 0)
     due = base
     text = text.replace(time.matched, ' ')
+  } else if (due) {
+    // Day-level due dates mean "by end of that day" — same default as the
+    // form's Today/Tomorrow chips (23:59), not midnight.
+    due.setHours(23, 59, 0, 0)
   }
 
   // Priority: !high/!1, !med/!medium/!2/!normal, !low/!3 (TickTick's "!" syntax).

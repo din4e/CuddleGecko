@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Repeat, Loader2 } from 'lucide-react'
+import { ChevronDown, Eye, PenLine, Repeat, Loader2 } from 'lucide-react'
 import { isoToLocalInput } from '../lib/utils'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { DialogFooter } from './ui/dialog'
+import { Markdown } from './Markdown'
 import BuddyPicker from './BuddyPicker'
 import { TodoChecklist } from './TodoChecklist'
 import { useCreateTodo, useUpdateTodo, useReplaceTodoTags, useMoveTodo } from '../hooks/api/useTodos'
@@ -23,11 +24,12 @@ const COLORS = [
   { value: '#8b5cf6', label: 'Purple' },
 ]
 
-// dueChipValue returns a datetime-local string for today + offset days at 09:00.
+// dueChipValue returns a datetime-local string for today + offset days at
+// 23:59 — a day-level due date means "by end of that day".
 function dueChipValue(offset: number): string {
   const d = new Date()
   d.setDate(d.getDate() + offset)
-  d.setHours(9, 0, 0, 0)
+  d.setHours(23, 59, 0, 0)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
@@ -66,6 +68,15 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, presetPare
   const [formRepeatInterval, setFormRepeatInterval] = useState<number>(editing?.repeat_interval && editing.repeat_interval > 0 ? editing.repeat_interval : 1)
   const [formTagIds, setFormTagIds] = useState<number[]>(editing?.tags?.map((tg) => tg.id) ?? [])
   const [formParentId, setFormParentId] = useState<number | null>(editing?.parent_id ?? presetParentId ?? null)
+  // Description is markdown: the textarea swaps to a rendered preview while the
+  // field has content; clearing the text returns to the editor.
+  const [descPreview, setDescPreview] = useState(false)
+  // Non-todo extras (amount, buddies, color) fold away by default; start
+  // expanded when the edited todo already carries values so nothing hides.
+  const hasExtras = editing != null && (editing.amount != null || (editing.contact_ids?.length ?? 0) > 0 || !!editing.color)
+  const [moreOpen, setMoreOpen] = useState(hasExtras)
+  // Live count of set extras, shown as a badge while the section is collapsed.
+  const extrasSet = [formAmount !== '', formContactIds.length > 0, formColor !== ''].filter(Boolean).length
 
   // Disallow picking self or a descendant as the new parent (backend would reject
   // the cycle); keeps the picker honest when editing.
@@ -158,8 +169,30 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, presetPare
           />
         </div>
         <div className="space-y-1.5">
-          <Label>{t('todos.description')}</Label>
-          <Textarea value={formDesc} onChange={(e) => setFormDesc(e.target.value)} rows={2} />
+          <div className="flex items-center justify-between">
+            <Label>{t('todos.description')}</Label>
+            {formDesc.trim() && (
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setDescPreview((p) => !p)}
+              >
+                {descPreview ? <PenLine className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                {descPreview ? t('todos.descWrite') : t('todos.descPreview')}
+              </button>
+            )}
+          </div>
+          {descPreview ? (
+            <div
+              className="min-h-16 w-full rounded-lg border bg-transparent px-2.5 py-2 text-sm"
+              onClick={() => setDescPreview(false)}
+              title={t('todos.descWrite')}
+            >
+              <Markdown content={formDesc} />
+            </div>
+          ) : (
+            <Textarea value={formDesc} onChange={(e) => setFormDesc(e.target.value)} rows={2} placeholder={t('todos.descMarkdownHint')} />
+          )}
         </div>
         {parentCandidates && parentCandidates.length > 0 && (
           <div className="space-y-1.5">
@@ -261,59 +294,6 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, presetPare
             )}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label>{t('todos.amount')}</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={formAmount}
-              onChange={(e) => setFormAmount(e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>{t('todos.amountType')}</Label>
-            <div className="flex gap-1">
-              {(['', 'income', 'expense'] as const).map((at) => (
-                <Button
-                  key={at}
-                  type="button"
-                  variant={formAmountType === at ? 'default' : 'outline'}
-                  size="sm"
-                  className="flex-1 text-xs"
-                  onClick={() => setFormAmountType(at)}
-                >
-                  {at === '' ? '-' : t(`todos.${at}`)}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label>{t('todos.buddy')}</Label>
-          <BuddyPicker
-            buddies={contacts}
-            selectedIds={formContactIds}
-            onChange={setFormContactIds}
-            onBuddiesUpdate={onContactsChange}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Color</Label>
-          <div className="flex gap-1.5">
-            {COLORS.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                onClick={() => setFormColor(c.value)}
-                className={`h-6 w-6 rounded-full border-2 transition-colors ${formColor === c.value ? 'border-primary ring-1 ring-primary' : 'border-transparent'}`}
-                style={{ backgroundColor: c.value || 'transparent', backgroundImage: c.value ? 'none' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
-                title={c.label}
-              />
-            ))}
-          </div>
-        </div>
         {tags.length > 0 && (
           <div className="space-y-1.5">
             <Label>{t('todos.tags')}</Label>
@@ -337,6 +317,80 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, presetPare
             </div>
           </div>
         )}
+        {/* Non-todo extras (finance amount, buddies, color) live behind a
+            collapsible so the form stays focused on task fields; the badge
+            hints at how many are set while collapsed. */}
+        <div className="space-y-1.5">
+          <button
+            type="button"
+            className="flex w-full items-center gap-1 rounded-md py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen((o) => !o)}
+          >
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${moreOpen ? '' : '-rotate-90'}`} />
+            {t('todos.moreSettings')}
+            {!moreOpen && extrasSet > 0 && (
+              <span className="ml-1 rounded-full bg-muted px-1.5 text-[10px] leading-4">{extrasSet}</span>
+            )}
+          </button>
+          {moreOpen && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>{t('todos.amount')}</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formAmount}
+                    onChange={(e) => setFormAmount(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{t('todos.amountType')}</Label>
+                  <div className="flex gap-1">
+                    {(['', 'income', 'expense'] as const).map((at) => (
+                      <Button
+                        key={at}
+                        type="button"
+                        variant={formAmountType === at ? 'default' : 'outline'}
+                        size="sm"
+                        className="flex-1 text-xs"
+                        onClick={() => setFormAmountType(at)}
+                      >
+                        {at === '' ? '-' : t(`todos.${at}`)}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('todos.buddy')}</Label>
+                <BuddyPicker
+                  buddies={contacts}
+                  selectedIds={formContactIds}
+                  onChange={setFormContactIds}
+                  onBuddiesUpdate={onContactsChange}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Color</Label>
+                <div className="flex gap-1.5">
+                  {COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => setFormColor(c.value)}
+                      className={`h-6 w-6 rounded-full border-2 transition-colors ${formColor === c.value ? 'border-primary ring-1 ring-primary' : 'border-transparent'}`}
+                      style={{ backgroundColor: c.value || 'transparent', backgroundImage: c.value ? 'none' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+                      title={c.label}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>

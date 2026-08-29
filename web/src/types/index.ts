@@ -311,6 +311,32 @@ export interface TodoItem {
   updated_at: string
 }
 
+/** Markdown note attached to a todo. */
+export interface TodoComment {
+  id: number
+  todo_id: number
+  user_id: number
+  username: string
+  content: string
+  created_at: string
+  updated_at: string
+}
+
+/** One audit-log line: which user changed what on a todo, when. */
+export interface TodoActivity {
+  id: number
+  todo_id: number
+  user_id: number
+  username: string
+  /** created / updated / completed / reopened / pinned / unpinned / moved / deleted / restored / commented / removed_comment */
+  action: string
+  /** Changed field when action === 'updated' (title / description / priority / …). */
+  field: string
+  old_value: string
+  new_value: string
+  created_at: string
+}
+
 export interface TodoStats {
   total: number
   pending: number

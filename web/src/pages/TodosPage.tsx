@@ -389,7 +389,7 @@ export default function TodosPage() {
   }), [])
 
   // One-click "postpone to tomorrow" (TickTick's signature action): tomorrow
-  // at the same clock time, or 09:00 when the task has no due date.
+  // at the same clock time, or end of day (23:59) when the task has no due date.
   const handlePostpone = useCallback((todo: Todo) => {
     const next = new Date()
     next.setDate(next.getDate() + 1)
@@ -397,14 +397,14 @@ export default function TodosPage() {
       const src = new Date(todo.due_time)
       next.setHours(src.getHours(), src.getMinutes(), 0, 0)
     } else {
-      next.setHours(9, 0, 0, 0)
+      next.setHours(23, 59, 0, 0)
     }
     updateTodo.mutate({ id: todo.id, data: fullUpdateData(todo, { due_time: next.toISOString() }) })
   }, [updateTodo, fullUpdateData])
 
   // Drag-to-reschedule (timeline / grouped views): move the due date to the
   // target day — or clear it when dropping on the no-date group — preserving
-  // the time of day; dates on undated tasks default to 09:00.
+  // the time of day; undated tasks land at end of day (23:59).
   const handleReschedule = useCallback((todo: Todo, target: Date | null) => {
     if (target == null) {
       updateTodo.mutate({ id: todo.id, data: fullUpdateData(todo, { clear_due_time: true }) })
@@ -415,7 +415,7 @@ export default function TodosPage() {
       const src = new Date(todo.due_time)
       next.setHours(src.getHours(), src.getMinutes(), 0, 0)
     } else {
-      next.setHours(9, 0, 0, 0)
+      next.setHours(23, 59, 0, 0)
     }
     updateTodo.mutate({ id: todo.id, data: fullUpdateData(todo, { due_time: next.toISOString() }) })
   }, [updateTodo, fullUpdateData])

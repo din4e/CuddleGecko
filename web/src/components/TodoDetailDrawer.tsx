@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs'
 import { TodoForm } from './TodoForm'
 import TodoSubtaskList from './TodoSubtaskList'
-import { useTodoChildrenMap } from '../hooks/api/useTodos'
+import { TodoComments } from './TodoComments'
+import { TodoHistory } from './TodoHistory'
+import { useTodoChildrenMap, useTodoComments } from '../hooks/api/useTodos'
 import type { Todo, Contact, Tag } from '../types'
 
 interface TodoDetailDrawerProps {
@@ -82,21 +85,33 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
   )
 }
 
-/** Right-side slide-over with the full task detail form — opened by clicking a
- *  card/row anywhere in the todo views. The form remounts per todo id so its
- *  state always matches the todo being viewed. Subtasks (to any depth) render
- *  beneath the form so a subtree is manageable without leaving the drawer. */
+/** Right-side slide-over for viewing/editing a todo — opened by clicking a
+ *  card/row anywhere in the todo views. Three tabs keep the form, the notes
+ *  (comments) and the modification history each one click away instead of
+ *  stacked in a very long scroll. The form remounts per todo id so its state
+ *  always matches the todo being viewed. */
 export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates, onContactsChange, onClose, onToggleSubtask, onDeleteSubtask, onStartPomodoro, onOpenTodo, onCreateChild }: TodoDetailDrawerProps) {
   const { t } = useTranslation()
+  // Comment count for the tab badge — same cached query TodoComments reads.
+  const { data: comments } = useTodoComments(todo?.id ?? null)
+  const commentCount = comments?.length ?? 0
+
   return (
     <Sheet open={open && todo != null} onOpenChange={(o) => { if (!o) onClose() }}>
       <SheetContent>
         <SheetHeader>
           <SheetTitle className="pr-8">{todo?.title ?? t('todos.editTodo')}</SheetTitle>
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto p-4">
-          {todo && (
-            <>
+        {todo && (
+          <Tabs defaultValue="detail" className="min-h-0 flex-1">
+            <TabsList className="mx-4 mt-2 shrink-0">
+              <TabsTrigger value="detail">{t('todos.tabDetail')}</TabsTrigger>
+              <TabsTrigger value="comments">
+                {t('todos.comments')}{commentCount > 0 && ` (${commentCount})`}
+              </TabsTrigger>
+              <TabsTrigger value="history">{t('todos.history')}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="detail" className="min-h-0 overflow-y-auto p-4">
               <TodoForm
                 key={todo.id}
                 editing={todo}
@@ -115,9 +130,15 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
                 onOpenTodo={(sub) => onOpenTodo?.(sub)}
                 onCreateChild={onCreateChild}
               />
-            </>
-          )}
-        </div>
+            </TabsContent>
+            <TabsContent value="comments" className="min-h-0 overflow-y-auto p-4">
+              <TodoComments key={`comments-${todo.id}`} todoId={todo.id} />
+            </TabsContent>
+            <TabsContent value="history" className="min-h-0 overflow-y-auto p-4">
+              <TodoHistory key={`history-${todo.id}`} todoId={todo.id} />
+            </TabsContent>
+          </Tabs>
+        )}
       </SheetContent>
     </Sheet>
   )

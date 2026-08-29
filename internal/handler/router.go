@@ -228,6 +228,13 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.GET("/todos/:id/tags", h.Todo.GetTags)
 			wsProtected.PUT("/todos/:id/tags", h.Todo.ReplaceTags)
 
+			// Per-todo comments (markdown notes) + modification history
+			wsProtected.GET("/todos/:id/comments", h.Todo.ListComments)
+			wsProtected.POST("/todos/:id/comments", h.Todo.CreateComment)
+			wsProtected.PUT("/todos/:id/comments/:commentId", h.Todo.UpdateComment)
+			wsProtected.DELETE("/todos/:id/comments/:commentId", h.Todo.DeleteComment)
+			wsProtected.GET("/todos/:id/activities", h.Todo.ListActivities)
+
 			// Workouts (training plans) + their exercise checklists
 			wsProtected.GET("/workouts", h.Workout.List)
 			wsProtected.GET("/workouts/stats", h.Workout.Stats)
