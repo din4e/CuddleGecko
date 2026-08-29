@@ -30,10 +30,20 @@ vi.mock('../../hooks/api/useTodos', () => ({
   useUpdateTodoItem: () => ({ mutateAsync: vi.fn() }),
   useReorderTodoItem: () => ({ mutateAsync: vi.fn() }),
   usePromoteTodoItem: () => ({ mutateAsync: vi.fn() }),
+  // Drawer notes + history panels: empty by default.
+  useTodoComments: () => ({ data: [], isPending: false }),
+  useCreateTodoComment: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateTodoComment: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteTodoComment: () => ({ mutate: vi.fn(), isPending: false }),
+  useTodoActivities: () => ({ data: [], isPending: false }),
 }))
 
 vi.mock('../../api/contacts', () => ({
   contactsApi: { list: vi.fn() },
+}))
+
+vi.mock('../../stores/auth', () => ({
+  useAuthStore: (sel: (s: { user: { id: number } | null }) => unknown) => sel({ user: { id: 1 } }),
 }))
 
 function todo(over: Partial<Todo> = {}): Todo {

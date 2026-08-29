@@ -80,7 +80,9 @@ func main() {
 	// The realtime hub fans todo mutations out to connected WS clients. Built
 	// before the todo service so it can be wired in as the change notifier.
 	hub := realtime.NewHub()
-	todoSvc := service.NewTodoService(todoRepo, eventRepo, todoRepo, service.WithTodoNotifier(hub))
+	todoActivityRepo := repository.NewTodoActivityRepo(db)
+	todoCommentRepo := repository.NewTodoCommentRepo(db)
+	todoSvc := service.NewTodoService(todoRepo, eventRepo, todoRepo, service.WithTodoNotifier(hub), service.WithTodoHistory(todoActivityRepo, userRepo, todoCommentRepo))
 	workoutSvc := service.NewWorkoutService(workoutRepo, workoutExerciseRepo, bodyMetricRepo)
 	exerciseLibraryRepo := repository.NewExerciseLibraryRepo(db)
 	workoutTemplateRepo := repository.NewWorkoutTemplateRepo(db)

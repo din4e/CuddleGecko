@@ -11,59 +11,66 @@ function atStartOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
+// Day-level due dates default to end of day (23:59), like the form's chips.
+function atEndOfDay(d: Date) {
+  const r = atStartOfDay(d)
+  r.setHours(23, 59, 0, 0)
+  return r
+}
+
 describe('parseQuickAdd — date parsing', () => {
   it('strips "tomorrow" and sets next day', () => {
     const { title, due } = parseQuickAdd('Buy milk tomorrow', NOW)
     expect(title).toBe('Buy milk')
-    expect(due).toEqual(atStartOfDay(new Date(2024, 0, 2)))
+    expect(due).toEqual(atEndOfDay(new Date(2024, 0, 2)))
   })
 
   it('parses "today"', () => {
     const { title, due } = parseQuickAdd('Call mom today', NOW)
     expect(title).toBe('Call mom')
-    expect(due).toEqual(atStartOfDay(NOW))
+    expect(due).toEqual(atEndOfDay(NOW))
   })
 
   it('parses Chinese 明天', () => {
     const { title, due } = parseQuickAdd('买牛奶 明天', NOW)
     expect(title).toBe('买牛奶')
-    expect(due).toEqual(atStartOfDay(new Date(2024, 0, 2)))
+    expect(due).toEqual(atEndOfDay(new Date(2024, 0, 2)))
   })
 
   it('parses Chinese 后天', () => {
     const { due } = parseQuickAdd('汇报 后天', NOW)
-    expect(due).toEqual(atStartOfDay(new Date(2024, 0, 3)))
+    expect(due).toEqual(atEndOfDay(new Date(2024, 0, 3)))
   })
 
   it('parses "next week"', () => {
     const { title, due } = parseQuickAdd('Review plan next week', NOW)
     expect(title).toBe('Review plan')
-    expect(due).toEqual(atStartOfDay(new Date(2024, 0, 8)))
+    expect(due).toEqual(atEndOfDay(new Date(2024, 0, 8)))
   })
 
   it('parses "in 3 days"', () => {
     const { due } = parseQuickAdd('ship feature in 3 days', NOW)
-    expect(due).toEqual(atStartOfDay(new Date(2024, 0, 4)))
+    expect(due).toEqual(atEndOfDay(new Date(2024, 0, 4)))
   })
 
   it('parses "5天后"', () => {
     const { due } = parseQuickAdd('交付 5天后', NOW)
-    expect(due).toEqual(atStartOfDay(new Date(2024, 0, 6)))
+    expect(due).toEqual(atEndOfDay(new Date(2024, 0, 6)))
   })
 
   it('parses English weekday → next occurrence', () => {
     const { due } = parseQuickAdd('standup tuesday', NOW)
-    expect(due).toEqual(atStartOfDay(TUESDAY))
+    expect(due).toEqual(atEndOfDay(TUESDAY))
   })
 
   it('parses Chinese 周三', () => {
     const { due } = parseQuickAdd('开会 周三', NOW)
-    expect(due).toEqual(atStartOfDay(WEDNESDAY))
+    expect(due).toEqual(atEndOfDay(WEDNESDAY))
   })
 
   it('parses Chinese 星期一 (same weekday → next week)', () => {
     const { due } = parseQuickAdd('复盘 星期一', NOW)
-    expect(due).toEqual(atStartOfDay(NEXT_MONDAY))
+    expect(due).toEqual(atEndOfDay(NEXT_MONDAY))
   })
 })
 

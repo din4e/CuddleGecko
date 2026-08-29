@@ -55,6 +55,60 @@ type TodoItem struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+// TodoComment is a markdown note attached to a Todo. Username is denormalized
+// at write time so the comment stays attributable even if the user row changes.
+type TodoComment struct {
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	TodoID    uint           `gorm:"index;not null" json:"todo_id"`
+	UserID    uint           `gorm:"index;not null" json:"user_id"`
+	Username  string         `gorm:"size:50;not null" json:"username"`
+	Content   string         `gorm:"type:longtext;not null" json:"content"`
+	CreatedAt time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// TodoActivity is one immutable audit-log line for a Todo: which user did what,
+// when. Action is a short verb (created/updated/deleted/...); for field edits
+// Field carries the changed column with Old/New values (truncated).
+type TodoActivity struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	TodoID    uint      `gorm:"index;not null" json:"todo_id"`
+	UserID    uint      `gorm:"index;not null" json:"user_id"`
+	Username  string    `gorm:"size:50;not null" json:"username"`
+	Action    string    `gorm:"size:30;not null" json:"action"`
+	Field     string    `gorm:"size:30" json:"field"`
+	OldValue  string    `gorm:"size:500" json:"old_value"`
+	NewValue  string    `gorm:"size:500" json:"new_value"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+// Todo activity action values.
+const (
+	TodoActivityCreated    = "created"
+	TodoActivityUpdated    = "updated"
+	TodoActivityCompleted  = "completed"
+	TodoActivityReopened   = "reopened"
+	TodoActivityPinned     = "pinned"
+	TodoActivityUnpinned   = "unpinned"
+	TodoActivityMoved      = "moved"
+	TodoActivityDeleted    = "deleted"
+	TodoActivityRestored   = "restored"
+	TodoActivityCommented  = "commented"
+	TodoActivityUncomment  = "removed_comment"
+)
+
+// TruncateActivityValue caps a recorded field value so a long description edit
+// doesn't bloat the activity log row.
+func TruncateActivityValue(s string) string {
+	const max = 500
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max])
+}
+
 // TodoListQuery captures the filter, sort and paging options for listing todos.
 // It powers the TickTick-style smart lists (Today / Next 7 days / Overdue),
 // search box, and sort menu.

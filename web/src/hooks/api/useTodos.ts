@@ -3,7 +3,7 @@ import { useMutation, useQueries, useQuery, useQueryClient, useInfiniteQuery } f
 import type { InfiniteData } from '@tanstack/react-query'
 import { todosApi } from '../../api/todos'
 import { rootKey } from './keys'
-import type { Todo, TodoItem, TodoStats, PaginatedData, TodoListParams, TodoStatus, TodoUpdateInput } from '../../types'
+import type { Todo, TodoItem, TodoComment, TodoActivity, TodoStats, PaginatedData, TodoListParams, TodoStatus, TodoUpdateInput } from '../../types'
 
 const scope = 'todos'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
@@ -390,5 +390,58 @@ export function useReplaceTodoTags() {
     mutationFn: ({ todoId, tagIds }: { todoId: number; tagIds: number[] }) =>
       todosApi.replaceTags(todoId, tagIds),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+  })
+}
+
+// --- Comments (markdown notes) + modification history ---
+
+const commentsKey = (todoId: number) => [...allKey(), 'comments', todoId] as const
+
+export function useTodoComments(todoId: number | null) {
+  return useQuery<TodoComment[]>({
+    queryKey: commentsKey(todoId as number),
+    queryFn: ({ signal }) => todosApi.listComments(todoId as number, signal).then((r) => r.data),
+    enabled: todoId != null,
+  })
+}
+
+export function useCreateTodoComment(todoId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (content: string) => todosApi.createComment(todoId, content),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: commentsKey(todoId) })
+      qc.invalidateQueries({ queryKey: [...allKey(), 'activities', todoId] })
+    },
+  })
+}
+
+export function useUpdateTodoComment(todoId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ commentId, content }: { commentId: number; content: string }) =>
+      todosApi.updateComment(todoId, commentId, content),
+    onSuccess: () => qc.invalidateQueries({ queryKey: commentsKey(todoId) }),
+  })
+}
+
+export function useDeleteTodoComment(todoId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (commentId: number) => todosApi.deleteComment(todoId, commentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: commentsKey(todoId) })
+      qc.invalidateQueries({ queryKey: [...allKey(), 'activities', todoId] })
+    },
+  })
+}
+
+const activitiesKey = (todoId: number) => [...allKey(), 'activities', todoId] as const
+
+export function useTodoActivities(todoId: number | null) {
+  return useQuery<TodoActivity[]>({
+    queryKey: activitiesKey(todoId as number),
+    queryFn: ({ signal }) => todosApi.listActivities(todoId as number, signal).then((r) => r.data),
+    enabled: todoId != null,
   })
 }
