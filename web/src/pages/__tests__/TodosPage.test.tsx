@@ -232,6 +232,74 @@ describe('TodosPage', () => {
     await waitFor(() => expect(screen.getByText('Manual done task')).toBeInTheDocument())
   })
 
+  it('hides completed tasks with one click and brings them back', async () => {
+    localStorage.setItem('todoView', 'grouped')
+    localStorage.setItem('todoSmartList', 'all')
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 1, title: 'Active task', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      { id: 2, title: 'Finished task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+    ]))
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Active task')).toBeInTheDocument()
+      expect(screen.getByText('Finished task')).toBeInTheDocument()
+      expect(screen.getByText('已完成 (1)')).toBeInTheDocument()
+    })
+
+    // One click: every completed task disappears (done grid included).
+    await user.click(screen.getByTitle('todos.hideCompleted'))
+    await waitFor(() => {
+      expect(screen.queryByText('Finished task')).not.toBeInTheDocument()
+      expect(screen.queryByText('已完成 (1)')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('Active task')).toBeInTheDocument()
+
+    // One click back: completed tasks show again.
+    await user.click(screen.getByTitle('todos.showCompleted'))
+    await waitFor(() => expect(screen.getByText('Finished task')).toBeInTheDocument())
+  })
+
+  it('surfaces pending children of a hidden completed parent', async () => {
+    // Completing a parent does NOT complete its children server-side, so
+    // hiding the done parent must promote its pending child to a top-level
+    // card instead of burying it (buildTodoTree's orphan rule).
+    localStorage.setItem('todoView', 'grouped')
+    localStorage.setItem('todoSmartList', 'all')
+    const parent = { id: 1, title: 'Done parent', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' } as Todo
+    const child = { id: 2, title: 'Kept child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    mockedList.mockImplementation(async (params?: TodoListParams) =>
+      params?.parent_id === 1
+        ? mockPage<Todo>([child])
+        : mockPage<Todo>([parent, child]),
+    )
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Done parent')).toBeInTheDocument())
+
+    await user.click(screen.getByTitle('todos.hideCompleted'))
+    // The done grid is gone. The parent's title may still appear in the
+    // child's "nested under" card hint — that hint is intentional — so the
+    // grid header is the reliable witness that the done CARD is hidden.
+    await waitFor(() => expect(screen.queryByText('已完成 (1)')).not.toBeInTheDocument())
+    // The pending child stays visible as its own card.
+    expect(screen.getByText('Kept child')).toBeInTheDocument()
+  })
+
+  it('hides the completed toggle on the Completed smart list', async () => {
+    // The dedicated Completed list is all-done — hiding there would blank the
+    // page, so the toggle is neither rendered nor applied.
+    localStorage.setItem('todoView', 'grouped')
+    localStorage.setItem('todoSmartList', 'completed')
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 2, title: 'Done task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+    ]))
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Done task')).toBeInTheDocument())
+    expect(screen.queryByTitle('todos.hideCompleted')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('todos.showCompleted')).not.toBeInTheDocument()
+  })
+
   it('renders todo with amount and priority', async () => {
     mockedList.mockResolvedValue(mockPage<Todo>([
       { id: 3, title: 'Team lunch', status: 'pending', priority: 'high', due_time: '2026-05-22T14:00:00+08:00', amount: 200, amount_type: 'expense', contact_ids: [], color: '#ff0000', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
