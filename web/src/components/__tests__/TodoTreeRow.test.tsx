@@ -8,12 +8,6 @@ import type { TodoNode } from '../../lib/buildTodoTree'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }))
 
-vi.mock('../TodoChecklist', () => ({
-  TodoChecklist: ({ todoId }: { todoId: number }) => (
-    <div data-testid={`checklist-${todoId}`}>checklist</div>
-  ),
-}))
-
 function makeTodo(id: number, overrides: Partial<Todo> = {}): Todo {
   return {
     id, user_id: 1, workspace_id: 1, title: `todo-${id}`, description: '',
@@ -34,7 +28,6 @@ function handlers(overrides: Partial<TodoTreeHandlers> = {}): TodoTreeHandlers {
     onEdit: vi.fn(),
     onDelete: vi.fn(),
     onMove: vi.fn(),
-    onAddChild: vi.fn(),
     formatDate: () => '',
     ...overrides,
   }
@@ -131,14 +124,6 @@ describe('TodoTree', () => {
     expect(onMove).toHaveBeenCalledWith(1, null, 2)
   })
 
-  it('add-child hands the row todo to the create flow when no inline handler is given', async () => {
-    const user = userEvent.setup()
-    const onAddChild = vi.fn()
-    render(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onAddChild })} />)
-    await user.click(screen.getByRole('button', { name: 'todos.addChild' }))
-    expect(onAddChild).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }))
-  })
-
   it('add-child becomes an inline input that creates children on Enter', async () => {
     const user = userEvent.setup()
     const onCreateChild = vi.fn()
@@ -149,14 +134,6 @@ describe('TodoTree', () => {
     expect(onCreateChild).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), '快速子任务')
     // Input stays open with a cleared draft for rapid entry.
     expect(screen.getByPlaceholderText('todos.addSubtaskPlaceholder')).toHaveValue('')
-  })
-
-  it('toggles the inline subtask checklist', async () => {
-    const user = userEvent.setup()
-    render(<TodoTree nodes={[node(makeTodo(1))]} {...handlers()} />)
-    expect(screen.queryByTestId('checklist-1')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'todos.subtasks' }))
-    expect(screen.getByTestId('checklist-1')).toBeInTheDocument()
   })
 
   it('renders a selection checkbox in bulk mode', async () => {

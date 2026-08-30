@@ -9,7 +9,6 @@ import { Textarea } from './ui/textarea'
 import { DialogFooter } from './ui/dialog'
 import { Markdown } from './Markdown'
 import BuddyPicker from './BuddyPicker'
-import { TodoChecklist } from './TodoChecklist'
 import { useCreateTodo, useUpdateTodo, useReplaceTodoTags, useMoveTodo } from '../hooks/api/useTodos'
 import { descendantIds } from '../lib/buildTodoTree'
 import type { Todo, Contact, Tag, TodoStatus, TodoUpdateInput } from '../types'
@@ -39,7 +38,6 @@ export interface TodoFormProps {
   contacts: Contact[]
   tags: Tag[]
   parentCandidates?: Todo[]
-  presetParentId?: number | null
   onContactsChange: (contacts: Contact[]) => void
   onClose: () => void
 }
@@ -47,7 +45,7 @@ export interface TodoFormProps {
 /** Shared todo create/edit fields — hosted by TodoFormDialog (create modal)
  *  and TodoDetailDrawer (right slide-over). State initializes from `editing`
  *  once per mount; both shells remount via a key on the todo id. */
-export function TodoForm({ editing, contacts, tags, parentCandidates, presetParentId, onContactsChange, onClose }: TodoFormProps) {
+export function TodoForm({ editing, contacts, tags, parentCandidates, onContactsChange, onClose }: TodoFormProps) {
   const { t } = useTranslation()
   const createTodo = useCreateTodo()
   const updateTodo = useUpdateTodo()
@@ -67,7 +65,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, presetPare
   const [formRepeat, setFormRepeat] = useState<string>(editing?.repeat ?? '')
   const [formRepeatInterval, setFormRepeatInterval] = useState<number>(editing?.repeat_interval && editing.repeat_interval > 0 ? editing.repeat_interval : 1)
   const [formTagIds, setFormTagIds] = useState<number[]>(editing?.tags?.map((tg) => tg.id) ?? [])
-  const [formParentId, setFormParentId] = useState<number | null>(editing?.parent_id ?? presetParentId ?? null)
+  const [formParentId, setFormParentId] = useState<number | null>(editing?.parent_id ?? null)
   // Description is markdown: the textarea swaps to a rendered preview while the
   // field has content; clearing the text returns to the editor.
   const [descPreview, setDescPreview] = useState(false)
@@ -211,7 +209,6 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, presetPare
             </select>
           </div>
         )}
-        {editing && <TodoChecklist todoId={editing.id} />}
         <div className="space-y-1.5">
           <Label>{t('todos.status')}</Label>
           <div className="flex gap-1">

@@ -5,7 +5,6 @@ import TodoTree from '../TodoTreeRow'
 import { buildTodoTree, type TodoNode } from '../../lib/buildTodoTree'
 import type { Todo } from '../../types'
 
-vi.mock('../TodoChecklist', () => ({ TodoChecklist: () => null }))
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }))
@@ -29,7 +28,6 @@ const handlers = {
   onEdit: vi.fn(),
   onDelete: vi.fn(),
   onMove: vi.fn(),
-  onAddChild: vi.fn(),
   formatDate: () => '',
 }
 

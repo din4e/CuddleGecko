@@ -127,8 +127,6 @@ export default function TodosPage() {
   // Detail drawer (right slide-over): the editing surface for existing todos.
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<Todo | null>(null)
-  // When creating via "add child" in the tree, this presets the new todo's parent.
-  const [presetParent, setPresetParent] = useState<Todo | null>(null)
   const pageSize = 50
   const [confirmDelete, setConfirmDelete] = useState<Todo | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -230,8 +228,7 @@ export default function TodosPage() {
     return m
   }, [todos, childrenMap])
 
-  const openCreate = useCallback(() => { setEditing(null); setPresetParent(null); setDialogOpen(true) }, [])
-  const openCreateChild = useCallback((parent: Todo) => { setEditing(null); setPresetParent(parent); setDialogOpen(true) }, [])
+  const openCreate = useCallback(() => { setEditing(null); setDialogOpen(true) }, [])
   // Inline child quick-add (card subtask area / tree "+"): create directly,
   // no dialog. In the tree view the parent auto-expands so the new child is
   // visible immediately.
@@ -273,7 +270,6 @@ export default function TodosPage() {
 
   const openEdit = useCallback((todo: Todo) => {
     setEditing(todo)
-    setPresetParent(null)
     setDrawerOpen(true)
   }, [])
 
@@ -844,7 +840,6 @@ export default function TodosPage() {
       parentTitle={todo.parent_id ? todoTitleById.get(todo.parent_id) : undefined}
       subtaskProgress={subtaskProgress.get(todo.id)}
       onStartPomodoro={handleStartPomodoro}
-      onAddChild={openCreateChild}
       onPostpone={handlePostpone}
       // Compact (kanban) cards DO get the subtask list, but TodoCard keeps it
       // collapsed behind the progress chip: the board cell stays lean and a
@@ -855,7 +850,6 @@ export default function TodosPage() {
           childrenByParent={childrenByParent}
           onToggle={(sub) => void handleToggle(sub.id)}
           onEdit={openEdit}
-          onAddChild={openCreateChild}
           onCreateChild={handleCreateChild}
           onDelete={setConfirmDelete}
           onStartPomodoro={handleStartPomodoro}
@@ -1169,7 +1163,6 @@ export default function TodosPage() {
               onEdit={openEdit}
               onDelete={setConfirmDelete}
               onMove={handleTreeMove}
-              onAddChild={openCreateChild}
               onCreateChild={handleCreateChild}
               onStartPomodoro={handleStartPomodoro}
               onTogglePin={handleTogglePin}
@@ -1290,15 +1283,13 @@ export default function TodosPage() {
       {dialogOpen && (
         <Suspense fallback={null}>
           <TodoFormDialog
-            key={presetParent?.id ?? 'new'}
             open
             editing={null}
             contacts={contacts}
             tags={tags}
             parentCandidates={todos}
-            presetParentId={presetParent?.id ?? null}
             onContactsChange={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
-            onClose={() => { setDialogOpen(false); setPresetParent(null) }}
+            onClose={() => setDialogOpen(false)}
           />
         </Suspense>
       )}

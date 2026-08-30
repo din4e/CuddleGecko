@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Ban, CheckCircle2, Circle, CornerDownRight, Plus, Timer, Trash2 } from 'lucide-react'
+import { Ban, CheckCircle2, Circle, Plus, Timer, Trash2 } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
+import { AddChildInput } from './AddChildInput'
 import type { Todo } from '../types'
 
 export interface TodoSubtaskListProps {
@@ -11,38 +12,13 @@ export interface TodoSubtaskListProps {
   childrenByParent: Map<number, Todo[]>
   onToggle: (todo: Todo) => void
   onEdit: (todo: Todo) => void
-  onAddChild: (todo: Todo) => void
   /** Inline quick-add: type + Enter creates the child directly (no dialog).
    *  When wired, every row's "+" opens an inline adder for THAT row — at any
-   *  depth; otherwise it falls back to onAddChild (the create dialog). */
+   *  depth; otherwise no add affordance is rendered. */
   onCreateChild?: (parent: Todo, title: string) => void
   /** Delete routes through the page's confirm dialog when provided. */
   onDelete?: (todo: Todo) => void
   onStartPomodoro?: (todo: Todo) => void
-}
-
-/** The inline adder input shared by rows and the section header. */
-function Adder({ placeholder, onCommit, onDismiss }: {
-  placeholder: string
-  onCommit: (v: string) => void
-  onDismiss: () => void
-}) {
-  const [draft, setDraft] = useState('')
-  return (
-    <input
-      autoFocus
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      placeholder={placeholder}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') { e.preventDefault(); onCommit(draft.trim()); setDraft('') }
-        if (e.key === 'Escape') onDismiss()
-      }}
-      onBlur={() => { if (!draft.trim()) onDismiss() }}
-      maxLength={200}
-      className="w-full rounded-sm bg-transparent px-1 py-0.5 text-xs outline-none ring-1 ring-primary"
-    />
-  )
 }
 
 /**
@@ -51,7 +27,7 @@ function Adder({ placeholder, onCommit, onDismiss }: {
  * detail drawer. Every row gets the same feature set regardless of depth:
  * toggle, due label, progress, pomodoro, add-child, delete.
  */
-export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEdit, onAddChild, onCreateChild, onDelete, onStartPomodoro }: TodoSubtaskListProps) {
+export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEdit, onCreateChild, onDelete, onStartPomodoro }: TodoSubtaskListProps) {
   const { t } = useTranslation()
   const children = childrenByParent.get(todo.id)
   // Id of the todo the inline adder targets (the section's own todo for the
@@ -133,16 +109,18 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
                 <Trash2 className="h-3 w-3" />
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 shrink-0 p-0 opacity-0 transition-opacity group-hover/sub:opacity-100"
-              onClick={() => (onCreateChild ? setAddingFor(child.id) : onAddChild(child))}
-              aria-label={t('todos.addChild')}
-              title={t('todos.addChild')}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
+            {onCreateChild && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 shrink-0 p-0 opacity-0 transition-opacity group-hover/sub:opacity-100"
+                onClick={() => setAddingFor(child.id)}
+                aria-label={t('todos.addChild')}
+                title={t('todos.addChild')}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            )}
           </div>
           {/* Recurse: grandchildren render indented under their own parent row,
               with the same controls as any other depth. */}
@@ -152,7 +130,6 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
               childrenByParent={childrenByParent}
               onToggle={onToggle}
               onEdit={onEdit}
-              onAddChild={onAddChild}
               onCreateChild={onCreateChild}
               onDelete={onDelete}
               onStartPomodoro={onStartPomodoro}
@@ -161,20 +138,22 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
           {/* Row-level inline adder: new child of THIS row. */}
           {rowAdder?.id === child.id && (
             <div className="pl-6 py-0.5">
-              <Adder
+              <AddChildInput
                 placeholder={t('todos.addSubtaskPlaceholder')}
-                onCommit={(v) => { if (v) onCreateChild!(child, v) }}
+                onCommit={(v) => onCreateChild!(child, v)}
                 onDismiss={() => setAddingFor(null)}
+                className="text-xs"
               />
             </div>
           )}
         </div>
       ))}
       {showAdder && (addingFor === todo.id ? (
-        <Adder
+        <AddChildInput
           placeholder={t('todos.addSubtaskPlaceholder')}
-          onCommit={(v) => { if (v) onCreateChild!(todo, v) }}
+          onCommit={(v) => onCreateChild!(todo, v)}
           onDismiss={() => setAddingFor(null)}
+          className="text-xs"
         />
       ) : (
         <button
@@ -190,6 +169,3 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
   )
 }
 
-/** Marker icon re-export keeps callers from importing lucide directly for the
- *  "has subtasks" affordance if they need one. */
-export { CornerDownRight }
