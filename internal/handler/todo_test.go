@@ -167,8 +167,8 @@ func (m *mockTodoSvcRepo) Reorder(ctx context.Context, workspaceID, id uint, aft
 	return m.Called(ctx, workspaceID, id, afterID).Error(0)
 }
 
-func (m *mockTodoSvcRepo) Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint) error {
-	return m.Called(ctx, workspaceID, id, parentID, afterID).Error(0)
+func (m *mockTodoSvcRepo) Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint, position string) error {
+	return m.Called(ctx, workspaceID, id, parentID, afterID, position).Error(0)
 }
 
 type mockTodoEventRepo struct {

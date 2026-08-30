@@ -225,8 +225,13 @@ export function useReorderTodo() {
 export function useMoveTodo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, parentId, afterId }: { id: number; parentId: number | null; afterId: number | null }) =>
-      todosApi.move(id, parentId, afterId),
+    mutationFn: ({ id, parentId, afterId, position }: {
+      id: number
+      parentId: number | null
+      afterId: number | null
+      /** Appends at the end of the sibling group when afterId is null. */
+      position?: 'first' | 'last'
+    }) => todosApi.move(id, parentId, afterId, position),
     onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
   })
 }

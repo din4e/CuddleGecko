@@ -180,12 +180,19 @@ export default function TodosPage() {
   // "load more" query; the lazy tree fetches roots only and pulls children per
   // expanded node. Only the active view's query is enabled.
   const flatQuery = useTodosInfinite(listParams, { enabled: view !== 'tree' && smartList !== 'trash' })
-  const rootQuery = useTodosInfinite({ ...listParams, roots_only: true }, { enabled: view === 'tree' && smartList !== 'trash' })
+  // The tree is an outliner — sibling order IS the manual sort_order. Its
+  // queries are pinned to manual/asc: fetching with the toolbar sort (default
+  // due_date) would make every drop snap back to its old slot on refetch.
+  // Sorted browsing belongs to the flat/kanban/timeline views.
+  const rootQuery = useTodosInfinite(
+    { ...listParams, sort: 'manual', order: 'asc', roots_only: true },
+    { enabled: view === 'tree' && smartList !== 'trash' },
+  )
   // Children are fetched WITHOUT the smart-list filters (only sort/order):
   // a parent that matches the filter must show its whole subtree — otherwise
   // a subtask due next week silently vanishes under a "today" parent. The
   // filters keep applying to the roots themselves.
-  const childrenMap = useTodoChildrenMap(view === 'tree' ? [...expanded] : [], { sort, order })
+  const childrenMap = useTodoChildrenMap(view === 'tree' ? [...expanded] : [], { sort: 'manual', order: 'asc' })
   const { data: stats } = useTodoStats()
   const { data: trashTodos } = useTodoTrash(smartList === 'trash')
   const restoreTodo = useRestoreTodo()
@@ -673,10 +680,16 @@ export default function TodosPage() {
   }, [])
 
   // Tree-view reparenting: indent/outdent/up/down all reduce to a single move
-  // call (parent_id + place-after sibling).
-  const handleTreeMove = useCallback(async (id: number, parentId: number | null, afterId: number | null) => {
+  // call (parent_id + place-after sibling). afterId 'last' appends at the end
+  // of the sibling group (the server resolves it — see TodoTreeRow.MoveAfterId).
+  const handleTreeMove = useCallback(async (id: number, parentId: number | null, afterId: number | null | 'last') => {
     try {
-      await moveTodo.mutateAsync({ id, parentId, afterId })
+      await moveTodo.mutateAsync({
+        id,
+        parentId,
+        afterId: afterId === 'last' ? null : afterId,
+        position: afterId === 'last' ? 'last' : undefined,
+      })
     } catch {
       toast.error(t('todos.reorderFailed'))
     }
@@ -688,7 +701,7 @@ export default function TodosPage() {
   // it anyway).
   const handleNest = useCallback((id: number, parentId: number) => {
     if (id === parentId || descendantIds([...todoByIdLoaded.values()], id).has(parentId)) return
-    void handleTreeMove(id, parentId, null)
+    void handleTreeMove(id, parentId, 'last')
   }, [todoByIdLoaded, handleTreeMove])
   const toggleExpand = useCallback((id: number) =>
     setExpanded((prev) => {
@@ -1001,27 +1014,33 @@ export default function TodosPage() {
             <option key={tag.id} value={String(tag.id)}>{tag.name}</option>
           ))}
         </select>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as TodoSort)}
-          className="h-7 rounded-md border bg-background px-1.5 text-xs"
-          aria-label={t('todos.sort')}
-        >
-          <option value="due_date">{t('todos.sortDueDate')}</option>
-          <option value="priority">{t('todos.sortPriority')}</option>
-          <option value="title">{t('todos.sortTitle')}</option>
-          <option value="created">{t('todos.sortCreated')}</option>
-          <option value="manual">{t('todos.sortManual')}</option>
-        </select>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 w-7 p-0"
-          onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
-          title={order === 'asc' ? t('todos.ascending') : t('todos.descending')}
-        >
-          <ArrowDownUp className={`h-3.5 w-3.5 transition-transform ${order === 'desc' ? 'rotate-180' : ''}`} />
-        </Button>
+        {/* Sort controls are meaningless in the tree view — the tree's order
+            is always manual (see the pinned rootQuery/childrenMap sort). */}
+        {view !== 'tree' && (
+          <>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as TodoSort)}
+              className="h-7 rounded-md border bg-background px-1.5 text-xs"
+              aria-label={t('todos.sort')}
+            >
+              <option value="due_date">{t('todos.sortDueDate')}</option>
+              <option value="priority">{t('todos.sortPriority')}</option>
+              <option value="title">{t('todos.sortTitle')}</option>
+              <option value="created">{t('todos.sortCreated')}</option>
+              <option value="manual">{t('todos.sortManual')}</option>
+            </select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+              title={order === 'asc' ? t('todos.ascending') : t('todos.descending')}
+            >
+              <ArrowDownUp className={`h-3.5 w-3.5 transition-transform ${order === 'desc' ? 'rotate-180' : ''}`} />
+            </Button>
+          </>
+        )}
       </div>
 
       {/* Bulk action bar */}

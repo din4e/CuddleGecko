@@ -11,6 +11,12 @@ import { cn } from '@/lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
 import { TodoChecklist } from './TodoChecklist'
 
+/** afterId targets: a sibling id to place after, null for the top of the
+ *  sibling group, or 'last' to append at the end (the backend resolves it, so
+ *  the client doesn't need the current last child id — collapsed or partially
+ *  loaded parents would otherwise nest at the wrong position). */
+export type MoveAfterId = number | null | 'last'
+
 export interface TodoTreeHandlers {
   expanded: Set<number>
   onToggleExpand: (id: number) => void
@@ -18,7 +24,7 @@ export interface TodoTreeHandlers {
   onRename: (id: number, title: string) => void
   onEdit: (todo: Todo) => void
   onDelete: (todo: Todo) => void
-  onMove: (id: number, parentId: number | null, afterId: number | null) => void
+  onMove: (id: number, parentId: number | null, afterId: MoveAfterId) => void
   onAddChild: (todo: Todo) => void
   /** When provided, the row's "+" becomes an inline quick-add (type + Enter
    *  creates the child directly — no dialog). Falls back to onAddChild. */
@@ -102,9 +108,6 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   const canDropHere =
     dragId != null && dragId !== todo.id && !ancestorIds.has(dragId)
   const prevSiblingId = index > 0 ? siblings[index - 1].todo.id : null
-  const lastChildId = node.children.length
-    ? node.children[node.children.length - 1].todo.id
-    : null
 
   const prevSibling = index > 0 ? siblings[index - 1] : null
   const nextSibling = index < siblings.length - 1 ? siblings[index + 1] : null
@@ -194,8 +197,11 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   const commitDrop = () => {
     if (dragId == null || !dropZone) return
     if (dropZone === 'child') {
-      // Append as the LAST child of this row.
-      onMove(dragId, todo.id, lastChildId)
+      // Append as the LAST child of this row — the server resolves "last", so
+      // it holds even when this row's children aren't (fully) loaded. Expand a
+      // collapsed target so the drop's effect is actually visible.
+      if (!isOpen) onToggleExpand(todo.id)
+      onMove(dragId, todo.id, 'last')
     } else if (dropZone === 'before') {
       onMove(dragId, parentId, prevSiblingId)
     } else {

@@ -33,12 +33,20 @@ const handlers = {
   formatDate: () => '',
 }
 
-function renderTree() {
+function renderTree(expanded?: Set<number>) {
   const onDragIdChange = vi.fn()
   function Harness() {
     const [dragId, setDragId] = useState<number | null>(null)
     onDragIdChange.mockImplementation((id: number | null) => setDragId(id))
-    return <TodoTree nodes={nodes} {...handlers} dragId={dragId} onDragIdChange={onDragIdChange} />
+    return (
+      <TodoTree
+        nodes={nodes}
+        {...handlers}
+        expanded={expanded ?? handlers.expanded}
+        dragId={dragId}
+        onDragIdChange={onDragIdChange}
+      />
+    )
   }
   const utils = render(<Harness />)
   return { onDragIdChange, ...utils }
@@ -67,13 +75,28 @@ describe('TodoTree drag & drop reparenting', () => {
     const rootB = screen.getByText('Root B').closest('[tabindex="0"]') as HTMLElement
     const rootA = screen.getByText('Root A').closest('[tabindex="0"]') as HTMLElement
 
-    // Root A has one child (id 2) → dropping "Root B" as child passes afterId=2.
+    // The row delegates "last child" to the server (afterId='last'), so the
+    // position holds even for collapsed/partially loaded parents.
     fireEvent.dragStart(rootB, { dataTransfer: { setData: vi.fn(), effectAllowed: 'move' } })
     expect(onDragIdChange).toHaveBeenCalledWith(4)
     fireDrag(rootA, 'dragover', zoneOf(rootA, 0.5))
     fireDrag(rootA, 'drop', zoneOf(rootA, 0.5))
 
-    expect(handlers.onMove).toHaveBeenCalledWith(4, 1, 2)
+    expect(handlers.onMove).toHaveBeenCalledWith(4, 1, 'last')
+  })
+
+  it('middle drop on a collapsed row appends last and expands it so the drop is visible', () => {
+    // Only Root A expanded: Child A1 is visible but its own child is not.
+    renderTree(new Set([1]))
+    const rootB = screen.getByText('Root B').closest('[tabindex="0"]') as HTMLElement
+    const childA1 = screen.getByText('Child A1').closest('[tabindex="0"]') as HTMLElement
+
+    fireEvent.dragStart(rootB, { dataTransfer: { setData: vi.fn(), effectAllowed: 'move' } })
+    fireDrag(childA1, 'dragover', zoneOf(childA1, 0.5))
+    fireDrag(childA1, 'drop', zoneOf(childA1, 0.5))
+
+    expect(handlers.onMove).toHaveBeenCalledWith(4, 2, 'last')
+    expect(handlers.onToggleExpand).toHaveBeenCalledWith(2)
   })
 
   it('drop near the top edge inserts as previous sibling', () => {

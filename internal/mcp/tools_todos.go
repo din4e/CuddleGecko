@@ -282,6 +282,7 @@ func (s *MCPServer) registerTodoTools() {
 			"id":        map[string]interface{}{"type": "integer", "description": "Todo ID to move"},
 			"parent_id": map[string]interface{}{"type": "integer", "description": "New parent todo ID (omit or 0 for root/top level)"},
 			"after_id":  map[string]interface{}{"type": "integer", "description": "Sibling todo ID to place it after (omit for top of its sibling group)"},
+			"position":  map[string]interface{}{"type": "string", "enum": []string{"first", "last"}, "description": "Position among siblings when after_id is omitted: 'last' appends at the end, 'first' (default) at the top"},
 		},
 		"required": []string{"id"},
 	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
@@ -297,7 +298,7 @@ func (s *MCPServer) registerTodoTools() {
 			u := toUint(v)
 			afterID = &u
 		}
-		if err := s.todoSvc.Move(ctx, userID, workspaceID, id, parentID, afterID); err != nil {
+		if err := s.todoSvc.Move(ctx, userID, workspaceID, id, parentID, afterID, toString(getArg(args, "position"))); err != nil {
 			return nil, err
 		}
 		return map[string]interface{}{"success": true, "message": "todo moved"}, nil

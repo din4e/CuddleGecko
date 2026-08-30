@@ -202,8 +202,9 @@ func (h *TodoHandler) Reorder(c *gin.Context) {
 }
 
 type moveTodoRequest struct {
-	ParentID *uint `json:"parent_id"`
-	AfterID  *uint `json:"after_id"`
+	ParentID *uint   `json:"parent_id"`
+	AfterID  *uint   `json:"after_id"`
+	Position *string `json:"position"` // "first" (default) | "last"; ignored when after_id is set
 }
 
 // Move reparents a todo (parent_id; nil/omitted = root) and reorders it among
@@ -221,12 +222,17 @@ func (h *TodoHandler) Move(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
+	position := ""
+	if req.Position != nil {
+		position = *req.Position
+	}
 
-	if err := h.svc.Move(c.Request.Context(), userID, workspaceID, id, req.ParentID, req.AfterID); err != nil {
+	if err := h.svc.Move(c.Request.Context(), userID, workspaceID, id, req.ParentID, req.AfterID, position); err != nil {
 		switch {
 		case errors.Is(err, service.ErrTodoNotFound):
 			response.NotFound(c, "todo not found")
-		case errors.Is(err, repository.ErrTodoCycle),
+		case errors.Is(err, service.ErrInvalidTodo),
+			errors.Is(err, repository.ErrTodoCycle),
 			errors.Is(err, repository.ErrTodoSelfParent),
 			errors.Is(err, repository.ErrTodoInvalidParent):
 			response.BadRequest(c, err.Error())

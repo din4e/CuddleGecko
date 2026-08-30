@@ -43,8 +43,8 @@ export const todosApi = {
   reorder: (id: number, afterId: number | null) =>
     request.patch<void>(`/todos/${id}/reorder`, { after_id: afterId }).then(() => {}),
 
-  move: (id: number, parentId: number | null, afterId: number | null) =>
-    request.patch<void>(`/todos/${id}/move`, { parent_id: parentId, after_id: afterId }).then(() => {}),
+  move: (id: number, parentId: number | null, afterId: number | null, position?: 'first' | 'last') =>
+    request.patch<void>(`/todos/${id}/move`, { parent_id: parentId, after_id: afterId, position }).then(() => {}),
 
   togglePin: (id: number) =>
     request.patch<Todo>(`/todos/${id}/pin`).then((data) => ({ data })),
