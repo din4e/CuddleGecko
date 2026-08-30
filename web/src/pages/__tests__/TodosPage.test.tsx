@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -449,5 +449,71 @@ describe('TodosPage', () => {
         expect.any(AbortSignal),
       )
     })
+  })
+
+  it('renders a parent subtasks on the Today list via unfiltered children queries', async () => {
+    // Regression: flat views used to build subtask sections from the FILTERED
+    // list — an undated subtask under a "today" parent never matched, so the
+    // section rendered empty. Like the tree/drawer, children must come from
+    // per-parent queries without the smart-list filters.
+    localStorage.setItem('todoView', 'grouped')
+    const parent = { id: 1, title: 'Dated parent', status: 'pending', priority: 'normal', due_time: '2026-05-20T10:00:00+08:00', amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const child = { id: 2, title: 'Undated child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    mockedList.mockImplementation(async (params?: TodoListParams) =>
+      params?.parent_id === 1
+        ? mockPage<Todo>([child])
+        : mockPage<Todo>([parent]),
+    )
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Dated parent')).toBeInTheDocument())
+    // The undated child does not match the today filter but still renders in
+    // the parent's subtask section.
+    await waitFor(() => expect(screen.getByText('Undated child')).toBeInTheDocument())
+
+    // The children query carries ONLY sort/order + parent_id — no smart-list
+    // filters — so every subtask shows under its parent.
+    const childCall = mockedList.mock.calls.find(([p]) => p?.parent_id === 1)
+    expect(childCall).toBeDefined()
+    expect(childCall?.[0]).not.toHaveProperty('status')
+    expect(childCall?.[0]).not.toHaveProperty('due_before')
+  })
+
+  it('shows a subtask added inline on the Today list right after creating it', async () => {
+    // Regression for the reported bug: adding a subtask on a filtered smart
+    // list looked broken — the child was created server-side but never
+    // appeared, because the refetched list filtered it out.
+    localStorage.setItem('todoView', 'grouped')
+    const parent = { id: 1, title: 'Today parent', status: 'pending', priority: 'normal', due_time: '2026-05-20T10:00:00+08:00', amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    // Server-side state the create mutation grows, mirrored into both mock
+    // branches (children slice + the parent's child_count).
+    let children: Todo[] = []
+    mockedList.mockImplementation(async (params?: TodoListParams) =>
+      params?.parent_id === 1
+        ? mockPage<Todo>(children)
+        : mockPage<Todo>([{ ...parent, child_count: children.length }]),
+    )
+    mockedCreate.mockImplementation(async () => {
+      children = [{ id: 2, title: 'Fresh subtask', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo]
+      return { data: children[0] }
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Today parent')).toBeInTheDocument())
+
+    // Open the subtask section's trailing adder. It shares its accessible
+    // name with the icon-only toolbar button, so tell them apart by content.
+    const adderButtons = screen.getAllByRole('button', { name: 'todos.addChild' })
+    const trailingAdder = adderButtons.find((b) => b.textContent === 'todos.addChild')
+    expect(trailingAdder).toBeDefined()
+    await user.click(trailingAdder!)
+    const input = screen.getByPlaceholderText('todos.addSubtaskPlaceholder')
+    fireEvent.change(input, { target: { value: 'Fresh subtask' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    // handleCreateChild awaits the mutation, so the call lands a tick later.
+    await waitFor(() => {
+      expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ title: 'Fresh subtask', parent_id: 1 }))
+    })
+    await waitFor(() => expect(screen.getByText('Fresh subtask')).toBeInTheDocument())
   })
 })
