@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../components/ui/dialog'
-import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical, Eye, EyeOff } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -142,6 +142,9 @@ export default function TodosPage() {
   })
   const [expandingAll, setExpandingAll] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  // One-click "hide completed": keeps the working list lean. Persisted so the
+  // choice survives reloads, like the view/smart-list choices above.
+  const [hideCompleted, setHideCompleted] = useState(() => localStorage.getItem('todoHideCompleted') === '1')
 
   // Debounce the search box so typing doesn't fire a request per keystroke.
   // Filter changes swap the query key, which resets pagination to page 1.
@@ -160,6 +163,9 @@ export default function TodosPage() {
   useEffect(() => {
     localStorage.setItem('todoTreeExpanded', JSON.stringify([...expanded]))
   }, [expanded])
+  useEffect(() => {
+    localStorage.setItem('todoHideCompleted', hideCompleted ? '1' : '0')
+  }, [hideCompleted])
   // One-time cleanup of the pre-lazy-tree collapse-state key.
   useEffect(() => {
     localStorage.removeItem('todoTreeCollapsed')
@@ -218,6 +224,20 @@ export default function TodosPage() {
   const total = (view === 'tree' ? rootQuery.data : flatQuery.data)?.pages[0]?.total ?? 0
   const loading = view === 'tree' ? rootQuery.isPending : flatQuery.isPending
 
+  // One-click visibility filter. Meaningless on the dedicated Completed list
+  // (everything there is done — hiding would blank the page) and on trash, so
+  // the toggle is neither rendered nor applied there.
+  const hideDoneApplicable = smartList !== 'completed' && smartList !== 'trash'
+  const hideDone = hideCompleted && hideDoneApplicable
+  // The display set every view renders from. Children of a hidden done parent
+  // surface as top-level cards (presentIds/isTopLevel below are computed over
+  // this set, mirroring buildTodoTree's orphan rule) so pending work never
+  // disappears with its completed parent.
+  const displayTodos = useMemo(
+    () => (hideDone ? todos.filter((t) => t.status !== 'done') : todos),
+    [todos, hideDone],
+  )
+
   // Every loaded todo: in the tree view `todos` holds only roots — children
   // live in the per-parent slices. Lookups that must reach them (rename, the
   // parent-title hint, the nest cycle guard) go through this map instead.
@@ -261,6 +281,8 @@ export default function TodosPage() {
         case '2': setView('grouped'); break
         case '3': setView('kanban'); break
         case '4': setView('tree'); break
+        case 'h': case 'H':
+          setHideCompleted((v) => !v); break
         case '?': setShortcutsOpen(true); break
       }
     }
@@ -594,7 +616,7 @@ export default function TodosPage() {
   // Flat-view nesting: children render inside their parent's card, so the
   // flat lists keep only top-level todos (parent absent from the current list
   // → the child surfaces at top level, same rule as buildTodoTree).
-  const presentIds = useMemo(() => new Set(todos.map((t) => t.id)), [todos])
+  const presentIds = useMemo(() => new Set(displayTodos.map((t) => t.id)), [displayTodos])
   const isTopLevel = useCallback(
     (t: Todo) => t.parent_id == null || !presentIds.has(t.parent_id),
     [presentIds],
@@ -607,8 +629,8 @@ export default function TodosPage() {
   // being added. Hence the same unfiltered per-parent children slices the
   // tree uses, one per displayed parent that has children.
   const flatChildParents = useMemo(
-    () => todos.filter((t) => isTopLevel(t) && (t.child_count ?? 0) > 0).map((t) => t.id),
-    [todos, isTopLevel],
+    () => displayTodos.filter((t) => isTopLevel(t) && (t.child_count ?? 0) > 0).map((t) => t.id),
+    [displayTodos, isTopLevel],
   )
   // Grandchildren cascade: any loaded child with children of its own joins
   // the id set so every depth renders (same accumulation as the drawer).
@@ -647,9 +669,9 @@ export default function TodosPage() {
     return m
   }, [todos, childrenByParent])
 
-  const pendingTodos = todos.filter((t) => t.status === 'pending' && isTopLevel(t))
-  const doneTodos = todos.filter((t) => t.status === 'done' && isTopLevel(t))
-  const abandonedTodos = todos.filter((t) => t.status === 'abandoned' && isTopLevel(t))
+  const pendingTodos = displayTodos.filter((t) => t.status === 'pending' && isTopLevel(t))
+  const doneTodos = displayTodos.filter((t) => t.status === 'done' && isTopLevel(t))
+  const abandonedTodos = displayTodos.filter((t) => t.status === 'abandoned' && isTopLevel(t))
 
   // Manual reordering (only meaningful when sort === 'manual'). Positions are
   // expressed as "move to right after afterId" (or to the top when null),
@@ -708,7 +730,7 @@ export default function TodosPage() {
     })
   , [])
 
-  const todoTree = useMemo(() => buildLazyTree(todos, childrenMap), [todos, childrenMap])
+  const todoTree = useMemo(() => buildLazyTree(displayTodos, childrenMap), [displayTodos, childrenMap])
 
   // Iterative "expand all" for the lazy tree: expand every loaded node the
   // server says has children; as children slices arrive the effect re-runs and
@@ -800,7 +822,7 @@ export default function TodosPage() {
   // to that day (the trailing no-date group clears the due time).
   const timelineGroups = useMemo(() => {
     const map = new Map<string, { label: string; target: Date | null; items: Todo[] }>()
-    for (const todo of todos) {
+    for (const todo of displayTodos) {
       if (!isTopLevel(todo)) continue
       const d = todo.due_time ? new Date(todo.due_time) : null
       const key = d ? d.toDateString() : 'none'
@@ -810,7 +832,7 @@ export default function TodosPage() {
       map.get(key)!.items.push(todo)
     }
     return Array.from(map.entries()).map(([key, g]) => ({ key, ...g }))
-  }, [todos, isTopLevel, t])
+  }, [displayTodos, isTopLevel, t])
 
   const viewButtons: { key: TodoView; icon: typeof ListChecks; label: string }[] = [
     { key: 'timeline', icon: AlignJustify, label: t('todos.viewTimeline') },
@@ -1035,6 +1057,20 @@ export default function TodosPage() {
             </Button>
           </>
         )}
+        {/* One-click hide/show completed — applies to every view; hidden on the
+           Completed list and trash where it has nothing to act on. */}
+        {hideDoneApplicable && (
+          <Button
+            variant={hideDone ? 'secondary' : 'outline'}
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => setHideCompleted((v) => !v)}
+            title={hideDone ? t('todos.showCompleted') : t('todos.hideCompleted')}
+            aria-label={hideDone ? t('todos.showCompleted') : t('todos.hideCompleted')}
+          >
+            {hideDone ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+          </Button>
+        )}
       </div>
 
       {/* Bulk action bar */}
@@ -1075,7 +1111,7 @@ export default function TodosPage() {
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      ) : todos.length === 0 ? (
+      ) : displayTodos.length === 0 ? (
         <EmptyState message={t('todos.noTodos')} />
       ) : sort === 'manual' && view !== 'kanban' && view !== 'tree' ? (
         /* Manual-order flat list: drag to reorder (the up/down buttons remain
@@ -1247,7 +1283,7 @@ export default function TodosPage() {
            predicate, in-column drag persists sort_order. */
         <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
           <KanbanBoard
-            todos={todos}
+            todos={displayTodos}
             columns={kanbanColumns}
             tags={tags}
             addColumn={addColumn}
@@ -1343,6 +1379,7 @@ export default function TodosPage() {
               ['2', t('todos.viewGrouped')],
               ['3', t('todos.viewKanban')],
               ['4', t('todos.viewTree')],
+              ['H', t('todos.toggleCompleted')],
               ['?', t('todos.shortcutsHelp')],
             ] as const).map(([key, label]) => (
               <li key={key} className="flex items-center justify-between">
