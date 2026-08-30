@@ -1,9 +1,10 @@
 # CI for the CuddleGecko web backend (Gin/GORM) + React frontend.
 #
-# Runs on every push to main/dev and every PR: Go build/vet/test, a
-# govulncheck audit (catches reachable dependency CVEs before they land —
-# two were found and patched manually in Aug 2026), the frontend type-check,
-# eslint, and vitest.
+# DISABLED for automatic runs (2026-08-30, owner request) — manual dispatch
+# only. To re-enable, restore the push/pull_request triggers below.
+# Full suite when run manually: Go build/vet/test, a govulncheck audit
+# (catches reachable dependency CVEs before they land — two were found and
+# patched manually in Aug 2026), the frontend type-check, eslint, and vitest.
 #
 # NOTE: the frontend type-check uses `tsc -p tsconfig.app.json --noEmit`;
 # a bare `tsc --noEmit` at the repo root is a NO-OP (empty files + project
@@ -12,9 +13,7 @@
 name: ci
 
 on:
-  push:
-    branches: [main, dev]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
