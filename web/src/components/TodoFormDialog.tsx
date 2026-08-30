@@ -9,14 +9,13 @@ interface TodoFormDialogProps {
   contacts: Contact[]
   tags: Tag[]
   parentCandidates?: Todo[]
-  presetParentId?: number | null
   onContactsChange: (contacts: Contact[]) => void
   onClose: () => void
 }
 
 /** Create-only modal shell around the shared TodoForm — editing lives in the
  *  TodoDetailDrawer slide-over. */
-export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates, presetParentId, onContactsChange, onClose }: TodoFormDialogProps) {
+export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates, onContactsChange, onClose }: TodoFormDialogProps) {
   const { t } = useTranslation()
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -29,7 +28,6 @@ export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates
           contacts={contacts}
           tags={tags}
           parentCandidates={parentCandidates}
-          presetParentId={presetParentId}
           onContactsChange={onContactsChange}
           onClose={onClose}
         />

@@ -29,7 +29,7 @@ describe('TodoSubtaskList', () => {
   it('renders nothing for a todo without children', () => {
     const { container } = render(
       <TodoSubtaskList todo={parent} childrenByParent={new Map()}
-        onToggle={vi.fn()} onEdit={vi.fn()} onAddChild={vi.fn()} />,
+        onToggle={vi.fn()} onEdit={vi.fn()} />,
     )
     expect(container).toBeEmptyDOMElement()
   })
@@ -37,7 +37,7 @@ describe('TodoSubtaskList', () => {
   it('renders children and nested grandchildren (arbitrary depth)', () => {
     render(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
-        onToggle={vi.fn()} onEdit={vi.fn()} onAddChild={vi.fn()} />,
+        onToggle={vi.fn()} onEdit={vi.fn()} />,
     )
     expect(screen.getByText('Child')).toBeInTheDocument()
     expect(screen.getByText('Grandchild')).toBeInTheDocument()
@@ -48,7 +48,7 @@ describe('TodoSubtaskList', () => {
     const onEdit = vi.fn()
     render(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
-        onToggle={onToggle} onEdit={onEdit} onAddChild={vi.fn()} />,
+        onToggle={onToggle} onEdit={onEdit} />,
     )
     fireEvent.click(screen.getByText('Child'))
     expect(onEdit).toHaveBeenCalledWith(child)
@@ -60,7 +60,7 @@ describe('TodoSubtaskList', () => {
     const onCreateChild = vi.fn()
     render(
       <TodoSubtaskList todo={parent} childrenByParent={new Map()}
-        onToggle={vi.fn()} onEdit={vi.fn()} onAddChild={vi.fn()}
+        onToggle={vi.fn()} onEdit={vi.fn()}
         onCreateChild={onCreateChild} />,
     )
     fireEvent.click(screen.getByText('todos.addChild'))
@@ -75,7 +75,7 @@ describe('TodoSubtaskList', () => {
   it('offers an inline adder at every depth', () => {
     render(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
-        onToggle={vi.fn()} onEdit={vi.fn()} onAddChild={vi.fn()}
+        onToggle={vi.fn()} onEdit={vi.fn()}
         onCreateChild={vi.fn()} />,
     )
     // One trailing adder entry per level (top + nested list) plus per-row "+"
@@ -87,7 +87,7 @@ describe('TodoSubtaskList', () => {
     const onCreateChild = vi.fn()
     render(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
-        onToggle={vi.fn()} onEdit={vi.fn()} onAddChild={vi.fn()}
+        onToggle={vi.fn()} onEdit={vi.fn()}
         onCreateChild={onCreateChild} />,
     )
     // The first adder entry in the DOM belongs to the deepest level — the
@@ -104,7 +104,7 @@ describe('TodoSubtaskList', () => {
     const dated = { ...child, due_time: '2999-01-01T10:00:00Z' }
     render(
       <TodoSubtaskList todo={parent} childrenByParent={new Map([[1, [dated]]])}
-        onToggle={vi.fn()} onEdit={vi.fn()} onAddChild={vi.fn()} onDelete={onDelete} />,
+        onToggle={vi.fn()} onEdit={vi.fn()} onDelete={onDelete} />,
     )
     fireEvent.click(screen.getAllByLabelText('common.delete')[0])
     expect(onDelete).toHaveBeenCalledWith(dated)

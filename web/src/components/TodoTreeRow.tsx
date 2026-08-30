@@ -2,14 +2,14 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, ArrowRight, Ban, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
-  Circle, ListTodo, ListTree, Loader2, Pencil, Plus, Star, Timer, Trash2,
+  Circle, ListTree, Loader2, Pencil, Plus, Star, Timer, Trash2,
 } from 'lucide-react'
 import type { Todo } from '../types'
 import type { TodoNode } from '../lib/buildTodoTree'
 import { subtreeProgressFromNode } from '../lib/todoProgress'
 import { cn } from '@/lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
-import { TodoChecklist } from './TodoChecklist'
+import { AddChildInput } from './AddChildInput'
 
 /** afterId targets: a sibling id to place after, null for the top of the
  *  sibling group, or 'last' to append at the end (the backend resolves it, so
@@ -25,9 +25,8 @@ export interface TodoTreeHandlers {
   onEdit: (todo: Todo) => void
   onDelete: (todo: Todo) => void
   onMove: (id: number, parentId: number | null, afterId: MoveAfterId) => void
-  onAddChild: (todo: Todo) => void
-  /** When provided, the row's "+" becomes an inline quick-add (type + Enter
-   *  creates the child directly — no dialog). Falls back to onAddChild. */
+  /** Inline quick-add: the row's "+" reveals a shared input (type + Enter
+   *  creates the child directly). Not wired → no "+" is rendered. */
   onCreateChild?: (todo: Todo, title: string) => void
   onStartPomodoro?: (todo: Todo) => void
   onTogglePin?: (todo: Todo) => void
@@ -92,7 +91,7 @@ export default function TodoTree({
 const TreeRow = memo(function TreeRow(props: RowProps) {
   const { node, siblings, index, parentId, grandparentId, depth, ancestorIds } = props
   const {
-    expanded, onToggleExpand, onToggle, onRename, onEdit, onDelete, onMove, onAddChild, onCreateChild, formatDate,
+    expanded, onToggleExpand, onToggle, onRename, onEdit, onDelete, onMove, onCreateChild, formatDate,
     selectable, selectedIds, onSelectToggle, onStartPomodoro, onTogglePin,
     dragId, onDragIdChange, onLoadChildren,
   } = props
@@ -119,7 +118,6 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(todo.title)
-  const [showItems, setShowItems] = useState(false)
   // Single click on the title opens the detail drawer; double-click renames.
   // The delayed click lets a second click cancel it before the drawer opens.
   const titleClickTimer = useRef<number | null>(null)
@@ -136,25 +134,10 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
     setDraft(todo.title)
     setEditing(true)
   }
-  // Inline child quick-add (TickTick-style): "+" reveals an input under the
-  // row; Enter creates the child and keeps the input open for the next one.
+  // Inline child quick-add (TickTick-style): "+" reveals the shared input
+  // under the row; Enter creates the child and the input stays open for the
+  // next one.
   const [addingChild, setAddingChild] = useState(false)
-  const [childDraft, setChildDraft] = useState('')
-  const commitChild = () => {
-    const v = childDraft.trim()
-    if (v && onCreateChild) {
-      onCreateChild(todo, v)
-      setChildDraft('')
-    }
-  }
-  const toggleAddChild = () => {
-    if (onCreateChild) {
-      setChildDraft('')
-      setAddingChild((v) => !v)
-    } else {
-      onAddChild(todo)
-    }
-  }
   const commit = () => {
     const v = draft.trim()
     if (v && v !== todo.title) onRename(todo.id, v)
@@ -336,20 +319,6 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             {formatDueLabel(todo.due_time, new Date(), t)}
           </span>
         )}
-        <button
-          type="button"
-          onClick={() => setShowItems((v) => !v)}
-          aria-label={t('todos.subtasks')}
-          aria-expanded={showItems}
-          title={t('todos.subtasks')}
-          className={cn(
-            'flex items-center gap-0.5 rounded px-1 text-[10px] hover:bg-accent',
-            showItems ? 'text-primary' : 'text-muted-foreground',
-          )}
-        >
-          <ListTodo className="h-3 w-3" />
-          {!!todo.item_total && <span>{todo.item_done}/{todo.item_total}</span>}
-        </button>
         {subProgress.total > 0 && (
           <span
             className={cn(
@@ -386,9 +355,11 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
               <Star className={cn('h-3.5 w-3.5', todo.pinned && 'fill-current')} />
             </RowBtn>
           )}
-          <RowBtn onClick={toggleAddChild} title={t('todos.addChild')}>
-            <Plus className="h-3.5 w-3.5" />
-          </RowBtn>
+          {onCreateChild && (
+            <RowBtn onClick={() => setAddingChild((v) => !v)} title={t('todos.addChild')}>
+              <Plus className="h-3.5 w-3.5" />
+            </RowBtn>
+          )}
           <RowBtn disabled={!canOutdent} onClick={() => onMove(todo.id, grandparentId, parentId)} title={t('todos.outdent')}>
             <ArrowLeft className="h-3.5 w-3.5" />
           </RowBtn>
@@ -416,25 +387,12 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
 
       {addingChild && (
         <div style={{ paddingLeft: depth * 18 + 24 }} className="py-0.5">
-          <input
-            autoFocus
-            value={childDraft}
-            onChange={(e) => setChildDraft(e.target.value)}
+          <AddChildInput
             placeholder={t('todos.addSubtaskPlaceholder')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); commitChild() }
-              if (e.key === 'Escape') { setAddingChild(false); setChildDraft('') }
-            }}
-            onBlur={() => { if (!childDraft.trim()) setAddingChild(false) }}
-            maxLength={200}
-            className="w-full min-w-0 rounded-sm bg-transparent px-1 py-0.5 text-sm outline-none ring-1 ring-primary"
+            onCommit={(v) => onCreateChild!(todo, v)}
+            onDismiss={() => setAddingChild(false)}
+            className="text-sm"
           />
-        </div>
-      )}
-
-      {showItems && (
-        <div style={{ paddingLeft: depth * 18 + 24 }} className="py-1">
-          <TodoChecklist todoId={todo.id} />
         </div>
       )}
 
@@ -478,7 +436,6 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             onEdit={onEdit}
             onDelete={onDelete}
             onMove={onMove}
-            onAddChild={onAddChild}
             onCreateChild={onCreateChild}
             onStartPomodoro={onStartPomodoro}
             onTogglePin={onTogglePin}

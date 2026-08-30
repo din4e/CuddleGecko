@@ -20,13 +20,6 @@ vi.mock('../../hooks/api/useTodos', () => ({
   useUpdateTodo: () => ({ mutateAsync: mocks.updateTodo, isPending: false }),
   useReplaceTodoTags: () => ({ mutateAsync: mocks.replaceTags }),
   useMoveTodo: () => ({ mutateAsync: mocks.moveTodo, isPending: false }),
-  useTodoItems: () => ({ data: [] }),
-  useCreateTodoItem: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useToggleTodoItem: () => ({ mutateAsync: vi.fn() }),
-  useDeleteTodoItem: () => ({ mutateAsync: vi.fn() }),
-  useUpdateTodoItem: () => ({ mutateAsync: vi.fn() }),
-  useReorderTodoItem: () => ({ mutateAsync: vi.fn() }),
-  usePromoteTodoItem: () => ({ mutateAsync: vi.fn() }),
 }))
 
 vi.mock('../../api/contacts', () => ({
@@ -86,29 +79,6 @@ describe('TodoFormDialog', () => {
     const titleInput = document.querySelector('input') as HTMLInputElement
     expect(titleInput).not.toBeNull()
     expect(titleInput.value).toBe('')
-  })
-
-  it('create with a preset parent includes parent_id in the payload', async () => {
-    const user = userEvent.setup()
-    render(
-      <TodoFormDialog
-        open
-        editing={null}
-        contacts={[]}
-        tags={[]}
-        parentCandidates={[todo({ id: 5, title: 'Parent' })]}
-        presetParentId={5}
-        onContactsChange={vi.fn()}
-        onClose={vi.fn()}
-      />,
-    )
-    const titleInput = document.querySelector('input') as HTMLInputElement
-    await user.type(titleInput, 'child')
-    await user.click(screen.getByText('common.create'))
-
-    expect(mocks.createTodo).toHaveBeenCalledTimes(1)
-    const payload = mocks.createTodo.mock.calls[0][0] as Partial<Todo>
-    expect(payload.parent_id).toBe(5)
   })
 
   it('edit without changing parent does not call move', async () => {

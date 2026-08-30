@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Ban, CheckCircle2, ChevronDown, Circle, Clock, CalendarClock, ListTodo, ListTree, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer } from 'lucide-react'
+import { Ban, CheckCircle2, ChevronDown, Circle, Clock, CalendarClock, ListTodo, ListTree, Plus, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
@@ -37,7 +37,6 @@ export interface TodoCardProps {
   formatDate: (dateStr: string | null) => string
   parentTitle?: string
   onStartPomodoro?: (todo: Todo) => void
-  onAddChild?: (todo: Todo) => void
   /** One-click "postpone to tomorrow" (TickTick's signature reschedule). */
   onPostpone?: (todo: Todo) => void
   /** Nested subtask renderer (flat views); rendered inside the card body.
@@ -67,7 +66,6 @@ const TodoCard = memo(function TodoCard({
   formatDate,
   parentTitle,
   onStartPomodoro,
-  onAddChild,
   onPostpone,
   subtasks,
   subtaskProgress,
@@ -283,6 +281,18 @@ const TodoCard = memo(function TodoCard({
             <ChevronDown className={cn('h-3 w-3 transition-transform', subtasksOpen && 'rotate-180')} />
           </button>
         )}
+        {/* Kanban cards with no subtasks yet still need the one add-subtask
+            entry (the progress chip only exists once children do). */}
+        {compact && subtasks && !subtasksOpen && (
+          <button
+            type="button"
+            onClick={() => setSubtasksOpen(true)}
+            className="mt-1 flex w-fit items-center gap-1 rounded px-0.5 text-[10px] text-muted-foreground/80 hover:bg-muted/60 hover:text-foreground"
+          >
+            <Plus className="h-3 w-3" />
+            {t('todos.addChild')}
+          </button>
+        )}
       </CardContent>
       {subtasks && (!compact || subtasksOpen) && subtasks}
 
@@ -310,11 +320,6 @@ const TodoCard = memo(function TodoCard({
             title={abandonTitle}
           >
             <Ban className={`h-3 w-3 ${todo.status === 'abandoned' ? 'text-destructive' : 'text-muted-foreground'}`} />
-          </Button>
-        )}
-        {onAddChild && (
-          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onAddChild(todo)} aria-label={t('todos.addChild')} title={t('todos.addChild')}>
-            <CornerDownRight className="h-3 w-3" />
           </Button>
         )}
         <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onTogglePin(todo)} aria-label={t('todos.pinAria')} title={t('todos.pinAria')}>
