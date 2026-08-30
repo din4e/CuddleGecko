@@ -18,6 +18,13 @@ var (
 	ErrTodoInvalidParent = errors.New("parent todo not found in this workspace")
 )
 
+// Sibling positions for Move when after_id is absent: land at the top of the
+// sibling group (default) or append at the end.
+const (
+	TodoMoveFirst = "first"
+	TodoMoveLast  = "last"
+)
+
 type TodoRepository interface {
 	Create(ctx context.Context, todo *model.Todo) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Todo, error)
@@ -28,7 +35,7 @@ type TodoRepository interface {
 	GetTags(ctx context.Context, todoID uint) ([]model.Tag, error)
 	Stats(ctx context.Context, workspaceID uint) (model.TodoStats, error)
 	Reorder(ctx context.Context, workspaceID, id uint, afterID *uint) error
-	Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint) error
+	Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint, position string) error
 	PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID uint) (*model.Todo, error)
 	Duplicate(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error)
 	SetPinned(ctx context.Context, workspaceID, id uint, pinned bool) error
@@ -386,15 +393,19 @@ func (s *TodoService) Reorder(ctx context.Context, userID, workspaceID, id uint,
 }
 
 // Move reparents a todo (parent_id; nil = root) and reorders it among its
-// siblings. Emits a workspace-wide refresh because the sibling ordering of both
-// the old and new parent can shift.
-func (s *TodoService) Move(ctx context.Context, userID, workspaceID, id uint, parentID, afterID *uint) error {
+// siblings. Position among the siblings: after afterID when set, else "last"
+// appends at the end and ""/"first" lands at the top. Emits a workspace-wide
+// refresh because the sibling ordering of both the old and new parent can shift.
+func (s *TodoService) Move(ctx context.Context, userID, workspaceID, id uint, parentID, afterID *uint, position string) error {
+	if position != "" && position != TodoMoveFirst && position != TodoMoveLast {
+		return fmt.Errorf("%w: position must be 'first' or 'last'", ErrInvalidTodo)
+	}
 	todo, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return ErrTodoNotFound
 	}
 	prevParent := todo.ParentID
-	if err := s.repo.Move(ctx, workspaceID, id, parentID, afterID); err != nil {
+	if err := s.repo.Move(ctx, workspaceID, id, parentID, afterID, position); err != nil {
 		return err
 	}
 	if !uintPtrEqual(prevParent, parentID) {

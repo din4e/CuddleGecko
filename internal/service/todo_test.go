@@ -156,8 +156,8 @@ func (m *mockTodoRepo) Reorder(ctx context.Context, workspaceID, id uint, afterI
 	return m.Called(ctx, workspaceID, id, afterID).Error(0)
 }
 
-func (m *mockTodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint) error {
-	return m.Called(ctx, workspaceID, id, parentID, afterID).Error(0)
+func (m *mockTodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint, position string) error {
+	return m.Called(ctx, workspaceID, id, parentID, afterID, position).Error(0)
 }
 
 type mockEventRepoForSync struct {

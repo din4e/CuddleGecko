@@ -302,6 +302,25 @@ describe('TodosPage', () => {
     await waitFor(() => expect(screen.getByText('Child')).toBeInTheDocument())
   })
 
+  it('tree view pins manual sort and hides the sort picker', async () => {
+    localStorage.setItem('todoView', 'tree')
+    const root = { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 0, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    mockedList.mockImplementation(async () => mockPage<Todo>([root]))
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Root')).toBeInTheDocument())
+
+    // The tree always fetches manual/asc — even though the toolbar's default
+    // sort is due_date — so a drop's new sort_order survives the refetch
+    // instead of snapping back to its old slot.
+    expect(mockedList).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: 'manual', order: 'asc', roots_only: true }),
+      expect.any(AbortSignal),
+    )
+    // Sort controls are meaningless in the outliner tree — they're hidden.
+    expect(screen.queryByLabelText('todos.sort')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('todos.ascending')).not.toBeInTheDocument()
+  })
+
   it('renames a child row in the tree view', async () => {
     localStorage.setItem('todoView', 'tree')
     // Regression: tree-view children live in per-parent slices, not in the

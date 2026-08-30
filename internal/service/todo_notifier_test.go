@@ -125,9 +125,9 @@ func TestTodoNotifier_Move(t *testing.T) {
 	svc, repo := newNotifiedService(n)
 	// ensureTodoOwned (GetByID) + repo.Move
 	repo.On("GetByID", mock.Anything, uint(2), uint(5)).Return(&model.Todo{ID: 5, WorkspaceID: 2}, nil)
-	repo.On("Move", mock.Anything, uint(2), uint(5), mock.Anything, mock.Anything).Return(nil)
+	repo.On("Move", mock.Anything, uint(2), uint(5), mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	err := svc.Move(context.Background(), 1, 2, 5, nil, nil)
+	err := svc.Move(context.Background(), 1, 2, 5, nil, nil, "")
 	assert.NoError(t, err)
 	// Move fans out a workspace-wide refresh (sibling order may shift).
 	assert.Equal(t, []capturedChange{{2, 0, TodoBulk}}, n.events)

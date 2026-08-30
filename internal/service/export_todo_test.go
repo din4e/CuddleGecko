@@ -115,8 +115,8 @@ func TestExport_TodoNestingRoundTrip(t *testing.T) {
 	require.NoError(t, todoRepo.Create(ctx, parent))
 	require.NoError(t, todoRepo.Create(ctx, child))
 	require.NoError(t, todoRepo.Create(ctx, grand))
-	require.NoError(t, todoRepo.Move(ctx, 1, child.ID, &parent.ID, nil)) // child under parent
-	require.NoError(t, todoRepo.Move(ctx, 1, grand.ID, &child.ID, nil))  // grand under child
+	require.NoError(t, todoRepo.Move(ctx, 1, child.ID, &parent.ID, nil, "")) // child under parent
+	require.NoError(t, todoRepo.Move(ctx, 1, grand.ID, &child.ID, nil, ""))  // grand under child
 
 	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
 	require.NoError(t, err)

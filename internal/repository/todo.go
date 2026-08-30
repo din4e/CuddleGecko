@@ -226,8 +226,10 @@ func (r *TodoRepo) Reorder(ctx context.Context, workspaceID, id uint, afterID *u
 // Move reparents a todo (parent_id; nil = root) and reorders it to appear right
 // after afterID among its (new) siblings. Parent existence and cycle safety
 // (can't move under itself or a descendant) are validated inside the same
-// transaction; sibling sort_order is renumbered per parent group.
-func (r *TodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint) error {
+// transaction; sibling sort_order is renumbered per parent group. Position:
+// after afterID when set, else "last" appends at the end of the sibling group,
+// anything else lands at the top.
+func (r *TodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint, position string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 1. The moved todo must exist in the workspace.
 		var moved model.Todo
@@ -282,6 +284,8 @@ func (r *TodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, aft
 					break
 				}
 			}
+		} else if position == "last" {
+			insertAt = len(siblings)
 		}
 		ordered := make([]model.Todo, 0, len(siblings)+1)
 		ordered = append(ordered, siblings[:insertAt]...)
