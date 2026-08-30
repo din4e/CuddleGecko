@@ -588,21 +588,54 @@ export default function TodosPage() {
     return d > new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) && d <= weekEnd
   }
 
-  // Group todos by date for timeline/grouped views
   // Flat-view nesting: children render inside their parent's card, so the
   // flat lists keep only top-level todos (parent absent from the current list
   // → the child surfaces at top level, same rule as buildTodoTree).
+  const presentIds = useMemo(() => new Set(todos.map((t) => t.id)), [todos])
+  const isTopLevel = useCallback(
+    (t: Todo) => t.parent_id == null || !presentIds.has(t.parent_id),
+    [presentIds],
+  )
+  // Flat views render subtask sections under each top-level card. Like the
+  // tree and the detail drawer, those sections must show the parent's WHOLE
+  // subtree regardless of the smart-list filter — a "today" parent's undated
+  // subtask (or a pending child under a completed parent) never matches the
+  // filtered flat list, so it would be invisible — including right after
+  // being added. Hence the same unfiltered per-parent children slices the
+  // tree uses, one per displayed parent that has children.
+  const flatChildParents = useMemo(
+    () => todos.filter((t) => isTopLevel(t) && (t.child_count ?? 0) > 0).map((t) => t.id),
+    [todos, isTopLevel],
+  )
+  // Grandchildren cascade: any loaded child with children of its own joins
+  // the id set so every depth renders (same accumulation as the drawer).
+  const [deepChildIds, setDeepChildIds] = useState<Set<number>>(() => new Set())
+  const flatChildrenMap = useTodoChildrenMap(
+    view !== 'tree' && smartList !== 'trash' ? [...new Set([...flatChildParents, ...deepChildIds])] : [],
+    { sort, order },
+  )
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const found = new Set<number>()
+    for (const slice of flatChildrenMap.values()) {
+      for (const c of slice.items) {
+        if ((c.child_count ?? 0) > 0) found.add(c.id)
+      }
+    }
+    setDeepChildIds((prev) => {
+      if (prev.size === found.size && [...found].every((id) => prev.has(id))) return prev
+      return found
+    })
+  }, [flatChildrenMap])
+  /* eslint-enable react-hooks/set-state-in-effect */
   const childrenByParent = useMemo(() => {
     const m = new Map<number, Todo[]>()
-    for (const t of todos) {
-      if (t.parent_id == null) continue
-      const arr = m.get(t.parent_id) ?? []
-      arr.push(t)
-      m.set(t.parent_id, arr)
+    if (view === 'tree') return m
+    for (const [parentId, slice] of flatChildrenMap) {
+      if (slice.items.length > 0) m.set(parentId, slice.items)
     }
     return m
-  }, [todos])
-  const presentIds = useMemo(() => new Set(todos.map((t) => t.id)), [todos])
+  }, [view, flatChildrenMap])
   // Cross-subtask completion roll-up for card chips (incl. kanban): done/total
   // over every descendant, computed from the loaded children map.
   const subtaskProgress = useMemo(() => {
@@ -610,10 +643,6 @@ export default function TodosPage() {
     for (const t of todos) m.set(t.id, subtreeProgressFromMap(childrenByParent, t.id))
     return m
   }, [todos, childrenByParent])
-  const isTopLevel = useCallback(
-    (t: Todo) => t.parent_id == null || !presentIds.has(t.parent_id),
-    [presentIds],
-  )
 
   const pendingTodos = todos.filter((t) => t.status === 'pending' && isTopLevel(t))
   const doneTodos = todos.filter((t) => t.status === 'done' && isTopLevel(t))
