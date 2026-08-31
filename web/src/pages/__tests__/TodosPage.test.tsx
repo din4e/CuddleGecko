@@ -24,6 +24,7 @@ vi.mock('react-i18next', () => ({
         'todos.high': '高',
         'todos.noDueDate': '无截止日期',
         'todos.completed': '已完成',
+        'todos.abandoned': '已放弃',
         'todos.syncToEvent': '同步到事件',
         'todos.deleteConfirm': '确定删除此待办？',
         'common.cancel': '取消',
@@ -232,32 +233,40 @@ describe('TodosPage', () => {
     await waitFor(() => expect(screen.getByText('Manual done task')).toBeInTheDocument())
   })
 
-  it('hides completed tasks with one click and brings them back', async () => {
+  it('hides completed and abandoned tasks with one click and brings them back', async () => {
     localStorage.setItem('todoView', 'grouped')
     localStorage.setItem('todoSmartList', 'all')
     mockedList.mockResolvedValue(mockPage<Todo>([
       { id: 1, title: 'Active task', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
       { id: 2, title: 'Finished task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+      { id: 3, title: 'Dropped task', status: 'abandoned', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
     ]))
     const user = userEvent.setup()
     renderPage()
     await waitFor(() => {
       expect(screen.getByText('Active task')).toBeInTheDocument()
       expect(screen.getByText('Finished task')).toBeInTheDocument()
+      expect(screen.getByText('Dropped task')).toBeInTheDocument()
       expect(screen.getByText('已完成 (1)')).toBeInTheDocument()
+      expect(screen.getByText('已放弃 (1)')).toBeInTheDocument()
     })
 
-    // One click: every completed task disappears (done grid included).
+    // One click: every settled task disappears (done + abandoned grids).
     await user.click(screen.getByTitle('todos.hideCompleted'))
     await waitFor(() => {
       expect(screen.queryByText('Finished task')).not.toBeInTheDocument()
+      expect(screen.queryByText('Dropped task')).not.toBeInTheDocument()
       expect(screen.queryByText('已完成 (1)')).not.toBeInTheDocument()
+      expect(screen.queryByText('已放弃 (1)')).not.toBeInTheDocument()
     })
     expect(screen.getByText('Active task')).toBeInTheDocument()
 
-    // One click back: completed tasks show again.
+    // One click back: settled tasks show again.
     await user.click(screen.getByTitle('todos.showCompleted'))
-    await waitFor(() => expect(screen.getByText('Finished task')).toBeInTheDocument())
+    await waitFor(() => {
+      expect(screen.getByText('Finished task')).toBeInTheDocument()
+      expect(screen.getByText('Dropped task')).toBeInTheDocument()
+    })
   })
 
   it('surfaces pending children of a hidden completed parent', async () => {
@@ -323,6 +332,20 @@ describe('TodosPage', () => {
     ]))
     renderPage()
     await waitFor(() => expect(screen.getByText('Done task')).toBeInTheDocument())
+    expect(screen.queryByTitle('todos.hideCompleted')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('todos.showCompleted')).not.toBeInTheDocument()
+  })
+
+  it('hides the completed toggle on the Abandoned smart list', async () => {
+    // Same rule as the Completed list: everything there is abandoned, so the
+    // toggle would blank the page.
+    localStorage.setItem('todoView', 'grouped')
+    localStorage.setItem('todoSmartList', 'abandoned')
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 3, title: 'Dropped task', status: 'abandoned', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+    ]))
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Dropped task')).toBeInTheDocument())
     expect(screen.queryByTitle('todos.hideCompleted')).not.toBeInTheDocument()
     expect(screen.queryByTitle('todos.showCompleted')).not.toBeInTheDocument()
   })

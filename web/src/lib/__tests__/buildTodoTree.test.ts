@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTodoTree, buildLazyTree, descendantIds, subtreeAllDoneFromMap, type LazyChildrenSlice } from '../buildTodoTree'
+import { buildTodoTree, buildLazyTree, descendantIds, subtreeSettledFromMap, type LazyChildrenSlice } from '../buildTodoTree'
 import type { Todo } from '../../types'
 
 function t(id: number, parent: number | null = null, sort = 0, over: Partial<Todo> = {}): Todo {
@@ -52,6 +52,7 @@ describe('descendantIds', () => {
 
 describe('buildLazyTree hideDone', () => {
   const done = { status: 'done' as const, completed_at: '2026-05-01' }
+  const abandoned = { status: 'abandoned' as const }
 
   it('marks nothing hidden when hideDone is off', () => {
     const root = t(1)
@@ -77,7 +78,23 @@ describe('buildLazyTree hideDone', () => {
     expect(tree[0].hidden).toBeFalsy()
   })
 
-  it('keeps a done node with an open descendant visible', () => {
+  it('hides abandoned nodes too — a settled abandoned branch drops with it', () => {
+    // 1(pending) → 2(abandoned) → 3(abandoned): the toggle folds abandoned
+    // work the same way it folds done work.
+    const root = t(1)
+    const tree = buildLazyTree(
+      [root],
+      new Map([
+        [1, slice([t(2, 1, 0, abandoned)])],
+        [2, slice([t(3, 2, 0, abandoned)])],
+      ]),
+      { hideDone: true },
+    )
+    expect(tree[0].children[0].hidden).toBe(true)
+    expect(tree[0].children[0].children[0].hidden).toBe(true)
+  })
+
+  it('keeps a settled node with an open descendant visible', () => {
     // 1(pending) → 2(done) → 3(pending): hiding 2 would swallow 3.
     const root = t(1)
     const tree = buildLazyTree(
@@ -89,9 +106,19 @@ describe('buildLazyTree hideDone', () => {
       { hideDone: true },
     )
     expect(tree[0].children[0].hidden).toBeFalsy()
+    // Same for an abandoned parent: its pending child keeps it afloat.
+    const abandonedTree = buildLazyTree(
+      [root],
+      new Map([
+        [1, slice([t(4, 1, 0, abandoned)])],
+        [4, slice([t(5, 4)])],
+      ]),
+      { hideDone: true },
+    )
+    expect(abandonedTree[0].children[0].hidden).toBeFalsy()
   })
 
-  it('keeps a done node whose children are unloaded or truncated', () => {
+  it('keeps a settled node whose children are unloaded or truncated', () => {
     const root = t(1)
     // No slice for the done child (child_count 2, unfetched) → unknown.
     const unloaded = buildLazyTree(
@@ -110,14 +137,19 @@ describe('buildLazyTree hideDone', () => {
   })
 })
 
-describe('subtreeAllDoneFromMap', () => {
-  it('is true only when the whole loaded subtree is done and nothing is unloaded', () => {
+describe('subtreeSettledFromMap', () => {
+  it('is true only when the whole loaded subtree is settled and nothing is unloaded', () => {
     const m = new Map<number, Todo[]>([
       [1, [t(2, 1, 0, { status: 'done', completed_at: '2026-05-01' })]],
     ])
-    expect(subtreeAllDoneFromMap(t(1, null, 0, { child_count: 1 }), m)).toBe(true)
-    expect(subtreeAllDoneFromMap(t(1, null, 0, { child_count: 2 }), m)).toBe(false) // one child unfetched
-    expect(subtreeAllDoneFromMap(t(9), m)).toBe(true) // childless leaf
+    expect(subtreeSettledFromMap(t(1, null, 0, { child_count: 1 }), m)).toBe(true)
+    expect(subtreeSettledFromMap(t(1, null, 0, { child_count: 2 }), m)).toBe(false) // one child unfetched
+    expect(subtreeSettledFromMap(t(9), m)).toBe(true) // childless leaf
+    // An abandoned child is just as settled as a done one.
+    const withAbandoned = new Map<number, Todo[]>([
+      [1, [t(2, 1, 0, { status: 'abandoned' })]],
+    ])
+    expect(subtreeSettledFromMap(t(1, null, 0, { child_count: 1 }), withAbandoned)).toBe(true)
   })
 
   it('is false when any loaded descendant is open', () => {
@@ -125,6 +157,6 @@ describe('subtreeAllDoneFromMap', () => {
       [1, [t(2, 1, 0, { status: 'done', completed_at: '2026-05-01' })]],
       [2, [t(3, 2)]],
     ])
-    expect(subtreeAllDoneFromMap(t(1, null, 0, { child_count: 1 }), m)).toBe(false)
+    expect(subtreeSettledFromMap(t(1, null, 0, { child_count: 1 }), m)).toBe(false)
   })
 })

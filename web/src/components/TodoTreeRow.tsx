@@ -63,8 +63,9 @@ export default function TodoTree({
   nodes,
   ...handlers
 }: { nodes: TodoNode[] } & TodoTreeHandlers) {
-  // hideDone marks whole-done subtrees hidden; roots arrive prefiltered by the
-  // page, this guard just keeps the component correct on its own.
+  // hideDone marks whole-settled (done/abandoned) subtrees hidden; roots
+  // arrive prefiltered by the page, this guard just keeps the component
+  // correct on its own.
   const visible = nodes.filter((n) => !n.hidden)
   return (
     <>
@@ -100,13 +101,14 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   } = props
   const [dropZone, setDropZone] = useState<DropZone | null>(null)
   const todo = node.todo
-  // hideDone: done nodes whose whole loaded subtree is done are marked hidden
-  // (children stay intact — progress and move targets use the real subtree).
+  // hideDone: settled (done/abandoned) nodes whose whole loaded subtree is
+  // settled are marked hidden (children stay intact — progress and move
+  // targets use the real subtree).
   const visibleChildren = node.children.filter((c) => !c.hidden)
   // Lazy tree: the server-reported child count keeps the caret visible for
   // collapsed nodes whose children haven't been fetched yet. Loaded-but-hidden
-  // children are discounted so an all-done subtree leaves no caret that would
-  // expand to nothing; unfetched ones still can (they might be pending).
+  // children are discounted so an all-settled subtree leaves no caret that
+  // would expand to nothing; unfetched ones still can (they might be pending).
   const hiddenLoaded = node.children.length - visibleChildren.length
   const hasChildren = visibleChildren.length > 0 || (todo.child_count ?? 0) > hiddenLoaded
   const isOpen = expanded.has(todo.id)

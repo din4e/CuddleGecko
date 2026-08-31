@@ -35,7 +35,7 @@ import { useKanbanColumns } from '../hooks/api/useKanbanColumns'
 import type { KanbanColumn } from '../api/settings'
 import TodoTree from '../components/TodoTreeRow'
 import { type KanbanLane } from '../components/KanbanBoard'
-import { buildLazyTree, descendantIds, type TodoNode } from '../lib/buildTodoTree'
+import { buildLazyTree, descendantIds, isSettledStatus, type TodoNode } from '../lib/buildTodoTree'
 import { subtreeProgressFromMap } from '../lib/todoProgress'
 import { usePomodoroStore } from '../stores/pomodoro'
 import { useTodoCollapseStore } from '../stores/todoCollapse'
@@ -143,8 +143,9 @@ export default function TodosPage() {
   })
   const [expandingAll, setExpandingAll] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
-  // One-click "hide completed": keeps the working list lean. Persisted so the
-  // choice survives reloads, like the view/smart-list choices above.
+  // One-click "hide completed & abandoned": keeps the working list lean.
+  // Persisted so the choice survives reloads, like the view/smart-list choices
+  // above.
   const [hideCompleted, setHideCompleted] = useState(() => localStorage.getItem('todoHideCompleted') === '1')
 
   // Debounce the search box so typing doesn't fire a request per keystroke.
@@ -225,17 +226,17 @@ export default function TodosPage() {
   const total = (view === 'tree' ? rootQuery.data : flatQuery.data)?.pages[0]?.total ?? 0
   const loading = view === 'tree' ? rootQuery.isPending : flatQuery.isPending
 
-  // One-click visibility filter. Meaningless on the dedicated Completed list
-  // (everything there is done — hiding would blank the page) and on trash, so
-  // the toggle is neither rendered nor applied there.
-  const hideDoneApplicable = smartList !== 'completed' && smartList !== 'trash'
+  // One-click visibility filter. Meaningless on the dedicated Completed and
+  // Abandoned lists (everything there is settled — hiding would blank the
+  // page) and on trash, so the toggle is neither rendered nor applied there.
+  const hideDoneApplicable = smartList !== 'completed' && smartList !== 'abandoned' && smartList !== 'trash'
   const hideDone = hideCompleted && hideDoneApplicable
-  // The display set every view renders from. Children of a hidden done parent
-  // surface as top-level cards (presentIds/isTopLevel below are computed over
-  // this set, mirroring buildTodoTree's orphan rule) so pending work never
-  // disappears with its completed parent.
+  // The display set every view renders from. Children of a hidden settled
+  // parent surface as top-level cards (presentIds/isTopLevel below are
+  // computed over this set, mirroring buildTodoTree's orphan rule) so pending
+  // work never disappears with its completed/abandoned parent.
   const displayTodos = useMemo(
-    () => (hideDone ? todos.filter((t) => t.status !== 'done') : todos),
+    () => (hideDone ? todos.filter((t) => !isSettledStatus(t.status)) : todos),
     [todos, hideDone],
   )
 
@@ -1071,8 +1072,9 @@ export default function TodosPage() {
             </Button>
           </>
         )}
-        {/* One-click hide/show completed — applies to every view; hidden on the
-           Completed list and trash where it has nothing to act on. */}
+        {/* One-click hide/show completed & abandoned — applies to every view;
+           hidden on the Completed/Abandoned lists and trash where it has
+           nothing to act on. */}
         {hideDoneApplicable && (
           <Button
             variant={hideDone ? 'secondary' : 'outline'}
