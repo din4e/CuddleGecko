@@ -67,8 +67,14 @@ export default function SettingsPage() {
   const adapters = useModeStore((s) => s.adapters)
   const nodeRadius = useGraphSettings((s) => s.nodeRadius)
   const emojiSize = useGraphSettings((s) => s.emojiSize)
+  const showLabels = useGraphSettings((s) => s.showLabels)
+  const linkDistance = useGraphSettings((s) => s.linkDistance)
+  const chargeStrength = useGraphSettings((s) => s.chargeStrength)
   const setNodeRadius = useGraphSettings((s) => s.setNodeRadius)
   const setEmojiSize = useGraphSettings((s) => s.setEmojiSize)
+  const setShowLabels = useGraphSettings((s) => s.setShowLabels)
+  const setLinkDistance = useGraphSettings((s) => s.setLinkDistance)
+  const setChargeStrength = useGraphSettings((s) => s.setChargeStrength)
   const resetGraphSettings = useGraphSettings((s) => s.reset)
 
   // AI provider state
@@ -685,6 +691,39 @@ export default function SettingsPage() {
               step={1}
               value={emojiSize}
               onChange={(e) => setEmojiSize(Number(e.target.value))}
+              className="w-full accent-primary"
+            />
+          </div>
+          <label className="flex cursor-pointer select-none items-center justify-between gap-4">
+            <span className="font-medium">{t('settings.showLabels')}</span>
+            <input
+              type="checkbox"
+              checked={showLabels}
+              onChange={(e) => setShowLabels(e.target.checked)}
+              className="size-4 rounded border-input accent-primary"
+            />
+          </label>
+          <div className="space-y-2">
+            <Label>{t('settings.linkDistance')} ({linkDistance})</Label>
+            <input
+              type="range"
+              min={10}
+              max={200}
+              step={5}
+              value={linkDistance}
+              onChange={(e) => setLinkDistance(Number(e.target.value))}
+              className="w-full accent-primary"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{t('settings.chargeStrength')} ({chargeStrength})</Label>
+            <input
+              type="range"
+              min={10}
+              max={100}
+              step={5}
+              value={chargeStrength}
+              onChange={(e) => setChargeStrength(Number(e.target.value))}
               className="w-full accent-primary"
             />
           </div>

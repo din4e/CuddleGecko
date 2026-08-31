@@ -27,6 +27,18 @@ export interface KanbanConfig {
   columns: KanbanColumn[]
 }
 
+// Same shape as web/src/stores/graphSettings — the server stores the full
+// canonical config and merges partial updates onto it.
+export interface GraphSettings {
+  nodeRadius: number
+  emojiSize: number
+  showLabels: boolean
+  showSelf: boolean
+  layoutMode: 'force' | 'cluster' | 'random'
+  linkDistance: number
+  chargeStrength: number
+}
+
 export const settingsApi = {
   getCaptcha: () => request.get<CaptchaConfig>('/settings/captcha'),
   updateCaptcha: (config: Partial<CaptchaConfig>) =>
@@ -37,4 +49,6 @@ export const settingsApi = {
   updateDashboard: (config: DashboardConfig) => request.put<DashboardConfig>('/settings/dashboard', config),
   getKanban: () => request.get<KanbanConfig>('/settings/kanban'),
   updateKanban: (config: KanbanConfig) => request.put<KanbanConfig>('/settings/kanban', config),
+  getGraph: () => request.get<GraphSettings>('/settings/graph'),
+  updateGraph: (config: Partial<GraphSettings>) => request.put<GraphSettings>('/settings/graph', config),
 }
