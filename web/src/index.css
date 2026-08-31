@@ -51,6 +51,8 @@
 }
 
 :root {
+    --scrollbar-thumb: oklch(0.17 0.02 155 / 18%);
+    --scrollbar-thumb-hover: oklch(0.17 0.02 155 / 32%);
     --background: oklch(0.99 0.005 155);
     --foreground: oklch(0.17 0.02 155);
     --card: oklch(1 0 0);
@@ -86,6 +88,8 @@
 }
 
 .dark {
+    --scrollbar-thumb: oklch(0.96 0.01 155 / 16%);
+    --scrollbar-thumb-hover: oklch(0.96 0.01 155 / 30%);
     --background: oklch(0.15 0.02 155);
     --foreground: oklch(0.96 0.01 155);
     --card: oklch(0.2 0.025 155);
@@ -129,6 +133,28 @@
   html {
     @apply font-sans;
     }
+  /* —— 全局滚动条：窄 + 淡（Firefox/标准属性 + WebKit）—— */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 /* —— Auth page motion（可爱微动效；prefers-reduced-motion 下关闭）—— */
