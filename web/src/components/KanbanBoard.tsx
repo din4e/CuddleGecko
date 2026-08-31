@@ -483,7 +483,7 @@ export default function KanbanBoard({
           </div>
           {/* Header row: draggable column headers */}
           <SortableContext items={columns.map((c) => colSortId(c.id))} strategy={horizontalListSortingStrategy}>
-            <div className="flex gap-1.5 items-start">
+            <div className="flex gap-1.5 items-center">
               {laneMode !== 'none' && <div className="w-20 shrink-0" />}
               {columns.map((col) => (
                 <ColumnHeader
@@ -547,7 +547,7 @@ export default function KanbanBoard({
                   <button
                     type="button"
                     onClick={() => setAddColumnOpen(true)}
-                    className="flex min-h-[56px] w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed text-sm text-muted-foreground hover:border-primary/50 hover:text-primary"
+                    className="flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed text-sm text-muted-foreground hover:border-primary/50 hover:text-primary"
                   >
                     <Plus className="h-4 w-4" />
                     {t('todos.kanbanAddColumn')}
