@@ -121,6 +121,25 @@ describe('TodoDetailDrawer', () => {
     expect(onToggleSubtask).toHaveBeenCalledWith(sub)
   })
 
+  it('hides done subtask rows when the page toggle is on (hideDone)', () => {
+    const doneSub = todo({ id: 8, title: 'Done subtask', parent_id: 7, status: 'done', completed_at: '2026-05-01' })
+    const openSub = todo({ id: 9, title: 'Open subtask', parent_id: 7 })
+    mocks.childrenMap.mockReturnValue(new Map([[7, { items: [doneSub, openSub], total: 2, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
+    render(
+      <TodoDetailDrawer
+        todo={todo()}
+        open
+        contacts={[]}
+        tags={[]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+        hideDone
+      />,
+    )
+    expect(screen.queryByText('Done subtask')).not.toBeInTheDocument()
+    expect(screen.getByText('Open subtask')).toBeInTheDocument()
+  })
+
   it('renders nothing when no todo is set', () => {
     const { container } = render(
       <TodoDetailDrawer

@@ -286,6 +286,33 @@ describe('TodosPage', () => {
     expect(screen.getByText('Kept child')).toBeInTheDocument()
   })
 
+  it('hides completed subtask rows inside cards with the hide-completed toggle', async () => {
+    localStorage.setItem('todoView', 'grouped')
+    localStorage.setItem('todoSmartList', 'all')
+    const parent = { id: 1, title: 'Working parent', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 2, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const doneSub = { id: 2, title: 'Done subtask', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, child_count: 0, completed_at: '2026-05-20', created_at: '', updated_at: '' } as Todo
+    const openSub = { id: 3, title: 'Open subtask', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    mockedList.mockImplementation(async (params?: TodoListParams) =>
+      params?.parent_id === 1
+        ? mockPage<Todo>([doneSub, openSub])
+        : mockPage<Todo>([parent, doneSub, openSub]),
+    )
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Working parent')).toBeInTheDocument()
+      expect(screen.getByText('Done subtask')).toBeInTheDocument()
+      expect(screen.getByText('Open subtask')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByTitle('todos.hideCompleted'))
+    // The done subtask row drops out of the card's section while the open
+    // row and the parent card itself stay.
+    await waitFor(() => expect(screen.queryByText('Done subtask')).not.toBeInTheDocument())
+    expect(screen.getByText('Open subtask')).toBeInTheDocument()
+    expect(screen.getByText('Working parent')).toBeInTheDocument()
+  })
+
   it('hides the completed toggle on the Completed smart list', async () => {
     // The dedicated Completed list is all-done — hiding there would blank the
     // page, so the toggle is neither rendered nor applied.

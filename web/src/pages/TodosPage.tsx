@@ -38,6 +38,7 @@ import { type KanbanLane } from '../components/KanbanBoard'
 import { buildLazyTree, descendantIds, type TodoNode } from '../lib/buildTodoTree'
 import { subtreeProgressFromMap } from '../lib/todoProgress'
 import { usePomodoroStore } from '../stores/pomodoro'
+import { useTodoCollapseStore } from '../stores/todoCollapse'
 import {
   useTodosInfinite,
   useTodoChildrenMap,
@@ -258,6 +259,8 @@ export default function TodosPage() {
     try {
       await createTodo.mutateAsync({ title: v, parent_id: parent.id })
       setExpanded((prev) => (prev.has(parent.id) ? prev : new Set(prev).add(parent.id)))
+      // Flat views fold through the collapse store instead of `expanded`.
+      useTodoCollapseStore.getState().reveal(parent.id)
     } catch {
       toast.error(t('todos.createFailed'))
     }
@@ -719,6 +722,8 @@ export default function TodosPage() {
   // it anyway).
   const handleNest = useCallback((id: number, parentId: number) => {
     if (id === parentId || descendantIds([...todoByIdLoaded.values()], id).has(parentId)) return
+    // Reveal the target's subtask section so the nested todo lands in view.
+    useTodoCollapseStore.getState().reveal(parentId)
     void handleTreeMove(id, parentId, 'last')
   }, [todoByIdLoaded, handleTreeMove])
   const toggleExpand = useCallback((id: number) =>
@@ -730,7 +735,7 @@ export default function TodosPage() {
     })
   , [])
 
-  const todoTree = useMemo(() => buildLazyTree(displayTodos, childrenMap), [displayTodos, childrenMap])
+  const todoTree = useMemo(() => buildLazyTree(displayTodos, childrenMap, { hideDone }), [displayTodos, childrenMap, hideDone])
 
   // Iterative "expand all" for the lazy tree: expand every loaded node the
   // server says has children; as children slices arrive the effect re-runs and
@@ -863,6 +868,11 @@ export default function TodosPage() {
       subtaskProgress={subtaskProgress.get(todo.id)}
       onStartPomodoro={handleStartPomodoro}
       onPostpone={handlePostpone}
+      // Subtask drag & drop: rows carry the tree's tri-zone semantics, and a
+      // drop on the card body nests under this todo. Shares the tree's drag
+      // state, so drags interoperate across cards (one view renders at a time).
+      subtaskDragId={view !== 'tree' ? treeDragId : undefined}
+      onNestSubtask={view !== 'tree' ? handleNest : undefined}
       // Compact (kanban) cards DO get the subtask list, but TodoCard keeps it
       // collapsed behind the progress chip: the board cell stays lean and a
       // drag overlay (fresh mount) never carries the expanded list.
@@ -875,6 +885,10 @@ export default function TodosPage() {
           onCreateChild={handleCreateChild}
           onDelete={setConfirmDelete}
           onStartPomodoro={handleStartPomodoro}
+          hideDone={hideDone}
+          onMove={handleTreeMove}
+          dragId={treeDragId}
+          onDragIdChange={setTreeDragId}
         />
       ) : undefined}
     />
@@ -1346,6 +1360,10 @@ export default function TodosPage() {
             onStartPomodoro={handleStartPomodoro}
             onOpenTodo={openEdit}
             onCreateChild={handleCreateChild}
+            hideDone={hideDone}
+            subtaskDragId={treeDragId}
+            onSubtaskDragIdChange={setTreeDragId}
+            onMoveSubtask={handleTreeMove}
           />
         </Suspense>
       )}

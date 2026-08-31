@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TodoCard from '../TodoCard'
 import type { TodoCardProps } from '../TodoCard'
+import { useTodoCollapseStore } from '../../stores/todoCollapse'
 import type { Todo } from '../../types'
 
 vi.mock('react-i18next', () => ({
@@ -51,6 +52,9 @@ function renderCard(overrides: Partial<Todo> = {}, handlers: Partial<Handlers> =
 describe('TodoCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Subtask fold state lives in a persisted shared store — reset it so
+    // folds made here (or in sibling test files) don't leak between cases.
+    useTodoCollapseStore.setState({ collapsed: new Set() })
   })
 
   it('renders the title and priority label', () => {
@@ -145,4 +149,104 @@ describe('TodoCard', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'Buy milk' }))
     expect(onSelectToggle).toHaveBeenCalledWith(1)
   })
+
+  it('the progress chip folds and unfolds the subtask list (non-compact)', async () => {
+    const user = userEvent.setup()
+    const base = {
+      contactNames: '',
+      onToggle: vi.fn(),
+      onTogglePin: vi.fn(),
+      onSync: vi.fn(),
+      onEdit: vi.fn(),
+      onRename: vi.fn(),
+      onDuplicate: vi.fn(),
+      onDelete: vi.fn(),
+      formatDate: () => 'Jan 1',
+    }
+    render(
+      <TodoCard
+        {...base}
+        todo={makeTodo()}
+        subtasks={<div data-testid="subtask-list">list</div>}
+        subtaskProgress={{ done: 1, total: 2 }}
+      />,
+    )
+    expect(screen.getByTestId('subtask-list')).toBeInTheDocument()
+    // Accessible name comes from the chip's content: done/total.
+    await user.click(screen.getByRole('button', { name: '1/2' }))
+    expect(screen.queryByTestId('subtask-list')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '1/2' }))
+    expect(screen.getByTestId('subtask-list')).toBeInTheDocument()
+  })
+
+  it('a stale fold never hides the add-subtask entry of a childless todo', () => {
+    useTodoCollapseStore.setState({ collapsed: new Set([1]) })
+    render(
+      <TodoCard
+        todo={makeTodo()}
+        contactNames=""
+        onToggle={vi.fn()}
+        onTogglePin={vi.fn()}
+        onSync={vi.fn()}
+        onEdit={vi.fn()}
+        onRename={vi.fn()}
+        onDuplicate={vi.fn()}
+        onDelete={vi.fn()}
+        formatDate={() => 'Jan 1'}
+        subtasks={<div data-testid="subtask-list">list</div>}
+      />,
+    )
+    // No subtaskProgress (total 0) → the fold is ignored and the section —
+    // whose only content is the "add child" entry — stays visible.
+    expect(screen.getByTestId('subtask-list')).toBeInTheDocument()
+  })
+
+  it('a subtask drag dropped on the card body nests under it', () => {
+    const onNestSubtask = vi.fn()
+    const props = {
+      contactNames: '',
+      onToggle: vi.fn(),
+      onTogglePin: vi.fn(),
+      onSync: vi.fn(),
+      onEdit: vi.fn(),
+      onRename: vi.fn(),
+      onDuplicate: vi.fn(),
+      onDelete: vi.fn(),
+      formatDate: () => 'Jan 1',
+      subtasks: <div data-testid="subtask-list">list</div>,
+      subtaskDragId: 7 as number | null,
+      onNestSubtask,
+    }
+    render(<TodoCard {...props} todo={makeTodo()} />)
+    const card = screen.getByText('Buy milk').closest('[data-slot="card"]')!
+    fireEvent.dragOver(card, { dataTransfer: dtStub() })
+    fireEvent.drop(card, { dataTransfer: dtStub() })
+    expect(onNestSubtask).toHaveBeenCalledWith(7, 1)
+  })
+
+  it('ignores a subtask drop of the card onto itself', () => {
+    const onNestSubtask = vi.fn()
+    render(
+      <TodoCard
+        todo={makeTodo()}
+        contactNames=""
+        onToggle={vi.fn()}
+        onTogglePin={vi.fn()}
+        onSync={vi.fn()}
+        onEdit={vi.fn()}
+        onRename={vi.fn()}
+        onDuplicate={vi.fn()}
+        onDelete={vi.fn()}
+        formatDate={() => 'Jan 1'}
+        subtaskDragId={1}
+        onNestSubtask={onNestSubtask}
+      />,
+    )
+    const card = screen.getByText('Buy milk').closest('[data-slot="card"]')!
+    fireEvent.drop(card, { dataTransfer: dtStub() })
+    expect(onNestSubtask).not.toHaveBeenCalled()
+  })
 })
+
+// jsdom has no DataTransfer; the card handlers only assign dropEffect.
+const dtStub = () => ({ effectAllowed: '', dropEffect: '', setData: vi.fn() })
