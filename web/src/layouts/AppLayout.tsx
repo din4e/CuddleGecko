@@ -44,6 +44,7 @@ import { BrandWordmark } from '../components/BrandWordmark'
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher'
 import { cn } from '@/lib/utils'
 import { useNavConfigStore } from '../stores/navConfig'
+import { useGraphSettings } from '../stores/graphSettings'
 import { CUSTOMIZABLE_PATHS } from '../lib/nav'
 import { preloadPage } from '../lib/pageLoaders'
 
@@ -85,6 +86,7 @@ export default function AppLayout() {
   const navOrder = useNavConfigStore((s) => s.order)
   const navHidden = useNavConfigStore((s) => s.hidden)
   const loadNav = useNavConfigStore((s) => s.load)
+  const loadGraphSettings = useGraphSettings((s) => s.load)
 
   const toggleSidebar = () => {
     if (isMobileViewport()) {
@@ -116,6 +118,11 @@ export default function AppLayout() {
   useEffect(() => {
     loadNav()
   }, [loadNav])
+
+  // Load per-user graph display settings (server is the cross-device source of truth).
+  useEffect(() => {
+    loadGraphSettings()
+  }, [loadGraphSettings])
 
   useEffect(() => {
     const onResize = () => {

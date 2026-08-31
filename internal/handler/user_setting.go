@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/din4e/cuddlegecko/internal/service"
@@ -176,4 +177,133 @@ func (h *UserSettingHandler) UpdateDashboard(c *gin.Context) {
 		return
 	}
 	response.OK(c, dashboardConfigResponse{Order: req.Order, Hidden: req.Hidden})
+}
+
+const graphSettingKey = "graph"
+
+// graphConfig is the user's graph display preferences (canvas sizes, label
+// visibility, force-layout physics). Mirrors web/src/stores/graphSettings.
+type graphConfig struct {
+	NodeRadius     int    `json:"nodeRadius"`
+	EmojiSize      int    `json:"emojiSize"`
+	ShowLabels     bool   `json:"showLabels"`
+	ShowSelf       bool   `json:"showSelf"`
+	LayoutMode     string `json:"layoutMode"`
+	LinkDistance   int    `json:"linkDistance"`
+	ChargeStrength int    `json:"chargeStrength"`
+}
+
+// defaultGraphConfig matches the frontend GRAPH_SETTINGS_DEFAULTS (which in
+// turn mirror d3-force physics defaults).
+func defaultGraphConfig() graphConfig {
+	return graphConfig{
+		NodeRadius:     18,
+		EmojiSize:      28,
+		ShowLabels:     true,
+		ShowSelf:       true,
+		LayoutMode:     "force",
+		LinkDistance:   30,
+		ChargeStrength: 30,
+	}
+}
+
+var validGraphLayouts = map[string]bool{"force": true, "cluster": true, "random": true}
+
+// graphConfigPatch carries optional fields so partial stored/updated configs
+// merge onto defaults instead of zeroing missing booleans.
+type graphConfigPatch struct {
+	NodeRadius     *int    `json:"nodeRadius"`
+	EmojiSize      *int    `json:"emojiSize"`
+	ShowLabels     *bool   `json:"showLabels"`
+	ShowSelf       *bool   `json:"showSelf"`
+	LayoutMode     *string `json:"layoutMode"`
+	LinkDistance   *int    `json:"linkDistance"`
+	ChargeStrength *int    `json:"chargeStrength"`
+}
+
+func (p *graphConfigPatch) applyTo(cfg *graphConfig) {
+	if p.NodeRadius != nil {
+		cfg.NodeRadius = *p.NodeRadius
+	}
+	if p.EmojiSize != nil {
+		cfg.EmojiSize = *p.EmojiSize
+	}
+	if p.ShowLabels != nil {
+		cfg.ShowLabels = *p.ShowLabels
+	}
+	if p.ShowSelf != nil {
+		cfg.ShowSelf = *p.ShowSelf
+	}
+	if p.LayoutMode != nil {
+		cfg.LayoutMode = *p.LayoutMode
+	}
+	if p.LinkDistance != nil {
+		cfg.LinkDistance = *p.LinkDistance
+	}
+	if p.ChargeStrength != nil {
+		cfg.ChargeStrength = *p.ChargeStrength
+	}
+}
+
+// clampGraphConfig pins values to the same ranges the UI sliders enforce, so
+// a stale or hand-rolled client can't store an unusable canvas.
+func clampGraphConfig(cfg *graphConfig) {
+	clampInt := func(v, lo, hi int) int {
+		if v < lo {
+			return lo
+		}
+		if v > hi {
+			return hi
+		}
+		return v
+	}
+	cfg.NodeRadius = clampInt(cfg.NodeRadius, 10, 40)
+	cfg.EmojiSize = clampInt(cfg.EmojiSize, 12, 48)
+	cfg.LinkDistance = clampInt(cfg.LinkDistance, 10, 200)
+	cfg.ChargeStrength = clampInt(cfg.ChargeStrength, 10, 100)
+	if !validGraphLayouts[cfg.LayoutMode] {
+		cfg.LayoutMode = "force"
+	}
+}
+
+// storedGraphConfig loads and merges the persisted config onto defaults.
+// Missing/corrupt storage yields the defaults.
+func (h *UserSettingHandler) storedGraphConfig(ctx context.Context, userID uint) graphConfig {
+	out := defaultGraphConfig()
+	val, found, err := h.svc.Get(ctx, userID, graphSettingKey)
+	if err != nil || !found {
+		return out
+	}
+	var stored graphConfigPatch
+	if json.Unmarshal([]byte(val), &stored) == nil {
+		stored.applyTo(&out)
+	}
+	clampGraphConfig(&out)
+	return out
+}
+
+// GetGraph returns the user's graph display settings (defaults for unset fields).
+func (h *UserSettingHandler) GetGraph(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	response.OK(c, h.storedGraphConfig(c.Request.Context(), userID))
+}
+
+// UpdateGraph merges the request onto the stored config, clamps it, and saves.
+// Responds with the canonical full config.
+func (h *UserSettingHandler) UpdateGraph(c *gin.Context) {
+	var req graphConfigPatch
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "invalid request body")
+		return
+	}
+	userID := middleware.GetUserID(c)
+	cfg := h.storedGraphConfig(c.Request.Context(), userID)
+	req.applyTo(&cfg)
+	clampGraphConfig(&cfg)
+	b, _ := json.Marshal(cfg)
+	if err := h.svc.Set(c.Request.Context(), userID, graphSettingKey, string(b)); err != nil {
+		response.InternalError(c, "failed to save graph settings")
+		return
+	}
+	response.OK(c, cfg)
 }

@@ -130,6 +130,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			protected.PUT("/settings/kanban", h.UserSetting.UpdateKanban)
 			protected.GET("/settings/dashboard", h.UserSetting.GetDashboard)
 			protected.PUT("/settings/dashboard", h.UserSetting.UpdateDashboard)
+			protected.GET("/settings/graph", h.UserSetting.GetGraph)
+			protected.PUT("/settings/graph", h.UserSetting.UpdateGraph)
 
 			// Workspace management (no workspace context needed)
 			protected.GET("/workspaces", h.Workspace.List)

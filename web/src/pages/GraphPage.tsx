@@ -9,15 +9,14 @@ import { useIsDarkMode } from '../hooks/useIsDarkMode'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
-import { useGraphSettings } from '../stores/graphSettings'
+import { Label } from '../components/ui/label'
+import { useGraphSettings, type GraphLayoutMode } from '../stores/graphSettings'
 import { getNodeLabelColor } from '../lib/constants'
-import { ZoomIn, ZoomOut, Maximize, Minimize, RotateCcw, Crosshair, Loader2, Network } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize, Minimize, RotateCcw, Crosshair, Loader2, Network, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import EmptyState from '../components/EmptyState'
 
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof ForceGraph2DType
-
-type LayoutMode = 'force' | 'cluster' | 'random'
 
 const avatarImageCache = new Map<string, HTMLImageElement>()
 
@@ -75,6 +74,150 @@ function SegmentedControl<T extends string>({
   )
 }
 
+function SliderRow({
+  label,
+  min,
+  max,
+  step = 1,
+  value,
+  onChange,
+}: {
+  label: string
+  min: number
+  max: number
+  step?: number
+  value: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">
+        {label} <span className="text-muted-foreground tabular-nums">({value}px)</span>
+      </Label>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-primary"
+      />
+    </div>
+  )
+}
+
+function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer select-none items-center justify-between gap-4 text-xs font-medium">
+      {label}
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="size-4 rounded border-input accent-primary"
+      />
+    </label>
+  )
+}
+
+// In-context display settings for the graph canvas. Lives on the page (both
+// the normal header and the fullscreen toolbar) so sizes, labels, physics and
+// layout can be tuned while watching the graph react.
+function GraphSettingsPanel() {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+  const nodeRadius = useGraphSettings((s) => s.nodeRadius)
+  const setNodeRadius = useGraphSettings((s) => s.setNodeRadius)
+  const emojiSize = useGraphSettings((s) => s.emojiSize)
+  const setEmojiSize = useGraphSettings((s) => s.setEmojiSize)
+  const showLabels = useGraphSettings((s) => s.showLabels)
+  const setShowLabels = useGraphSettings((s) => s.setShowLabels)
+  const showSelf = useGraphSettings((s) => s.showSelf)
+  const setShowSelf = useGraphSettings((s) => s.setShowSelf)
+  const layoutMode = useGraphSettings((s) => s.layoutMode)
+  const setLayoutMode = useGraphSettings((s) => s.setLayoutMode)
+  const linkDistance = useGraphSettings((s) => s.linkDistance)
+  const setLinkDistance = useGraphSettings((s) => s.setLinkDistance)
+  const chargeStrength = useGraphSettings((s) => s.chargeStrength)
+  const setChargeStrength = useGraphSettings((s) => s.setChargeStrength)
+  const reset = useGraphSettings((s) => s.reset)
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const layoutOptions: { value: GraphLayoutMode; label: string }[] = [
+    { value: 'force', label: t('graph.layoutForce') },
+    { value: 'cluster', label: t('graph.layoutCluster') },
+    { value: 'random', label: t('graph.layoutRandom') },
+  ]
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <Button
+        variant="outline"
+        size="icon"
+        className="size-8"
+        onClick={() => setOpen((o) => !o)}
+        title={t('graph.displaySettings')}
+        aria-label={t('graph.displaySettings')}
+        aria-expanded={open}
+      >
+        <SlidersHorizontal className="h-4 w-4" />
+      </Button>
+      {open && (
+        <div className="absolute right-0 top-9 z-30 w-72 space-y-4 rounded-lg border bg-background p-4 shadow-lg">
+          <div className="text-xs font-semibold text-muted-foreground">{t('graph.displaySettings')}</div>
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium">{t('graph.layout')}</span>
+            <div>
+              <SegmentedControl value={layoutMode} onChange={setLayoutMode} options={layoutOptions} />
+            </div>
+          </div>
+          <ToggleRow label={t('graph.showSelf')} checked={showSelf} onChange={setShowSelf} />
+          <ToggleRow label={t('settings.showLabels')} checked={showLabels} onChange={setShowLabels} />
+          <div className="h-px bg-border" role="separator" />
+          <SliderRow label={t('settings.nodeRadius')} min={10} max={40} value={nodeRadius} onChange={setNodeRadius} />
+          <SliderRow label={t('settings.emojiSize')} min={12} max={48} value={emojiSize} onChange={setEmojiSize} />
+          <SliderRow
+            label={t('settings.linkDistance')}
+            min={10}
+            max={200}
+            step={5}
+            value={linkDistance}
+            onChange={setLinkDistance}
+          />
+          <SliderRow
+            label={t('settings.chargeStrength')}
+            min={10}
+            max={100}
+            step={5}
+            value={chargeStrength}
+            onChange={setChargeStrength}
+          />
+          <Button variant="outline" size="sm" className="w-full" onClick={reset}>
+            {t('settings.resetDefaults')}
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 type GraphNodeData = {
   id: number
   name: string
@@ -98,12 +241,17 @@ export default function GraphPage() {
   const [loading, setLoading] = useState(true)
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set())
   const [filterMode, setFilterMode] = useState<'label' | 'relation'>('label')
-  const [showSelf, setShowSelf] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('force')
   const nodeRadius = useGraphSettings((s) => s.nodeRadius)
   const emojiSizeSetting = useGraphSettings((s) => s.emojiSize)
+  const showLabels = useGraphSettings((s) => s.showLabels)
+  const showSelf = useGraphSettings((s) => s.showSelf)
+  const setShowSelf = useGraphSettings((s) => s.setShowSelf)
+  const layoutMode = useGraphSettings((s) => s.layoutMode)
+  const setLayoutMode = useGraphSettings((s) => s.setLayoutMode)
+  const linkDistance = useGraphSettings((s) => s.linkDistance)
+  const chargeStrength = useGraphSettings((s) => s.chargeStrength)
 
   const handleZoomIn = useCallback(() => {
     if (fgRef.current) {
@@ -438,30 +586,30 @@ export default function GraphPage() {
       ctx.fillText(node.name?.[0] || '?', x, y)
     }
 
-    // Skip name labels when zoomed out on large graphs
-    if (!isLarge || globalScale > 0.6) {
+    // Name labels: hidden entirely when disabled; auto-hidden when zoomed
+    // out on large graphs to avoid a wall of text.
+    if (showLabels && (!isLarge || globalScale > 0.6)) {
       ctx.font = `${fontSize}px Sans-Serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
       ctx.fillStyle = isSelf ? '#10b981' : textColor
       ctx.fillText(node.name, x, y + r + 2 / globalScale)
     }
-  }, [nodeRadius, emojiSizeSetting, dark, isLarge])
+  }, [nodeRadius, emojiSizeSetting, showLabels, dark, isLarge])
 
-  // Reheat simulation and adjust forces when switching layout
+  // Reheat simulation and adjust forces when layout or physics settings
+  // change. Cluster keeps a tighter ⅔ spread; large graphs tighten spacing
+  // so hundreds of nodes stay readable — both scale with the user's base
+  // settings, reproducing the historical -20/20 and -40/15 at the defaults.
   useEffect(() => {
     const fg = fgRef.current
     if (!fg) return
-    if (layoutMode === 'cluster') {
-      fg.d3Force('charge')?.strength(-20)
-      fg.d3Force('link')?.distance(20)
-    }
-    if (isLarge) {
-      fg.d3Force('charge')?.strength(-40)
-      fg.d3Force('link')?.distance(15)
-    }
+    const chargeScale = layoutMode === 'cluster' ? 2 / 3 : isLarge ? 4 / 3 : 1
+    const distanceScale = layoutMode === 'cluster' ? 2 / 3 : isLarge ? 1 / 2 : 1
+    fg.d3Force('charge')?.strength(-chargeStrength * chargeScale)
+    fg.d3Force('link')?.distance(linkDistance * distanceScale)
     fg.d3ReheatSimulation()
-  }, [layoutMode, isLarge])
+  }, [layoutMode, isLarge, chargeStrength, linkDistance])
 
   if (loading) {
     return (
@@ -509,7 +657,7 @@ export default function GraphPage() {
 
   const cooldownTicks = layoutMode === 'random' ? 0 : (isLarge ? 200 : 100)
 
-  const layoutOptions: { value: LayoutMode; label: string }[] = [
+  const layoutOptions: { value: GraphLayoutMode; label: string }[] = [
     { value: 'force', label: t('graph.layoutForce') },
     { value: 'cluster', label: t('graph.layoutCluster') },
     { value: 'random', label: t('graph.layoutRandom') },
@@ -522,7 +670,7 @@ export default function GraphPage() {
 
   const visibleNodeCount = fgData.nodes.length - (showSelf ? 1 : 0)
 
-  const zoomButtons = (
+  const canvasToolbar = (
     <>
       <Button variant="outline" size="icon" className="size-8" onClick={handleZoomIn} title={t('graph.zoomIn')} aria-label={t('graph.zoomIn')}>
         <ZoomIn className="h-4 w-4" />
@@ -539,6 +687,7 @@ export default function GraphPage() {
       <Button variant="outline" size="icon" className="size-8" onClick={toggleFullscreen} title={isFullscreen ? t('graph.exitFullscreen') : t('graph.fullscreen')} aria-label={isFullscreen ? t('graph.exitFullscreen') : t('graph.fullscreen')}>
         {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
       </Button>
+      <GraphSettingsPanel />
     </>
   )
 
@@ -552,7 +701,7 @@ export default function GraphPage() {
               {visibleNodeCount}/{graphData.nodes.length}
             </span>
             <div className="mx-1 h-4 w-px bg-border" />
-            <div className="flex items-center gap-1">{zoomButtons}</div>
+            <div className="flex items-center gap-1">{canvasToolbar}</div>
           </div>
         </div>
       )}
@@ -576,7 +725,7 @@ export default function GraphPage() {
               >
                 {showSelf ? t('graph.hideSelf') : t('graph.showSelf')}
               </Button>
-              <div className="flex items-center gap-1">{zoomButtons}</div>
+              <div className="flex items-center gap-1">{canvasToolbar}</div>
             </div>
           </div>
 
