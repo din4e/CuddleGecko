@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import KanbanBoard from '../KanbanBoard'
 import type { Todo, Tag } from '../../types'
@@ -103,5 +103,36 @@ describe('KanbanBoard', () => {
     expect(screen.getByText('todos.normal')).toBeInTheDocument()
     expect(screen.getByText('todos.low')).toBeInTheDocument()
     localStorage.removeItem('kanbanSwimlaneMode')
+  })
+
+  it('renders one full-height divider per column', () => {
+    renderBoard()
+    expect(screen.getAllByLabelText('todos.kanbanResizeColumn')).toHaveLength(columns.length)
+  })
+
+  it('drags a divider to resize the column and persists the width', () => {
+    renderBoard()
+    const divider = screen.getAllByLabelText('todos.kanbanResizeColumn')[0]
+    fireEvent.pointerDown(divider, { pointerId: 1, clientX: 200 })
+    fireEvent.pointerMove(divider, { pointerId: 1, clientX: 412 }) // +212 → 256+212=468
+    const colEl = document.querySelector('[data-kanban-col="status-pending"]') as HTMLElement
+    expect(colEl.style.width).toBe('468px')
+    fireEvent.pointerUp(divider, { pointerId: 1 })
+    expect(localStorage.getItem('kanbanColWidths')).toBe(
+      JSON.stringify({ 'status-pending': 468 }),
+    )
+  })
+
+  it('clamps divider drags to the min/max column width', () => {
+    renderBoard()
+    const divider = screen.getAllByLabelText('todos.kanbanResizeColumn')[0]
+    fireEvent.pointerDown(divider, { pointerId: 1, clientX: 200 })
+    fireEvent.pointerMove(divider, { pointerId: 1, clientX: 1200 })
+    let colEl = document.querySelector('[data-kanban-col="status-pending"]') as HTMLElement
+    expect(colEl.style.width).toBe('480px')
+    fireEvent.pointerMove(divider, { pointerId: 1, clientX: -1000 })
+    colEl = document.querySelector('[data-kanban-col="status-pending"]') as HTMLElement
+    expect(colEl.style.width).toBe('180px')
+    fireEvent.pointerUp(divider, { pointerId: 1 })
   })
 })
