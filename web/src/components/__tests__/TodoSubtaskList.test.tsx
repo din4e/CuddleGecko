@@ -205,6 +205,25 @@ describe('TodoSubtaskList', () => {
     expect(screen.getByText('Open grandchild')).toBeInTheDocument()
   })
 
+  it('hideDone drops abandoned rows too, unless they hide open descendants', () => {
+    const abandonedChild = base({ id: 12, title: 'Abandoned child', parent_id: 1, status: 'abandoned' })
+    const abandonedParentOfOpen = base({ id: 13, title: 'Abandoned parent of open', parent_id: 1, status: 'abandoned', child_count: 1 })
+    const openGrandchild = base({ id: 14, title: 'Open under abandoned', parent_id: 13 })
+    render(
+      <TodoSubtaskList todo={parent}
+        childrenByParent={new Map<number, Todo[]>([
+          [1, [abandonedChild, abandonedParentOfOpen]],
+          [13, [openGrandchild]],
+        ])}
+        onToggle={vi.fn()} onEdit={vi.fn()} hideDone />,
+    )
+    expect(screen.queryByText('Abandoned child')).not.toBeInTheDocument()
+    // An abandoned row with a pending descendant stays — same orphan-safety
+    // rule as done rows.
+    expect(screen.getByText('Abandoned parent of open')).toBeInTheDocument()
+    expect(screen.getByText('Open under abandoned')).toBeInTheDocument()
+  })
+
   it('hideDone keeps a done row whose children are not loaded yet', () => {
     // child_count > 0 with no slice in the map: the descendants are unknown,
     // so the row stays until they load (pending work never disappears).

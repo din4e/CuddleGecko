@@ -5,7 +5,7 @@ import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
 import { AddChildInput } from './AddChildInput'
-import { subtreeAllDoneFromMap } from '../lib/buildTodoTree'
+import { isSettledStatus, subtreeSettledFromMap } from '../lib/buildTodoTree'
 import { useTodoCollapseStore } from '../stores/todoCollapse'
 import type { Todo } from '../types'
 
@@ -29,10 +29,11 @@ export interface TodoSubtaskListProps {
   /** Delete routes through the page's confirm dialog when provided. */
   onDelete?: (todo: Todo) => void
   onStartPomodoro?: (todo: Todo) => void
-  /** The page's one-click "hide completed" toggle: done rows whose whole
-   *  loaded subtree is done drop out of render. A done row with open (or
-   *  still unloaded) descendants stays — pending work never vanishes with
-   *  its parent. Progress chips keep counting the unfiltered map. */
+  /** The page's one-click "hide completed" toggle: settled (done/abandoned)
+   *  rows whose whole loaded subtree is settled drop out of render. A settled
+   *  row with open (or still unloaded) descendants stays — pending work never
+   *  vanishes with its parent. Progress chips keep counting the unfiltered
+   *  map. */
   hideDone?: boolean
   /** Drag & drop reparenting (tree-view semantics, at any depth). When
    *  wired, rows become draggable and act as tri-zone drop targets: upper
@@ -85,7 +86,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
   // child exists — that's exactly when "add a subtask" is needed most.
   const showAdder = onCreateChild != null
   const rows = hideDone && children
-    ? children.filter((c) => c.status !== 'done' || !subtreeAllDoneFromMap(c, childrenByParent))
+    ? children.filter((c) => !isSettledStatus(c.status) || !subtreeSettledFromMap(c, childrenByParent))
     : children
   if (!rows?.length && !showAdder) return null
 
@@ -100,7 +101,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
         // The caret/fold follows the VISIBLE rows (a caret that expands to
         // nothing is a bug), but the progress chip keeps the TRUE counts.
         const visibleGrandChildren = hideDone && grandChildren
-          ? grandChildren.filter((g) => g.status !== 'done' || !subtreeAllDoneFromMap(g, childrenByParent))
+          ? grandChildren.filter((g) => !isSettledStatus(g.status) || !subtreeSettledFromMap(g, childrenByParent))
           : grandChildren
         const hasChildren = !!visibleGrandChildren?.length
         const showsProgress = !!grandChildren?.length

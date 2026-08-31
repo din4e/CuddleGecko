@@ -1,5 +1,11 @@
 import type { Todo } from '../types'
 
+/** "Settled" statuses — the ones the hide-completed toggle folds away. Done
+ *  AND abandoned both mean no open work left in the row itself. */
+export function isSettledStatus(status: Todo['status']): boolean {
+  return status === 'done' || status === 'abandoned'
+}
+
 export interface TodoNode {
   todo: Todo
   children: TodoNode[]
@@ -8,9 +14,9 @@ export interface TodoNode {
   /** Lazy tree: the children slice is truncated — a per-node "load more"
    *  grows the page size (see useTodoChildrenMap). */
   childrenHasMore?: boolean
-  /** hideDone: this done node's whole loaded subtree is done, so the row is
-   *  hidden from render. children stay intact — progress chips and move
-   *  targets keep operating on the real subtree. */
+  /** hideDone: this settled (done/abandoned) node's whole loaded subtree is
+   *  settled, so the row is hidden from render. children stay intact —
+   *  progress chips and move targets keep operating on the real subtree. */
   hidden?: boolean
 }
 
@@ -61,19 +67,21 @@ export function buildTodoTree(todos: Todo[]): TodoNode[] {
  * A node whose slice is missing (not expanded / not yet fetched) simply has
  * no children here — the caret visibility comes from todo.child_count.
  *
- * opts.hideDone marks done nodes `hidden` (see TodoNode) — marking only, the
- * renderer decides. A done node with open or still-unloaded descendants is
- * kept visible: pending work never disappears with its completed parent.
+ * opts.hideDone marks settled (done/abandoned) nodes `hidden` (see TodoNode)
+ * — marking only, the renderer decides. A settled node with open or
+ * still-unloaded descendants is kept visible: pending work never disappears
+ * with its completed parent.
  */
 export function buildLazyTree(
   roots: Todo[],
   slices: Map<number, LazyChildrenSlice>,
   opts?: { hideDone?: boolean },
 ): TodoNode[] {
-  // "Settled" = the node's whole loaded subtree is done AND nothing under it
-  // is still unloaded or truncated, so hiding it can't swallow open work.
+  // "Settled" = the node and its whole loaded subtree are done/abandoned AND
+  // nothing under it is still unloaded or truncated, so hiding it can't
+  // swallow open work.
   const settled = (n: TodoNode): boolean =>
-    n.children.every((c) => c.todo.status === 'done' && settled(c)) &&
+    n.children.every((c) => isSettledStatus(c.todo.status) && settled(c)) &&
     !n.childrenHasMore &&
     (n.todo.child_count ?? 0) <= n.children.length
   const hideDone = opts?.hideDone ?? false
@@ -85,17 +93,17 @@ export function buildLazyTree(
       childrenLoading: slice != null && !slice.loaded,
       childrenHasMore: slice?.hasMore ?? false,
     }
-    if (hideDone) node.hidden = todo.status === 'done' && settled(node)
+    if (hideDone) node.hidden = isSettledStatus(todo.status) && settled(node)
     return node
   }
   return roots.map(build)
 }
 
 /** Map-based counterpart of buildLazyTree's "settled" rule for subtask lists
- * (flat-view cards): true when the todo's whole loaded subtree is done and
- * nothing under it is still unloaded — i.e. hiding the row can't swallow
- * open work. */
-export function subtreeAllDoneFromMap(
+ * (flat-view cards): true when the todo's whole loaded subtree is settled
+ * (done/abandoned) and nothing under it is still unloaded — i.e. hiding the
+ * row can't swallow open work. */
+export function subtreeSettledFromMap(
   todo: Todo,
   childrenByParent: Map<number, Todo[]>,
   seen: Set<number> = new Set(),
@@ -107,7 +115,7 @@ export function subtreeAllDoneFromMap(
   // truncated) → the rest could be open → keep the row visible.
   if ((todo.child_count ?? 0) > (children?.length ?? 0)) return false
   return (children ?? []).every(
-    (c) => c.status === 'done' && subtreeAllDoneFromMap(c, childrenByParent, seen),
+    (c) => isSettledStatus(c.status) && subtreeSettledFromMap(c, childrenByParent, seen),
   )
 }
 
