@@ -70,6 +70,11 @@ const MIN_COL_WIDTH = 180
 const MAX_COL_WIDTH = 480
 const WIDTHS_KEY = 'kanbanColWidths'
 const SWIMLANE_KEY = 'kanbanSwimlaneMode'
+// Layout constants mirrored from the Tailwind classes below so divider strips
+// can be positioned arithmetically: COL_GAP = gap-1.5, LANE_SPACER_W = w-20.
+const COL_GAP = 6
+const LANE_SPACER_W = 80
+const RESIZER_STRIP_W = 12
 
 // Drag ids are namespaced so handlers can tell draggables apart:
 //   t<todoId>            sortable card
@@ -170,25 +175,37 @@ export default function KanbanBoard({
   const startResize = (colId: string) => (e: React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    const el = e.currentTarget as HTMLElement
     const startX = e.clientX
     const startW = widthOf(colId)
-    el.setPointerCapture(e.pointerId)
+    // Window-level listeners keep the drag alive even when the pointer
+    // outruns the 12px strip (no pointer capture needed).
     const move = (ev: PointerEvent) => {
       const w = Math.min(MAX_COL_WIDTH, Math.max(MIN_COL_WIDTH, startW + ev.clientX - startX))
       setColWidths((prev) => (prev[colId] === w ? prev : { ...prev, [colId]: w }))
     }
     const up = () => {
-      el.removeEventListener('pointermove', move)
-      el.removeEventListener('pointerup', up)
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
       setColWidths((prev) => {
         localStorage.setItem(WIDTHS_KEY, JSON.stringify(prev))
         return prev
       })
     }
-    el.addEventListener('pointermove', move)
-    el.addEventListener('pointerup', up)
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
   }
+
+  // Divider strips sit over the gap after every column, spanning the whole
+  // board height (header + all lanes). Positions are computed from the same
+  // width numbers the columns render with, so they track the drag live.
+  const dividers = useMemo(() => {
+    const spacer = laneMode !== 'none' ? LANE_SPACER_W : 0
+    const w = (id: string) => colWidths[id] ?? DEFAULT_COL_WIDTH
+    return columns.map((col, i) => {
+      const rightEdge = columns.slice(0, i + 1).reduce((sum, c) => sum + w(c.id) + COL_GAP, spacer)
+      return { colId: col.id, left: rightEdge - COL_GAP / 2 - RESIZER_STRIP_W / 2 }
+    })
+  }, [columns, colWidths, laneMode])
 
   // --- Canvas pan: grab empty board space and drag to scroll horizontally ---
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -437,10 +454,34 @@ export default function KanbanBoard({
         onPointerMove={onPanPointerMove}
         onPointerUp={endPan}
         onPointerCancel={endPan}
-        className={`overflow-x-auto pb-2 ${panning ? 'cursor-grabbing select-none' : ''}`}
+        className={`overflow-x-auto pb-2 h-[calc(100vh-19rem)] ${panning ? 'cursor-grabbing select-none' : ''}`}
       >
-        <div className="min-w-max">
-          {/* Header row: draggable column headers with resize dividers */}
+        {/* flex-col + h-full: header keeps its natural height, lane rows
+            stretch to fill the viewport, so cells (and the divider strips
+            overlaying them) run all the way down instead of ending where the
+            shortest card list does. */}
+        <div className="min-w-max relative flex flex-col h-full">
+          {/* Draggable column dividers — full-height strips over each gap.
+              pointer-events-none on the layer, auto on the strips, so cards
+              and pan-to-scroll underneath keep working. */}
+          <div className="absolute inset-0 pointer-events-none">
+            {dividers.map(({ colId, left }) => (
+              <div
+                key={colId}
+                data-kanban-resizer
+                role="separator"
+                aria-orientation="vertical"
+                aria-label={t('todos.kanbanResizeColumn')}
+                title={t('todos.kanbanResizeColumn')}
+                onPointerDown={startResize(colId)}
+                style={{ left, width: RESIZER_STRIP_W }}
+                className="group/resizer pointer-events-auto absolute top-0 bottom-0 z-10 flex touch-none cursor-col-resize justify-center"
+              >
+                <div className="w-0.5 h-full rounded bg-transparent transition-colors group-hover/resizer:bg-primary/50" />
+              </div>
+            ))}
+          </div>
+          {/* Header row: draggable column headers */}
           <SortableContext items={columns.map((c) => colSortId(c.id))} strategy={horizontalListSortingStrategy}>
             <div className="flex gap-1.5 items-start">
               {laneMode !== 'none' && <div className="w-20 shrink-0" />}
@@ -451,7 +492,6 @@ export default function KanbanBoard({
                   width={widthOf(col.id)}
                   count={(derived.byColumn.get(col.id) ?? []).length}
                   onRemove={() => removeColumn(col.id)}
-                  onResizeStart={startResize(col.id)}
                 />
               ))}
               {derived.hasUnmatched && (
@@ -525,7 +565,9 @@ export default function KanbanBoard({
             ]
             const collapsed = collapsedLanes.has(lane.id)
             return (
-              <div key={lane.id} className="flex gap-1.5 items-start mt-1.5">
+              // Stretched lanes share the board height (cells + dividers reach
+              // the bottom); a collapsed lane keeps its natural label height.
+              <div key={lane.id} className={`flex gap-1.5 mt-1.5 ${collapsed ? 'items-start' : 'items-stretch flex-1 min-h-0'}`}>
                 {laneMode !== 'none' && (
                   <div className="w-20 shrink-0 flex items-center gap-1 pt-2">
                     <button
@@ -557,7 +599,7 @@ export default function KanbanBoard({
                 ))}
                 {!collapsed && derived.hasUnmatched && (
                   <div style={{ width: 224 }} className="shrink-0">
-                    <div className="min-h-[60px] bg-muted/20 rounded-lg p-2 border-2 border-dashed space-y-1.5">
+                    <div className="h-full min-h-[60px] bg-muted/20 rounded-lg p-2 border-2 border-dashed space-y-1.5">
                       {(derived.unmatchedByLane[lane.id] ?? []).map((tid) => {
                         const td = todoById.get(tid)
                         return td ? <div key={tid} className="opacity-80">{renderCard(td)}</div> : null
@@ -612,19 +654,18 @@ function ColumnIcon({ col }: { col: KanbanColumn }) {
   return <TagIcon className="h-4 w-4 text-blue-500" />
 }
 
-/** Sortable column header with a right-edge resize divider. */
+/** Sortable column header. Column width is controlled by the full-height
+ *  divider strips rendered in the board overlay. */
 function ColumnHeader({
   col,
   width,
   count,
   onRemove,
-  onResizeStart,
 }: {
   col: KanbanColumn
   width: number
   count: number
   onRemove: () => void
-  onResizeStart: (e: React.PointerEvent) => void
 }) {
   const { t } = useTranslation()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -634,6 +675,7 @@ function ColumnHeader({
   return (
     <div
       ref={setNodeRef}
+      data-kanban-col={col.id}
       style={{ width, transform: CSS.Translate.toString(transform), transition }}
       className={`shrink-0 relative ${isDragging ? 'opacity-30' : ''}`}
     >
@@ -657,15 +699,6 @@ function ColumnHeader({
           <X className="h-3.5 w-3.5" />
         </button>
       </h3>
-      <div
-        data-kanban-resizer
-        onPointerDown={onResizeStart}
-        className="absolute -right-1 top-0 h-full w-2 cursor-col-resize z-10 flex items-center justify-center group/resizer"
-        aria-label={t('todos.kanbanResizeColumn')}
-        title={t('todos.kanbanResizeColumn')}
-      >
-        <div className="h-8 w-0.5 rounded bg-transparent group-hover/resizer:bg-primary/50" />
-      </div>
     </div>
   )
 }
