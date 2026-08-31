@@ -8,6 +8,10 @@ export interface TodoNode {
   /** Lazy tree: the children slice is truncated — a per-node "load more"
    *  grows the page size (see useTodoChildrenMap). */
   childrenHasMore?: boolean
+  /** hideDone: this done node's whole loaded subtree is done, so the row is
+   *  hidden from render. children stay intact — progress chips and move
+   *  targets keep operating on the real subtree. */
+  hidden?: boolean
 }
 
 /** Structural slice shape produced by useTodoChildrenMap per expanded node. */
@@ -56,18 +60,55 @@ export function buildTodoTree(todos: Todo[]): TodoNode[] {
  * the server's (it applies the toolbar sort), so no client-side reordering.
  * A node whose slice is missing (not expanded / not yet fetched) simply has
  * no children here — the caret visibility comes from todo.child_count.
+ *
+ * opts.hideDone marks done nodes `hidden` (see TodoNode) — marking only, the
+ * renderer decides. A done node with open or still-unloaded descendants is
+ * kept visible: pending work never disappears with its completed parent.
  */
-export function buildLazyTree(roots: Todo[], slices: Map<number, LazyChildrenSlice>): TodoNode[] {
+export function buildLazyTree(
+  roots: Todo[],
+  slices: Map<number, LazyChildrenSlice>,
+  opts?: { hideDone?: boolean },
+): TodoNode[] {
+  // "Settled" = the node's whole loaded subtree is done AND nothing under it
+  // is still unloaded or truncated, so hiding it can't swallow open work.
+  const settled = (n: TodoNode): boolean =>
+    n.children.every((c) => c.todo.status === 'done' && settled(c)) &&
+    !n.childrenHasMore &&
+    (n.todo.child_count ?? 0) <= n.children.length
+  const hideDone = opts?.hideDone ?? false
   const build = (todo: Todo): TodoNode => {
     const slice = slices.get(todo.id)
-    return {
+    const node: TodoNode = {
       todo,
       children: (slice?.items ?? []).map(build),
       childrenLoading: slice != null && !slice.loaded,
       childrenHasMore: slice?.hasMore ?? false,
     }
+    if (hideDone) node.hidden = todo.status === 'done' && settled(node)
+    return node
   }
   return roots.map(build)
+}
+
+/** Map-based counterpart of buildLazyTree's "settled" rule for subtask lists
+ * (flat-view cards): true when the todo's whole loaded subtree is done and
+ * nothing under it is still unloaded — i.e. hiding the row can't swallow
+ * open work. */
+export function subtreeAllDoneFromMap(
+  todo: Todo,
+  childrenByParent: Map<number, Todo[]>,
+  seen: Set<number> = new Set(),
+): boolean {
+  if (seen.has(todo.id)) return false // cycle in the map → unknown → keep visible
+  seen.add(todo.id)
+  const children = childrenByParent.get(todo.id)
+  // No slice, or fewer loaded rows than the server says exist (unfetched /
+  // truncated) → the rest could be open → keep the row visible.
+  if ((todo.child_count ?? 0) > (children?.length ?? 0)) return false
+  return (children ?? []).every(
+    (c) => c.status === 'done' && subtreeAllDoneFromMap(c, childrenByParent, seen),
+  )
 }
 
 /** flattenTree depth-first; handy for keyboard nav / "select all in subtree". */

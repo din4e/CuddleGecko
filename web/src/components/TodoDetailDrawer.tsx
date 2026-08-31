@@ -7,6 +7,7 @@ import TodoSubtaskList from './TodoSubtaskList'
 import { TodoComments } from './TodoComments'
 import { TodoHistory } from './TodoHistory'
 import { useTodoChildrenMap, useTodoComments } from '../hooks/api/useTodos'
+import type { SubtaskMoveAfterId } from './TodoSubtaskList'
 import type { Todo, Contact, Tag } from '../types'
 
 interface TodoDetailDrawerProps {
@@ -25,19 +26,31 @@ interface TodoDetailDrawerProps {
   onOpenTodo?: (todo: Todo) => void
   /** Inline quick-add under any subtask row (page's create handler). */
   onCreateChild?: (parent: Todo, title: string) => void
+  /** The page's one-click "hide completed" toggle — done subtask rows whose
+   *  whole subtree is done drop out here too, same rule as the cards. */
+  hideDone?: boolean
+  /** Subtask drag & drop, sharing the page's drag state so a drag started on
+   *  a card's subtask can finish on a drawer row (and vice versa). */
+  subtaskDragId?: number | null
+  onSubtaskDragIdChange?: (id: number | null) => void
+  onMoveSubtask?: (id: number, parentId: number | null, afterId: SubtaskMoveAfterId) => void
 }
 
 /** Loads the todo's whole subtree: starts with direct children, then keeps
  *  adding one children query per discovered child until nothing new appears.
  *  Every child gets its own unfiltered slice so grandchild rows always show,
  *  regardless of the smart list that surfaced the parent. */
-function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo, onCreateChild }: {
+function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo, onCreateChild, hideDone, dragId, onDragIdChange, onMove }: {
   todo: Todo
   onToggle?: (todo: Todo) => void
   onDelete?: (todo: Todo) => void
   onStartPomodoro?: (todo: Todo) => void
   onOpenTodo: (todo: Todo) => void
   onCreateChild?: (parent: Todo, title: string) => void
+  hideDone?: boolean
+  dragId?: number | null
+  onDragIdChange?: (id: number | null) => void
+  onMove?: (id: number, parentId: number | null, afterId: SubtaskMoveAfterId) => void
 }) {
   const { t } = useTranslation()
   // Accumulated parent ids whose children slices we need (root + descendants
@@ -79,6 +92,10 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
         onCreateChild={onCreateChild}
         onDelete={onDelete}
         onStartPomodoro={onStartPomodoro}
+        hideDone={hideDone}
+        onMove={onMove}
+        dragId={dragId}
+        onDragIdChange={onDragIdChange}
       />
     </div>
   )
@@ -89,7 +106,7 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
  *  (comments) and the modification history each one click away instead of
  *  stacked in a very long scroll. The form remounts per todo id so its state
  *  always matches the todo being viewed. */
-export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates, onContactsChange, onClose, onToggleSubtask, onDeleteSubtask, onStartPomodoro, onOpenTodo, onCreateChild }: TodoDetailDrawerProps) {
+export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates, onContactsChange, onClose, onToggleSubtask, onDeleteSubtask, onStartPomodoro, onOpenTodo, onCreateChild, hideDone, subtaskDragId, onSubtaskDragIdChange, onMoveSubtask }: TodoDetailDrawerProps) {
   const { t } = useTranslation()
   // Comment count for the tab badge — same cached query TodoComments reads.
   const { data: comments } = useTodoComments(todo?.id ?? null)
@@ -128,6 +145,10 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
                 onStartPomodoro={onStartPomodoro}
                 onOpenTodo={(sub) => onOpenTodo?.(sub)}
                 onCreateChild={onCreateChild}
+                hideDone={hideDone}
+                dragId={subtaskDragId}
+                onDragIdChange={onSubtaskDragIdChange}
+                onMove={onMoveSubtask}
               />
             </TabsContent>
             <TabsContent value="comments" className="min-h-0 overflow-y-auto p-4">

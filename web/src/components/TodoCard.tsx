@@ -6,6 +6,7 @@ import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
 import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
+import { useTodoCollapseStore } from '../stores/todoCollapse'
 import type { SubtreeProgress } from '../lib/todoProgress'
 import type { Todo } from '../types'
 
@@ -46,6 +47,12 @@ export interface TodoCardProps {
   subtasks?: ReactNode
   /** Cross-subtask completion roll-up (done/total over all descendants). */
   subtaskProgress?: SubtreeProgress
+  /** Native subtask drag in flight (page-level id, spans cards). While set
+   *  the whole card is a nest drop target: dropping a subtask ON a task
+   *  makes it that task's last child — mirroring the dnd-kit middle-zone
+   *  nesting card drags already have (TodoSortableGroups.onNest). */
+  subtaskDragId?: number | null
+  onNestSubtask?: (draggedId: number, parentId: number) => void
 }
 
 const TodoCard = memo(function TodoCard({
@@ -69,6 +76,8 @@ const TodoCard = memo(function TodoCard({
   onPostpone,
   subtasks,
   subtaskProgress,
+  subtaskDragId,
+  onNestSubtask,
 }: TodoCardProps) {
   const { t } = useTranslation()
   const [editingTitle, setEditingTitle] = useState(false)
@@ -76,6 +85,16 @@ const TodoCard = memo(function TodoCard({
   // Compact (kanban) cards hide their subtask list behind the progress chip
   // so the board and drag overlays stay lean.
   const [subtasksOpen, setSubtasksOpen] = useState(false)
+  // Native subtask drag hovering this card (nest target highlight).
+  const [nestHover, setNestHover] = useState(false)
+  const canNest = subtaskDragId != null && subtaskDragId !== todo.id && onNestSubtask != null
+  // Flat views fold the card's subtask list through the shared persisted
+  // collapse store (synced with the drawer and every nesting depth inside).
+  // Only meaningful while children exist — a stale fold must never hide the
+  // "add subtask" entry of a todo whose children were all removed.
+  const collapseHas = useTodoCollapseStore((s) => s.collapsed.has(todo.id))
+  const toggleCollapse = useTodoCollapseStore((s) => s.toggle)
+  const sectionFolded = !!subtaskProgress && subtaskProgress.total > 0 && collapseHas
   // Single click on the title opens the detail drawer; double-click renames.
   // The two are disambiguated by delaying the click action long enough for a
   // second click to cancel it.
@@ -108,8 +127,26 @@ const TodoCard = memo(function TodoCard({
 
   return (
     <Card
-      className={`group relative gap-0 py-0 ${closed ? 'opacity-60' : ''}`}
+      className={`group relative gap-0 py-0 ${closed ? 'opacity-60' : ''} ${canNest && nestHover ? 'ring-2 ring-primary/70 bg-primary/5' : ''}`}
       style={todo.color ? { borderLeftColor: todo.color, borderLeftWidth: '3px' } : undefined}
+      onDragOver={(e) => {
+        if (!canNest) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        setNestHover(true)
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setNestHover(false)
+      }}
+      onDrop={(e) => {
+        if (!canNest) return
+        // Subtask rows stop their own dragover/drop, so reaching here means
+        // the pointer released on the card body itself → nest under it.
+        e.preventDefault()
+        e.stopPropagation()
+        onNestSubtask!(subtaskDragId!, todo.id)
+        setNestHover(false)
+      }}
     >
       <CardContent className={compact ? 'p-1.5 pr-16' : 'p-2 space-y-1'}>
         <div className="flex items-start gap-1.5">
@@ -206,8 +243,25 @@ const TodoCard = memo(function TodoCard({
               </span>
             )}
             {/* Cross-subtask roll-up over all descendants (not just checklist
-                items) — complements the item_done chip above. */}
-            {subtaskProgress && subtaskProgress.total > 0 && (
+                items) — complements the item_done chip above. In the flat
+                views (subtasks wired) the chip is also the fold toggle for
+                the card's subtask list, mirroring the kanban chip below. */}
+            {subtaskProgress && subtaskProgress.total > 0 && (subtasks ? (
+              <button
+                type="button"
+                onClick={() => toggleCollapse(todo.id)}
+                aria-expanded={!sectionFolded}
+                title={t('todos.subtaskProgress', { done: subtaskProgress.done, total: subtaskProgress.total })}
+                className={cn(
+                  'flex items-center gap-1 rounded tabular-nums hover:bg-muted/60',
+                  subtaskProgress.done === subtaskProgress.total ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground',
+                )}
+              >
+                <ListTree className="h-3 w-3" />
+                {subtaskProgress.done}/{subtaskProgress.total}
+                <ChevronDown className={cn('h-3 w-3 transition-transform', !sectionFolded && 'rotate-180')} />
+              </button>
+            ) : (
               <span
                 className={cn(
                   'flex items-center gap-1 tabular-nums',
@@ -218,7 +272,7 @@ const TodoCard = memo(function TodoCard({
                 <ListTree className="h-3 w-3" />
                 {subtaskProgress.done}/{subtaskProgress.total}
               </span>
-            )}
+            ))}
             {todo.repeat && repeatLabel && (
               <span className="flex items-center gap-1 text-primary">
                 <Repeat className="h-3 w-3" />
@@ -294,7 +348,7 @@ const TodoCard = memo(function TodoCard({
           </button>
         )}
       </CardContent>
-      {subtasks && (!compact || subtasksOpen) && subtasks}
+      {subtasks && (compact ? subtasksOpen : !sectionFolded) && subtasks}
 
       {/* Action toolbar — floating top-right so it costs no row height.
           Hover-reveal on md+; always visible on touch/small screens. */}

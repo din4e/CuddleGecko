@@ -165,4 +165,28 @@ describe('TodoTree', () => {
     fireEvent.keyDown(screen.getByText('todo-2'), { key: 'Tab', shiftKey: true })
     expect(onMove).toHaveBeenCalledWith(2, null, 1)
   })
+
+  it('skips hidden (hideDone) child rows and leaves no empty-expanding caret', () => {
+    // One loaded child, done and marked hidden; child_count matches the
+    // loaded row → the caret disappears with it instead of expanding to
+    // nothing.
+    const tree = [node(makeTodo(1, { child_count: 1 }), [
+      { todo: makeTodo(2, { status: 'done' }), children: [], hidden: true },
+    ])]
+    render(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
+    expect(screen.getByText('todo-1')).toBeInTheDocument()
+    expect(screen.queryByText('todo-2')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'todos.collapse' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the caret when hidden children are matched by unfetched ones', () => {
+    // child_count 2 with one loaded+hidden done row: the unfetched child may
+    // be pending, so the caret must stay.
+    const tree = [node(makeTodo(1, { child_count: 2 }), [
+      { todo: makeTodo(2, { status: 'done' }), children: [], hidden: true },
+    ])]
+    render(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
+    expect(screen.queryByText('todo-2')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'todos.collapse' })).toBeInTheDocument()
+  })
 })
