@@ -57,7 +57,7 @@ type updateTodoRequest struct {
 
 // parseDueQuery parses an optional RFC3339 due-time query parameter.
 // Returns nil when the parameter is absent or empty.
-func parseDueQuery(c *gin.Context, key string) (*time.Time, bool) {
+func parseTimeQuery(c *gin.Context, key string) (*time.Time, bool) {
 	raw := c.Query(key)
 	if raw == "" {
 		return nil, true
@@ -90,6 +90,9 @@ func (h *TodoHandler) List(c *gin.Context) {
 	if v := c.Query("started"); v == "1" || v == "true" {
 		q.Started = true
 	}
+	if v := c.Query("deferred"); v == "1" || v == "true" {
+		q.Deferred = true
+	}
 	if v := c.Query("roots_only"); v == "1" || v == "true" {
 		q.RootsOnly = true
 	}
@@ -104,17 +107,23 @@ func (h *TodoHandler) List(c *gin.Context) {
 			q.TagIDs = append(q.TagIDs, uint(id))
 		}
 	}
-	if dueAfter, ok := parseDueQuery(c, "due_after"); !ok {
+	if dueAfter, ok := parseTimeQuery(c, "due_after"); !ok {
 		response.BadRequest(c, "invalid due_after format")
 		return
 	} else {
 		q.DueAfter = dueAfter
 	}
-	if dueBefore, ok := parseDueQuery(c, "due_before"); !ok {
+	if dueBefore, ok := parseTimeQuery(c, "due_before"); !ok {
 		response.BadRequest(c, "invalid due_before format")
 		return
 	} else {
 		q.DueBefore = dueBefore
+	}
+	if doneAfter, ok := parseTimeQuery(c, "done_after"); !ok {
+		response.BadRequest(c, "invalid done_after format")
+		return
+	} else {
+		q.DoneAfter = doneAfter
 	}
 
 	todos, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, q)

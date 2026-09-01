@@ -286,6 +286,37 @@ func TestTodoHandler_List_InvalidDueBefore(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+func TestTodoHandler_List_DeferredAndDoneAfter(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("List", mock.Anything, uint(1), mock.MatchedBy(func(q model.TodoListQuery) bool {
+		return q.Deferred
+	})).Return([]model.Todo{}, int64(0), nil)
+	doneAfter := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	repo.On("List", mock.Anything, uint(1), mock.MatchedBy(func(q model.TodoListQuery) bool {
+		return q.DoneAfter != nil && q.DoneAfter.Equal(doneAfter)
+	})).Return([]model.Todo{}, int64(0), nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos?deferred=1", nil)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/todos?done_after=2026-09-01T00:00:00Z", nil)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/api/todos?done_after=not-a-date", nil)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 func TestTodoHandler_List_ParentFilterAndRootsOnly(t *testing.T) {
 	repo := new(mockTodoSvcRepo)
 	eventRepo := new(mockTodoEventRepo)

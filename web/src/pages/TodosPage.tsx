@@ -16,12 +16,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../components/ui/dialog'
-import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical, Eye, EyeOff } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical, Eye, EyeOff, Tags } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
 } from '../components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import type { Todo, TodoSort, TodoListParams, TodoUpdateInput } from '../types'
@@ -68,10 +69,18 @@ const TodoFormDialog = lazy(() => import('../components/TodoFormDialog').then((m
 const TodoDetailDrawer = lazy(() => import('../components/TodoDetailDrawer').then((m) => ({ default: m.TodoDetailDrawer })))
 
 // TickTick-style smart lists. Each maps to a set of backend list params.
-type SmartList = 'all' | 'today' | 'next7' | 'overdue' | 'pending' | 'completed' | 'abandoned' | 'trash'
+type SmartList = 'all' | 'today' | 'next7' | 'overdue' | 'pending' | 'deferred' | 'doneToday' | 'doneThisWeek' | 'completed' | 'abandoned' | 'trash'
 
 function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+// Monday 00:00 of the argument's week — the same boundary the backend's
+// done_this_week stat uses.
+function startOfWeek(d: Date) {
+  const start = startOfDay(d)
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7))
+  return start
 }
 
 function smartListParams(list: SmartList): TodoListParams {
@@ -86,6 +95,14 @@ function smartListParams(list: SmartList): TodoListParams {
       return { overdue: true, started: true }
     case 'pending':
       return { status: 'pending', started: true }
+    case 'deferred':
+      // The stat strip's 已推迟 bucket: pending tasks whose start_time is in
+      // the future. (No `started` here — it would exclude exactly these.)
+      return { deferred: true }
+    case 'doneToday':
+      return { status: 'done', done_after: todayStart.toISOString() }
+    case 'doneThisWeek':
+      return { status: 'done', done_after: startOfWeek(new Date()).toISOString() }
     case 'completed':
       return { status: 'done' }
     case 'abandoned':
@@ -116,7 +133,8 @@ export default function TodosPage() {
   const [quickTitle, setQuickTitle] = useState('')
   const [quickDue, setQuickDue] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<'' | 'low' | 'normal' | 'high'>('')
-  const [tagFilter, setTagFilter] = useState<string>('')
+  // Multi-label filter (any-of): tasks tagged with ANY of the selected tags.
+  const [tagFilters, setTagFilters] = useState<number[]>([])
   const [searchInput, setSearchInput] = useState('')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<TodoSort>('due_date')
@@ -176,7 +194,7 @@ export default function TodosPage() {
   const listParams: TodoListParams = {
     ...smartListParams(smartList),
     priority: priorityFilter || undefined,
-    tag_id: tagFilter ? Number(tagFilter) : undefined,
+    tag_id: tagFilters.length > 0 ? tagFilters : undefined,
     q: q || undefined,
     sort,
     order,
@@ -226,10 +244,12 @@ export default function TodosPage() {
   const total = (view === 'tree' ? rootQuery.data : flatQuery.data)?.pages[0]?.total ?? 0
   const loading = view === 'tree' ? rootQuery.isPending : flatQuery.isPending
 
-  // One-click visibility filter. Meaningless on the dedicated Completed and
-  // Abandoned lists (everything there is settled — hiding would blank the
-  // page) and on trash, so the toggle is neither rendered nor applied there.
-  const hideDoneApplicable = smartList !== 'completed' && smartList !== 'abandoned' && smartList !== 'trash'
+  // One-click visibility filter. Meaningless on the settled-only lists
+  // (Completed / Abandoned / Done today / Done this week — everything there is
+  // settled, hiding would blank the page) and on trash, so the toggle is
+  // neither rendered nor applied there.
+  const settledOnlyList = smartList === 'completed' || smartList === 'abandoned' || smartList === 'doneToday' || smartList === 'doneThisWeek'
+  const hideDoneApplicable = !settledOnlyList && smartList !== 'trash'
   const hideDone = hideCompleted && hideDoneApplicable
   // The display set every view renders from. Children of a hidden settled
   // parent surface as top-level cards (presentIds/isTopLevel below are
@@ -949,14 +969,30 @@ export default function TodosPage() {
         </div>
       </div>
 
-      {/* Productivity overview — one compact inline strip instead of a card grid */}
+      {/* Productivity overview — one compact inline strip instead of a card
+          grid. Each stat is a link into the smart list that matches its
+          bucket (待办 → 进行中, 已逾期 → 逾期, 已推迟/今日完成/本周完成 → the
+          dedicated lists). */}
       {stats && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span>{t('todos.statPending')} <b className="text-sm font-semibold text-foreground">{stats.pending}</b></span>
-          <span>{t('todos.statOverdue')} <b className={`text-sm font-semibold ${stats.overdue > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>{stats.overdue}</b></span>
-          <span>{t('todos.statDeferred')} <b className={`text-sm font-semibold ${stats.deferred > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>{stats.deferred}</b></span>
-          <span>{t('todos.statDoneToday')} <b className="text-sm font-semibold text-green-600 dark:text-green-400">{stats.done_today}</b></span>
-          <span>{t('todos.statDoneThisWeek')} <b className="text-sm font-semibold text-foreground">{stats.done_this_week}</b></span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          {([
+            { list: 'pending', label: t('todos.statPending'), value: stats.pending, valueClass: 'text-foreground' },
+            { list: 'overdue', label: t('todos.statOverdue'), value: stats.overdue, valueClass: stats.overdue > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground' },
+            { list: 'deferred', label: t('todos.statDeferred'), value: stats.deferred, valueClass: stats.deferred > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground' },
+            { list: 'doneToday', label: t('todos.statDoneToday'), value: stats.done_today, valueClass: 'text-green-600 dark:text-green-400' },
+            { list: 'doneThisWeek', label: t('todos.statDoneThisWeek'), value: stats.done_this_week, valueClass: 'text-foreground' },
+          ] as const).map(({ list, label, value, valueClass }) => (
+            <button
+              key={list}
+              type="button"
+              onClick={() => setSmartList(list)}
+              className={`rounded-sm px-1 text-left transition-colors hover:bg-accent hover:text-accent-foreground ${
+                smartList === list ? 'font-medium text-foreground' : 'text-muted-foreground'
+              }`}
+            >
+              {label} <b className={`text-sm font-semibold ${valueClass}`}>{value}</b>
+            </button>
+          ))}
         </div>
       )}
 
@@ -1000,9 +1036,9 @@ export default function TodosPage() {
           className="h-7 rounded-md border bg-background px-1.5 text-xs"
           aria-label={t('todos.smartList')}
         >
-          {(['all', 'today', 'next7', 'overdue', 'pending', 'completed', 'abandoned', 'trash'] as SmartList[]).map((s) => (
+          {(['all', 'today', 'next7', 'overdue', 'pending', 'deferred', 'completed', 'doneToday', 'doneThisWeek', 'abandoned', 'trash'] as SmartList[]).map((s) => (
             <option key={s} value={s}>
-              {t(`todos.${s === 'next7' ? 'next7' : s}`)}
+              {t(`todos.${s}`)}
             </option>
           ))}
         </select>
@@ -1038,17 +1074,57 @@ export default function TodosPage() {
           <option value="normal">{t('todos.normal')}</option>
           <option value="low">{t('todos.low')}</option>
         </select>
-        <select
-          value={tagFilter}
-          onChange={(e) => setTagFilter(e.target.value)}
-          className="h-7 rounded-md border bg-background px-1.5 text-xs"
-          aria-label={t('todos.tags')}
-        >
-          <option value="">{t('todos.allTags')}</option>
-          {tags.map((tag) => (
-            <option key={tag.id} value={String(tag.id)}>{tag.name}</option>
-          ))}
-        </select>
+        {/* Multi-label filter: any-of (OR) — a task shows when it carries any
+           one of the checked tags. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className={`flex h-7 items-center gap-1 rounded-md border px-1.5 text-xs ${tagFilters.length > 0 ? 'border-primary/40 bg-primary/5 text-foreground' : 'bg-background text-muted-foreground'}`}
+                aria-label={t('todos.tags')}
+              />
+            }
+          >
+            <Tags className="h-3.5 w-3.5" />
+            <span className="max-w-24 truncate">
+              {tagFilters.length === 0
+                ? t('todos.allTags')
+                : tagFilters.length === 1
+                  ? tags.find((tg) => tg.id === tagFilters[0])?.name ?? t('todos.tags')
+                  : t('todos.tagsSelected', { n: tagFilters.length })}
+            </span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-40">
+            {tags.length === 0 && (
+              <div className="px-1.5 py-1 text-xs text-muted-foreground">{t('todos.noTags')}</div>
+            )}
+            {tags.map((tag) => (
+              <DropdownMenuCheckboxItem
+                key={tag.id}
+                checked={tagFilters.includes(tag.id)}
+                onCheckedChange={(checked) =>
+                  setTagFilters((prev) =>
+                    checked ? [...prev, tag.id] : prev.filter((id) => id !== tag.id),
+                  )
+                }
+                className="text-xs"
+              >
+                <span
+                  className="mr-1 inline-block h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: tag.color || '#94a3b8' }}
+                />
+                <span className="truncate">{tag.name}</span>
+              </DropdownMenuCheckboxItem>
+            ))}
+            {tagFilters.length > 0 && (
+              <DropdownMenuItem className="text-xs" onClick={() => setTagFilters([])}>
+                <X className="h-3.5 w-3.5" />
+                {t('todos.clearTags')}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
         {/* Sort controls are meaningless in the tree view — the tree's order
             is always manual (see the pinned rootQuery/childrenMap sort). */}
         {view !== 'tree' && (
@@ -1162,10 +1238,10 @@ export default function TodosPage() {
               renderOverlayCard={(todo) => renderTodoCard(todo, true)}
             />
           )}
-          {pendingTodos.length === 0 && smartList !== 'completed' && smartList !== 'abandoned' && (
+          {pendingTodos.length === 0 && !settledOnlyList && (
             <p className="text-sm text-muted-foreground text-center py-8">{t('todos.noTodos')}</p>
           )}
-          {doneTodos.length > 0 && (smartList === 'all' || smartList === 'completed') && (
+          {doneTodos.length > 0 && (smartList === 'all' || settledOnlyList) && (
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
               <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1262,7 +1338,7 @@ export default function TodosPage() {
            今天/明天 → that day, 本周 → end of this week, 稍后 → next Monday,
            无日期 → clear the due time. */
         <div className="space-y-3">
-          {smartList !== 'completed' && smartList !== 'abandoned' && (
+          {!settledOnlyList && (
             <TodoSortableGroups
               groups={groupedTodos
                 .map((g) => ({
@@ -1280,7 +1356,7 @@ export default function TodosPage() {
               onNest={handleNest}
             />
           )}
-          {doneTodos.length > 0 && (smartList === 'all' || smartList === 'completed') && (
+          {doneTodos.length > 0 && (smartList === 'all' || settledOnlyList) && (
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
               <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
