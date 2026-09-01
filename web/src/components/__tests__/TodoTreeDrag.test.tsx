@@ -70,8 +70,8 @@ beforeEach(() => vi.clearAllMocks())
 describe('TodoTree drag & drop reparenting', () => {
   it('drop on the middle of a row makes the dragged task its last child', () => {
     const { onDragIdChange } = renderTree()
-    const rootB = screen.getByText('Root B').closest('[tabindex="0"]') as HTMLElement
-    const rootA = screen.getByText('Root A').closest('[tabindex="0"]') as HTMLElement
+    const rootB = screen.getByText('Root B').closest('div[tabindex="0"]') as HTMLElement
+    const rootA = screen.getByText('Root A').closest('div[tabindex="0"]') as HTMLElement
 
     // The row delegates "last child" to the server (afterId='last'), so the
     // position holds even for collapsed/partially loaded parents.
@@ -86,8 +86,8 @@ describe('TodoTree drag & drop reparenting', () => {
   it('middle drop on a collapsed row appends last and expands it so the drop is visible', () => {
     // Only Root A expanded: Child A1 is visible but its own child is not.
     renderTree(new Set([1]))
-    const rootB = screen.getByText('Root B').closest('[tabindex="0"]') as HTMLElement
-    const childA1 = screen.getByText('Child A1').closest('[tabindex="0"]') as HTMLElement
+    const rootB = screen.getByText('Root B').closest('div[tabindex="0"]') as HTMLElement
+    const childA1 = screen.getByText('Child A1').closest('div[tabindex="0"]') as HTMLElement
 
     fireEvent.dragStart(rootB, { dataTransfer: { setData: vi.fn(), effectAllowed: 'move' } })
     fireDrag(childA1, 'dragover', zoneOf(childA1, 0.5))
@@ -99,8 +99,8 @@ describe('TodoTree drag & drop reparenting', () => {
 
   it('drop near the top edge inserts as previous sibling', () => {
     renderTree()
-    const rootB = screen.getByText('Root B').closest('[tabindex="0"]') as HTMLElement
-    const childA1 = screen.getByText('Child A1').closest('[tabindex="0"]') as HTMLElement
+    const rootB = screen.getByText('Root B').closest('div[tabindex="0"]') as HTMLElement
+    const childA1 = screen.getByText('Child A1').closest('div[tabindex="0"]') as HTMLElement
 
     fireEvent.dragStart(rootB, { dataTransfer: { setData: vi.fn(), effectAllowed: 'move' } })
     // Child A1 is index 0 under parent 1 → before-insert has no prev sibling.
@@ -112,7 +112,7 @@ describe('TodoTree drag & drop reparenting', () => {
 
   it('refuses drops onto the dragged node itself', () => {
     renderTree()
-    const rootA = screen.getByText('Root A').closest('[tabindex="0"]') as HTMLElement
+    const rootA = screen.getByText('Root A').closest('div[tabindex="0"]') as HTMLElement
     fireEvent.dragStart(rootA, { dataTransfer: { setData: vi.fn(), effectAllowed: 'move' } })
     fireDrag(rootA, 'dragover', 50)
     fireDrag(rootA, 'drop', 50)
@@ -121,8 +121,8 @@ describe('TodoTree drag & drop reparenting', () => {
 
   it('refuses drops into the dragged node\'s own descendants (cycle)', () => {
     renderTree()
-    const rootA = screen.getByText('Root A').closest('[tabindex="0"]') as HTMLElement
-    const grand = screen.getByText('Grandchild').closest('[tabindex="0"]') as HTMLElement
+    const rootA = screen.getByText('Root A').closest('div[tabindex="0"]') as HTMLElement
+    const grand = screen.getByText('Grandchild').closest('div[tabindex="0"]') as HTMLElement
     fireEvent.dragStart(rootA, { dataTransfer: { setData: vi.fn(), effectAllowed: 'move' } })
     fireDrag(grand, 'dragover', zoneOf(grand, 0.5))
     fireDrag(grand, 'drop', zoneOf(grand, 0.5))

@@ -5,6 +5,7 @@ import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
 import { AddChildInput } from './AddChildInput'
+import { InlineMarkdown } from './InlineMarkdown'
 import { isSettledStatus, subtreeSettledFromMap } from '../lib/buildTodoTree'
 import { useTodoCollapseStore } from '../stores/todoCollapse'
 import type { Todo } from '../types'
@@ -196,14 +197,23 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
                   ? <Ban className="h-3.5 w-3.5" />
                   : <Circle className="h-3.5 w-3.5" />}
             </button>
-            <button
-              type="button"
+            {/* span 而非 button:标题内可渲染 Markdown 链接,锚点按规范不能
+                嵌套在 button(交互内容)里。 */}
+            <span
+              role="button"
+              tabIndex={0}
               className={`min-w-0 flex-1 truncate text-left text-xs ${child.status !== 'pending' ? 'text-muted-foreground line-through' : ''}`}
               onClick={() => onEdit(child)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onEdit(child)
+                }
+              }}
               title={child.title}
             >
-              {child.title}
-            </button>
+              <InlineMarkdown text={child.title} />
+            </span>
             {child.due_time && (
               <span
                 className={cn(

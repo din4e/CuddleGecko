@@ -10,6 +10,7 @@ import { useTodoCollapseStore } from '../stores/todoCollapse'
 import { priorityConfig } from '../lib/todoPriority'
 import type { SubtreeProgress } from '../lib/todoProgress'
 import type { Todo } from '../types'
+import { InlineMarkdown } from './InlineMarkdown'
 
 const repeatLabelOf = (t: (k: string) => string, r?: string) =>
   r ? t(`todos.repeat${r.charAt(0).toUpperCase()}${r.slice(1)}`) : ''
@@ -180,8 +181,11 @@ const TodoCard = memo(function TodoCard({
                 className="text-sm font-medium w-full bg-transparent border-b border-primary outline-none"
               />
             ) : (
-              <button
-                type="button"
+              // span 而非 button:标题内可渲染 Markdown 链接,锚点按规范不能
+              // 嵌套在 button(交互内容)里;键盘 Enter/Space 直接开抽屉。
+              <span
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   cancelPendingTitleClick()
                   titleClickTimer.current = window.setTimeout(() => {
@@ -193,14 +197,22 @@ const TodoCard = memo(function TodoCard({
                   cancelPendingTitleClick()
                   startRename()
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onEdit(todo)
+                  }
+                }}
                 className={`block max-w-full text-left text-sm font-medium leading-snug cursor-text ${closed ? 'line-through text-muted-foreground' : ''}`}
                 title={todo.title}
               >
-                {todo.title}
-              </button>
+                <InlineMarkdown text={todo.title} />
+              </span>
             )}
             {todo.description && !compact && (
-              <p className="text-[11px] leading-snug text-muted-foreground line-clamp-1">{todo.description}</p>
+              <p className="text-[11px] leading-snug text-muted-foreground line-clamp-1">
+                <InlineMarkdown text={todo.description} />
+              </p>
             )}
           </div>
         </div>

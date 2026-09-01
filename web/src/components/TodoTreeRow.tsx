@@ -12,6 +12,7 @@ import { formatDueLabel } from '../lib/dueLabel'
 import { Badge } from './ui/badge'
 import { priorityConfig } from '../lib/todoPriority'
 import { AddChildInput } from './AddChildInput'
+import { InlineMarkdown } from './InlineMarkdown'
 
 /** afterId targets: a sibling id to place after, null for the top of the
  *  sibling group, or 'last' to append at the end (the backend resolves it, so
@@ -298,8 +299,11 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             className="min-w-0 flex-1 rounded-sm bg-transparent px-1 outline-none ring-1 ring-primary"
           />
         ) : (
-          <button
-            type="button"
+          // span 而非 button:标题内可渲染 Markdown 链接,锚点按规范不能
+          // 嵌套在 button(交互内容)里;键盘 Enter/Space 直接开抽屉。
+          <span
+            role="button"
+            tabIndex={0}
             onClick={() => {
               cancelPendingTitleClick()
               titleClickTimer.current = window.setTimeout(() => {
@@ -311,13 +315,19 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
               cancelPendingTitleClick()
               startEdit()
             }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onEdit(todo)
+              }
+            }}
             className={cn(
               'min-w-0 flex-1 truncate text-left text-sm font-medium',
               todo.status !== 'pending' && 'text-muted-foreground line-through',
             )}
           >
-            {todo.title}
-          </button>
+            <InlineMarkdown text={todo.title} />
+          </span>
         )}
 
         {/* compact meta — same visual language as TodoCard's meta row */}
