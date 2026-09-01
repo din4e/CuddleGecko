@@ -109,7 +109,8 @@
     log(`创建根节点「${ROOT_TITLE}」#${rootId}`, 'ok')
     todoCount++
 
-    // 按清单分组;没有 projectId 的任务归入「收集箱」
+    // 按清单分组;没有 projectId 的任务属于「收集箱」——它是 dida 的内置
+    // 清单概念而非真实任务,不建节点,直接挂到同步根下。
     const byProject = new Map()
     for (const t of tasks) {
       if (!includeDone && t.status === 2) continue
@@ -120,10 +121,12 @@
     const projName = new Map(projects.map((p) => [p.id, p.name || '(未命名清单)']))
 
     for (const [pid, list] of byProject) {
+      // 收集箱(无 projectId,或名为 收集箱/Inbox 的清单)不建父节点
       const name = pid === '(inbox)' ? '收集箱' : (projName.get(pid) || pid)
-      const projTodoId = await createTodo(api, { title: `📋 ${name}`, _cgParent: rootId })
-      todoCount++
-      log(`清单「${name}」(${list.length} 条)`, 'dim')
+      const isInbox = pid === '(inbox)' || name === '收集箱' || name === 'Inbox'
+      const projTodoId = isInbox ? rootId : await createTodo(api, { title: `📋 ${name}`, _cgParent: rootId })
+      if (!isInbox) todoCount++
+      log(`${isInbox ? '收集箱' : `清单「${name}」`}(${list.length} 条)`, 'dim')
 
       // 组树:子任务按 dida parentId 挂到已建的父节点
       const children = new Map()
