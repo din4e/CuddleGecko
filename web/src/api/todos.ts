@@ -4,20 +4,22 @@ import type { Todo, TodoItem, TodoActivity, TodoStatus, Tag, TodoStats, Event, P
 function buildParams(params?: TodoListParams) {
   const out: Record<string, unknown> = { page: params?.page ?? 1, page_size: params?.page_size ?? 50 }
   const keys: (keyof TodoListParams)[] = [
-    'status', 'priority', 'q', 'due_before', 'due_after', 'tag_id', 'started', 'sort', 'order', 'overdue', 'parent_id', 'roots_only',
+    'status', 'priority', 'q', 'due_before', 'due_after', 'done_after', 'deferred', 'started', 'tag_id', 'sort', 'order', 'overdue', 'parent_id', 'roots_only',
   ]
   for (const key of keys) {
     const value = params?.[key]
-    if (value !== undefined && value !== '' && value !== null) {
-      out[key] = value
-    }
+    if (value === undefined || value === '' || value === null) continue
+    if (Array.isArray(value) && value.length === 0) continue
+    out[key] = value
   }
   return out
 }
 
 export const todosApi = {
   list: (params?: TodoListParams, signal?: AbortSignal) =>
-    request.get<PaginatedData<Todo>>('/todos', { params: buildParams(params), signal }).then((data) => ({ data })),
+    // indexes:null serializes array params (tag_id=[1,2]) as repeated keys
+    // (?tag_id=1&tag_id=2) — the backend reads them via QueryArray (any-of OR).
+    request.get<PaginatedData<Todo>>('/todos', { params: buildParams(params), paramsSerializer: { indexes: null }, signal }).then((data) => ({ data })),
 
   stats: () =>
     request.get<TodoStats>('/todos/stats').then((data) => ({ data })),

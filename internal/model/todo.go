@@ -105,6 +105,8 @@ type TodoListQuery struct {
 	DueAfter  *time.Time // include todos due at or after this time
 	Overdue   bool       // pending todos whose due_time is in the past
 	Started   bool       // hide tasks whose start_time is still in the future
+	Deferred  bool       // only pending todos whose start_time is still in the future
+	DoneAfter *time.Time // completed_at at or after this time (done-today / done-this-week lists)
 	TagIDs    []uint     // only todos tagged with any of these
 	ParentID  *uint      // only direct children of this todo
 	RootsOnly bool       // only top-level todos (parent_id IS NULL) — lazy tree roots

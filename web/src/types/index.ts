@@ -220,7 +220,12 @@ export interface TodoListParams {
   due_after?: string
   overdue?: boolean
   started?: boolean
-  tag_id?: number
+  /** Pending todos whose start_time is still in the future. */
+  deferred?: boolean
+  /** completed_at at or after this time (done-today / done-this-week lists). */
+  done_after?: string
+  /** Single tag id, or several for an any-of (OR) filter. */
+  tag_id?: number | number[]
   sort?: TodoSort
   order?: 'asc' | 'desc'
   parent_id?: number | null

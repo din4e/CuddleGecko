@@ -365,6 +365,68 @@ func TestTodoRepo_StartedFilter(t *testing.T) {
 	assert.Equal(t, int64(2), total)
 }
 
+// --- Deferred / done-after filters (stat-click smart lists) ---
+
+func TestTodoRepo_DeferredFilter(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+
+	future := time.Now().Add(48 * time.Hour)
+	require.NoError(t, repo.Create(ctx, &model.Todo{UserID: 1, WorkspaceID: 1, Title: "deferred", Status: "pending", StartTime: &future}))
+	mustCreateTodo(t, repo, 1, "now")
+	// A done task with a future start_time is settled, not deferred — mirrors
+	// the stats bucket (pending AND future start).
+	require.NoError(t, repo.Create(ctx, &model.Todo{UserID: 1, WorkspaceID: 1, Title: "done", Status: "done", StartTime: &future}))
+
+	todos, total, err := repo.List(ctx, 1, model.TodoListQuery{Deferred: true})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, todos, 1)
+	assert.Equal(t, "deferred", todos[0].Title)
+}
+
+func TestTodoRepo_DoneAfterFilter(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+
+	now := time.Now()
+	lastWeek := now.AddDate(0, 0, -7)
+	require.NoError(t, repo.Create(ctx, &model.Todo{UserID: 1, WorkspaceID: 1, Title: "today", Status: "done", CompletedAt: &now}))
+	require.NoError(t, repo.Create(ctx, &model.Todo{UserID: 1, WorkspaceID: 1, Title: "last-week", Status: "done", CompletedAt: &lastWeek}))
+	mustCreateTodo(t, repo, 1, "open")
+
+	// Boundary an hour ago: only the recent completion matches (paired with
+	// status=done by the caller, like the done-today smart list).
+	hourAgo := now.Add(-time.Hour)
+	todos, total, err := repo.List(ctx, 1, model.TodoListQuery{Status: "done", DoneAfter: &hourAgo})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, todos, 1)
+	assert.Equal(t, "today", todos[0].Title)
+}
+
+func TestTodoRepo_List_TagFilterAny(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+
+	urgent := model.Tag{UserID: 1, WorkspaceID: 1, Name: "urgent", Color: "#ff0000"}
+	home := model.Tag{UserID: 1, WorkspaceID: 1, Name: "home", Color: "#00ff00"}
+	require.NoError(t, db.Create(&urgent).Error)
+	require.NoError(t, db.Create(&home).Error)
+
+	require.NoError(t, repo.Create(ctx, &model.Todo{UserID: 1, WorkspaceID: 1, Title: "a", Status: "pending", Priority: "normal", Tags: []model.Tag{urgent}}))
+	require.NoError(t, repo.Create(ctx, &model.Todo{UserID: 1, WorkspaceID: 1, Title: "b", Status: "pending", Priority: "normal", Tags: []model.Tag{home}}))
+	mustCreateTodo(t, repo, 1, "untagged")
+
+	// Multi-tag filter is ANY-of (OR): todos tagged with either label match.
+	_, total, err := repo.List(ctx, 1, model.TodoListQuery{TagIDs: []uint{urgent.ID, home.ID}})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), total)
+}
+
 // --- Stats counts ---
 
 func TestTodoRepo_Stats(t *testing.T) {

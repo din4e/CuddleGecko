@@ -23,13 +23,21 @@ describe('todosApi', () => {
   it('list() calls GET /todos with default pagination', async () => {
     mockRequest.get.mockResolvedValue([])
     await todosApi.list()
-    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { page: 1, page_size: 50 } })
+    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { page: 1, page_size: 50 }, paramsSerializer: { indexes: null }, signal: undefined })
   })
 
   it('list(params) calls GET /todos with filters and pagination', async () => {
     mockRequest.get.mockResolvedValue([])
     await todosApi.list({ status: 'pending', sort: 'priority', q: 'milk' })
-    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { page: 1, page_size: 50, status: 'pending', sort: 'priority', q: 'milk' } })
+    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { page: 1, page_size: 50, status: 'pending', sort: 'priority', q: 'milk' }, paramsSerializer: { indexes: null }, signal: undefined })
+  })
+
+  it('list({tag_id: [...]}) forwards the array for any-of tag filtering', async () => {
+    mockRequest.get.mockResolvedValue([])
+    await todosApi.list({ tag_id: [5, 7] })
+    // indexes:null makes axios serialize the array as repeated keys
+    // (?tag_id=5&tag_id=7) which the backend reads via QueryArray.
+    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { page: 1, page_size: 50, tag_id: [5, 7] }, paramsSerializer: { indexes: null }, signal: undefined })
   })
 
   it('stats() calls GET /todos/stats', async () => {
@@ -52,8 +60,8 @@ describe('todosApi', () => {
 
   it('list() omits empty/undefined filters', async () => {
     mockRequest.get.mockResolvedValue([])
-    await todosApi.list({ status: undefined, q: '', priority: undefined })
-    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { page: 1, page_size: 50 } })
+    await todosApi.list({ status: undefined, q: '', priority: undefined, tag_id: [] })
+    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { page: 1, page_size: 50 }, paramsSerializer: { indexes: null }, signal: undefined })
   })
 
   it('create(data) calls POST /todos', async () => {
@@ -183,6 +191,6 @@ describe('todosApi', () => {
   it('list({parent_id}) forwards parent_id', async () => {
     mockRequest.get.mockResolvedValue([])
     await todosApi.list({ parent_id: 5 })
-    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { page: 1, page_size: 50, parent_id: 5 } })
+    expect(mockRequest.get).toHaveBeenCalledWith('/todos', { params: { page: 1, page_size: 50, parent_id: 5 }, paramsSerializer: { indexes: null }, signal: undefined })
   })
 })

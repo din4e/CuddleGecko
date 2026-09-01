@@ -73,6 +73,17 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQ
 		now := time.Now()
 		query = query.Where("start_time IS NULL OR start_time <= ?", now)
 	}
+	if q.Deferred {
+		// The inverse of Started, mirroring the stats "deferred" bucket exactly:
+		// pending tasks whose start_time is still in the future.
+		now := time.Now()
+		query = query.Where("status = ? AND start_time IS NOT NULL AND start_time > ?", "pending", now)
+	}
+	if q.DoneAfter != nil {
+		// Completed at or after this time — backs the done-today / done-this-week
+		// smart lists (paired with status=done from the caller).
+		query = query.Where("completed_at IS NOT NULL AND completed_at >= ?", *q.DoneAfter)
+	}
 	if len(q.TagIDs) > 0 {
 		// Subquery (instead of JOIN) keeps the count correct even when a todo
 		// matches more than one of the requested tags.

@@ -588,6 +588,103 @@ describe('TodosPage', () => {
     })
   })
 
+  it('jumps to the matching smart list when clicking a stat in the overview strip', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('暂无待办')).toBeInTheDocument()
+    })
+
+    // 已逾期 → overdue list
+    await user.click(screen.getByRole('button', { name: /todos\.statOverdue/ }))
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ overdue: true }), expect.any(AbortSignal))
+    })
+
+    // 已推迟 → deferred list (deliberately no `started` — it would exclude
+    // exactly the deferred tasks)
+    await user.click(screen.getByRole('button', { name: /todos\.statDeferred/ }))
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ deferred: true }), expect.any(AbortSignal))
+    })
+    const deferredCall = mockedList.mock.calls.find(([p]) => (p as TodoListParams).deferred === true)
+    expect(deferredCall?.[0]).not.toHaveProperty('started')
+
+    // 待办 → pending list
+    await user.click(screen.getByRole('button', { name: /todos\.statPending/ }))
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ status: 'pending', started: true }), expect.any(AbortSignal))
+    })
+
+    // 今日完成 → done + done_after (today 00:00)
+    await user.click(screen.getByRole('button', { name: /todos\.statDoneToday/ }))
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'done', done_after: expect.any(String) }),
+        expect.any(AbortSignal),
+      )
+    })
+
+    // 本周完成 → done + done_after (this week's Monday 00:00)
+    await user.click(screen.getByRole('button', { name: /todos\.statDoneThisWeek/ }))
+    await waitFor(() => {
+      const last = mockedList.mock.calls[mockedList.mock.calls.length - 1][0] as TodoListParams
+      expect(last.status).toBe('done')
+      expect(last.done_after).toBeDefined()
+      // The week boundary is at or before today's midnight.
+      expect(new Date(last.done_after!).getTime()).toBeLessThanOrEqual(new Date().setHours(0, 0, 0, 0))
+    })
+  })
+
+  it('filters by multiple tags with any-of semantics', async () => {
+    mockedTagsList.mockResolvedValue(mockAxios<PaginatedData<Tag>>({
+      items: [
+        { id: 5, user_id: 1, name: 'work', color: '', created_at: '' },
+        { id: 7, user_id: 1, name: 'home', color: '', created_at: '' },
+      ],
+      total: 2, page: 1, page_size: 200,
+    }))
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('暂无待办')).toBeInTheDocument()
+    })
+
+    // Open the tag dropdown and check two labels — the menu stays open for
+    // multi-select.
+    await user.click(screen.getByRole('button', { name: 'todos.tags' }))
+    await user.click(await screen.findByText('work'))
+    await user.click(await screen.findByText('home'))
+
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledWith(
+        expect.objectContaining({ tag_id: [5, 7] }),
+        expect.any(AbortSignal),
+      )
+    })
+
+    // Clear restores the unfiltered list.
+    await user.click(screen.getByText('todos.clearTags'))
+    await waitFor(() => {
+      const last = mockedList.mock.calls[mockedList.mock.calls.length - 1][0] as TodoListParams
+      expect(last.tag_id).toBeFalsy()
+    })
+  })
+
+  it('hides the completed toggle on the Done-today smart list', async () => {
+    // Same rule as the Completed list: everything there is done, so the
+    // toggle would blank the page.
+    localStorage.setItem('todoView', 'grouped')
+    localStorage.setItem('todoSmartList', 'doneToday')
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 4, title: 'Done today task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-09-01', created_at: '', updated_at: '' },
+    ]))
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Done today task')).toBeInTheDocument())
+    expect(screen.queryByTitle('todos.hideCompleted')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('todos.showCompleted')).not.toBeInTheDocument()
+  })
+
   it('renders a parent subtasks on the Today list via unfiltered children queries', async () => {
     // Regression: flat views used to build subtask sections from the FILTERED
     // list — an undated subtask under a "today" parent never matched, so the
