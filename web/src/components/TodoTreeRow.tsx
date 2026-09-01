@@ -2,13 +2,15 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, ArrowRight, Ban, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
-  Circle, ListTree, Loader2, Pencil, Plus, Star, Timer, Trash2,
+  Circle, Clock, ListTree, Loader2, Pencil, Plus, Star, Timer, Trash2,
 } from 'lucide-react'
 import type { Todo } from '../types'
 import type { TodoNode } from '../lib/buildTodoTree'
 import { subtreeProgressFromNode } from '../lib/todoProgress'
 import { cn } from '@/lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
+import { Badge } from './ui/badge'
+import { priorityConfig } from '../lib/todoPriority'
 import { AddChildInput } from './AddChildInput'
 
 /** afterId targets: a sibling id to place after, null for the top of the
@@ -274,7 +276,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
         {/* toggle done */}
         <button type="button" className="p-0.5" onClick={() => onToggle(todo.id)} aria-label={todo.status === 'pending' ? t('todos.markDone') : t('todos.markPending')}>
           {todo.status === 'done' ? (
-            <CheckCircle2 className="h-4 w-4 text-primary" />
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
           ) : todo.status === 'abandoned' ? (
             <Ban className="h-4 w-4 text-muted-foreground" />
           ) : (
@@ -310,7 +312,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
               startEdit()
             }}
             className={cn(
-              'min-w-0 flex-1 truncate text-left text-sm',
+              'min-w-0 flex-1 truncate text-left text-sm font-medium',
               todo.status !== 'pending' && 'text-muted-foreground line-through',
             )}
           >
@@ -318,15 +320,19 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
           </button>
         )}
 
-        {/* compact meta */}
+        {/* compact meta — same visual language as TodoCard's meta row */}
         {todo.pinned && (
-          <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" aria-label={t('todos.pinned')} />
+          <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
         )}
-        {todo.priority === 'high' && todo.status === 'pending' && (
-          <span className="text-[10px] font-semibold text-destructive">!{todo.priority[0].toUpperCase()}</span>
-        )}
+        <Badge variant="secondary" className={`shrink-0 px-1 py-0 text-[10px] leading-none ${priorityConfig[todo.priority]?.bg || ''}`}>
+          <span className={priorityConfig[todo.priority]?.color}>{t(`todos.${todo.priority}`)}</span>
+        </Badge>
         {todo.due_time && (
-          <span className={cn('text-[10px] whitespace-nowrap', dueOverdue ? 'text-destructive' : 'text-muted-foreground')}>
+          <span className={cn(
+            'flex items-center gap-0.5 whitespace-nowrap text-[10px]',
+            dueOverdue ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground',
+          )}>
+            <Clock className="h-3 w-3" />
             {formatDueLabel(todo.due_time, new Date(), t)}
           </span>
         )}
@@ -342,21 +348,19 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             {subProgress.done}/{subProgress.total}
           </span>
         )}
-        {onStartPomodoro && (
-          <button
-            type="button"
-            onClick={() => onStartPomodoro(todo)}
-            aria-label={t('todos.pomoStart')}
-            title={t('todos.pomoStart')}
-            className="flex items-center gap-0.5 rounded px-1 text-[10px] text-muted-foreground hover:bg-accent"
-          >
-            <Timer className="h-3 w-3" />
-            {!!todo.pomodoro_count && <span className="tabular-nums">{todo.pomodoro_count}</span>}
-          </button>
-        )}
 
-        {/* hover actions — always visible on touch/small screens, hover-reveal on md+ */}
-        <div className="flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+        {/* hover actions — pinned to the row's right edge (ml-auto), pomodoro
+            first, mirroring TodoCard's floating toolbar. Always visible on
+            touch/small screens, hover-reveal on md+. */}
+        <div className="ml-auto flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+          {onStartPomodoro && (
+            <RowBtn onClick={() => onStartPomodoro(todo)} title={t('todos.pomoStart')}>
+              <Timer className="h-3.5 w-3.5" />
+              {!!todo.pomodoro_count && (
+                <span className="text-[10px] tabular-nums">{todo.pomodoro_count}</span>
+              )}
+            </RowBtn>
+          )}
           {onTogglePin && (
             <RowBtn
               onClick={() => onTogglePin(todo)}
