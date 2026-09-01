@@ -120,7 +120,7 @@ describe('runSync', () => {
       token: 'tok', includeDone: true, includeItems: true, log: (t) => logs.push(t),
     })
 
-    // root #100 → project 工作 #101 → a #102 → b #103 → 收集箱 #104 → c #105
+    // root #100 → project 工作 #101 → a #102 → b #103; inbox task c → root #100 directly
     const postBodies = calls
       .filter((c) => c.method === 'POST' && c.url === '/api/todos')
       .map((c) => c.body)
@@ -133,10 +133,9 @@ describe('runSync', () => {
         due_time: '2026-08-22T03:00:00.000Z', start_time: '', parent_id: 101 },
       { title: '子任务', description: '', status: 'pending', priority: 'normal',
         due_time: '', start_time: '', parent_id: 102 },
-      { title: '📋 收集箱', description: '', status: 'pending', priority: 'normal',
-        due_time: '', start_time: '', parent_id: 100 },
+      // 收集箱是清单概念,不建节点——任务直接挂同步根
       { title: '收件箱任务', description: '', status: 'done', priority: 'low',
-        due_time: '', start_time: '', parent_id: 104 },
+        due_time: '', start_time: '', parent_id: 100 },
     ])
 
     // checklist items: two creates under todo #103, one toggle for the completed one
@@ -146,8 +145,8 @@ describe('runSync', () => {
     expect(toggles).toHaveLength(1)
     expect(toggles[0].url).toBe('/api/todos/103/items/501/toggle')
 
-    // 6 todos (root + 2 project nodes + 3 tasks), 2 items, no errors
-    expect(res).toEqual({ todoCount: 6, itemCount: 2, errorCount: 0 })
+    // 5 todos (root + 1 project node + 3 tasks; no inbox node), 2 items, no errors
+    expect(res).toEqual({ todoCount: 5, itemCount: 2, errorCount: 0 })
     expect(logs.some((l) => l.includes('同步完成'))).toBe(true)
   })
 
@@ -171,7 +170,7 @@ describe('runSync', () => {
     const res = await DidaSync.runSync(structuredClone(EXPORT),
       { token: 't', includeDone: false, includeItems: false, log: () => {} })
 
-    // c (done, sole inbox task) vanishes entirely — no 收集箱 node either
+    // c (done, sole inbox task) vanishes entirely
     expect(postTitles(calls)).toEqual([DidaSync.ROOT_TITLE, '📋 工作', '父任务', '子任务'])
     expect(calls.some((c) => c.url.includes('/items'))).toBe(false)
     expect(res).toEqual({ todoCount: 4, itemCount: 0, errorCount: 0 })
@@ -182,10 +181,10 @@ describe('runSync', () => {
     const res = await DidaSync.runSync(structuredClone(EXPORT), { token: 't', log: () => {} })
 
     expect(res.errorCount).toBe(1)
-    expect(res.todoCount).toBe(4) // root + 工作 node + 收集箱 node + 收件箱任务
+    expect(res.todoCount).toBe(3) // root + 工作 node + 收件箱任务
     // a's POST was attempted (and rejected); its child b and b's items are never attempted
     expect(postTitles(calls))
-      .toEqual([DidaSync.ROOT_TITLE, '📋 工作', '父任务', '📋 收集箱', '收件箱任务'])
+      .toEqual([DidaSync.ROOT_TITLE, '📋 工作', '父任务', '收件箱任务'])
     expect(calls.some((c) => c.body?.title === '子任务')).toBe(false)
     expect(calls.some((c) => c.url.includes('/items'))).toBe(false)
   })
