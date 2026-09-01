@@ -7,14 +7,9 @@ import { Badge } from './ui/badge'
 import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
 import { useTodoCollapseStore } from '../stores/todoCollapse'
+import { priorityConfig } from '../lib/todoPriority'
 import type { SubtreeProgress } from '../lib/todoProgress'
 import type { Todo } from '../types'
-
-const priorityConfig: Record<string, { color: string; bg: string }> = {
-  high: { color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/30' },
-  normal: { color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-  low: { color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-800' },
-}
 
 const repeatLabelOf = (t: (k: string) => string, r?: string) =>
   r ? t(`todos.repeat${r.charAt(0).toUpperCase()}${r.slice(1)}`) : ''
