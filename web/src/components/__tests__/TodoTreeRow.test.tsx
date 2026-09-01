@@ -41,6 +41,20 @@ describe('TodoTree', () => {
     expect(screen.getByText('todo-2')).toBeInTheDocument()
   })
 
+  it('renders markdown titles inline (bold) while plain titles stay plain', () => {
+    const tree = [node(makeTodo(1, { title: '**bold** task' })), node(makeTodo(2))]
+    render(<TodoTree nodes={tree} {...handlers()} />)
+    expect(screen.getByText('bold').tagName).toBe('STRONG')
+    expect(screen.getByText('todo-2')).toBeInTheDocument()
+  })
+
+  it('opens the drawer from the keyboard on the title (Enter)', () => {
+    const onEdit = vi.fn()
+    render(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onEdit })} />)
+    fireEvent.keyDown(screen.getByText('todo-1'), { key: 'Enter' })
+    expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }))
+  })
+
   it('toggles expand via the caret', async () => {
     const user = userEvent.setup()
     const onToggleExpand = vi.fn()

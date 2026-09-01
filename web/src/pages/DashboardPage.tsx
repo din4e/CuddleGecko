@@ -12,6 +12,7 @@ import { useWorkoutsList } from '../hooks/api/useWorkouts'
 import { useBodyMetricSummary } from '../hooks/api/useBodyMetrics'
 import { bmi } from '../types'
 import { StatGridSkeleton } from '../components/ListSkeleton'
+import { InlineMarkdown } from '../components/InlineMarkdown'
 import { useContactsList } from '../hooks/api/useContacts'
 import {
   Users,
@@ -356,7 +357,9 @@ export default function DashboardPage() {
               <ul className="space-y-2">
                 {overdueTodos.map((t0) => (
                   <li key={t0.id} className="flex items-center justify-between gap-2 py-1.5 border-b last:border-0">
-                    <span className="font-medium truncate">{t0.title}</span>
+                    <span className="font-medium truncate">
+                      <InlineMarkdown text={t0.title} />
+                    </span>
                     <span className="text-xs text-red-500 whitespace-nowrap">
                       {new Date(t0.due_time || '').toLocaleDateString()}
                     </span>

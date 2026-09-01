@@ -31,6 +31,7 @@ import TodoCard from '../components/TodoCard'
 import TodoSubtaskList from '../components/TodoSubtaskList'
 import TodoSortableGroups from '../components/TodoSortableGroups'
 import LoadMoreBar from '../components/LoadMoreBar'
+import { InlineMarkdown } from '../components/InlineMarkdown'
 import { matchesColumn } from '../lib/kanban'
 import { useKanbanColumns } from '../hooks/api/useKanbanColumns'
 import type { KanbanColumn } from '../api/settings'
@@ -1195,7 +1196,9 @@ export default function TodosPage() {
             (trashTodos ?? []).map((todo) => (
               <div key={todo.id} className="flex items-center gap-2 rounded-md border p-2 opacity-70">
                 <Trash2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="flex-1 min-w-0 truncate text-sm">{todo.title}</span>
+                <span className="flex-1 min-w-0 truncate text-sm">
+                  <InlineMarkdown text={todo.title} />
+                </span>
                 <Button size="sm" variant="outline" onClick={() => handleRestore(todo.id)}>
                   {t('todos.restore')}
                 </Button>

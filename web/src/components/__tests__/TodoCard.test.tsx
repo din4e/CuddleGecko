@@ -64,6 +64,12 @@ describe('TodoCard', () => {
     expect(screen.getByText('todos.high')).toBeInTheDocument()
   })
 
+  it('renders the description preview as inline markdown', () => {
+    renderCard({ description: '**bold** and `code` note' })
+    expect(screen.getByText('bold').tagName).toBe('STRONG')
+    expect(screen.getByText('code').tagName).toBe('CODE')
+  })
+
   it('shows the parent title hint when nested', () => {
     render(
       <TodoCard

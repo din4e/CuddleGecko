@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs'
 import { TodoForm } from './TodoForm'
 import TodoSubtaskList from './TodoSubtaskList'
+import { InlineMarkdown } from './InlineMarkdown'
 import { TodoHistory } from './TodoHistory'
 import { useTodoChildrenMap } from '../hooks/api/useTodos'
 import type { SubtaskMoveAfterId } from './TodoSubtaskList'
@@ -115,7 +116,9 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
     <Sheet open={open && todo != null} onOpenChange={(o) => { if (!o) onClose() }}>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle className="pr-8">{todo?.title ?? t('todos.editTodo')}</SheetTitle>
+          <SheetTitle className="pr-8">
+            {todo ? <InlineMarkdown text={todo.title} /> : t('todos.editTodo')}
+          </SheetTitle>
         </SheetHeader>
         {todo && (
           <Tabs defaultValue="detail" className="min-h-0 flex-1">
