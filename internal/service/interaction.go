@@ -22,11 +22,12 @@ type InteractionRepository interface {
 }
 
 type InteractionService struct {
-	repo InteractionRepository
+	repo     InteractionRepository
+	notifier ChangeNotifier
 }
 
-func NewInteractionService(repo InteractionRepository) *InteractionService {
-	return &InteractionService{repo: repo}
+func NewInteractionService(repo InteractionRepository, notifier ...ChangeNotifier) *InteractionService {
+	return &InteractionService{repo: repo, notifier: firstNotifier(notifier)}
 }
 
 func (s *InteractionService) Create(ctx context.Context, userID, workspaceID, contactID uint, interaction *model.Interaction) (*model.Interaction, error) {
@@ -36,6 +37,7 @@ func (s *InteractionService) Create(ctx context.Context, userID, workspaceID, co
 	if err := s.repo.Create(ctx, interaction); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceInteraction, ChangeCreated, interaction.ID, interaction)
 	return interaction, nil
 }
 
@@ -69,9 +71,14 @@ func (s *InteractionService) Update(ctx context.Context, userID, workspaceID, id
 	if err := s.repo.Update(ctx, interaction); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceInteraction, ChangeUpdated, interaction.ID, interaction)
 	return interaction, nil
 }
 
 func (s *InteractionService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
-	return s.repo.Delete(ctx, workspaceID, id)
+	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceInteraction, ChangeDeleted, id, nil)
+	return nil
 }

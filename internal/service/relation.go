@@ -44,10 +44,11 @@ type RelationService struct {
 	relationRepo    RelationRepository
 	contactRepo     ContactRepository
 	interactionRepo InteractionRepository
+	notifier        ChangeNotifier
 }
 
-func NewRelationService(relationRepo RelationRepository, contactRepo ContactRepository, interactionRepo InteractionRepository) *RelationService {
-	return &RelationService{relationRepo: relationRepo, contactRepo: contactRepo, interactionRepo: interactionRepo}
+func NewRelationService(relationRepo RelationRepository, contactRepo ContactRepository, interactionRepo InteractionRepository, notifier ...ChangeNotifier) *RelationService {
+	return &RelationService{relationRepo: relationRepo, contactRepo: contactRepo, interactionRepo: interactionRepo, notifier: firstNotifier(notifier)}
 }
 
 func (s *RelationService) Create(ctx context.Context, userID, workspaceID, contactIDA uint, relation *model.ContactRelation) (*model.ContactRelation, error) {
@@ -57,6 +58,7 @@ func (s *RelationService) Create(ctx context.Context, userID, workspaceID, conta
 	if err := s.relationRepo.Create(ctx, relation); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceRelation, ChangeCreated, relation.ID, relation)
 	return relation, nil
 }
 
@@ -65,7 +67,11 @@ func (s *RelationService) ListByContact(ctx context.Context, userID, workspaceID
 }
 
 func (s *RelationService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
-	return s.relationRepo.Delete(ctx, workspaceID, id)
+	if err := s.relationRepo.Delete(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceRelation, ChangeDeleted, id, nil)
+	return nil
 }
 
 func (s *RelationService) GetGraphData(ctx context.Context, userID, workspaceID uint) (*GraphData, error) {

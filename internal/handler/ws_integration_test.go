@@ -26,7 +26,7 @@ import (
 
 // TestTodoHTTP_Create_BroadcastsOverWS is the full-chain end-to-end guard:
 // an HTTP todo mutation flows service -> notifier -> hub -> a real WebSocket
-// client connected to the same workspace, which receives a todo.changed frame.
+// client connected to the same workspace, which receives a data.changed frame.
 func TestTodoHTTP_Create_BroadcastsOverWS(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
@@ -77,10 +77,10 @@ func TestTodoHTTP_Create_BroadcastsOverWS(t *testing.T) {
 	require.NoError(t, err)
 	var f realtime.Frame
 	require.NoError(t, json.Unmarshal(data, &f))
-	assert.Equal(t, realtime.FrameTodoChanged, f.Type)
+	assert.Equal(t, realtime.FrameDataChanged, f.Type)
 	assert.Equal(t, uint(1), f.WorkspaceID)
 	assert.Equal(t, "created", f.Kind)
-	assert.NotZero(t, f.TodoID, "created frame should carry the new todo id")
+	assert.NotZero(t, f.ID, "created frame should carry the new todo id")
 }
 
 // TestTodoHTTP_Broadcast_WorkspaceIsolation confirms a client in workspace 2

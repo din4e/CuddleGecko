@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   replaceTags: vi.fn(),
   moveTodo: vi.fn(),
   childrenMap: vi.fn(() => new Map()),
+  childrenMapArgs: vi.fn(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -22,19 +23,19 @@ vi.mock('../../hooks/api/useTodos', () => ({
   useReplaceTodoTags: () => ({ mutateAsync: mocks.replaceTags }),
   useMoveTodo: () => ({ mutateAsync: mocks.moveTodo, isPending: false }),
   useTodoItems: () => ({ data: [] }),
-  // Drawer subtask area: empty children slices by default.
   // Drawer subtask area: empty children slices by default (overridable).
-  useTodoChildrenMap: () => mocks.childrenMap(),  useCreateTodoItem: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  // childrenMapArgs records the (parentIds, filters) the drawer queries with.
+  useTodoChildrenMap: (parentIds: number[], filters: { sort?: string; order?: string }) => {
+    mocks.childrenMapArgs(parentIds, filters)
+    return mocks.childrenMap()
+  },
+  useCreateTodoItem: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useToggleTodoItem: () => ({ mutateAsync: vi.fn() }),
   useDeleteTodoItem: () => ({ mutateAsync: vi.fn() }),
   useUpdateTodoItem: () => ({ mutateAsync: vi.fn() }),
   useReorderTodoItem: () => ({ mutateAsync: vi.fn() }),
   usePromoteTodoItem: () => ({ mutateAsync: vi.fn() }),
-  // Drawer notes + history panels: empty by default.
-  useTodoComments: () => ({ data: [], isPending: false }),
-  useCreateTodoComment: () => ({ mutate: vi.fn(), isPending: false }),
-  useUpdateTodoComment: () => ({ mutate: vi.fn(), isPending: false }),
-  useDeleteTodoComment: () => ({ mutate: vi.fn(), isPending: false }),
+  // Drawer history panel: empty by default.
   useTodoActivities: () => ({ data: [], isPending: false }),
 }))
 
@@ -62,6 +63,7 @@ describe('TodoDetailDrawer', () => {
     mocks.replaceTags.mockReset()
     mocks.moveTodo.mockReset()
     mocks.childrenMap.mockReset()
+    mocks.childrenMapArgs.mockReset()
     mocks.childrenMap.mockReturnValue(new Map())
   })
 
@@ -138,6 +140,22 @@ describe('TodoDetailDrawer', () => {
     )
     expect(screen.queryByText('Done subtask')).not.toBeInTheDocument()
     expect(screen.getByText('Open subtask')).toBeInTheDocument()
+  })
+
+  it('fetches subtask slices in pinned manual order (a drop must stick on refetch)', () => {
+    render(
+      <TodoDetailDrawer
+        todo={todo()}
+        open
+        contacts={[]}
+        tags={[]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    // Subtask rows are drag-reorderable; a non-manual fetch sort (default
+    // due_date) would snap a dropped row back to its old slot on refetch.
+    expect(mocks.childrenMapArgs).toHaveBeenCalledWith([7], { sort: 'manual', order: 'asc' })
   })
 
   it('renders nothing when no todo is set', () => {

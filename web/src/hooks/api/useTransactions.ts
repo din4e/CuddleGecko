@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { transactionsApi } from '../../api/transactions'
 import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
+import { invalidateScope } from '@/lib/querySync'
 import type { Transaction, TransactionSummary, TransactionMonthly, PaginatedData } from '../../types'
 
 const scope = 'transactions'
@@ -42,7 +43,7 @@ export function useCreateTransaction() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: Partial<Transaction>) => transactionsApi.create(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }
@@ -51,7 +52,7 @@ export function useUpdateTransaction() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Transaction> }) => transactionsApi.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }
@@ -60,7 +61,7 @@ export function useDeleteTransaction() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => transactionsApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }

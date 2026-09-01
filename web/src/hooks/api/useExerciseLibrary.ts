@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { exerciseLibraryApi } from '../../api/exerciseLibrary'
 import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
+import { invalidateScope } from '@/lib/querySync'
 import type { ExerciseLibraryItem, ExerciseLibraryInput } from '../../types'
 
 const scope = 'exercise-library'
@@ -16,7 +17,7 @@ export function useExerciseLibrary() {
 
 export function useExerciseLibraryMutations() {
   const qc = useQueryClient()
-  const invalidate = () => qc.invalidateQueries({ queryKey: allKey() })
+  const invalidate = () => invalidateScope(qc, scope)
   const create = useMutation({
     mutationFn: (input: ExerciseLibraryInput) => exerciseLibraryApi.create(input),
     onSuccess: invalidate,

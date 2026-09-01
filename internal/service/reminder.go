@@ -19,11 +19,12 @@ type ReminderRepository interface {
 }
 
 type ReminderService struct {
-	repo ReminderRepository
+	repo     ReminderRepository
+	notifier ChangeNotifier
 }
 
-func NewReminderService(repo ReminderRepository) *ReminderService {
-	return &ReminderService{repo: repo}
+func NewReminderService(repo ReminderRepository, notifier ...ChangeNotifier) *ReminderService {
+	return &ReminderService{repo: repo, notifier: firstNotifier(notifier)}
 }
 
 func (s *ReminderService) Create(ctx context.Context, userID, workspaceID, contactID uint, reminder *model.Reminder) (*model.Reminder, error) {
@@ -37,6 +38,7 @@ func (s *ReminderService) Create(ctx context.Context, userID, workspaceID, conta
 	if err := s.repo.Create(ctx, reminder); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceReminder, ChangeCreated, reminder.ID, reminder)
 	return reminder, nil
 }
 
@@ -67,9 +69,14 @@ func (s *ReminderService) Update(ctx context.Context, userID, workspaceID, id ui
 	if err := s.repo.Update(ctx, reminder); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceReminder, ChangeUpdated, reminder.ID, reminder)
 	return reminder, nil
 }
 
 func (s *ReminderService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
-	return s.repo.Delete(ctx, workspaceID, id)
+	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceReminder, ChangeDeleted, id, nil)
+	return nil
 }

@@ -19,11 +19,12 @@ type TagRepository interface {
 }
 
 type TagService struct {
-	repo TagRepository
+	repo     TagRepository
+	notifier ChangeNotifier
 }
 
-func NewTagService(repo TagRepository) *TagService {
-	return &TagService{repo: repo}
+func NewTagService(repo TagRepository, notifier ...ChangeNotifier) *TagService {
+	return &TagService{repo: repo, notifier: firstNotifier(notifier)}
 }
 
 func (s *TagService) Create(ctx context.Context, userID, workspaceID uint, tag *model.Tag) (*model.Tag, error) {
@@ -32,6 +33,7 @@ func (s *TagService) Create(ctx context.Context, userID, workspaceID uint, tag *
 	if err := s.repo.Create(ctx, tag); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceTag, ChangeCreated, tag.ID, tag)
 	return tag, nil
 }
 
@@ -51,9 +53,14 @@ func (s *TagService) Update(ctx context.Context, userID, workspaceID, id uint, u
 	if err := s.repo.Update(ctx, tag); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceTag, ChangeUpdated, tag.ID, tag)
 	return tag, nil
 }
 
 func (s *TagService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
-	return s.repo.Delete(ctx, workspaceID, id)
+	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceTag, ChangeDeleted, id, nil)
+	return nil
 }

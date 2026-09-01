@@ -176,7 +176,7 @@ type ExportService struct {
 	setLogRepo      WorkoutSetLogRepository
 	goalRepo        FitnessGoalRepository
 	aiRepo          AIRepository
-	notifier        TodoChangeNotifier
+	notifier        ChangeNotifier
 }
 
 // ExportServiceOption configures an ExportService at construction.
@@ -184,7 +184,7 @@ type ExportServiceOption func(*ExportService)
 
 // WithExportNotifier wires a realtime notifier so imports fan out to other
 // connected clients in the same workspace (multi-device sync of imports).
-func WithExportNotifier(n TodoChangeNotifier) ExportServiceOption {
+func WithExportNotifier(n ChangeNotifier) ExportServiceOption {
 	return func(s *ExportService) {
 		if n != nil {
 			s.notifier = n
@@ -299,7 +299,7 @@ func NewExportService(
 		relationRepo:    relationRepo,
 		todoRepo:        todoRepo,
 		todoItemRepo:    todoItemRepo,
-		notifier:        noopTodoNotifier{},
+		notifier:        noopChangeNotifier{},
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -311,8 +311,17 @@ func NewExportService(
 // imported todos (the import path creates rows directly, bypassing the todo
 // service's per-mutation notifications).
 func (s *ExportService) notifyImported(ctx context.Context, workspaceID uint) {
-	if s.notifier != nil {
-		s.notifier.NotifyTodoChange(ctx, workspaceID, 0, TodoBulk)
+	if s.notifier == nil {
+		return
+	}
+	// Imports write rows directly through the repos, bypassing the per-domain
+	// services' notifications — fan out a bulk refresh per imported resource.
+	for _, resource := range []string{
+		ResourceTodo, ResourceContact, ResourceTag, ResourceInteraction,
+		ResourceReminder, ResourceRelation, ResourceTransaction,
+		ResourceWorkout, ResourceHabit,
+	} {
+		s.notifier.NotifyChange(ctx, workspaceID, resource, ChangeBulk, 0, nil)
 	}
 }
 

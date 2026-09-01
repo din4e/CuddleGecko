@@ -631,7 +631,11 @@ export default function TodosPage() {
   // subtask (or a pending child under a completed parent) never matches the
   // filtered flat list, so it would be invisible — including right after
   // being added. Hence the same unfiltered per-parent children slices the
-  // tree uses, one per displayed parent that has children.
+  // tree uses, one per displayed parent that has children — including the
+  // tree's pinned manual/asc sort: rows are drag-reorderable in every view,
+  // so a toolbar sort (default due_date) would snap each dropped row back to
+  // its old slot on refetch. The toolbar sort still governs the top-level
+  // cards.
   const flatChildParents = useMemo(
     () => displayTodos.filter((t) => isTopLevel(t) && (t.child_count ?? 0) > 0).map((t) => t.id),
     [displayTodos, isTopLevel],
@@ -641,7 +645,7 @@ export default function TodosPage() {
   const [deepChildIds, setDeepChildIds] = useState<Set<number>>(() => new Set())
   const flatChildrenMap = useTodoChildrenMap(
     view !== 'tree' && smartList !== 'trash' ? [...new Set([...flatChildParents, ...deepChildIds])] : [],
-    { sort, order },
+    { sort: 'manual', order: 'asc' },
   )
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {

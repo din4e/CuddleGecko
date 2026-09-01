@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { Todo, TodoItem, TodoComment, TodoActivity, TodoStatus, Tag, TodoStats, Event, PaginatedData, TodoListParams, TodoUpdateInput } from '../types'
+import type { Todo, TodoItem, TodoActivity, TodoStatus, Tag, TodoStats, Event, PaginatedData, TodoListParams, TodoUpdateInput } from '../types'
 
 function buildParams(params?: TodoListParams) {
   const out: Record<string, unknown> = { page: params?.page ?? 1, page_size: params?.page_size ?? 50 }
@@ -94,20 +94,6 @@ export const todosApi = {
 
   replaceTags: (todoId: number, tagIds: number[]) =>
     request.put<void>(`/todos/${todoId}/tags`, { tag_ids: tagIds }).then(() => {}),
-
-  // --- Comments (markdown notes) ---
-
-  listComments: (todoId: number, signal?: AbortSignal) =>
-    request.get<TodoComment[]>(`/todos/${todoId}/comments`, { signal }).then((data) => ({ data })),
-
-  createComment: (todoId: number, content: string) =>
-    request.post<TodoComment>(`/todos/${todoId}/comments`, { content }).then((d) => ({ data: d })),
-
-  updateComment: (todoId: number, commentId: number, content: string) =>
-    request.put<TodoComment>(`/todos/${todoId}/comments/${commentId}`, { content }).then((d) => ({ data: d })),
-
-  deleteComment: (todoId: number, commentId: number) =>
-    request.delete<void>(`/todos/${todoId}/comments/${commentId}`).then(() => {}),
 
   // --- Modification history (audit log) ---
 

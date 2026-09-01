@@ -19,11 +19,12 @@ type EventRepository interface {
 }
 
 type EventService struct {
-	repo EventRepository
+	repo     EventRepository
+	notifier ChangeNotifier
 }
 
-func NewEventService(repo EventRepository) *EventService {
-	return &EventService{repo: repo}
+func NewEventService(repo EventRepository, notifier ...ChangeNotifier) *EventService {
+	return &EventService{repo: repo, notifier: firstNotifier(notifier)}
 }
 
 func (s *EventService) Create(ctx context.Context, userID, workspaceID uint, event *model.Event) (*model.Event, error) {
@@ -35,6 +36,7 @@ func (s *EventService) Create(ctx context.Context, userID, workspaceID uint, eve
 	if err := s.repo.Create(ctx, event); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceEvent, ChangeCreated, event.ID, event)
 	return event, nil
 }
 
@@ -70,9 +72,14 @@ func (s *EventService) Update(ctx context.Context, userID, workspaceID, id uint,
 	if err := s.repo.Update(ctx, event); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceEvent, ChangeUpdated, event.ID, event)
 	return event, nil
 }
 
 func (s *EventService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
-	return s.repo.Delete(ctx, workspaceID, id)
+	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceEvent, ChangeDeleted, id, nil)
+	return nil
 }

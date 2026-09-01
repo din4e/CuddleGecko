@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fitnessGoalsApi } from '../../api/fitnessGoals'
 import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
+import { invalidateScope } from '@/lib/querySync'
 import type { FitnessGoal, FitnessGoalInput } from '../../types'
 
 const scope = 'fitness-goals'
@@ -16,7 +17,7 @@ export function useFitnessGoals() {
 
 export function useFitnessGoalMutations() {
   const qc = useQueryClient()
-  const invalidate = () => qc.invalidateQueries({ queryKey: allKey() })
+  const invalidate = () => invalidateScope(qc, scope)
   const create = useMutation({
     mutationFn: (input: FitnessGoalInput) => fitnessGoalsApi.create(input),
     onSuccess: invalidate,

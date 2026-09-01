@@ -33,7 +33,7 @@ function ActivitySummary({ activity }: { activity: TodoActivity }) {
 }
 
 /** Per-todo modification history: a newest-first audit timeline of which user
- *  did what, when. Rendered under the comments module in the detail drawer. */
+ *  did what, when. Rendered in the detail drawer's history tab. */
 export function TodoHistory({ todoId }: { todoId: number }) {
   const { t } = useTranslation()
   const { data: activities = [], isPending } = useTodoActivities(todoId)

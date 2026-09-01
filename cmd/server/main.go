@@ -71,27 +71,27 @@ func main() {
 	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
 	authSvc := service.NewAuthService(userRepo, &cfg.JWT, workspaceSvc)
 	captchaSvc := service.NewCaptchaService(cfg.Captcha, settingRepo)
-	contactSvc := service.NewContactService(contactRepo, taggingRepo, reminderRepo)
-	tagSvc := service.NewTagService(tagRepo)
-	interactionSvc := service.NewInteractionService(interactionRepo)
-	reminderSvc := service.NewReminderService(reminderRepo)
-	relationSvc := service.NewRelationService(relationRepo, contactRepo, interactionRepo)
-	eventSvc := service.NewEventService(eventRepo)
-	// The realtime hub fans todo mutations out to connected WS clients. Built
-	// before the todo service so it can be wired in as the change notifier.
+	// The realtime hub fans entity mutations out to connected WS clients.
+	// Built before the domain services so it can be wired in as their shared
+	// change notifier.
 	hub := realtime.NewHub()
+	contactSvc := service.NewContactService(contactRepo, taggingRepo, reminderRepo, hub)
+	tagSvc := service.NewTagService(tagRepo, hub)
+	interactionSvc := service.NewInteractionService(interactionRepo, hub)
+	reminderSvc := service.NewReminderService(reminderRepo, hub)
+	relationSvc := service.NewRelationService(relationRepo, contactRepo, interactionRepo, hub)
+	eventSvc := service.NewEventService(eventRepo, hub)
 	todoActivityRepo := repository.NewTodoActivityRepo(db)
-	todoCommentRepo := repository.NewTodoCommentRepo(db)
-	todoSvc := service.NewTodoService(todoRepo, eventRepo, todoRepo, service.WithTodoNotifier(hub), service.WithTodoHistory(todoActivityRepo, userRepo, todoCommentRepo))
-	workoutSvc := service.NewWorkoutService(workoutRepo, workoutExerciseRepo, bodyMetricRepo)
+	todoSvc := service.NewTodoService(todoRepo, eventRepo, todoRepo, service.WithTodoNotifier(hub), service.WithTodoHistory(todoActivityRepo, userRepo))
+	workoutSvc := service.NewWorkoutService(workoutRepo, workoutExerciseRepo, bodyMetricRepo, hub)
 	exerciseLibraryRepo := repository.NewExerciseLibraryRepo(db)
 	workoutTemplateRepo := repository.NewWorkoutTemplateRepo(db)
 	workoutSetLogRepo := repository.NewWorkoutSetLogRepo(db)
 	fitnessGoalRepo := repository.NewFitnessGoalRepo(db)
-	fitnessSvc := service.NewFitnessService(exerciseLibraryRepo, workoutTemplateRepo, workoutSetLogRepo, fitnessGoalRepo, workoutSvc)
-	habitSvc := service.NewHabitService(habitRepo, habitLogRepo)
-	pomodoroSvc := service.NewPomodoroService(pomodoroRepo)
-	transactionSvc := service.NewTransactionService(transactionRepo)
+	fitnessSvc := service.NewFitnessService(exerciseLibraryRepo, workoutTemplateRepo, workoutSetLogRepo, fitnessGoalRepo, workoutSvc, hub)
+	habitSvc := service.NewHabitService(habitRepo, habitLogRepo, hub)
+	pomodoroSvc := service.NewPomodoroService(pomodoroRepo, hub)
+	transactionSvc := service.NewTransactionService(transactionRepo, hub)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
 	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo,
 		service.WithExportNotifier(hub),

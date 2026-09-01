@@ -4,9 +4,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs'
 import { TodoForm } from './TodoForm'
 import TodoSubtaskList from './TodoSubtaskList'
-import { TodoComments } from './TodoComments'
 import { TodoHistory } from './TodoHistory'
-import { useTodoChildrenMap, useTodoComments } from '../hooks/api/useTodos'
+import { useTodoChildrenMap } from '../hooks/api/useTodos'
 import type { SubtaskMoveAfterId } from './TodoSubtaskList'
 import type { Todo, Contact, Tag } from '../types'
 
@@ -60,7 +59,10 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
   const [extraIds, setExtraIds] = useState<Set<number>>(() => new Set())
 
   const parentIds = [todo.id, ...extraIds]
-  const childrenMap = useTodoChildrenMap(parentIds, {})
+  // Pinned manual/asc (same as the tree and the flat views' subtask sections):
+  // rows are drag-reorderable, and the default due_date sort would snap every
+  // dropped row back to its old slot on refetch.
+  const childrenMap = useTodoChildrenMap(parentIds, { sort: 'manual', order: 'asc' })
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -80,7 +82,7 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
   }
 
   return (
-    <div className="mt-4">
+    <div className="mt-3">
       <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {t('todos.subtasks')}
       </h3>
@@ -102,15 +104,12 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
 }
 
 /** Right-side slide-over for viewing/editing a todo — opened by clicking a
- *  card/row anywhere in the todo views. Three tabs keep the form, the notes
- *  (comments) and the modification history each one click away instead of
- *  stacked in a very long scroll. The form remounts per todo id so its state
- *  always matches the todo being viewed. */
+ *  card/row anywhere in the todo views. Two tabs keep the form and the
+ *  modification history each one click away instead of stacked in a very long
+ *  scroll. The form remounts per todo id so its state always matches the todo
+ *  being viewed. */
 export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates, onContactsChange, onClose, onToggleSubtask, onDeleteSubtask, onStartPomodoro, onOpenTodo, onCreateChild, hideDone, subtaskDragId, onSubtaskDragIdChange, onMoveSubtask }: TodoDetailDrawerProps) {
   const { t } = useTranslation()
-  // Comment count for the tab badge — same cached query TodoComments reads.
-  const { data: comments } = useTodoComments(todo?.id ?? null)
-  const commentCount = comments?.length ?? 0
 
   return (
     <Sheet open={open && todo != null} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -120,14 +119,11 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
         </SheetHeader>
         {todo && (
           <Tabs defaultValue="detail" className="min-h-0 flex-1">
-            <TabsList className="mx-4 mt-2 shrink-0">
+            <TabsList className="mx-4 mt-1.5 shrink-0">
               <TabsTrigger value="detail">{t('todos.tabDetail')}</TabsTrigger>
-              <TabsTrigger value="comments">
-                {t('todos.comments')}{commentCount > 0 && ` (${commentCount})`}
-              </TabsTrigger>
               <TabsTrigger value="history">{t('todos.history')}</TabsTrigger>
             </TabsList>
-            <TabsContent value="detail" className="min-h-0 overflow-y-auto p-4">
+            <TabsContent value="detail" className="min-h-0 overflow-y-auto px-4 py-3">
               <TodoForm
                 key={todo.id}
                 editing={todo}
@@ -151,10 +147,7 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
                 onMove={onMoveSubtask}
               />
             </TabsContent>
-            <TabsContent value="comments" className="min-h-0 overflow-y-auto p-4">
-              <TodoComments key={`comments-${todo.id}`} todoId={todo.id} />
-            </TabsContent>
-            <TabsContent value="history" className="min-h-0 overflow-y-auto p-4">
+            <TabsContent value="history" className="min-h-0 overflow-y-auto px-4 py-3">
               <TodoHistory key={`history-${todo.id}`} todoId={todo.id} />
             </TabsContent>
           </Tabs>

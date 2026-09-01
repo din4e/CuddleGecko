@@ -70,6 +70,7 @@ type FitnessService struct {
 	workoutRepo WorkoutRepository
 	exRepo     WorkoutExerciseRepository
 	bodyRepo   BodyMetricRepository
+	notifier   ChangeNotifier
 }
 
 func NewFitnessService(
@@ -78,6 +79,7 @@ func NewFitnessService(
 	setRepo WorkoutSetLogRepository,
 	goalRepo FitnessGoalRepository,
 	workoutSvc *WorkoutService,
+	notifier ...ChangeNotifier,
 ) *FitnessService {
 	return &FitnessService{
 		libRepo:    libRepo,
@@ -88,6 +90,7 @@ func NewFitnessService(
 		workoutRepo: workoutSvc.repo,
 		exRepo:     workoutSvc.exRepo,
 		bodyRepo:   workoutSvc.bodyRepo,
+		notifier:   firstNotifier(notifier),
 	}
 }
 
@@ -112,6 +115,7 @@ func (s *FitnessService) CreateLibraryItem(ctx context.Context, userID, workspac
 	if err := s.libRepo.Create(ctx, item); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceExerciseLibrary, ChangeCreated, item.ID, item)
 	return item, nil
 }
 
@@ -135,11 +139,16 @@ func (s *FitnessService) UpdateLibraryItem(ctx context.Context, userID, workspac
 	if err := s.libRepo.Update(ctx, item); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceExerciseLibrary, ChangeUpdated, item.ID, item)
 	return item, nil
 }
 
 func (s *FitnessService) DeleteLibraryItem(ctx context.Context, userID, workspaceID, id uint) error {
 	err := s.libRepo.Delete(ctx, workspaceID, id)
+	if err == nil {
+		notifyChange(ctx, s.notifier, workspaceID, ResourceExerciseLibrary, ChangeDeleted, id, nil)
+		return nil
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrLibraryItemNotFound
 	}
@@ -180,6 +189,7 @@ func (s *FitnessService) CreateTemplate(ctx context.Context, userID, workspaceID
 	if err := s.tplRepo.Create(ctx, t); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkoutTemplate, ChangeCreated, t.ID, t)
 	return t, nil
 }
 
@@ -197,11 +207,20 @@ func (s *FitnessService) UpdateTemplate(ctx context.Context, userID, workspaceID
 	if err := s.tplRepo.Update(ctx, t); err != nil {
 		return nil, err
 	}
-	return s.tplRepo.GetByID(ctx, workspaceID, id)
+	updated, err := s.tplRepo.GetByID(ctx, workspaceID, id)
+	if err != nil {
+		return nil, err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkoutTemplate, ChangeUpdated, id, updated)
+	return updated, nil
 }
 
 func (s *FitnessService) DeleteTemplate(ctx context.Context, userID, workspaceID, id uint) error {
 	err := s.tplRepo.Delete(ctx, workspaceID, id)
+	if err == nil {
+		notifyChange(ctx, s.notifier, workspaceID, ResourceWorkoutTemplate, ChangeDeleted, id, nil)
+		return nil
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrTemplateNotFound
 	}
@@ -242,6 +261,7 @@ func (s *FitnessService) InstantiateTemplate(ctx context.Context, userID, worksp
 	if err := s.workoutRepo.CreateWithExercises(ctx, w, exercises); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeCreated, w.ID, w)
 	return w, nil
 }
 
@@ -270,6 +290,7 @@ func (s *FitnessService) CreateSetLog(ctx context.Context, userID, workspaceID, 
 	if err := s.setRepo.Create(ctx, log); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeUpdated, workoutID, nil)
 	return log, nil
 }
 
@@ -290,6 +311,7 @@ func (s *FitnessService) UpdateSetLog(ctx context.Context, userID, workspaceID, 
 	if err := s.setRepo.Update(ctx, log); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeUpdated, workoutID, nil)
 	return log, nil
 }
 
@@ -298,6 +320,10 @@ func (s *FitnessService) DeleteSetLog(ctx context.Context, userID, workspaceID, 
 		return err
 	}
 	err := s.setRepo.Delete(ctx, workoutID, exerciseID, id)
+	if err == nil {
+		notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeUpdated, workoutID, nil)
+		return nil
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrSetLogNotFound
 	}
@@ -349,6 +375,7 @@ func (s *FitnessService) CreateGoal(ctx context.Context, userID, workspaceID uin
 	if err := s.goalRepo.Create(ctx, g); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceFitnessGoal, ChangeCreated, g.ID, g)
 	out := []model.FitnessGoalWithProgress{{FitnessGoal: *g}}
 	if err := s.fillGoalProgress(ctx, workspaceID, out); err != nil {
 		return nil, err
@@ -374,6 +401,7 @@ func (s *FitnessService) UpdateGoal(ctx context.Context, userID, workspaceID, id
 	if err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceFitnessGoal, ChangeUpdated, id, updated)
 	out := []model.FitnessGoalWithProgress{{FitnessGoal: *updated}}
 	if err := s.fillGoalProgress(ctx, workspaceID, out); err != nil {
 		return nil, err
@@ -383,6 +411,10 @@ func (s *FitnessService) UpdateGoal(ctx context.Context, userID, workspaceID, id
 
 func (s *FitnessService) DeleteGoal(ctx context.Context, userID, workspaceID, id uint) error {
 	err := s.goalRepo.Delete(ctx, workspaceID, id)
+	if err == nil {
+		notifyChange(ctx, s.notifier, workspaceID, ResourceFitnessGoal, ChangeDeleted, id, nil)
+		return nil
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrGoalNotFound
 	}

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { remindersApi } from '../../api/reminders'
 import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
+import { invalidateScope } from '@/lib/querySync'
 import type { Reminder, ReminderStatus, PaginatedData } from '../../types'
 
 const scope = 'reminders'
@@ -20,7 +21,7 @@ export function useCreateReminder() {
   return useMutation({
     mutationFn: ({ contactId, data }: { contactId: number; data: Partial<Reminder> }) =>
       remindersApi.create(contactId, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }
@@ -29,7 +30,7 @@ export function useUpdateReminder() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Reminder> }) => remindersApi.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }
@@ -38,7 +39,7 @@ export function useDeleteReminder() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => remindersApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }

@@ -55,19 +55,6 @@ type TodoItem struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-// TodoComment is a markdown note attached to a Todo. Username is denormalized
-// at write time so the comment stays attributable even if the user row changes.
-type TodoComment struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	TodoID    uint           `gorm:"index;not null" json:"todo_id"`
-	UserID    uint           `gorm:"index;not null" json:"user_id"`
-	Username  string         `gorm:"size:50;not null" json:"username"`
-	Content   string         `gorm:"type:longtext;not null" json:"content"`
-	CreatedAt time.Time      `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
-}
-
 // TodoActivity is one immutable audit-log line for a Todo: which user did what,
 // when. Action is a short verb (created/updated/deleted/...); for field edits
 // Field carries the changed column with Old/New values (truncated).
@@ -94,8 +81,6 @@ const (
 	TodoActivityMoved      = "moved"
 	TodoActivityDeleted    = "deleted"
 	TodoActivityRestored   = "restored"
-	TodoActivityCommented  = "commented"
-	TodoActivityUncomment  = "removed_comment"
 )
 
 // TruncateActivityValue caps a recorded field value so a long description edit

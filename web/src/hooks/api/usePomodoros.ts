@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { pomodorosApi } from '../../api/pomodoros'
 import { rootKey } from './keys'
+import { invalidateScope } from '@/lib/querySync'
 
 const scope = 'pomodoros'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
@@ -18,6 +19,6 @@ export function useRecordPomodoro() {
   return useMutation({
     mutationFn: (data: { duration_seconds: number; kind?: string; todo_id?: number | null; completed?: boolean }) =>
       pomodorosApi.create(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }

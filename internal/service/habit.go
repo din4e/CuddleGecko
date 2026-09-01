@@ -28,12 +28,13 @@ type HabitLogRepository interface {
 }
 
 type HabitService struct {
-	repo    HabitRepository
-	logRepo HabitLogRepository
+	repo     HabitRepository
+	logRepo  HabitLogRepository
+	notifier ChangeNotifier
 }
 
-func NewHabitService(repo HabitRepository, logRepo HabitLogRepository) *HabitService {
-	return &HabitService{repo: repo, logRepo: logRepo}
+func NewHabitService(repo HabitRepository, logRepo HabitLogRepository, notifier ...ChangeNotifier) *HabitService {
+	return &HabitService{repo: repo, logRepo: logRepo, notifier: firstNotifier(notifier)}
 }
 
 func (s *HabitService) Create(ctx context.Context, userID, workspaceID uint, h *model.Habit) (*model.Habit, error) {
@@ -46,6 +47,7 @@ func (s *HabitService) Create(ctx context.Context, userID, workspaceID uint, h *
 	if err := s.repo.Create(ctx, h); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceHabit, ChangeCreated, h.ID, h)
 	return h, nil
 }
 
@@ -91,6 +93,7 @@ func (s *HabitService) Update(ctx context.Context, userID, workspaceID, id uint,
 	if err := s.repo.Update(ctx, h); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceHabit, ChangeUpdated, h.ID, h)
 	return h, nil
 }
 
@@ -99,6 +102,7 @@ func (s *HabitService) Delete(ctx context.Context, userID, workspaceID, id uint)
 		return err
 	}
 	_ = s.logRepo.DeleteByHabit(ctx, workspaceID, id)
+	notifyChange(ctx, s.notifier, workspaceID, ResourceHabit, ChangeDeleted, id, nil)
 	return nil
 }
 
@@ -110,7 +114,11 @@ func (s *HabitService) Toggle(ctx context.Context, userID, workspaceID, id uint,
 	if date == "" {
 		date = time.Now().Format(habitDateFormat)
 	}
-	return s.logRepo.Toggle(ctx, userID, workspaceID, id, date)
+	done, err := s.logRepo.Toggle(ctx, userID, workspaceID, id, date)
+	if err == nil {
+		notifyChange(ctx, s.notifier, workspaceID, ResourceHabit, ChangeUpdated, id, nil)
+	}
+	return done, err
 }
 
 // enrich fills the virtual stats fields for a batch of habits from one query.

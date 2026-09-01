@@ -14,11 +14,12 @@ type PomodoroRepository interface {
 }
 
 type PomodoroService struct {
-	repo PomodoroRepository
+	repo     PomodoroRepository
+	notifier ChangeNotifier
 }
 
-func NewPomodoroService(repo PomodoroRepository) *PomodoroService {
-	return &PomodoroService{repo: repo}
+func NewPomodoroService(repo PomodoroRepository, notifier ...ChangeNotifier) *PomodoroService {
+	return &PomodoroService{repo: repo, notifier: firstNotifier(notifier)}
 }
 
 func (s *PomodoroService) Create(ctx context.Context, userID, workspaceID uint, p *model.PomodoroSession) (*model.PomodoroSession, error) {
@@ -40,6 +41,7 @@ func (s *PomodoroService) Create(ctx context.Context, userID, workspaceID uint, 
 	if err := s.repo.Create(ctx, p); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourcePomodoro, ChangeCreated, p.ID, p)
 	return p, nil
 }
 

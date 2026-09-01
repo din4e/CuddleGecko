@@ -106,7 +106,7 @@ func TestWS_ConnectReceivesBroadcast(t *testing.T) {
 	// Give ServeWS a moment to register the client with the hub after the upgrade.
 	time.Sleep(100 * time.Millisecond)
 
-	hub.NotifyTodoChange(ctx, 1, 42, service.TodoUpdated)
+	hub.NotifyChange(ctx, 1, service.ResourceTodo, service.ChangeUpdated, 42, nil)
 
 	rctx, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel2()
@@ -115,8 +115,8 @@ func TestWS_ConnectReceivesBroadcast(t *testing.T) {
 
 	var f realtime.Frame
 	require.NoError(t, json.Unmarshal(data, &f))
-	assert.Equal(t, realtime.FrameTodoChanged, f.Type)
+	assert.Equal(t, realtime.FrameDataChanged, f.Type)
 	assert.Equal(t, uint(1), f.WorkspaceID)
-	assert.Equal(t, uint(42), f.TodoID)
+	assert.Equal(t, uint(42), f.ID)
 	assert.Equal(t, "updated", f.Kind)
 }

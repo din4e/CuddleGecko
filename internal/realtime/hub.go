@@ -1,6 +1,6 @@
-// Package realtime provides the WebSocket hub that fans todo change
+// Package realtime provides the WebSocket hub that fans entity-change
 // notifications out to every connected client of a workspace, enabling
-// multi-device sync.
+// multi-device sync across all data domains.
 package realtime
 
 import (
@@ -12,8 +12,8 @@ import (
 )
 
 // Hub maintains the set of active WebSocket clients grouped by workspace and
-// fans out change notifications. It implements service.TodoChangeNotifier so the
-// todo service can broadcast mutations without depending on realtime details.
+// fans out change notifications. It implements service.ChangeNotifier so domain
+// services can broadcast mutations without depending on realtime details.
 type Hub struct {
 	mu      sync.RWMutex
 	clients map[uint]map[*client]struct{} // workspaceID -> connected clients
@@ -70,15 +70,26 @@ func (h *Hub) BroadcastToWorkspace(workspaceID uint, payload []byte) {
 	}
 }
 
-// NotifyTodoChange satisfies service.TodoChangeNotifier. It is fire-and-forget:
-// it marshals a Frame and broadcasts it to the workspace, and never blocks on
-// the caller (each client send is non-blocking).
-func (h *Hub) NotifyTodoChange(_ context.Context, workspaceID, todoID uint, kind service.TodoChangeKind) {
+// NotifyChange satisfies service.ChangeNotifier. It is fire-and-forget: it
+// marshals a Frame (embedding the entity when given) and broadcasts it to the
+// workspace; it never blocks on the caller (each client send is non-blocking).
+func (h *Hub) NotifyChange(_ context.Context, workspaceID uint, resource string, kind service.ChangeKind, id uint, entity any) {
 	frame := Frame{
-		Type:        FrameTodoChanged,
+		Type:        FrameDataChanged,
 		WorkspaceID: workspaceID,
-		TodoID:      todoID,
+		Resource:    resource,
 		Kind:        string(kind),
+		ID:          id,
+	}
+	if entity != nil {
+		raw, err := json.Marshal(entity)
+		if err != nil {
+			// Without the entity the frame is still a usable invalidation
+			// signal — broadcast it rather than dropping the change entirely.
+			frame.Kind = string(service.ChangeBulk)
+		} else {
+			frame.Entity = raw
+		}
 	}
 	payload, err := json.Marshal(frame)
 	if err != nil {

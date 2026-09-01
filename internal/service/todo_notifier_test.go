@@ -10,20 +10,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// captureNotifier records every NotifyTodoChange call so tests can assert the
-// service emits the right (workspace, todo, kind) tuple for each mutation.
+// captureNotifier records every NotifyChange call so tests can assert the
+// service emits the right (workspace, resource, id, kind) tuple per mutation.
 type captureNotifier struct {
 	events []capturedChange
 }
 
 type capturedChange struct {
 	workspaceID uint
-	todoID      uint
-	kind        TodoChangeKind
+	resource    string
+	id          uint
+	kind        ChangeKind
 }
 
-func (n *captureNotifier) NotifyTodoChange(_ context.Context, workspaceID, todoID uint, kind TodoChangeKind) {
-	n.events = append(n.events, capturedChange{workspaceID: workspaceID, todoID: todoID, kind: kind})
+func (n *captureNotifier) NotifyChange(_ context.Context, workspaceID uint, resource string, kind ChangeKind, id uint, _ any) {
+	n.events = append(n.events, capturedChange{workspaceID: workspaceID, resource: resource, id: id, kind: kind})
 }
 
 func newNotifiedService(n *captureNotifier) (*TodoService, *mockTodoRepo) {
@@ -39,7 +40,7 @@ func TestTodoNotifier_Create(t *testing.T) {
 
 	_, err := svc.Create(context.Background(), 1, 2, &model.Todo{ID: 5, Title: "test"})
 	assert.NoError(t, err)
-	assert.Equal(t, []capturedChange{{2, 5, TodoCreated}}, n.events)
+	assert.Equal(t, []capturedChange{{2, ResourceTodo, 5, ChangeCreated}}, n.events)
 }
 
 func TestTodoNotifier_Update(t *testing.T) {
@@ -51,7 +52,7 @@ func TestTodoNotifier_Update(t *testing.T) {
 
 	_, err := svc.Update(context.Background(), 1, 2, 7, &model.Todo{Title: "y"}, TodoClear{})
 	assert.NoError(t, err)
-	assert.Equal(t, []capturedChange{{2, 7, TodoUpdated}}, n.events)
+	assert.Equal(t, []capturedChange{{2, ResourceTodo, 7, ChangeUpdated}}, n.events)
 }
 
 func TestTodoNotifier_Delete(t *testing.T) {
@@ -61,7 +62,7 @@ func TestTodoNotifier_Delete(t *testing.T) {
 
 	err := svc.Delete(context.Background(), 1, 1, 1)
 	assert.NoError(t, err)
-	assert.Equal(t, []capturedChange{{1, 1, TodoDeleted}}, n.events)
+	assert.Equal(t, []capturedChange{{1, ResourceTodo, 1, ChangeDeleted}}, n.events)
 }
 
 func TestTodoNotifier_CreateItem(t *testing.T) {
@@ -73,7 +74,7 @@ func TestTodoNotifier_CreateItem(t *testing.T) {
 	_, err := svc.CreateItem(context.Background(), 1, 2, 3, "step")
 	assert.NoError(t, err)
 	// items_changed targets the PARENT todo so card progress counters refresh.
-	assert.Equal(t, []capturedChange{{2, 3, TodoItemsChanged}}, n.events)
+	assert.Equal(t, []capturedChange{{2, ResourceTodo, 3, ChangeItemsChanged}}, n.events)
 }
 
 func TestTodoNotifier_BulkAction(t *testing.T) {
@@ -85,7 +86,7 @@ func TestTodoNotifier_BulkAction(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2), affected)
 	// Bulk fans out a workspace-wide refresh (todo_id 0).
-	assert.Equal(t, []capturedChange{{2, 0, TodoBulk}}, n.events)
+	assert.Equal(t, []capturedChange{{2, ResourceTodo, 0, ChangeBulk}}, n.events)
 }
 
 func TestTodoNotifier_BulkAction_NoopWhenUnaffected(t *testing.T) {
@@ -106,7 +107,7 @@ func TestTodoNotifier_TogglePin(t *testing.T) {
 
 	_, err := svc.TogglePin(context.Background(), 1, 2, 9)
 	assert.NoError(t, err)
-	assert.Equal(t, []capturedChange{{2, 9, TodoUpdated}}, n.events)
+	assert.Equal(t, []capturedChange{{2, ResourceTodo, 9, ChangeUpdated}}, n.events)
 }
 
 func TestTodoNotifier_NoopDefaultDoesNotPanic(t *testing.T) {
@@ -130,7 +131,7 @@ func TestTodoNotifier_Move(t *testing.T) {
 	err := svc.Move(context.Background(), 1, 2, 5, nil, nil, "")
 	assert.NoError(t, err)
 	// Move fans out a workspace-wide refresh (sibling order may shift).
-	assert.Equal(t, []capturedChange{{2, 0, TodoBulk}}, n.events)
+	assert.Equal(t, []capturedChange{{2, ResourceTodo, 0, ChangeBulk}}, n.events)
 }
 
 func TestTodoService_Create_WithValidParent(t *testing.T) {

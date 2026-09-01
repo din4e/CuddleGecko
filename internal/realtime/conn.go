@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -9,9 +10,10 @@ import (
 )
 
 const (
-	// FrameTodoChanged is the only frame type in v1: a todo in this workspace
-	// changed; clients should refetch the affected list.
-	FrameTodoChanged = "todo.changed"
+	// FrameDataChanged is the only frame type: an entity in this workspace
+	// changed; kind/entity tell the client whether to patch its cache or
+	// refetch the affected list.
+	FrameDataChanged = "data.changed"
 
 	sendBufSize = 16 // per-client outbound buffer; overflow evicts the client
 	writeWait   = 10 * time.Second
@@ -19,20 +21,24 @@ const (
 )
 
 // Frame is the JSON message pushed from server to client over the socket.
+// Entity, when present, is the mutated object marshaled exactly as the REST
+// API returns it, so clients can patch it into cached query results verbatim.
 type Frame struct {
-	Type        string `json:"type"` // always "todo.changed" in v1
-	WorkspaceID uint   `json:"workspace_id"`
-	TodoID      uint   `json:"todo_id,omitempty"`
-	Kind        string `json:"kind"` // created|updated|deleted|items_changed|bulk
+	Type        string          `json:"type"` // always "data.changed"
+	WorkspaceID uint            `json:"workspace_id"`
+	Resource    string          `json:"resource"` // todos|contacts|transactions|…
+	Kind        string          `json:"kind"`     // created|updated|deleted|items_changed|bulk
+	ID          uint            `json:"id,omitempty"`
+	Entity      json.RawMessage `json:"entity,omitempty"`
 }
 
 // client is one WebSocket connection scoped to a single workspace.
 type client struct {
-	conn     *websocket.Conn
+	conn        *websocket.Conn
 	workspaceID uint
-	send     chan []byte
-	stop     chan struct{}
-	stopOnce sync.Once
+	send        chan []byte
+	stop        chan struct{}
+	stopOnce    sync.Once
 }
 
 func newClient(conn *websocket.Conn, workspaceID uint) *client {
@@ -60,7 +66,7 @@ func ServeWS(ctx context.Context, hub *Hub, conn *websocket.Conn, workspaceID ui
 	defer conn.Close(websocket.StatusNormalClosure, "closing")
 
 	// readPump cancels the connection when the peer goes away; we don't expect
-	// inbound messages in v1 (the server only pushes).
+	// inbound messages (the server only pushes).
 	go c.readPump(ctx)
 	c.writePump(ctx)
 }

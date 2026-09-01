@@ -1,19 +1,27 @@
-// Real-time multi-device todo sync over WebSocket.
+// Real-time multi-device data sync over WebSocket.
 //
-// Opens one connection scoped to a workspace; on inbound "todo.changed" frames
-// the caller invalidates its todo queries so TanStack Query refetches the fresh
-// state. Reconnects with capped exponential backoff + jitter, re-reading the
-// access token via getToken() on every attempt so a refreshed token is picked
-// up automatically; an expiring token is rotated via refreshToken before the
-// handshake (a WS upgrade can't ride the HTTP 401 refresh-retry path).
+// Opens one connection scoped to a workspace; on inbound "data.changed" frames
+// the caller patches or invalidates the affected query caches (see
+// lib/querySync.ts). Reconnects with capped exponential backoff + jitter,
+// re-reading the access token via getToken() on every attempt so a refreshed
+// token is picked up automatically; an expiring token is rotated via
+// refreshToken before the handshake (a WS upgrade can't ride the HTTP 401
+// refresh-retry path).
 
 const BASE_BACKOFF_MS = 1000
 const MAX_BACKOFF_MS = 30000
 
-export interface TodoChangedMessage {
+export type DataChangedKind = 'created' | 'updated' | 'deleted' | 'items_changed' | 'bulk'
+
+export interface DataChangedMessage {
   workspaceId: number
-  todoId: number
-  kind: string
+  /** Cache scope of the changed domain — matches the frontend query scopes. */
+  resource: string
+  kind: DataChangedKind
+  /** The changed entity's id (0 for bulk events). */
+  id: number
+  /** Post-mutation entity in REST shape; present on created/updated when the server has it. */
+  entity?: Record<string, unknown>
 }
 
 export interface TodoWsSyncOptions {
@@ -28,8 +36,8 @@ export interface TodoWsSyncOptions {
   refreshToken?: () => Promise<string>
   /** Workspace to scope the connection to (captured from the URL at connect time). */
   workspaceId: number | null
-  /** Called for each inbound todo.changed frame. */
-  onTodoChanged: (msg: TodoChangedMessage) => void
+  /** Called for each inbound data.changed frame. */
+  onDataChanged: (msg: DataChangedMessage) => void
 }
 
 export interface TodoWsSyncController {
@@ -83,8 +91,8 @@ export function startTodoWsSync(opts: TodoWsSyncOptions): TodoWsSyncController {
       attempt = 0
     }
     socket.onmessage = (ev) => {
-      const msg = parseTodoChanged(ev.data)
-      if (msg) opts.onTodoChanged(msg)
+      const msg = parseDataChanged(ev.data)
+      if (msg) opts.onDataChanged(msg)
     }
     socket.onclose = () => {
       socket = null
@@ -135,7 +143,7 @@ function tokenExpiresWithin(token: string, withinMs: number): boolean {
   }
 }
 
-function parseTodoChanged(raw: unknown): TodoChangedMessage | null {
+function parseDataChanged(raw: unknown): DataChangedMessage | null {
   if (typeof raw !== 'string') return null
   let parsed: Record<string, unknown>
   try {
@@ -143,10 +151,14 @@ function parseTodoChanged(raw: unknown): TodoChangedMessage | null {
   } catch {
     return null // keepalive / non-JSON frame
   }
-  if (!parsed || parsed.type !== 'todo.changed') return null
+  if (!parsed || parsed.type !== 'data.changed') return null
   return {
     workspaceId: Number(parsed.workspace_id),
-    todoId: Number(parsed.todo_id ?? 0),
-    kind: String(parsed.kind ?? ''),
+    resource: String(parsed.resource ?? ''),
+    kind: String(parsed.kind ?? '') as DataChangedKind,
+    id: Number(parsed.id ?? 0),
+    entity: (parsed.entity && typeof parsed.entity === 'object'
+      ? parsed.entity as Record<string, unknown>
+      : undefined),
   }
 }
