@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { contactsApi } from '../../api/contacts'
 import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
+import { invalidateScope } from '@/lib/querySync'
 import type { Contact, PaginatedData, UpcomingBirthday } from '../../types'
 
 const scope = 'contacts'
@@ -49,7 +50,7 @@ export function useCreateContact() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: Partial<Contact>) => contactsApi.create(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }
@@ -58,7 +59,7 @@ export function useUpdateContact() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Contact> }) => contactsApi.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }
@@ -67,7 +68,7 @@ export function useDeleteContact() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => contactsApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }

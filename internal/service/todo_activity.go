@@ -2,34 +2,17 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 )
 
-var (
-	ErrTodoCommentNotFound   = errors.New("todo comment not found")
-	ErrTodoCommentEmpty      = errors.New("todo comment content is empty")
-	ErrTodoCommentNotAllowed = errors.New("not allowed to modify this comment")
-)
-
 // TodoActivityRepository persists the per-todo audit log.
 type TodoActivityRepository interface {
 	CreateBatch(ctx context.Context, activities []model.TodoActivity) error
 	List(ctx context.Context, todoID uint, limit int) ([]model.TodoActivity, error)
-}
-
-// TodoCommentRepository persists markdown notes attached to a todo.
-type TodoCommentRepository interface {
-	Create(ctx context.Context, comment *model.TodoComment) error
-	GetByID(ctx context.Context, todoID, id uint) (*model.TodoComment, error)
-	List(ctx context.Context, todoID uint) ([]model.TodoComment, error)
-	Update(ctx context.Context, comment *model.TodoComment) error
-	Delete(ctx context.Context, id uint) error
 }
 
 // TodoUserLookup resolves the actor's username for the activity log. Satisfied
@@ -42,18 +25,15 @@ type TodoUserLookup interface {
 // When either is nil the service skips history recording entirely (tests,
 // MCP tools under test, deployments that don't want the log).
 
-// WithTodoHistory enables per-todo activity recording, username resolution and
-// the comments store. Passing nil for a dependency skips just that part.
-func WithTodoHistory(activities TodoActivityRepository, users TodoUserLookup, comments TodoCommentRepository) TodoServiceOption {
+// WithTodoHistory enables per-todo activity recording and username resolution.
+// Passing nil for a dependency skips just that part.
+func WithTodoHistory(activities TodoActivityRepository, users TodoUserLookup) TodoServiceOption {
 	return func(s *TodoService) {
 		if activities != nil {
 			s.activityRepo = activities
 		}
 		if users != nil {
 			s.userLookup = users
-		}
-		if comments != nil {
-			s.commentRepo = comments
 		}
 	}
 }
@@ -207,102 +187,6 @@ func uintPtrString(u *uint) string {
 		return ""
 	}
 	return fmt.Sprintf("%d", *u)
-}
-
-// --- Comments (per-todo notes) ---
-
-const maxTodoCommentLength = 5000
-
-// ListComments returns a todo's comments, oldest first. The todo's workspace
-// scoping is enforced via ensureTodoOwned.
-func (s *TodoService) ListComments(ctx context.Context, userID, workspaceID, todoID uint) ([]model.TodoComment, error) {
-	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
-		return nil, err
-	}
-	if s.commentRepo == nil {
-		return []model.TodoComment{}, nil
-	}
-	return s.commentRepo.List(ctx, todoID)
-}
-
-func (s *TodoService) CreateComment(ctx context.Context, userID, workspaceID, todoID uint, content string) (*model.TodoComment, error) {
-	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
-		return nil, err
-	}
-	if s.commentRepo == nil {
-		return nil, ErrTodoCommentNotFound
-	}
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return nil, ErrTodoCommentEmpty
-	}
-	if len(content) > maxTodoCommentLength {
-		return nil, fmt.Errorf("%w: content exceeds %d characters", ErrTodoCommentEmpty, maxTodoCommentLength)
-	}
-	comment := &model.TodoComment{
-		TodoID:   todoID,
-		UserID:   userID,
-		Username: s.resolveUsername(ctx, userID),
-		Content:  content,
-	}
-	if err := s.commentRepo.Create(ctx, comment); err != nil {
-		return nil, err
-	}
-	s.recordActivity(ctx, userID, todoID, []model.TodoActivity{activityEntry(model.TodoActivityCommented, "comment", "", content)})
-	s.notify(ctx, workspaceID, todoID, TodoUpdated)
-	return comment, nil
-}
-
-func (s *TodoService) UpdateComment(ctx context.Context, userID, workspaceID, todoID, commentID uint, content string) (*model.TodoComment, error) {
-	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
-		return nil, err
-	}
-	if s.commentRepo == nil {
-		return nil, ErrTodoCommentNotFound
-	}
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return nil, ErrTodoCommentEmpty
-	}
-	if len(content) > maxTodoCommentLength {
-		return nil, fmt.Errorf("%w: content exceeds %d characters", ErrTodoCommentEmpty, maxTodoCommentLength)
-	}
-	comment, err := s.commentRepo.GetByID(ctx, todoID, commentID)
-	if err != nil {
-		return nil, ErrTodoCommentNotFound
-	}
-	// Only the author may edit their own note.
-	if comment.UserID != userID {
-		return nil, ErrTodoCommentNotAllowed
-	}
-	comment.Content = content
-	if err := s.commentRepo.Update(ctx, comment); err != nil {
-		return nil, err
-	}
-	s.notify(ctx, workspaceID, todoID, TodoUpdated)
-	return comment, nil
-}
-
-func (s *TodoService) DeleteComment(ctx context.Context, userID, workspaceID, todoID, commentID uint) error {
-	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
-		return err
-	}
-	if s.commentRepo == nil {
-		return ErrTodoCommentNotFound
-	}
-	comment, err := s.commentRepo.GetByID(ctx, todoID, commentID)
-	if err != nil {
-		return ErrTodoCommentNotFound
-	}
-	if comment.UserID != userID {
-		return ErrTodoCommentNotAllowed
-	}
-	if err := s.commentRepo.Delete(ctx, commentID); err != nil {
-		return err
-	}
-	s.recordActivity(ctx, userID, todoID, []model.TodoActivity{activityEntry(model.TodoActivityUncomment, "comment", comment.Content, "")})
-	s.notify(ctx, workspaceID, todoID, TodoUpdated)
-	return nil
 }
 
 // ListActivities returns the todo's audit log, newest first.

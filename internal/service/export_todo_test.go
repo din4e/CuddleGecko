@@ -228,7 +228,8 @@ func TestExport_Import_EmitsNotifier(t *testing.T) {
 	_, err := svc.ImportTodosCSV(ctx, 1, 1, "title,status\nimported,pending\n")
 	require.NoError(t, err)
 	require.NotEmpty(t, n.events, "CSV import should emit a workspace-wide refresh")
-	assert.Equal(t, TodoBulk, n.events[0].kind)
+	assert.Equal(t, ChangeBulk, n.events[0].kind)
+	assert.Equal(t, ResourceTodo, n.events[0].resource)
 	assert.Equal(t, uint(1), n.events[0].workspaceID)
 
 	n.events = nil

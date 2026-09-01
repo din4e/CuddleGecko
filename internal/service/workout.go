@@ -63,10 +63,11 @@ type WorkoutService struct {
 	repo      WorkoutRepository
 	exRepo    WorkoutExerciseRepository
 	bodyRepo  BodyMetricRepository
+	notifier  ChangeNotifier
 }
 
-func NewWorkoutService(repo WorkoutRepository, exRepo WorkoutExerciseRepository, bodyRepo BodyMetricRepository) *WorkoutService {
-	return &WorkoutService{repo: repo, exRepo: exRepo, bodyRepo: bodyRepo}
+func NewWorkoutService(repo WorkoutRepository, exRepo WorkoutExerciseRepository, bodyRepo BodyMetricRepository, notifier ...ChangeNotifier) *WorkoutService {
+	return &WorkoutService{repo: repo, exRepo: exRepo, bodyRepo: bodyRepo, notifier: firstNotifier(notifier)}
 }
 
 // --- Workouts ---
@@ -83,6 +84,7 @@ func (s *WorkoutService) Create(ctx context.Context, userID, workspaceID uint, w
 	if err := s.repo.Create(ctx, w); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeCreated, w.ID, w)
 	return w, nil
 }
 
@@ -140,6 +142,7 @@ func (s *WorkoutService) Update(ctx context.Context, userID, workspaceID, id uin
 	if err := s.repo.Update(ctx, w); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeUpdated, w.ID, w)
 	return w, nil
 }
 
@@ -164,18 +167,27 @@ func (s *WorkoutService) ToggleStatus(ctx context.Context, userID, workspaceID, 
 	if err := s.repo.Update(ctx, w); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeUpdated, w.ID, w)
 	return w, nil
 }
 
 func (s *WorkoutService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
-	return s.repo.Delete(ctx, workspaceID, id)
+	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeDeleted, id, nil)
+	return nil
 }
 
 func (s *WorkoutService) Reorder(ctx context.Context, userID, workspaceID, id uint, afterID *uint) error {
 	if err := s.ensureWorkoutOwned(ctx, workspaceID, id); err != nil {
 		return err
 	}
-	return s.repo.Reorder(ctx, workspaceID, id, afterID)
+	if err := s.repo.Reorder(ctx, workspaceID, id, afterID); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeBulk, 0, nil)
+	return nil
 }
 
 func (s *WorkoutService) Stats(ctx context.Context, userID, workspaceID uint) (model.WorkoutStats, error) {
@@ -212,6 +224,7 @@ func (s *WorkoutService) CreateExercise(ctx context.Context, userID, workspaceID
 	if err := s.exRepo.CreateExercise(ctx, ex); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeUpdated, workoutID, nil)
 	return ex, nil
 }
 
@@ -234,6 +247,7 @@ func (s *WorkoutService) UpdateExercise(ctx context.Context, userID, workspaceID
 	if err := s.exRepo.UpdateExercise(ctx, workoutID, ex); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeUpdated, workoutID, nil)
 	return ex, nil
 }
 
@@ -249,6 +263,7 @@ func (s *WorkoutService) ToggleExercise(ctx context.Context, userID, workspaceID
 		return nil, err
 	}
 	existing.Done = !existing.Done
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeUpdated, workoutID, nil)
 	return existing, nil
 }
 
@@ -259,7 +274,11 @@ func (s *WorkoutService) DeleteExercise(ctx context.Context, userID, workspaceID
 	if _, err := s.exRepo.GetExercise(ctx, workoutID, exerciseID); err != nil {
 		return ErrExerciseNotFound
 	}
-	return s.exRepo.DeleteExercise(ctx, workoutID, exerciseID)
+	if err := s.exRepo.DeleteExercise(ctx, workoutID, exerciseID); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeUpdated, workoutID, nil)
+	return nil
 }
 
 func (s *WorkoutService) ReorderExercise(ctx context.Context, userID, workspaceID, workoutID, exerciseID uint, afterID *uint) error {
@@ -269,7 +288,11 @@ func (s *WorkoutService) ReorderExercise(ctx context.Context, userID, workspaceI
 	if _, err := s.exRepo.GetExercise(ctx, workoutID, exerciseID); err != nil {
 		return ErrExerciseNotFound
 	}
-	return s.exRepo.ReorderExercise(ctx, workoutID, exerciseID, afterID)
+	if err := s.exRepo.ReorderExercise(ctx, workoutID, exerciseID, afterID); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeUpdated, workoutID, nil)
+	return nil
 }
 
 // --- Body metrics ---
@@ -283,6 +306,7 @@ func (s *WorkoutService) CreateMetric(ctx context.Context, userID, workspaceID u
 	if err := s.bodyRepo.Create(ctx, m); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceBodyMetric, ChangeCreated, m.ID, m)
 	return m, nil
 }
 
@@ -309,11 +333,16 @@ func (s *WorkoutService) UpdateMetric(ctx context.Context, userID, workspaceID, 
 	if err := s.bodyRepo.Update(ctx, m); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceBodyMetric, ChangeUpdated, m.ID, m)
 	return m, nil
 }
 
 func (s *WorkoutService) DeleteMetric(ctx context.Context, userID, workspaceID, id uint) error {
-	return s.bodyRepo.Delete(ctx, workspaceID, id)
+	if err := s.bodyRepo.Delete(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceBodyMetric, ChangeDeleted, id, nil)
+	return nil
 }
 
 func (s *WorkoutService) BodySummary(ctx context.Context, userID, workspaceID uint) (model.BodyMetricSummary, error) {

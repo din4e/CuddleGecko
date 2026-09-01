@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { workoutTemplatesApi } from '../../api/workoutTemplates'
 import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
+import { invalidateScope } from '@/lib/querySync'
 import type { Workout, WorkoutTemplate, WorkoutTemplateInput } from '../../types'
 
 const scope = 'workout-templates'
@@ -16,7 +17,7 @@ export function useWorkoutTemplates() {
 
 export function useWorkoutTemplateMutations() {
   const qc = useQueryClient()
-  const invalidate = () => qc.invalidateQueries({ queryKey: allKey() })
+  const invalidate = () => invalidateScope(qc, scope)
   const create = useMutation({
     mutationFn: (input: WorkoutTemplateInput) => workoutTemplatesApi.create(input),
     onSuccess: invalidate,

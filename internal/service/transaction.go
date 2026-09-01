@@ -21,11 +21,12 @@ type TransactionRepository interface {
 }
 
 type TransactionService struct {
-	repo TransactionRepository
+	repo     TransactionRepository
+	notifier ChangeNotifier
 }
 
-func NewTransactionService(repo TransactionRepository) *TransactionService {
-	return &TransactionService{repo: repo}
+func NewTransactionService(repo TransactionRepository, notifier ...ChangeNotifier) *TransactionService {
+	return &TransactionService{repo: repo, notifier: firstNotifier(notifier)}
 }
 
 func (s *TransactionService) Create(ctx context.Context, userID, workspaceID uint, tx *model.Transaction) (*model.Transaction, error) {
@@ -37,6 +38,7 @@ func (s *TransactionService) Create(ctx context.Context, userID, workspaceID uin
 	if err := s.repo.Create(ctx, tx); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceTransaction, ChangeCreated, tx.ID, tx)
 	return tx, nil
 }
 
@@ -84,9 +86,14 @@ func (s *TransactionService) Update(ctx context.Context, userID, workspaceID, id
 	if err := s.repo.Update(ctx, tx); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceTransaction, ChangeUpdated, tx.ID, tx)
 	return tx, nil
 }
 
 func (s *TransactionService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
-	return s.repo.Delete(ctx, workspaceID, id)
+	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceTransaction, ChangeDeleted, id, nil)
+	return nil
 }

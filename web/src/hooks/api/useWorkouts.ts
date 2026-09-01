@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { workoutsApi } from '../../api/workouts'
 import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
+import { invalidateScope } from '@/lib/querySync'
 import type {
   Workout,
   WorkoutExercise,
@@ -40,7 +41,7 @@ export function useCreateWorkout() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: Partial<Workout>) => workoutsApi.create(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }
@@ -49,7 +50,7 @@ export function useUpdateWorkout() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: WorkoutUpdateInput }) => workoutsApi.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }
@@ -58,7 +59,7 @@ export function useToggleWorkout() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => workoutsApi.toggle(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }
@@ -67,7 +68,7 @@ export function useReorderWorkout() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, afterId }: { id: number; afterId: number | null }) => workoutsApi.reorder(id, afterId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }
@@ -76,7 +77,7 @@ export function useDeleteWorkout() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => workoutsApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
 }
@@ -99,7 +100,7 @@ export function useCreateWorkoutExercise(workoutId: number) {
     mutationFn: (input: WorkoutExerciseInput) => workoutsApi.createExercise(workoutId, input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: exercisesKey(workoutId) })
-      qc.invalidateQueries({ queryKey: allKey() })
+      invalidateScope(qc, scope)
     },
     onError: mutationErrorToast,
   })
@@ -121,7 +122,7 @@ export function useToggleWorkoutExercise(workoutId: number) {
     mutationFn: (exerciseId: number) => workoutsApi.toggleExercise(workoutId, exerciseId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: exercisesKey(workoutId) })
-      qc.invalidateQueries({ queryKey: allKey() })
+      invalidateScope(qc, scope)
     },
     onError: mutationErrorToast,
   })
@@ -133,7 +134,7 @@ export function useDeleteWorkoutExercise(workoutId: number) {
     mutationFn: (exerciseId: number) => workoutsApi.deleteExercise(workoutId, exerciseId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: exercisesKey(workoutId) })
-      qc.invalidateQueries({ queryKey: allKey() })
+      invalidateScope(qc, scope)
     },
     onError: mutationErrorToast,
   })
@@ -171,7 +172,7 @@ export function useSetLogMutations(workoutId: number, exerciseId: number) {
     qc.invalidateQueries({ queryKey: setsKey(workoutId, exerciseId) })
     // PRs derive from set logs, and the workout card shows progress.
     qc.invalidateQueries({ queryKey: [...allKey(), 'prs'] })
-    qc.invalidateQueries({ queryKey: allKey() })
+    invalidateScope(qc, scope)
   }
   const create = useMutation({
     mutationFn: (input: SetLogInput) => workoutsApi.createSet(workoutId, exerciseId, input),

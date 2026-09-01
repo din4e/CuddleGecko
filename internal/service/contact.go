@@ -65,10 +65,11 @@ type ContactService struct {
 	// reminderRepo backs CreateBirthdayReminder; contacts own birthday data,
 	// so the birthday logic lives here rather than in ReminderService.
 	reminderRepo ReminderRepository
+	notifier     ChangeNotifier
 }
 
-func NewContactService(repo ContactRepository, taggingRepo TaggingRepository, reminderRepo ReminderRepository) *ContactService {
-	return &ContactService{repo: repo, taggingRepo: taggingRepo, reminderRepo: reminderRepo}
+func NewContactService(repo ContactRepository, taggingRepo TaggingRepository, reminderRepo ReminderRepository, notifier ...ChangeNotifier) *ContactService {
+	return &ContactService{repo: repo, taggingRepo: taggingRepo, reminderRepo: reminderRepo, notifier: firstNotifier(notifier)}
 }
 
 func (s *ContactService) Create(ctx context.Context, userID, workspaceID uint, contact *model.Contact) (*model.Contact, error) {
@@ -77,6 +78,7 @@ func (s *ContactService) Create(ctx context.Context, userID, workspaceID uint, c
 	if err := s.repo.Create(ctx, contact); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceContact, ChangeCreated, contact.ID, contact)
 	return contact, nil
 }
 
@@ -132,6 +134,7 @@ func (s *ContactService) Update(ctx context.Context, userID, workspaceID, id uin
 	if err := s.repo.Update(ctx, contact); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceContact, ChangeUpdated, contact.ID, contact)
 	return contact, nil
 }
 
@@ -141,6 +144,7 @@ func (s *ContactService) Delete(ctx context.Context, userID, workspaceID, id uin
 	}
 	// Clean up dangling tag associations.
 	_ = s.taggingRepo.RemoveAll(ctx, workspaceID, model.TagTargetContact, id)
+	notifyChange(ctx, s.notifier, workspaceID, ResourceContact, ChangeDeleted, id, nil)
 	return nil
 }
 
@@ -148,7 +152,11 @@ func (s *ContactService) ReplaceTags(ctx context.Context, userID, workspaceID, c
 	if _, err := s.repo.GetByID(ctx, workspaceID, contactID); err != nil {
 		return ErrContactNotFound
 	}
-	return s.taggingRepo.SetTags(ctx, workspaceID, model.TagTargetContact, contactID, tagIDs)
+	if err := s.taggingRepo.SetTags(ctx, workspaceID, model.TagTargetContact, contactID, tagIDs); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceContact, ChangeUpdated, contactID, nil)
+	return nil
 }
 
 func (s *ContactService) GetTags(ctx context.Context, userID, workspaceID, contactID uint) ([]model.Tag, error) {
@@ -293,6 +301,7 @@ func (s *ContactService) CreateBirthdayReminder(ctx context.Context, userID, wor
 	if err := s.reminderRepo.Create(ctx, reminder); err != nil {
 		return nil, err
 	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceReminder, ChangeCreated, reminder.ID, reminder)
 	return reminder, nil
 }
 

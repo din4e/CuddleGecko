@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { tagsApi } from '../../api/tags'
 import { rootKey } from './keys'
+import { invalidateScope } from '@/lib/querySync'
 import type { Tag, PaginatedData } from '../../types'
 
 const scope = 'tags'
@@ -18,7 +19,7 @@ export function useCreateTag() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: { name: string; color: string }) => tagsApi.create(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }
 
@@ -26,7 +27,7 @@ export function useUpdateTag() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Tag> }) => tagsApi.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }
 
@@ -34,6 +35,6 @@ export function useDeleteTag() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => tagsApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { habitsApi } from '../../api/habits'
 import { rootKey } from './keys'
+import { invalidateScope } from '@/lib/querySync'
 import type { Habit } from '../../types'
 
 const scope = 'habits'
@@ -17,7 +18,7 @@ export function useCreateHabit() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: Partial<Habit>) => habitsApi.create(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }
 
@@ -25,7 +26,7 @@ export function useUpdateHabit() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Habit> }) => habitsApi.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }
 
@@ -33,7 +34,7 @@ export function useDeleteHabit() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => habitsApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }
 
@@ -41,6 +42,6 @@ export function useCheckinHabit() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, date }: { id: number; date?: string }) => habitsApi.checkin(id, date),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }

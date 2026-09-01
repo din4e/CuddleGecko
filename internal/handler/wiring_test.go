@@ -41,7 +41,7 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 		&model.User{}, &model.RefreshToken{}, &model.Workspace{}, &model.WorkspaceMember{},
 		&model.Contact{}, &model.Tag{}, &model.Interaction{}, &model.Reminder{},
 		&model.ContactRelation{}, &model.Event{}, &model.Todo{}, &model.TodoItem{},
-		&model.TodoComment{}, &model.TodoActivity{},
+		&model.TodoActivity{},
 		&model.Workout{}, &model.WorkoutExercise{}, &model.BodyMetric{}, &model.Transaction{},
 		&model.AIProvider{}, &model.AIConversation{}, &model.AIMessage{},
 		&model.Setting{}, &model.UserSetting{},

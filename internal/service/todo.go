@@ -72,38 +72,15 @@ type EventRepositoryForSync interface {
 }
 
 // --- Real-time change notification (multi-device sync) ---
-
-// TodoChangeKind classifies a todo mutation for downstream sync listeners.
-type TodoChangeKind string
-
-const (
-	TodoCreated      TodoChangeKind = "created"
-	TodoUpdated      TodoChangeKind = "updated"
-	TodoDeleted      TodoChangeKind = "deleted"
-	TodoItemsChanged TodoChangeKind = "items_changed"
-	TodoBulk         TodoChangeKind = "bulk"
-)
-
-// TodoChangeNotifier receives a best-effort notification whenever a todo changes.
-// The realtime hub implements this so other devices in the same workspace can
-// refresh. Implementations must be safe to call from any goroutine and must not
-// block the caller — the service treats notifications as fire-and-forget.
-type TodoChangeNotifier interface {
-	NotifyTodoChange(ctx context.Context, workspaceID, todoID uint, kind TodoChangeKind)
-}
-
-// noopTodoNotifier is the default notifier: notifications are discarded (tests,
-// dev, or any deployment without a realtime hub wired in).
-type noopTodoNotifier struct{}
-
-func (noopTodoNotifier) NotifyTodoChange(context.Context, uint, uint, TodoChangeKind) {}
+// See change_notifier.go for the generic notifier contract; TodoServiceOption
+// still carries its own WithTodoNotifier alias for readability at call sites.
 
 // TodoServiceOption configures a TodoService at construction time.
 type TodoServiceOption func(*TodoService)
 
 // WithTodoNotifier wires a real-time change notifier (e.g. the WS hub) so todo
 // mutations fan out to other connected clients in the same workspace.
-func WithTodoNotifier(n TodoChangeNotifier) TodoServiceOption {
+func WithTodoNotifier(n ChangeNotifier) TodoServiceOption {
 	return func(s *TodoService) {
 		if n != nil {
 			s.notifier = n
@@ -115,26 +92,31 @@ type TodoService struct {
 	repo         TodoRepository
 	eventRepo    EventRepositoryForSync
 	itemRepo     TodoItemRepository
-	notifier     TodoChangeNotifier
+	notifier     ChangeNotifier
 	activityRepo TodoActivityRepository
-	commentRepo  TodoCommentRepository
 	userLookup   TodoUserLookup
 	usernames    usernameCache
 }
 
 func NewTodoService(repo TodoRepository, eventRepo EventRepositoryForSync, itemRepo TodoItemRepository, opts ...TodoServiceOption) *TodoService {
-	s := &TodoService{repo: repo, eventRepo: eventRepo, itemRepo: itemRepo, notifier: noopTodoNotifier{}}
+	s := &TodoService{repo: repo, eventRepo: eventRepo, itemRepo: itemRepo, notifier: noopChangeNotifier{}}
 	for _, opt := range opts {
 		opt(s)
 	}
 	return s
 }
 
-// notify fires the change notification. Best-effort: it never returns an error
-// and is only called after the underlying repo mutation has succeeded.
-func (s *TodoService) notify(ctx context.Context, workspaceID, todoID uint, kind TodoChangeKind) {
+// notify fires the change notification, embedding the post-mutation entity so
+// clients can patch caches without a refetch (pass nil todo for id-only
+// changes). Best-effort: it never returns an error and is only called after the
+// underlying repo mutation has succeeded.
+func (s *TodoService) notify(ctx context.Context, workspaceID uint, kind ChangeKind, id uint, todo *model.Todo) {
+	var entity any
+	if todo != nil {
+		entity = todo
+	}
 	if s.notifier != nil {
-		s.notifier.NotifyTodoChange(ctx, workspaceID, todoID, kind)
+		s.notifier.NotifyChange(ctx, workspaceID, ResourceTodo, kind, id, entity)
 	}
 }
 
@@ -166,7 +148,7 @@ func (s *TodoService) Create(ctx context.Context, userID, workspaceID uint, todo
 		return nil, err
 	}
 	s.recordActivity(ctx, userID, todo.ID, []model.TodoActivity{activityEntry(model.TodoActivityCreated, "", "", todo.Title)})
-	s.notify(ctx, workspaceID, todo.ID, TodoCreated)
+	s.notify(ctx, workspaceID, ChangeCreated, todo.ID, todo)
 	return todo, nil
 }
 
@@ -225,7 +207,7 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 		return nil, err
 	}
 	s.recordActivity(ctx, userID, todo.ID, diffTodoUpdates(&before, todo))
-	s.notify(ctx, workspaceID, todo.ID, TodoUpdated)
+	s.notify(ctx, workspaceID, ChangeUpdated, todo.ID, todo)
 	return todo, nil
 }
 
@@ -265,7 +247,7 @@ func (s *TodoService) ToggleStatus(ctx context.Context, userID, workspaceID, id 
 		}
 		s.recordActivity(ctx, userID, todo.ID, []model.TodoActivity{activityEntry(action, "status", prevStatus, todo.Status)})
 	}
-	s.notify(ctx, workspaceID, todo.ID, TodoUpdated)
+	s.notify(ctx, workspaceID, ChangeUpdated, todo.ID, todo)
 	return todo, nil
 }
 
@@ -299,7 +281,7 @@ func (s *TodoService) SetStatus(ctx context.Context, userID, workspaceID, id uin
 		}
 		s.recordActivity(ctx, userID, todo.ID, []model.TodoActivity{activityEntry(action, "status", prevStatus, todo.Status)})
 	}
-	s.notify(ctx, workspaceID, todo.ID, TodoUpdated)
+	s.notify(ctx, workspaceID, ChangeUpdated, todo.ID, todo)
 	return todo, nil
 }
 
@@ -355,7 +337,7 @@ func (s *TodoService) Delete(ctx context.Context, userID, workspaceID, id uint) 
 		return err
 	}
 	s.recordActivity(ctx, userID, id, []model.TodoActivity{activityEntry(model.TodoActivityDeleted, "", "", "")})
-	s.notify(ctx, workspaceID, id, TodoDeleted)
+	s.notify(ctx, workspaceID, ChangeDeleted, id, nil)
 	return nil
 }
 
@@ -375,7 +357,7 @@ func (s *TodoService) Restore(ctx context.Context, userID, workspaceID, id uint)
 		return ErrTodoNotFound
 	}
 	s.recordActivity(ctx, userID, id, []model.TodoActivity{activityEntry(model.TodoActivityRestored, "", "", "")})
-	s.notify(ctx, workspaceID, id, TodoUpdated)
+	s.notify(ctx, workspaceID, ChangeUpdated, id, nil)
 	return nil
 }
 
@@ -388,7 +370,7 @@ func (s *TodoService) Reorder(ctx context.Context, userID, workspaceID, id uint,
 	if err := s.repo.Reorder(ctx, workspaceID, id, afterID); err != nil {
 		return err
 	}
-	s.notify(ctx, workspaceID, 0, TodoBulk)
+	s.notify(ctx, workspaceID, ChangeBulk, 0, nil)
 	return nil
 }
 
@@ -413,7 +395,7 @@ func (s *TodoService) Move(ctx context.Context, userID, workspaceID, id uint, pa
 			activityEntry(model.TodoActivityMoved, "parent", uintPtrString(prevParent), uintPtrString(parentID)),
 		})
 	}
-	s.notify(ctx, workspaceID, 0, TodoBulk)
+	s.notify(ctx, workspaceID, ChangeBulk, 0, nil)
 	return nil
 }
 
@@ -429,8 +411,8 @@ func (s *TodoService) PromoteItem(ctx context.Context, userID, workspaceID, todo
 	if err != nil {
 		return nil, err
 	}
-	s.notify(ctx, workspaceID, todoID, TodoItemsChanged) // parent lost an item
-	s.notify(ctx, workspaceID, promoted.ID, TodoCreated)
+	s.notify(ctx, workspaceID, ChangeItemsChanged, todoID, nil) // parent lost an item
+	s.notify(ctx, workspaceID, ChangeCreated, promoted.ID, promoted)
 	return promoted, nil
 }
 
@@ -443,7 +425,7 @@ func (s *TodoService) Duplicate(ctx context.Context, userID, workspaceID, id uin
 	if err != nil {
 		return nil, err
 	}
-	s.notify(ctx, workspaceID, clone.ID, TodoCreated)
+	s.notify(ctx, workspaceID, ChangeCreated, clone.ID, clone)
 	return clone, nil
 }
 
@@ -453,7 +435,7 @@ func (s *TodoService) BulkAction(ctx context.Context, userID, workspaceID uint, 
 	if err != nil || affected == 0 {
 		return affected, err
 	}
-	s.notify(ctx, workspaceID, 0, TodoBulk)
+	s.notify(ctx, workspaceID, ChangeBulk, 0, nil)
 	return affected, err
 }
 
@@ -473,7 +455,7 @@ func (s *TodoService) TogglePin(ctx context.Context, userID, workspaceID, id uin
 		action = model.TodoActivityPinned
 	}
 	s.recordActivity(ctx, userID, id, []model.TodoActivity{activityEntry(action, "pinned", "", "")})
-	s.notify(ctx, workspaceID, id, TodoUpdated)
+	s.notify(ctx, workspaceID, ChangeUpdated, id, nil)
 	return todo, nil
 }
 
@@ -487,7 +469,7 @@ func (s *TodoService) IncrementPomodoro(ctx context.Context, userID, workspaceID
 	if err := s.repo.IncrementPomodoro(ctx, workspaceID, id); err != nil {
 		return err
 	}
-	s.notify(ctx, workspaceID, id, TodoUpdated)
+	s.notify(ctx, workspaceID, ChangeUpdated, id, nil)
 	return nil
 }
 
@@ -511,7 +493,7 @@ func (s *TodoService) ReplaceTags(ctx context.Context, userID, workspaceID, todo
 	if err := s.repo.ReplaceTags(ctx, todoID, tags); err != nil {
 		return err
 	}
-	s.notify(ctx, workspaceID, todoID, TodoUpdated)
+	s.notify(ctx, workspaceID, ChangeUpdated, todoID, nil)
 	return nil
 }
 
@@ -545,7 +527,7 @@ func (s *TodoService) CreateItem(ctx context.Context, userID, workspaceID, todoI
 	if err := s.itemRepo.CreateItem(ctx, item); err != nil {
 		return nil, err
 	}
-	s.notify(ctx, workspaceID, todoID, TodoItemsChanged)
+	s.notify(ctx, workspaceID, ChangeItemsChanged, todoID, nil)
 	return item, nil
 }
 
@@ -573,7 +555,7 @@ func (s *TodoService) UpdateItem(ctx context.Context, userID, workspaceID, todoI
 	if err := s.itemRepo.UpdateItem(ctx, todoID, item); err != nil {
 		return nil, err
 	}
-	s.notify(ctx, workspaceID, todoID, TodoItemsChanged)
+	s.notify(ctx, workspaceID, ChangeItemsChanged, todoID, nil)
 	return item, nil
 }
 
@@ -590,7 +572,7 @@ func (s *TodoService) ToggleItem(ctx context.Context, userID, workspaceID, todoI
 		return nil, err
 	}
 	current.Done = next
-	s.notify(ctx, workspaceID, todoID, TodoItemsChanged)
+	s.notify(ctx, workspaceID, ChangeItemsChanged, todoID, nil)
 	return current, nil
 }
 
@@ -604,7 +586,7 @@ func (s *TodoService) DeleteItem(ctx context.Context, userID, workspaceID, todoI
 	if err := s.itemRepo.DeleteItem(ctx, todoID, itemID); err != nil {
 		return err
 	}
-	s.notify(ctx, workspaceID, todoID, TodoItemsChanged)
+	s.notify(ctx, workspaceID, ChangeItemsChanged, todoID, nil)
 	return nil
 }
 
@@ -619,6 +601,6 @@ func (s *TodoService) ReorderItem(ctx context.Context, userID, workspaceID, todo
 	if err := s.itemRepo.ReorderItem(ctx, todoID, itemID, afterItemID); err != nil {
 		return err
 	}
-	s.notify(ctx, workspaceID, todoID, TodoItemsChanged)
+	s.notify(ctx, workspaceID, ChangeItemsChanged, todoID, nil)
 	return nil
 }

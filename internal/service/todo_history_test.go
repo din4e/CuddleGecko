@@ -25,8 +25,8 @@ func (f fakeUserLookup) GetUserByID(_ context.Context, id uint) (*model.User, er
 	return &model.User{ID: id, Username: name}, nil
 }
 
-// newTodoServiceWithHistory wires a TodoService with real activity/comment
-// repos over in-memory SQLite plus a fake username resolver.
+// newTodoServiceWithHistory wires a TodoService with a real activity repo over
+// in-memory SQLite plus a fake username resolver.
 func newTodoServiceWithHistory(t *testing.T) (*TodoService, *gorm.DB) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -35,12 +35,11 @@ func newTodoServiceWithHistory(t *testing.T) (*TodoService, *gorm.DB) {
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
-	require.NoError(t, db.AutoMigrate(&model.Todo{}, &model.TodoItem{}, &model.Tag{}, &model.TodoActivity{}, &model.TodoComment{}))
+	require.NoError(t, db.AutoMigrate(&model.Todo{}, &model.TodoItem{}, &model.Tag{}, &model.TodoActivity{}))
 	repo := repository.NewTodoRepo(db)
 	activityRepo := repository.NewTodoActivityRepo(db)
-	commentRepo := repository.NewTodoCommentRepo(db)
 	svc := NewTodoService(repo, noopEventRepo{}, repo,
-		WithTodoHistory(activityRepo, fakeUserLookup{names: map[uint]string{1: "alice", 2: "bob"}}, commentRepo))
+		WithTodoHistory(activityRepo, fakeUserLookup{names: map[uint]string{1: "alice", 2: "bob"}}))
 	return svc, db
 }
 
@@ -126,59 +125,10 @@ func TestServiceActivity_PinnedAndDeleted(t *testing.T) {
 	assert.Equal(t, "bob", activities[0].Username)
 }
 
-func TestServiceComments_CRUDAndAuthorOnly(t *testing.T) {
+func TestServiceActivity_UnknownTodo(t *testing.T) {
 	svc, _ := newTodoServiceWithHistory(t)
 	ctx := context.Background()
 
-	todo, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "with notes"})
-	require.NoError(t, err)
-
-	comment, err := svc.CreateComment(ctx, 1, 1, todo.ID, "  hello **world**  ")
-	require.NoError(t, err)
-	assert.Equal(t, "hello **world**", comment.Content, "content is trimmed")
-	assert.Equal(t, "alice", comment.Username)
-
-	// Empty content is rejected.
-	_, err = svc.CreateComment(ctx, 1, 1, todo.ID, "   ")
-	assert.ErrorIs(t, err, ErrTodoCommentEmpty)
-
-	// Another user can read but not edit/delete someone else's comment.
-	_, err = svc.UpdateComment(ctx, 2, 1, todo.ID, comment.ID, "hijacked")
-	assert.ErrorIs(t, err, ErrTodoCommentNotAllowed)
-	err = svc.DeleteComment(ctx, 2, 1, todo.ID, comment.ID)
-	assert.ErrorIs(t, err, ErrTodoCommentNotAllowed)
-
-	edited, err := svc.UpdateComment(ctx, 1, 1, todo.ID, comment.ID, "edited body")
-	require.NoError(t, err)
-	assert.Equal(t, "edited body", edited.Content)
-
-	comments, err := svc.ListComments(ctx, 2, 1, todo.ID)
-	require.NoError(t, err)
-	require.Len(t, comments, 1)
-
-	// Adding a comment also lands a "commented" activity line.
-	activities := listActivities(t, svc, todo.ID)
-	found := false
-	for _, a := range activities {
-		if a.Action == model.TodoActivityCommented {
-			found = true
-		}
-	}
-	assert.True(t, found, "comment creation should be recorded in the activity log")
-
-	require.NoError(t, svc.DeleteComment(ctx, 1, 1, todo.ID, comment.ID))
-	comments, err = svc.ListComments(ctx, 1, 1, todo.ID)
-	require.NoError(t, err)
-	assert.Empty(t, comments)
-}
-
-func TestServiceComments_UnknownTodo(t *testing.T) {
-	svc, _ := newTodoServiceWithHistory(t)
-	ctx := context.Background()
-
-	_, err := svc.CreateComment(ctx, 1, 1, 999, "hi")
-	assert.ErrorIs(t, err, ErrTodoNotFound)
-
-	_, err = svc.ListActivities(ctx, 1, 1, 999, 10)
+	_, err := svc.ListActivities(ctx, 1, 1, 999, 10)
 	assert.ErrorIs(t, err, ErrTodoNotFound)
 }

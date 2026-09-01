@@ -38,19 +38,37 @@ func TestHub_BroadcastWorkspaceIsolation(t *testing.T) {
 	assert.Empty(t, b1.send, "workspace 2 client must not receive workspace 1 broadcast")
 }
 
-func TestHub_NotifyTodoChangeMarshalsFrame(t *testing.T) {
+func TestHub_NotifyChangeMarshalsFrame(t *testing.T) {
 	h := NewHub()
 	c := newClient(nil, 5)
 	h.Register(c)
 
-	h.NotifyTodoChange(context.Background(), 5, 42, service.TodoUpdated)
+	h.NotifyChange(context.Background(), 5, service.ResourceTodo, service.ChangeUpdated, 42, map[string]any{"id": 42, "title": "x"})
 
 	var f Frame
 	require.NoError(t, json.Unmarshal(recv(t, c), &f))
-	assert.Equal(t, FrameTodoChanged, f.Type)
+	assert.Equal(t, FrameDataChanged, f.Type)
 	assert.Equal(t, uint(5), f.WorkspaceID)
-	assert.Equal(t, uint(42), f.TodoID)
+	assert.Equal(t, "todos", f.Resource)
+	assert.Equal(t, uint(42), f.ID)
 	assert.Equal(t, "updated", f.Kind)
+	assert.JSONEq(t, `{"id":42,"title":"x"}`, string(f.Entity))
+}
+
+func TestHub_NotifyChangeEntityMarshalFallback(t *testing.T) {
+	h := NewHub()
+	c := newClient(nil, 5)
+	h.Register(c)
+
+	// An unmarshalable entity degrades the frame to a bulk invalidation rather
+	// than dropping the change entirely.
+	h.NotifyChange(context.Background(), 5, service.ResourceTodo, service.ChangeUpdated, 1, func() {})
+
+	var f Frame
+	require.NoError(t, json.Unmarshal(recv(t, c), &f))
+	assert.Equal(t, FrameDataChanged, f.Type)
+	assert.Equal(t, "bulk", f.Kind)
+	assert.Nil(t, f.Entity)
 }
 
 func TestHub_SlowClientEvicted(t *testing.T) {

@@ -3,7 +3,8 @@ import { useMutation, useQueries, useQuery, useQueryClient, useInfiniteQuery } f
 import type { InfiniteData } from '@tanstack/react-query'
 import { todosApi } from '../../api/todos'
 import { rootKey } from './keys'
-import type { Todo, TodoItem, TodoComment, TodoActivity, TodoStats, PaginatedData, TodoListParams, TodoStatus, TodoUpdateInput } from '../../types'
+import { invalidateScope, markLocalMutation } from '@/lib/querySync'
+import type { Todo, TodoItem, TodoActivity, TodoStats, PaginatedData, TodoListParams, TodoStatus, TodoUpdateInput } from '../../types'
 
 const scope = 'todos'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
@@ -128,18 +129,147 @@ export function useRestoreTodo() {
     mutationFn: (id: number) => todosApi.restore(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [...allKey(), 'trash'] })
-      qc.invalidateQueries({ queryKey: allKey() })
+      invalidateScope(qc, scope)
     },
     // TodosPage shows a specific restore-failed toast; suppress the global one.
     meta: { localErrorHandling: true },
   })
 }
 
+// --- Optimistic move/reorder/create helpers ---
+// Cached 'list' keys are [...allKey(), 'list', params]; params.parent_id (when
+// present) marks a children-slice entry, and its absence means a root list.
+type TodoListKey = readonly unknown[]
+
+function listEntryParentId(key: TodoListKey): number | null {
+  const params = key[3]
+  if (params != null && typeof params === 'object' && 'parent_id' in params) {
+    const pid = (params as { parent_id?: number }).parent_id
+    return pid ?? null
+  }
+  return null
+}
+
+function listEntryStatus(key: TodoListKey): string | undefined {
+  const params = key[3]
+  if (params != null && typeof params === 'object' && 'status' in params) {
+    return (params as { status?: string }).status
+  }
+  return undefined
+}
+
+// Applies an items-array transform to every page of any cached list shape;
+// returns null when data matches no known shape (stats, trash, …).
+function mapListItems(data: unknown, fn: (items: Todo[]) => Todo[]): unknown {
+  if (data == null) return null
+  if (typeof data === 'object' && 'pages' in data) {
+    const inf = data as unknown as InfiniteData<PaginatedData<Todo>>
+    return { ...data, pages: inf.pages.map((p) => ({ ...p, items: fn(p.items ?? []) })) }
+  }
+  if (typeof data === 'object' && 'items' in data) {
+    const page = data as unknown as PaginatedData<Todo>
+    return { ...page, items: fn(page.items ?? []) }
+  }
+  return null
+}
+
+// Reorders `moved` after `afterId` (or at the sibling group's top/end) inside
+// one items array. Items from other parents stay put; the position only
+// matters within the moved todo's new sibling group.
+function reorderItems(items: Todo[], moved: Todo, afterId: number | null, position?: string): Todo[] {
+  const rest = items.filter((t) => t.id !== moved.id)
+  let insertAt: number
+  if (afterId != null) {
+    const afterIdx = rest.findIndex((t) => t.id === afterId)
+    insertAt = afterIdx >= 0 ? afterIdx + 1 : rest.length
+  } else if (position === 'last') {
+    insertAt = rest.length
+  } else {
+    const firstSibling = rest.findIndex((t) => (t.parent_id ?? null) === (moved.parent_id ?? null))
+    insertAt = firstSibling >= 0 ? firstSibling : 0
+  }
+  rest.splice(insertAt, 0, moved)
+  return rest
+}
+
+// Optimistically applies a move/reorder to every cached list entry: the todo
+// migrates between parent-filtered children entries and repositions inside
+// root lists. Returns a rollback snapshot (Map key → original data).
+function optimisticallyMoveTodo(
+  qc: ReturnType<typeof useQueryClient>,
+  id: number,
+  parentId: number | null,
+  afterId: number | null,
+  position?: string,
+): Map<TodoListKey, unknown> {
+  const entries = qc.getQueriesData({ queryKey: [...allKey(), 'list'] })
+  const anywhere = entries.flatMap(([, data]) => {
+    const items: Todo[] =
+      data != null && typeof data === 'object' && 'pages' in data
+        ? ((data as unknown as InfiniteData<PaginatedData<Todo>>).pages.flatMap((p) => p.items ?? []))
+        : data != null && typeof data === 'object' && 'items' in data
+          ? ((data as unknown as PaginatedData<Todo>).items ?? [])
+          : []
+    return items.filter((t) => t.id === id)
+  })
+  if (anywhere.length === 0) return new Map()
+  const moved: Todo = { ...anywhere[0], parent_id: parentId }
+
+  const previous = new Map<TodoListKey, unknown>()
+  for (const [key, data] of entries) {
+    const entryParent = listEntryParentId(key)
+    const next = mapListItems(data, (items) => {
+      if (entryParent !== parentId) {
+        // Children slice of another parent: the todo only leaves.
+        return items.filter((t) => t.id !== id)
+      }
+      return reorderItems(items, moved, afterId, position)
+    })
+    if (next != null && next !== data) {
+      previous.set(key, data)
+      qc.setQueryData(key, next)
+    }
+  }
+  return previous
+}
+
+// Inserts a freshly created todo into the cached list entries it plausibly
+// belongs to (matching parent and, when the entry filters by status, matching
+// status). Entries it can't be placed in are left for the next refetch.
+function insertCreatedTodo(qc: ReturnType<typeof useQueryClient>, created: Todo): void {
+  for (const [key, data] of qc.getQueriesData({ queryKey: [...allKey(), 'list'] })) {
+    if (listEntryParentId(key) !== (created.parent_id ?? null)) continue
+    const status = listEntryStatus(key)
+    if (status != null && status !== created.status) continue
+    const next = mapListItems(data, (items) =>
+      items.some((t) => t.id === created.id) ? items : [created, ...items],
+    )
+    if (next != null && next !== data) qc.setQueryData(key, next)
+  }
+
+  // Root lists don't hold the child; grow the parent's child_count there so
+  // lazy subtask sections know to mount their children query.
+  if (created.parent_id != null) {
+    for (const [key, data] of qc.getQueriesData({ queryKey: [...allKey(), 'list'] })) {
+      if (listEntryParentId(key) === created.parent_id) continue
+      const next = mapListItems(data, (items) =>
+        items.map((t) => (t.id === created.parent_id ? { ...t, child_count: (t.child_count ?? 0) + 1 } : t)),
+      )
+      if (next != null && next !== data) qc.setQueryData(key, next)
+    }
+  }
+}
+
 export function useCreateTodo() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: Partial<Todo>) => todosApi.create(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: ({ data: created }) => {
+      // Mark the local mutation so the WS echo is dropped, then place the
+      // server-returned entity straight into the matching caches — no refetch.
+      markLocalMutation(scope)
+      insertCreatedTodo(qc, created)
+    },
   })
 }
 
@@ -147,7 +277,7 @@ export function useUpdateTodo() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: TodoUpdateInput }) => todosApi.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }
 
@@ -181,7 +311,7 @@ export function useToggleTodoStatus() {
       ctx?.previous.forEach((data, key) => qc.setQueryData(key, data))
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: allKey() })
+      invalidateScope(qc, scope)
     },
   })
 }
@@ -208,7 +338,7 @@ export function useSetTodoStatus() {
       ctx?.previous.forEach((data, key) => qc.setQueryData(key, data))
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: allKey() })
+      invalidateScope(qc, scope)
     },
   })
 }
@@ -218,8 +348,36 @@ export function useReorderTodo() {
   return useMutation({
     mutationFn: ({ id, afterId }: { id: number; afterId: number | null }) =>
       todosApi.reorder(id, afterId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onMutate: async ({ id, afterId }) => {
+      await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
+      const previous = optimisticallyMoveTodo(qc, id, listEntryParentIdOfTodo(qc, id), afterId)
+      return { previous }
+    },
+    onError: (_err, _vars, ctx) => {
+      ctx?.previous.forEach((data, key) => qc.setQueryData(key, data))
+    },
+    onSettled: () => {
+      // Reconcile with the server's renumbered sort_order — list subtree only,
+      // so stats/trash stay untouched.
+      markLocalMutation(scope)
+      void qc.invalidateQueries({ queryKey: [...allKey(), 'list'] })
+    },
   })
+}
+
+// The todo's current parent, read from any cached list (null = root / unknown).
+function listEntryParentIdOfTodo(qc: ReturnType<typeof useQueryClient>, id: number): number | null {
+  for (const [, data] of qc.getQueriesData({ queryKey: [...allKey(), 'list'] })) {
+    const items: Todo[] =
+      data != null && typeof data === 'object' && 'pages' in data
+        ? ((data as unknown as InfiniteData<PaginatedData<Todo>>).pages.flatMap((p) => p.items ?? []))
+        : data != null && typeof data === 'object' && 'items' in data
+          ? ((data as unknown as PaginatedData<Todo>).items ?? [])
+          : []
+    const found = items.find((t) => t.id === id)
+    if (found) return found.parent_id ?? null
+  }
+  return null
 }
 
 export function useMoveTodo() {
@@ -232,7 +390,19 @@ export function useMoveTodo() {
       /** Appends at the end of the sibling group when afterId is null. */
       position?: 'first' | 'last'
     }) => todosApi.move(id, parentId, afterId, position),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onMutate: async ({ id, parentId, afterId, position }) => {
+      await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
+      const previous = optimisticallyMoveTodo(qc, id, parentId, afterId, position)
+      return { previous }
+    },
+    onError: (_err, _vars, ctx) => {
+      ctx?.previous.forEach((data, key) => qc.setQueryData(key, data))
+    },
+    onSettled: () => {
+      // Move renumbers both sibling groups server-side; reconcile the lists.
+      markLocalMutation(scope)
+      void qc.invalidateQueries({ queryKey: [...allKey(), 'list'] })
+    },
   })
 }
 
@@ -240,7 +410,7 @@ export function usePomodoroTodo() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => todosApi.pomodoro(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }
 
@@ -262,7 +432,7 @@ export function useTogglePin() {
       ctx?.previous.forEach((data, key) => qc.setQueryData(key, data))
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: allKey() })
+      invalidateScope(qc, scope)
     },
   })
 }
@@ -284,7 +454,7 @@ export function useDuplicateTodo() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => todosApi.duplicate(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     // TodosPage shows a specific duplicate-failed toast; suppress the global one.
     meta: { localErrorHandling: true },
   })
@@ -294,7 +464,7 @@ export function useDeleteTodo() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => todosApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }
 
@@ -303,7 +473,7 @@ export function useBulkActionTodo() {
   return useMutation({
     mutationFn: ({ ids, action }: { ids: number[]; action: 'complete' | 'delete' }) =>
       todosApi.bulk(ids, action),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
     // TodosPage shows a specific bulk-failed toast; suppress the global one.
     meta: { localErrorHandling: true },
   })
@@ -329,7 +499,7 @@ export function useCreateTodoItem(todoId: number) {
     mutationFn: (content: string) => todosApi.createItem(todoId, content),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: itemsKey(todoId) })
-      qc.invalidateQueries({ queryKey: allKey() })
+      invalidateScope(qc, scope)
     },
   })
 }
@@ -340,7 +510,7 @@ export function useToggleTodoItem(todoId: number) {
     mutationFn: (itemId: number) => todosApi.toggleItem(todoId, itemId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: itemsKey(todoId) })
-      qc.invalidateQueries({ queryKey: allKey() })
+      invalidateScope(qc, scope)
     },
   })
 }
@@ -360,7 +530,7 @@ export function usePromoteTodoItem(todoId: number) {
     mutationFn: (itemId: number) => todosApi.promoteItem(todoId, itemId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: itemsKey(todoId) })
-      qc.invalidateQueries({ queryKey: allKey() })
+      invalidateScope(qc, scope)
     },
   })
 }
@@ -371,7 +541,7 @@ export function useDeleteTodoItem(todoId: number) {
     mutationFn: (itemId: number) => todosApi.deleteItem(todoId, itemId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: itemsKey(todoId) })
-      qc.invalidateQueries({ queryKey: allKey() })
+      invalidateScope(qc, scope)
     },
   })
 }
@@ -394,52 +564,11 @@ export function useReplaceTodoTags() {
   return useMutation({
     mutationFn: ({ todoId, tagIds }: { todoId: number; tagIds: number[] }) =>
       todosApi.replaceTags(todoId, tagIds),
-    onSuccess: () => qc.invalidateQueries({ queryKey: allKey() }),
+    onSuccess: () => invalidateScope(qc, scope),
   })
 }
 
-// --- Comments (markdown notes) + modification history ---
-
-const commentsKey = (todoId: number) => [...allKey(), 'comments', todoId] as const
-
-export function useTodoComments(todoId: number | null) {
-  return useQuery<TodoComment[]>({
-    queryKey: commentsKey(todoId as number),
-    queryFn: ({ signal }) => todosApi.listComments(todoId as number, signal).then((r) => r.data),
-    enabled: todoId != null,
-  })
-}
-
-export function useCreateTodoComment(todoId: number) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (content: string) => todosApi.createComment(todoId, content),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: commentsKey(todoId) })
-      qc.invalidateQueries({ queryKey: [...allKey(), 'activities', todoId] })
-    },
-  })
-}
-
-export function useUpdateTodoComment(todoId: number) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ commentId, content }: { commentId: number; content: string }) =>
-      todosApi.updateComment(todoId, commentId, content),
-    onSuccess: () => qc.invalidateQueries({ queryKey: commentsKey(todoId) }),
-  })
-}
-
-export function useDeleteTodoComment(todoId: number) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (commentId: number) => todosApi.deleteComment(todoId, commentId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: commentsKey(todoId) })
-      qc.invalidateQueries({ queryKey: [...allKey(), 'activities', todoId] })
-    },
-  })
-}
+// --- Modification history ---
 
 const activitiesKey = (todoId: number) => [...allKey(), 'activities', todoId] as const
 
