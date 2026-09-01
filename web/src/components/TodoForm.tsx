@@ -149,8 +149,8 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
           flex column, so the footer below stays pinned and never overlaps the
           last fields (the old sticky-inside-scroll approach always covered
           them at full scroll). */}
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-1">
-        <div className="space-y-1.5">
+      <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto py-1">
+        <div className="space-y-1">
           <Label>{t('todos.title_field')} *</Label>
           <Input
             value={formTitle}
@@ -166,7 +166,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             maxLength={200}
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <div className="flex items-center justify-between">
             <Label>{t('todos.description')}</Label>
             {formDesc.trim() && (
@@ -182,7 +182,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
           </div>
           {descPreview ? (
             <div
-              className="min-h-16 w-full rounded-lg border bg-transparent px-2.5 py-2 text-sm"
+              className="min-h-12 w-full rounded-lg border bg-transparent px-2.5 py-1.5 text-sm"
               onClick={() => setDescPreview(false)}
               title={t('todos.descWrite')}
             >
@@ -193,12 +193,12 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
           )}
         </div>
         {parentCandidates && parentCandidates.length > 0 && (
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <Label>{t('todos.parent')}</Label>
             <select
               value={formParentId ?? ''}
               onChange={(e) => setFormParentId(e.target.value ? Number(e.target.value) : null)}
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              className="h-8 w-full rounded-md border bg-background px-2 text-sm"
             >
               <option value="">{t('todos.parentNone')}</option>
               {parentCandidates
@@ -209,7 +209,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             </select>
           </div>
         )}
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label>{t('todos.status')}</Label>
           <div className="flex gap-1">
             {(['pending', 'done', 'abandoned'] as const).map((s) => (
@@ -226,8 +226,8 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
             <Label>{t('todos.priority')}</Label>
             <div className="flex gap-1">
               {(['low', 'normal', 'high'] as const).map((p) => (
@@ -244,7 +244,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
               ))}
             </div>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <Label>{t('todos.dueTime')}</Label>
             <Input type="datetime-local" value={formDueTime} onChange={(e) => setFormDueTime(e.target.value)} />
             <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -255,12 +255,12 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             </div>
           </div>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label className="flex items-center gap-1"><Repeat className="h-3.5 w-3.5" />{t('todos.repeat')}</Label>
           <select
             value={formRepeat}
             onChange={(e) => setFormRepeat(e.target.value)}
-            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+            className="h-8 w-full rounded-md border bg-background px-2 text-sm"
           >
             <option value="">{t('todos.repeatNone')}</option>
             <option value="daily">{t('todos.repeatDaily')}</option>
@@ -282,17 +282,17 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             </div>
           )}
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label>{t('todos.startTime')}</Label>
           <div className="flex gap-2">
             <Input type="datetime-local" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} className="flex-1" />
             {formStartTime && (
-              <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => setFormStartTime('')}>{t('todos.clear')}</Button>
+              <Button type="button" variant="outline" size="sm" className="h-8" onClick={() => setFormStartTime('')}>{t('todos.clear')}</Button>
             )}
           </div>
         </div>
         {tags.length > 0 && (
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <Label>{t('todos.tags')}</Label>
             <div className="flex flex-wrap gap-1.5">
               {tags.map((tag) => {
@@ -317,7 +317,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
         {/* Non-todo extras (finance amount, buddies, color) live behind a
             collapsible so the form stays focused on task fields; the badge
             hints at how many are set while collapsed. */}
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <button
             type="button"
             className="flex w-full items-center gap-1 rounded-md py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -332,8 +332,8 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
           </button>
           {moreOpen && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
                   <Label>{t('todos.amount')}</Label>
                   <Input
                     type="number"
@@ -343,7 +343,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
                     placeholder="0.00"
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <Label>{t('todos.amountType')}</Label>
                   <div className="flex gap-1">
                     {(['', 'income', 'expense'] as const).map((at) => (
@@ -361,7 +361,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
                   </div>
                 </div>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <Label>{t('todos.buddy')}</Label>
                 <BuddyPicker
                   buddies={contacts}
@@ -370,7 +370,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
                   onBuddiesUpdate={onContactsChange}
                 />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <Label>Color</Label>
                 <div className="flex gap-1.5">
                   {COLORS.map((c) => (
