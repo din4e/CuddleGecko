@@ -365,6 +365,83 @@ func TestTodoRepo_StartedFilter(t *testing.T) {
 	assert.Equal(t, int64(2), total)
 }
 
+// --- Cascade complete/restore: parent completion sweeps its subtree ---
+
+func TestTodoRepo_CascadeCompleteAndRestore(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+
+	parent := mustCreateTodo(t, repo, 1, "parent")
+	pendingChild := mustCreateTodo(t, repo, 1, "pending-child")
+	require.NoError(t, repo.SetParent(ctx, 1, pendingChild.ID, &parent.ID))
+	abandonedChild := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "abandoned-child", Status: "abandoned", ParentID: &parent.ID}
+	require.NoError(t, repo.Create(ctx, abandonedChild))
+	doneAt := time.Now().Add(-time.Hour)
+	doneChild := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "done-child", Status: "done", CompletedAt: &doneAt, ParentID: &parent.ID}
+	require.NoError(t, repo.Create(ctx, doneChild))
+	due := time.Now().Add(24 * time.Hour)
+	recurringChild := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "recurring-child", Status: "pending", Repeat: "daily", DueTime: &due, ParentID: &parent.ID}
+	require.NoError(t, repo.Create(ctx, recurringChild))
+	grandchild := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "grandchild", Status: "pending", ParentID: &pendingChild.ID}
+	require.NoError(t, repo.Create(ctx, grandchild))
+
+	// Completing the parent cascades to the whole subtree...
+	n, err := repo.CascadeComplete(ctx, 1, []uint{parent.ID}, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), n, "pending + abandoned + grandchild flip; the already-done child does not")
+
+	pendingLoaded, err := repo.GetByID(ctx, 1, pendingChild.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "done", pendingLoaded.Status)
+	require.NotNil(t, pendingLoaded.StatusBeforeCascade)
+	assert.Equal(t, "pending", *pendingLoaded.StatusBeforeCascade)
+	assert.NotNil(t, pendingLoaded.CompletedAt)
+
+	abandonedLoaded, _ := repo.GetByID(ctx, 1, abandonedChild.ID)
+	assert.Equal(t, "done", abandonedLoaded.Status)
+	require.NotNil(t, abandonedLoaded.StatusBeforeCascade)
+	assert.Equal(t, "abandoned", *abandonedLoaded.StatusBeforeCascade)
+
+	doneLoaded, _ := repo.GetByID(ctx, 1, doneChild.ID)
+	assert.Equal(t, "done", doneLoaded.Status)
+	assert.Nil(t, doneLoaded.StatusBeforeCascade, "already-done rows keep no snapshot")
+	assert.Equal(t, doneAt.Unix(), doneLoaded.CompletedAt.Unix(), "done rows keep their own completion time")
+
+	recurringLoaded, _ := repo.GetByID(ctx, 1, recurringChild.ID)
+	assert.Equal(t, "pending", recurringLoaded.Status, "recurring descendants keep their own schedule")
+
+	grandLoaded, _ := repo.GetByID(ctx, 1, grandchild.ID)
+	assert.Equal(t, "done", grandLoaded.Status, "cascade reaches nested depth")
+
+	// The user directly reopens one child while the parent is done: its
+	// snapshot is cleared and a later parent reopen must not touch it.
+	pendingLoaded.Status = "pending"
+	pendingLoaded.CompletedAt = nil
+	pendingLoaded.StatusBeforeCascade = nil
+	require.NoError(t, repo.Update(ctx, pendingLoaded))
+
+	// Reopening the parent restores the snapshotted statuses verbatim...
+	n, err = repo.CascadeRestore(ctx, 1, []uint{parent.ID})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), n, "abandoned child + grandchild restore; the manually reopened child stays")
+
+	abandonedLoaded, _ = repo.GetByID(ctx, 1, abandonedChild.ID)
+	assert.Equal(t, "abandoned", abandonedLoaded.Status)
+	assert.Nil(t, abandonedLoaded.StatusBeforeCascade)
+	assert.Nil(t, abandonedLoaded.CompletedAt)
+
+	grandLoaded, _ = repo.GetByID(ctx, 1, grandchild.ID)
+	assert.Equal(t, "pending", grandLoaded.Status)
+	assert.Nil(t, grandLoaded.StatusBeforeCascade)
+
+	pendingLoaded, _ = repo.GetByID(ctx, 1, pendingChild.ID)
+	assert.Equal(t, "pending", pendingLoaded.Status, "manual status wins over the parent reopen")
+
+	doneLoaded, _ = repo.GetByID(ctx, 1, doneChild.ID)
+	assert.Equal(t, "done", doneLoaded.Status, "already-done child is untouched by the restore")
+}
+
 // --- Deferred / done-after filters (stat-click smart lists) ---
 
 func TestTodoRepo_DeferredFilter(t *testing.T) {

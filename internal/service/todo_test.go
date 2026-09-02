@@ -160,6 +160,16 @@ func (m *mockTodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID,
 	return m.Called(ctx, workspaceID, id, parentID, afterID, position).Error(0)
 }
 
+func (m *mockTodoRepo) CascadeComplete(ctx context.Context, workspaceID uint, parentIDs []uint, now time.Time) (int64, error) {
+	args := m.Called(ctx, workspaceID, parentIDs, now)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *mockTodoRepo) CascadeRestore(ctx context.Context, workspaceID uint, parentIDs []uint) (int64, error) {
+	args := m.Called(ctx, workspaceID, parentIDs)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 type mockEventRepoForSync struct {
 	mock.Mock
 }
@@ -253,6 +263,7 @@ func TestTodoService_ToggleStatus_PendingToDone(t *testing.T) {
 	existing := &model.Todo{ID: 1, Status: "pending"}
 	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
+	repo.On("CascadeComplete", mock.Anything, uint(1), mock.Anything, mock.Anything).Return(int64(0), nil)
 
 	todo, err := svc.ToggleStatus(context.Background(), 1, 1, 1)
 	assert.NoError(t, err)
@@ -270,6 +281,7 @@ func TestTodoService_ToggleStatus_DoneToPending(t *testing.T) {
 	existing := &model.Todo{ID: 1, Status: "done", CompletedAt: &now}
 	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
+	repo.On("CascadeRestore", mock.Anything, uint(1), mock.Anything).Return(int64(0), nil)
 
 	todo, err := svc.ToggleStatus(context.Background(), 1, 1, 1)
 	assert.NoError(t, err)
@@ -315,6 +327,7 @@ func TestTodoService_SetStatus_AbandonClearsCompletionTime(t *testing.T) {
 	existing := &model.Todo{ID: 1, Status: "done", CompletedAt: &completed}
 	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
+	repo.On("CascadeRestore", mock.Anything, uint(1), mock.Anything).Return(int64(0), nil)
 
 	todo, err := svc.SetStatus(context.Background(), 1, 1, 1, "abandoned")
 	assert.NoError(t, err)
@@ -330,6 +343,7 @@ func TestTodoService_SetStatus_DoneSetsCompletionTime(t *testing.T) {
 	existing := &model.Todo{ID: 1, Status: "abandoned"}
 	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
+	repo.On("CascadeComplete", mock.Anything, uint(1), mock.Anything, mock.Anything).Return(int64(0), nil)
 
 	todo, err := svc.SetStatus(context.Background(), 1, 1, 1, "done")
 	assert.NoError(t, err)
@@ -407,6 +421,7 @@ func TestTodoService_Update_StatusSyncsCompletionTime(t *testing.T) {
 	repo.On("Update", mock.Anything, mock.MatchedBy(func(td *model.Todo) bool {
 		return td.Status == "pending" && td.CompletedAt == nil
 	})).Return(nil)
+	repo.On("CascadeRestore", mock.Anything, uint(1), mock.Anything).Return(int64(0), nil)
 
 	updated, err := svc.Update(context.Background(), 1, 1, 1, &model.Todo{Status: "pending"}, TodoClear{})
 	assert.NoError(t, err)

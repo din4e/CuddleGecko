@@ -43,6 +43,8 @@ type TodoRepository interface {
 	UpdateCreatedAt(ctx context.Context, id uint, at time.Time) error
 	IncrementPomodoro(ctx context.Context, workspaceID, id uint) error
 	BulkAction(ctx context.Context, workspaceID uint, ids []uint, action string) (int64, error)
+	CascadeComplete(ctx context.Context, workspaceID uint, parentIDs []uint, now time.Time) (int64, error)
+	CascadeRestore(ctx context.Context, workspaceID uint, parentIDs []uint) (int64, error)
 	ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error)
 	Restore(ctx context.Context, workspaceID, id uint) error
 }
@@ -175,6 +177,11 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 	}
 	todo.Description = updates.Description
 	if updates.Status != "" {
+		if updates.Status != todo.Status {
+			// A direct user status change always wins: drop any snapshot a
+			// parent's earlier cascade left on this row.
+			todo.StatusBeforeCascade = nil
+		}
 		applyStatus(todo, updates.Status)
 	}
 	if updates.Priority != "" {
@@ -206,6 +213,7 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 	if err := s.repo.Update(ctx, todo); err != nil {
 		return nil, err
 	}
+	s.applyCascade(ctx, workspaceID, id, before.Status, todo.Status)
 	s.recordActivity(ctx, userID, todo.ID, diffTodoUpdates(&before, todo))
 	s.notify(ctx, workspaceID, ChangeUpdated, todo.ID, todo)
 	return todo, nil
@@ -235,11 +243,15 @@ func (s *TodoService) ToggleStatus(ctx context.Context, userID, workspaceID, id 
 	} else {
 		todo.Status = "pending"
 		todo.CompletedAt = nil
+		// Reopening is a direct user action: forget any snapshot a parent's
+		// cascade left here (the subtree cascade below still runs).
+		todo.StatusBeforeCascade = nil
 	}
 
 	if err := s.repo.Update(ctx, todo); err != nil {
 		return nil, err
 	}
+	s.applyCascade(ctx, workspaceID, id, prevStatus, todo.Status)
 	if todo.Status != prevStatus {
 		action := model.TodoActivityReopened
 		if todo.Status == "done" {
@@ -269,11 +281,17 @@ func (s *TodoService) SetStatus(ctx context.Context, userID, workspaceID, id uin
 	}
 	prevStatus := todo.Status
 
+	if status != todo.Status {
+		// A direct user status change always wins: drop any snapshot a
+		// parent's earlier cascade left on this row.
+		todo.StatusBeforeCascade = nil
+	}
 	applyStatus(todo, status)
 
 	if err := s.repo.Update(ctx, todo); err != nil {
 		return nil, err
 	}
+	s.applyCascade(ctx, workspaceID, id, prevStatus, todo.Status)
 	if todo.Status != prevStatus {
 		action := model.TodoActivityReopened
 		if todo.Status == "done" {
@@ -298,6 +316,31 @@ func applyStatus(todo *model.Todo, status string) {
 		return
 	}
 	todo.CompletedAt = nil
+}
+
+// applyCascade fans a parent's status transition out to its subtree.
+// Completing a todo cascade-completes every non-recurring descendant — each
+// remembering its previous status in status_before_cascade — and moving a todo
+// out of done (reopen or abandon) restores those descendants to exactly where
+// they were. A best-effort failure never fails the parent's own mutation; a
+// workspace-wide refresh notification papers over the partial state on other
+// devices.
+func (s *TodoService) applyCascade(ctx context.Context, workspaceID, id uint, prevStatus, nextStatus string) {
+	if prevStatus == nextStatus {
+		return
+	}
+	var (
+		n   int64
+		err error
+	)
+	if nextStatus == "done" {
+		n, err = s.repo.CascadeComplete(ctx, workspaceID, []uint{id}, time.Now())
+	} else if prevStatus == "done" {
+		n, err = s.repo.CascadeRestore(ctx, workspaceID, []uint{id})
+	}
+	if err == nil && n > 0 {
+		s.notify(ctx, workspaceID, ChangeBulk, 0, nil)
+	}
 }
 
 // markDone completes a todo in place.
