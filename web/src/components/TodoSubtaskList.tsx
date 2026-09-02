@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Ban, CheckCircle2, ChevronDown, ChevronRight, Circle, Plus, Timer, Trash2 } from 'lucide-react'
+import { Ban, CheckCircle2, ChevronDown, ChevronRight, Circle, Timer, Trash2 } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
-import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 import { isSettledStatus, subtreeSettledFromMap } from '../lib/buildTodoTree'
 import { useTodoCollapseStore } from '../stores/todoCollapse'
@@ -23,11 +22,6 @@ export interface TodoSubtaskListProps {
   childrenByParent: Map<number, Todo[]>
   onToggle: (todo: Todo) => void
   onEdit: (todo: Todo) => void
-  /** Inline quick-add: every row's hover "+" (the row's rightmost control)
-   *  opens an inline adder for THAT row — at any depth. The parent todo's own
-   *  add entry lives on the host surface (card toolbar / drawer heading), not
-   *  here, so the section never renders a second, text-style entry. */
-  onCreateChild?: (parent: Todo, title: string) => void
   /** Delete routes through the page's confirm dialog when provided. */  onDelete?: (todo: Todo) => void
   onStartPomodoro?: (todo: Todo) => void
   /** The page's one-click "hide completed" toggle: settled (done/abandoned)
@@ -62,16 +56,16 @@ function resolveDropZone(e: React.DragEvent): DropZone {
 /**
  * TodoSubtaskList renders a todo's subtasks — recursively, at any depth —
  * beneath the parent's card in the flat views (timeline / grouped) and the
- * detail drawer. Every row gets the same feature set regardless of depth:
- * toggle, due label, progress, pomodoro, add-child, delete. Rows with children
- * carry a caret to fold their own branch (shared, persisted fold state).
+ * detail drawer. It is a pure row renderer: adding subtasks lives on the host
+ * surface only (the card toolbar's "+" / the drawer heading's "+"), so rows
+ * carry no add affordance of their own. Every row still gets the same feature
+ * set regardless of depth: toggle, due label, progress, pomodoro, delete. Rows
+ * with children carry a caret to fold their own branch (shared, persisted fold
+ * state).
  */
-export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEdit, onCreateChild, onDelete, onStartPomodoro, hideDone, onMove, dragId, onDragIdChange, ancestorIds }: TodoSubtaskListProps) {
+export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEdit, onDelete, onStartPomodoro, hideDone, onMove, dragId, onDragIdChange, ancestorIds }: TodoSubtaskListProps) {
   const { t } = useTranslation()
   const children = childrenByParent.get(todo.id)
-  // Id of the todo the inline adder targets (a clicked row's todo). null =
-  // hidden.
-  const [addingFor, setAddingFor] = useState<number | null>(null)
   const collapsed = useTodoCollapseStore((s) => s.collapsed)
   const toggleCollapse = useTodoCollapseStore((s) => s.toggle)
   const reveal = useTodoCollapseStore((s) => s.reveal)
@@ -87,10 +81,6 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
     ? children.filter((c) => !isSettledStatus(c.status) || !subtreeSettledFromMap(c, childrenByParent))
     : children
   if (!rows?.length) return null
-
-  const rowAdder = addingFor != null
-    ? rows?.find((c) => c.id === addingFor)
-    : undefined
 
   return (
     <div className="mt-1 space-y-1 border-l-2 border-border pl-2">
@@ -252,18 +242,6 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
                 <Trash2 className="h-3 w-3" />
               </Button>
             )}
-            {onCreateChild && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 shrink-0 p-0 opacity-0 transition-opacity group-hover/sub:opacity-100"
-                onClick={() => setAddingFor(child.id)}
-                aria-label={t('todos.addChild')}
-                title={t('todos.addChild')}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            )}
           </div>
           {/* Recurse: grandchildren render indented under their own parent row,
               with the same controls as any other depth — unless folded. */}
@@ -274,7 +252,6 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
                 childrenByParent={childrenByParent}
                 onToggle={onToggle}
                 onEdit={onEdit}
-                onCreateChild={onCreateChild}
                 onDelete={onDelete}
                 onStartPomodoro={onStartPomodoro}
                 hideDone={hideDone}
@@ -282,17 +259,6 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
                 dragId={dragId}
                 onDragIdChange={onDragIdChange}
                 ancestorIds={selfChain}
-              />
-            </div>
-          )}
-          {/* Row-level inline adder: new child of THIS row. */}
-          {!childFolded && rowAdder?.id === child.id && (
-            <div className="pl-6 py-0.5">
-              <AddChildInput
-                placeholder={t('todos.addSubtaskPlaceholder')}
-                onCommit={(v) => onCreateChild!(child, v)}
-                onDismiss={() => setAddingFor(null)}
-                className="text-xs"
               />
             </div>
           )}

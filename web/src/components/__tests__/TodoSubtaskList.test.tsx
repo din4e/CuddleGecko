@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useState } from 'react'
-import { render, screen, fireEvent, createEvent, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen, fireEvent, createEvent } from '@testing-library/react'
 import TodoSubtaskList from '../TodoSubtaskList'
 import type { TodoSubtaskListProps } from '../TodoSubtaskList'
 import { useTodoCollapseStore } from '../../stores/todoCollapse'
@@ -101,47 +100,19 @@ describe('TodoSubtaskList', () => {
     expect(onToggle).toHaveBeenCalledWith(child)
   })
 
-  it('renders nothing for a childless todo even with onCreateChild wired', () => {
-    // The section only renders rows now — a childless todo's add entry lives
-    // on the host surface (card toolbar / drawer heading), so no duplicate
-    // text-style adder is rendered here.
-    const onCreateChild = vi.fn()
-    const { container } = render(
-      <TodoSubtaskList todo={parent} childrenByParent={new Map()}
-        onToggle={vi.fn()} onEdit={vi.fn()}
-        onCreateChild={onCreateChild} />,
-    )
-    expect(container).toBeEmptyDOMElement()
-  })
-
-  it('offers a row-level adder at every depth', () => {
+  it('renders no add affordance at any depth — adding lives on the host surface', () => {
+    // The section is a pure row renderer: the card toolbar's "+" (or the
+    // drawer heading's "+") is the only add-subtask entry, so neither the
+    // rows nor the section render their own adder.
     render(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
-        onToggle={vi.fn()} onEdit={vi.fn()}
-        onCreateChild={vi.fn()} />,
+        onToggle={vi.fn()} onEdit={vi.fn()} />,
     )
-    // One right-side "+" per row (Child + Grandchild) — deeper subtasks are
-    // as easy to extend as top-level ones, with no second text-style entry.
-    expect(screen.getAllByRole('button', { name: 'todos.addChild' }).length).toBe(2)
-  })
-
-  it('opens the deepest row-level adder and commits to that row', async () => {
-    const onCreateChild = vi.fn()
-    const user = userEvent.setup()
-    render(
-      <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
-        onToggle={vi.fn()} onEdit={vi.fn()}
-        onCreateChild={onCreateChild} />,
-    )
-    // The "+" INSIDE the Grandchild row adds to the grandchild, proving the
-    // adder exists beyond depth 1.
-    const grandRow = rowOf('Grandchild')
-    await user.click(within(grandRow).getByRole('button', { name: 'todos.addChild' }))
-    const input = screen.getByPlaceholderText('todos.addSubtaskPlaceholder')
-    await user.type(input, 'Deep subtask{Enter}')
-    expect(onCreateChild).toHaveBeenCalledWith(grandchild, 'Deep subtask')
-    // Stays open with a cleared draft for rapid multi-entry.
-    expect(screen.getByPlaceholderText('todos.addSubtaskPlaceholder')).toHaveValue('')
+    expect(screen.queryByRole('button', { name: 'todos.addChild' })).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('todos.addSubtaskPlaceholder')).not.toBeInTheDocument()
+    // Both depths still render their rows.
+    expect(screen.getByText('Child')).toBeInTheDocument()
+    expect(screen.getByText('Grandchild')).toBeInTheDocument()
   })
 
   it('shows the due label and routes delete through onDelete', () => {
