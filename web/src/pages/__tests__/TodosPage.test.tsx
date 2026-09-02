@@ -734,12 +734,9 @@ describe('TodosPage', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('Today parent')).toBeInTheDocument())
 
-    // Open the subtask section's trailing adder. It shares its accessible
-    // name with the icon-only toolbar button, so tell them apart by content.
-    const adderButtons = screen.getAllByRole('button', { name: 'todos.addChild' })
-    const trailingAdder = adderButtons.find((b) => b.textContent === 'todos.addChild')
-    expect(trailingAdder).toBeDefined()
-    await user.click(trailingAdder!)
+    // Open the card toolbar's "+" (top-right, the one add-subtask entry on
+    // the card — the parent has no children yet, so no row-level "+" exists).
+    await user.click(screen.getByRole('button', { name: 'todos.addChild' }))
     const input = screen.getByPlaceholderText('todos.addSubtaskPlaceholder')
     fireEvent.change(input, { target: { value: 'Fresh subtask' } })
     fireEvent.keyDown(input, { key: 'Enter' })

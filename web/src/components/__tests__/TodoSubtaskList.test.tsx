@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useState } from 'react'
-import { render, screen, fireEvent, createEvent } from '@testing-library/react'
+import { render, screen, fireEvent, createEvent, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import TodoSubtaskList from '../TodoSubtaskList'
 import type { TodoSubtaskListProps } from '../TodoSubtaskList'
 import { useTodoCollapseStore } from '../../stores/todoCollapse'
@@ -100,47 +101,47 @@ describe('TodoSubtaskList', () => {
     expect(onToggle).toHaveBeenCalledWith(child)
   })
 
-  it('shows the inline adder with onCreateChild even without children', () => {
+  it('renders nothing for a childless todo even with onCreateChild wired', () => {
+    // The section only renders rows now — a childless todo's add entry lives
+    // on the host surface (card toolbar / drawer heading), so no duplicate
+    // text-style adder is rendered here.
     const onCreateChild = vi.fn()
-    render(
+    const { container } = render(
       <TodoSubtaskList todo={parent} childrenByParent={new Map()}
         onToggle={vi.fn()} onEdit={vi.fn()}
         onCreateChild={onCreateChild} />,
     )
-    fireEvent.click(screen.getByText('todos.addChild'))
-    const input = screen.getByPlaceholderText('todos.addSubtaskPlaceholder')
-    fireEvent.change(input, { target: { value: 'New subtask' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    expect(onCreateChild).toHaveBeenCalledWith(parent, 'New subtask')
-    // Stays open with a cleared draft for rapid multi-entry.
-    expect(screen.getByPlaceholderText('todos.addSubtaskPlaceholder')).toHaveValue('')
+    expect(container).toBeEmptyDOMElement()
   })
 
-  it('offers an inline adder at every depth', () => {
+  it('offers a row-level adder at every depth', () => {
     render(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={vi.fn()} onEdit={vi.fn()}
         onCreateChild={vi.fn()} />,
     )
-    // One trailing adder entry per level (top + nested list) plus per-row "+"
-    // buttons — deeper subtasks are as easy to extend as top-level ones.
-    expect(screen.getAllByText('todos.addChild').length).toBeGreaterThan(1)
+    // One right-side "+" per row (Child + Grandchild) — deeper subtasks are
+    // as easy to extend as top-level ones, with no second text-style entry.
+    expect(screen.getAllByRole('button', { name: 'todos.addChild' }).length).toBe(2)
   })
 
-  it('offers an inline adder at every depth (deepest first in the DOM)', () => {
+  it('opens the deepest row-level adder and commits to that row', async () => {
     const onCreateChild = vi.fn()
+    const user = userEvent.setup()
     render(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={vi.fn()} onEdit={vi.fn()}
         onCreateChild={onCreateChild} />,
     )
-    // The first adder entry in the DOM belongs to the deepest level — the
-    // grandchild's own list — proving the adder exists beyond depth 1.
-    fireEvent.click(screen.getAllByText('todos.addChild')[0])
+    // The "+" INSIDE the Grandchild row adds to the grandchild, proving the
+    // adder exists beyond depth 1.
+    const grandRow = rowOf('Grandchild')
+    await user.click(within(grandRow).getByRole('button', { name: 'todos.addChild' }))
     const input = screen.getByPlaceholderText('todos.addSubtaskPlaceholder')
-    fireEvent.change(input, { target: { value: 'Deep subtask' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
+    await user.type(input, 'Deep subtask{Enter}')
     expect(onCreateChild).toHaveBeenCalledWith(grandchild, 'Deep subtask')
+    // Stays open with a cleared draft for rapid multi-entry.
+    expect(screen.getByPlaceholderText('todos.addSubtaskPlaceholder')).toHaveValue('')
   })
 
   it('shows the due label and routes delete through onDelete', () => {

@@ -892,6 +892,7 @@ export default function TodosPage() {
       formatDate={formatDate}
       parentTitle={todo.parent_id ? todoTitleById.get(todo.parent_id) : undefined}
       subtaskProgress={subtaskProgress.get(todo.id)}
+      onCreateChild={handleCreateChild}
       onStartPomodoro={handleStartPomodoro}
       onPostpone={handlePostpone}
       // Subtask drag & drop: rows carry the tree's tri-zone semantics, and a
