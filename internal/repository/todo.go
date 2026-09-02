@@ -914,8 +914,10 @@ func (r *TodoRepo) cascadeCompleteTx(ctx context.Context, tx *gorm.DB, workspace
 	if len(ids) == 0 {
 		return 0, nil
 	}
+	// `repeat` is backtick-quoted: it's a reserved word on MySQL, and SQLite
+	// accepts backtick identifiers too (no dialect branch needed).
 	res := tx.Model(&model.Todo{}).
-		Where("id IN ? AND workspace_id = ? AND status <> ? AND (repeat = '' OR repeat IS NULL) AND status_before_cascade IS NULL", ids, workspaceID, "done").
+		Where("id IN ? AND workspace_id = ? AND status <> ? AND (`repeat` = '' OR `repeat` IS NULL) AND status_before_cascade IS NULL", ids, workspaceID, "done").
 		Updates(map[string]interface{}{
 			"status":                "done",
 			"completed_at":          now,
