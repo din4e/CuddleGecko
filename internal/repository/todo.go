@@ -158,7 +158,7 @@ func todoOrderClause(sort, order string) string {
 
 func (r *TodoRepo) Update(ctx context.Context, todo *model.Todo) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{ID: todo.ID}).
-		Select("title", "description", "status", "priority", "due_time", "start_time", "amount", "amount_type", "contact_ids", "color", "repeat", "repeat_interval", "completed_at").
+		Select("title", "description", "status", "priority", "due_time", "start_time", "amount", "amount_type", "contact_ids", "color", "repeat", "repeat_interval", "completed_at", "status_before_cascade").
 		Updates(todo).Error; err != nil {
 		return fmt.Errorf("update todo: %w", err)
 	}
@@ -850,6 +850,12 @@ func (r *TodoRepo) bulkComplete(ctx context.Context, workspaceID uint, ids []uin
 				return err
 			}
 			affected += res.RowsAffected
+			// Completing parents in a bulk batch cascades to their subtrees,
+			// same as a single toggle: descendants snapshot their previous
+			// status so a later reopen restores it.
+			if _, err := r.cascadeCompleteTx(ctx, tx, workspaceID, doneIDs, now); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -862,4 +868,91 @@ func wrapIfErr(err error, msg string) error {
 		return nil
 	}
 	return fmt.Errorf("%s: %w", msg, err)
+}
+
+// descendantIDs returns the transitive non-deleted descendants of the given
+// roots (the roots themselves excluded), via the same recursive CTE the
+// cascade delete/restore uses. The query runs on the given handle so it can
+// join a caller's transaction (required on the single-conn SQLite pool — a
+// pool query inside an open tx would deadlock).
+func (r *TodoRepo) descendantIDs(tx *gorm.DB, workspaceID uint, roots []uint) ([]uint, error) {
+	all, err := r.subtreeIDs(tx, workspaceID, roots, false)
+	if err != nil {
+		return nil, err
+	}
+	rootSet := make(map[uint]bool, len(roots))
+	for _, id := range roots {
+		rootSet[id] = true
+	}
+	out := make([]uint, 0, len(all))
+	for _, id := range all {
+		if !rootSet[id] {
+			out = append(out, id)
+		}
+	}
+	return out, nil
+}
+
+// CascadeComplete completes every non-recurring descendant of the given todos
+// in one UPDATE, remembering each row's previous status in
+// status_before_cascade so CascadeRestore can put it back verbatim. Rows
+// already done are untouched (nothing to remember); recurring descendants keep
+// advancing on their own schedule instead of being force-completed. Best-effort
+// callers still get the affected count for change notification.
+func (r *TodoRepo) CascadeComplete(ctx context.Context, workspaceID uint, parentIDs []uint, now time.Time) (int64, error) {
+	if len(parentIDs) == 0 {
+		return 0, nil
+	}
+	return r.cascadeCompleteTx(ctx, r.db.WithContext(ctx), workspaceID, parentIDs, now)
+}
+
+func (r *TodoRepo) cascadeCompleteTx(ctx context.Context, tx *gorm.DB, workspaceID uint, parentIDs []uint, now time.Time) (int64, error) {
+	ids, err := r.descendantIDs(tx, workspaceID, parentIDs)
+	if err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	res := tx.Model(&model.Todo{}).
+		Where("id IN ? AND workspace_id = ? AND status <> ? AND (repeat = '' OR repeat IS NULL) AND status_before_cascade IS NULL", ids, workspaceID, "done").
+		Updates(map[string]interface{}{
+			"status":                "done",
+			"completed_at":          now,
+			"status_before_cascade": gorm.Expr("status"),
+		})
+	if res.Error != nil {
+		return 0, fmt.Errorf("cascade complete todos: %w", res.Error)
+	}
+	return res.RowsAffected, nil
+}
+
+// CascadeRestore is the mirror of CascadeComplete: every descendant still
+// holding a status_before_cascade snapshot returns to exactly the status it
+// had before its parent was completed (pending stays pending, abandoned stays
+// abandoned), dropping its completion timestamp. Descendants whose status was
+// changed directly by the user in the meantime carry no snapshot and keep the
+// manual status.
+func (r *TodoRepo) CascadeRestore(ctx context.Context, workspaceID uint, parentIDs []uint) (int64, error) {
+	if len(parentIDs) == 0 {
+		return 0, nil
+	}
+	ids, err := r.descendantIDs(r.db.WithContext(ctx), workspaceID, parentIDs)
+	if err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	res := r.db.WithContext(ctx).Model(&model.Todo{}).
+		Where("id IN ? AND workspace_id = ? AND status_before_cascade IS NOT NULL", ids, workspaceID).
+		Updates(map[string]interface{}{
+			"status":                gorm.Expr("status_before_cascade"),
+			"completed_at":          nil,
+			"status_before_cascade": nil,
+		})
+	if res.Error != nil {
+		return 0, fmt.Errorf("cascade restore todos: %w", res.Error)
+	}
+	return res.RowsAffected, nil
 }

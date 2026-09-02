@@ -214,3 +214,68 @@ func TestServiceIntegration_OwnershipNotFound(t *testing.T) {
 	_, err = svc.TogglePin(ctx, 1, 1, 999)
 	assert.ErrorIs(t, err, ErrTodoNotFound)
 }
+
+// --- Completing a parent cascades to its subtree; reopening restores ---
+
+func TestServiceIntegration_ToggleParentCascadesSubtree(t *testing.T) {
+	svc, _ := newTodoServiceWithDB(t)
+	ctx := context.Background()
+
+	parent, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "parent"})
+	require.NoError(t, err)
+	pendingChild, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "pending-child", ParentID: &parent.ID})
+	require.NoError(t, err)
+	abandonedChild, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "abandoned-child", ParentID: &parent.ID, Status: "abandoned"})
+	require.NoError(t, err)
+
+	// Completing the parent sweep-completes both children, remembering the
+	// statuses they held.
+	_, err = svc.ToggleStatus(ctx, 1, 1, parent.ID)
+	require.NoError(t, err)
+
+	child, _ := svc.GetByID(ctx, 1, 1, pendingChild.ID)
+	assert.Equal(t, "done", child.Status)
+	require.NotNil(t, child.StatusBeforeCascade)
+	assert.Equal(t, "pending", *child.StatusBeforeCascade)
+
+	abandoned, _ := svc.GetByID(ctx, 1, 1, abandonedChild.ID)
+	assert.Equal(t, "done", abandoned.Status)
+	require.NotNil(t, abandoned.StatusBeforeCascade)
+	assert.Equal(t, "abandoned", *abandoned.StatusBeforeCascade)
+
+	// Reopening the parent puts each child back exactly where it was.
+	_, err = svc.ToggleStatus(ctx, 1, 1, parent.ID)
+	require.NoError(t, err)
+
+	child, _ = svc.GetByID(ctx, 1, 1, pendingChild.ID)
+	assert.Equal(t, "pending", child.Status)
+	assert.Nil(t, child.StatusBeforeCascade)
+	assert.Nil(t, child.CompletedAt)
+
+	abandoned, _ = svc.GetByID(ctx, 1, 1, abandonedChild.ID)
+	assert.Equal(t, "abandoned", abandoned.Status)
+	assert.Nil(t, abandoned.StatusBeforeCascade)
+}
+
+// Abandoning a done parent (instead of reopening it) also restores the
+// cascade-completed subtree — anything-not-done undoes the cascade.
+func TestServiceIntegration_SetStatusParentDoneToAbandonedRestoresSubtree(t *testing.T) {
+	svc, _ := newTodoServiceWithDB(t)
+	ctx := context.Background()
+
+	parent, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "parent"})
+	require.NoError(t, err)
+	child, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "child", ParentID: &parent.ID})
+	require.NoError(t, err)
+
+	_, err = svc.SetStatus(ctx, 1, 1, parent.ID, "done")
+	require.NoError(t, err)
+	child, _ = svc.GetByID(ctx, 1, 1, child.ID)
+	assert.Equal(t, "done", child.Status)
+
+	_, err = svc.SetStatus(ctx, 1, 1, parent.ID, "abandoned")
+	require.NoError(t, err)
+	child, _ = svc.GetByID(ctx, 1, 1, child.ID)
+	assert.Equal(t, "pending", child.Status, "child returns to its pre-cascade status")
+	assert.Nil(t, child.StatusBeforeCascade)
+}

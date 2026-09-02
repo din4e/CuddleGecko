@@ -27,6 +27,11 @@ type Todo struct {
 	SortOrder   int            `gorm:"not null;default:0" json:"sort_order"`
 	ParentID    *uint          `gorm:"index" json:"parent_id"`
 	CompletedAt *time.Time     `json:"completed_at"`
+	// Status a todo held before a parent's completion cascade-completed it
+	// (pending/abandoned). Reopening the parent restores this status and
+	// clears the snapshot; any direct status change on the todo clears it too,
+	// so an explicit manual status always wins over a later parent reopen.
+	StatusBeforeCascade *string     `gorm:"size:20" json:"status_before_cascade"`
 	// Denormalized checklist progress, kept in sync with TodoItem changes so
 	// list views can render progress badges without extra queries.
 	ItemTotal  int            `gorm:"not null;default:0" json:"item_total"`

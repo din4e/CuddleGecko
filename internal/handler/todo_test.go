@@ -171,6 +171,16 @@ func (m *mockTodoSvcRepo) Move(ctx context.Context, workspaceID, id uint, parent
 	return m.Called(ctx, workspaceID, id, parentID, afterID, position).Error(0)
 }
 
+func (m *mockTodoSvcRepo) CascadeComplete(ctx context.Context, workspaceID uint, parentIDs []uint, now time.Time) (int64, error) {
+	args := m.Called(ctx, workspaceID, parentIDs, now)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *mockTodoSvcRepo) CascadeRestore(ctx context.Context, workspaceID uint, parentIDs []uint) (int64, error) {
+	args := m.Called(ctx, workspaceID, parentIDs)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 type mockTodoEventRepo struct {
 	mock.Mock
 }
@@ -567,6 +577,7 @@ func TestTodoHandler_ToggleStatus(t *testing.T) {
 	existing := &model.Todo{ID: 1, Status: "pending"}
 	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
+	repo.On("CascadeComplete", mock.Anything, uint(1), mock.Anything, mock.Anything).Return(int64(0), nil)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("PATCH", "/api/todos/1/toggle", nil)
