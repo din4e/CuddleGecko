@@ -914,15 +914,23 @@ func (r *TodoRepo) cascadeCompleteTx(ctx context.Context, tx *gorm.DB, workspace
 	if len(ids) == 0 {
 		return 0, nil
 	}
-	// `repeat` is backtick-quoted: it's a reserved word on MySQL, and SQLite
-	// accepts backtick identifiers too (no dialect branch needed).
-	res := tx.Model(&model.Todo{}).
+	// Two statements, never one SET reading a column it also writes: MySQL
+	// assigns SET columns left-to-right while SQLite evaluates against the
+	// pre-update row, so a combined `SET status='done',
+	// status_before_cascade=status` snapshots the NEW status on MySQL.
+	// 1) snapshot each row's current status — rows not already done, without
+	//    a snapshot, and not recurring (those keep their own schedule).
+	//    `repeat` is backtick-quoted: reserved word on MySQL, and SQLite
+	//    accepts backtick identifiers too (no dialect branch needed).
+	if err := tx.Model(&model.Todo{}).
 		Where("id IN ? AND workspace_id = ? AND status <> ? AND (`repeat` = '' OR `repeat` IS NULL) AND status_before_cascade IS NULL", ids, workspaceID, "done").
-		Updates(map[string]interface{}{
-			"status":                "done",
-			"completed_at":          now,
-			"status_before_cascade": gorm.Expr("status"),
-		})
+		Updates(map[string]interface{}{"status_before_cascade": gorm.Expr("status")}).Error; err != nil {
+		return 0, fmt.Errorf("snapshot todo statuses: %w", err)
+	}
+	// 2) flip the snapshotted rows to done.
+	res := tx.Model(&model.Todo{}).
+		Where("id IN ? AND workspace_id = ? AND status <> ? AND status_before_cascade IS NOT NULL", ids, workspaceID, "done").
+		Updates(map[string]interface{}{"status": "done", "completed_at": now})
 	if res.Error != nil {
 		return 0, fmt.Errorf("cascade complete todos: %w", res.Error)
 	}
@@ -947,14 +955,16 @@ func (r *TodoRepo) CascadeRestore(ctx context.Context, workspaceID uint, parentI
 		return 0, nil
 	}
 	res := r.db.WithContext(ctx).Model(&model.Todo{}).
+		Where("id IN ? AND workspace_id = ? AND status_before_cascade IS NOT NULL", ids, workspaceID)
+	// Same SET-ordering caveat as cascadeCompleteTx: restore the status
+	// (snapshot untouched), then clear the snapshot in a second statement.
+	if err := res.Updates(map[string]interface{}{"status": gorm.Expr("status_before_cascade"), "completed_at": nil}).Error; err != nil {
+		return 0, fmt.Errorf("cascade restore todos: %w", err)
+	}
+	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
 		Where("id IN ? AND workspace_id = ? AND status_before_cascade IS NOT NULL", ids, workspaceID).
-		Updates(map[string]interface{}{
-			"status":                gorm.Expr("status_before_cascade"),
-			"completed_at":          nil,
-			"status_before_cascade": nil,
-		})
-	if res.Error != nil {
-		return 0, fmt.Errorf("cascade restore todos: %w", res.Error)
+		UpdateColumn("status_before_cascade", nil).Error; err != nil {
+		return 0, fmt.Errorf("clear cascade snapshots: %w", err)
 	}
 	return res.RowsAffected, nil
 }
