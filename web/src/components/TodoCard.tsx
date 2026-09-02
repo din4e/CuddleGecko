@@ -8,6 +8,7 @@ import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
 import { useTodoCollapseStore } from '../stores/todoCollapse'
 import { priorityConfig } from '../lib/todoPriority'
+import { AddChildInput } from './AddChildInput'
 import type { SubtreeProgress } from '../lib/todoProgress'
 import type { Todo } from '../types'
 import { InlineMarkdown } from './InlineMarkdown'
@@ -36,6 +37,10 @@ export interface TodoCardProps {
   onStartPomodoro?: (todo: Todo) => void
   /** One-click "postpone to tomorrow" (TickTick's signature reschedule). */
   onPostpone?: (todo: Todo) => void
+  /** Inline quick-add for this todo's subtasks: the toolbar's right-side "+"
+   *  reveals a shared input under the card. The only add-subtask entry on the
+   *  card — rows inside the subtask section carry their own right-side "+". */
+  onCreateChild?: (parent: Todo, title: string) => void
   /** Nested subtask renderer (flat views); rendered inside the card body.
    *  On compact (kanban) cards it exists too but stays collapsed until the
    *  progress chip is clicked — drag overlays mount fresh, so they never
@@ -70,6 +75,7 @@ const TodoCard = memo(function TodoCard({
   parentTitle,
   onStartPomodoro,
   onPostpone,
+  onCreateChild,
   subtasks,
   subtaskProgress,
   subtaskDragId,
@@ -81,6 +87,9 @@ const TodoCard = memo(function TodoCard({
   // Compact (kanban) cards hide their subtask list behind the progress chip
   // so the board and drag overlays stay lean.
   const [subtasksOpen, setSubtasksOpen] = useState(false)
+  // The toolbar "+" toggles the card's inline add-subtask input (the one
+  // add entry, top-right like every other card action).
+  const [addingChild, setAddingChild] = useState(false)
   // Native subtask drag hovering this card (nest target highlight).
   const [nestHover, setNestHover] = useState(false)
   const canNest = subtaskDragId != null && subtaskDragId !== todo.id && onNestSubtask != null
@@ -342,20 +351,23 @@ const TodoCard = memo(function TodoCard({
             <ChevronDown className={cn('h-3 w-3 transition-transform', subtasksOpen && 'rotate-180')} />
           </button>
         )}
-        {/* Kanban cards with no subtasks yet still need the one add-subtask
-            entry (the progress chip only exists once children do). */}
-        {compact && subtasks && !subtasksOpen && (
-          <button
-            type="button"
-            onClick={() => setSubtasksOpen(true)}
-            className="mt-1 flex w-fit items-center gap-1 rounded px-0.5 text-[10px] text-muted-foreground/80 hover:bg-muted/60 hover:text-foreground"
-          >
-            <Plus className="h-3 w-3" />
-            {t('todos.addChild')}
-          </button>
-        )}
       </CardContent>
       {subtasks && (compact ? subtasksOpen : !sectionFolded) && subtasks}
+      {addingChild && onCreateChild && (
+        <div className={compact ? 'px-1.5 pb-1.5' : 'px-2 pb-2'}>
+          <AddChildInput
+            placeholder={t('todos.addSubtaskPlaceholder')}
+            onCommit={(v) => {
+              onCreateChild(todo, v)
+              // Kanban keeps the list hidden behind the chip — opening it is
+              // what makes the freshly added subtask visible.
+              if (compact) setSubtasksOpen(true)
+            }}
+            onDismiss={() => setAddingChild(false)}
+            className="text-xs"
+          />
+        </div>
+      )}
 
       {/* Action toolbar — floating top-right so it costs no row height.
           Hover-reveal on md+; always visible on touch/small screens. */}
@@ -386,6 +398,18 @@ const TodoCard = memo(function TodoCard({
         <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onTogglePin(todo)} aria-label={t('todos.pinAria')} title={t('todos.pinAria')}>
           <Star className={`h-3 w-3 ${todo.pinned ? 'fill-amber-400 text-amber-500' : 'text-muted-foreground'}`} />
         </Button>
+        {onCreateChild && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 w-5 p-0"
+            onClick={() => setAddingChild((v) => !v)}
+            aria-label={t('todos.addChild')}
+            title={t('todos.addChild')}
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+        )}
         <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onSync(todo)} aria-label={syncLabel} title={syncLabel}>
           <ArrowRight className="h-3 w-3" />
         </Button>

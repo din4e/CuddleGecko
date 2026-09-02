@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Plus } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs'
+import { Button } from './ui/button'
 import { TodoForm } from './TodoForm'
 import TodoSubtaskList from './TodoSubtaskList'
+import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 import { TodoHistory } from './TodoHistory'
 import { useTodoChildrenMap } from '../hooks/api/useTodos'
@@ -82,11 +85,40 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
     if (slice.items?.length > 0) childrenByParent.set(parentId, slice.items)
   }
 
+  // The drawer's own add entry (right of the section heading) — the subtask
+  // list only renders rows, so this is the parent todo's single add control,
+  // mirroring the card toolbar's right-side "+".
+  const [addingRoot, setAddingRoot] = useState(false)
+
   return (
     <div className="mt-3">
-      <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {t('todos.subtasks')}
-      </h3>
+      <div className="mb-1 flex items-center justify-between">
+        <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {t('todos.subtasks')}
+        </h3>
+        {onCreateChild && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 w-5 p-0 text-muted-foreground"
+            onClick={() => setAddingRoot((v) => !v)}
+            aria-label={t('todos.addChild')}
+            title={t('todos.addChild')}
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+      {addingRoot && onCreateChild && (
+        <div className="mb-1">
+          <AddChildInput
+            placeholder={t('todos.addSubtaskPlaceholder')}
+            onCommit={(v) => onCreateChild(todo, v)}
+            onDismiss={() => setAddingRoot(false)}
+            className="text-xs"
+          />
+        </div>
+      )}
       <TodoSubtaskList
         todo={todo}
         childrenByParent={childrenByParent}

@@ -23,12 +23,12 @@ export interface TodoSubtaskListProps {
   childrenByParent: Map<number, Todo[]>
   onToggle: (todo: Todo) => void
   onEdit: (todo: Todo) => void
-  /** Inline quick-add: type + Enter creates the child directly (no dialog).
-   *  When wired, every row's "+" opens an inline adder for THAT row — at any
-   *  depth; otherwise no add affordance is rendered. */
+  /** Inline quick-add: every row's hover "+" (the row's rightmost control)
+   *  opens an inline adder for THAT row — at any depth. The parent todo's own
+   *  add entry lives on the host surface (card toolbar / drawer heading), not
+   *  here, so the section never renders a second, text-style entry. */
   onCreateChild?: (parent: Todo, title: string) => void
-  /** Delete routes through the page's confirm dialog when provided. */
-  onDelete?: (todo: Todo) => void
+  /** Delete routes through the page's confirm dialog when provided. */  onDelete?: (todo: Todo) => void
   onStartPomodoro?: (todo: Todo) => void
   /** The page's one-click "hide completed" toggle: settled (done/abandoned)
    *  rows whose whole loaded subtree is settled drop out of render. A settled
@@ -69,8 +69,8 @@ function resolveDropZone(e: React.DragEvent): DropZone {
 export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEdit, onCreateChild, onDelete, onStartPomodoro, hideDone, onMove, dragId, onDragIdChange, ancestorIds }: TodoSubtaskListProps) {
   const { t } = useTranslation()
   const children = childrenByParent.get(todo.id)
-  // Id of the todo the inline adder targets (the section's own todo for the
-  // trailing "add child" row, or a clicked row's todo). null = hidden.
+  // Id of the todo the inline adder targets (a clicked row's todo). null =
+  // hidden.
   const [addingFor, setAddingFor] = useState<number | null>(null)
   const collapsed = useTodoCollapseStore((s) => s.collapsed)
   const toggleCollapse = useTodoCollapseStore((s) => s.toggle)
@@ -83,15 +83,12 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
   // of `todo` — refuse when the drag comes from todo's own chain (cycle).
   const selfChain = new Set(ancestorIds).add(todo.id)
 
-  // With the inline adder wired, the section is useful even before the first
-  // child exists — that's exactly when "add a subtask" is needed most.
-  const showAdder = onCreateChild != null
   const rows = hideDone && children
     ? children.filter((c) => !isSettledStatus(c.status) || !subtreeSettledFromMap(c, childrenByParent))
     : children
-  if (!rows?.length && !showAdder) return null
+  if (!rows?.length) return null
 
-  const rowAdder = addingFor != null && addingFor !== todo.id
+  const rowAdder = addingFor != null
     ? rows?.find((c) => c.id === addingFor)
     : undefined
 
@@ -302,23 +299,6 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
         </div>
         )
       })}
-      {showAdder && (addingFor === todo.id ? (
-        <AddChildInput
-          placeholder={t('todos.addSubtaskPlaceholder')}
-          onCommit={(v) => onCreateChild!(todo, v)}
-          onDismiss={() => setAddingFor(null)}
-          className="text-xs"
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAddingFor(todo.id)}
-          className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-[11px] text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground"
-        >
-          <Plus className="h-3 w-3" />
-          {t('todos.addChild')}
-        </button>
-      ))}
     </div>
   )
 }
