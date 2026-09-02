@@ -909,7 +909,6 @@ export default function TodosPage() {
           childrenByParent={childrenByParent}
           onToggle={(sub) => void handleToggle(sub.id)}
           onEdit={openEdit}
-          onCreateChild={handleCreateChild}
           onDelete={setConfirmDelete}
           onStartPomodoro={handleStartPomodoro}
           hideDone={hideDone}
