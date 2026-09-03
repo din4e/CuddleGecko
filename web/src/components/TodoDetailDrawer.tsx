@@ -124,6 +124,7 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
         childrenByParent={childrenByParent}
         onToggle={(sub) => onToggle?.(sub)}
         onEdit={onOpenTodo}
+        onCreateChild={onCreateChild}
         onDelete={onDelete}
         onStartPomodoro={onStartPomodoro}
         hideDone={hideDone}

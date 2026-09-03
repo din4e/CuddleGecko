@@ -741,7 +741,7 @@ function BoardCell({
       <div
         ref={setNodeRef}
         style={{ width }}
-        className={`shrink-0 space-y-1.5 min-h-[100px] max-h-[calc(100vh-19rem)] overflow-y-auto bg-muted/30 rounded-lg p-2 transition-colors ring-2 ${isOver ? 'ring-primary/60 bg-primary/5' : 'ring-transparent'}`}
+        className={`shrink-0 space-y-1 min-h-[100px] max-h-[calc(100vh-19rem)] overflow-y-auto bg-muted/30 rounded-lg p-2 transition-colors ring-2 ${isOver ? 'ring-primary/60 bg-primary/5' : 'ring-transparent'}`}
       >
         {itemIds.length === 0 && showEmpty && !adding && (
           <p className="text-sm text-muted-foreground text-center py-6">{t('todos.noTodos')}</p>

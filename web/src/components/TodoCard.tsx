@@ -153,7 +153,7 @@ const TodoCard = memo(function TodoCard({
         setNestHover(false)
       }}
     >
-      <CardContent className={compact ? 'p-1.5 pr-16' : 'p-2 space-y-1'}>
+      <CardContent className={compact ? 'p-1.5 pr-16' : 'p-1.5 space-y-1'}>
         <div className="flex items-start gap-1.5">
           {selectable && (
             <input
