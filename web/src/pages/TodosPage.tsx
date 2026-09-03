@@ -909,6 +909,7 @@ export default function TodosPage() {
           childrenByParent={childrenByParent}
           onToggle={(sub) => void handleToggle(sub.id)}
           onEdit={openEdit}
+          onCreateChild={handleCreateChild}
           onDelete={setConfirmDelete}
           onStartPomodoro={handleStartPomodoro}
           hideDone={hideDone}
@@ -1220,7 +1221,7 @@ export default function TodosPage() {
           {pendingTodos.length > 0 && (
             <TodoSortableGroups
               groups={[{ key: 'manual', items: pendingTodos }]}
-              itemAreaClass="space-y-1.5"
+              itemAreaClass="space-y-1"
               renderCard={(todo) => {
                 const i = pendingTodos.indexOf(todo)
                 return (
@@ -1248,7 +1249,7 @@ export default function TodosPage() {
           {doneTodos.length > 0 && (smartList === 'all' || settledOnlyList) && (
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
-              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {doneTodos.map((todo) => renderTodoCard(todo))}
               </div>
             </div>
@@ -1256,7 +1257,7 @@ export default function TodosPage() {
           {abandonedTodos.length > 0 && (smartList === 'all' || smartList === 'abandoned') && (
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-1">{t('todos.abandoned')} ({abandonedTodos.length})</h3>
-              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {abandonedTodos.map((todo) => renderTodoCard(todo))}
               </div>
             </div>
@@ -1327,7 +1328,7 @@ export default function TodosPage() {
               ),
               items: g.items,
             }))}
-            itemAreaClass="space-y-1.5 ml-2"
+            itemAreaClass="space-y-1 ml-2"
             renderCard={renderTodoCard}
             renderOverlayCard={(todo) => renderTodoCard(todo, true)}
             onGroupDrop={(todo, key) => {
@@ -1350,7 +1351,7 @@ export default function TodosPage() {
                   label: <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{g.label}</h3>,
                   items: g.items,
                 }))}
-              itemAreaClass="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+              itemAreaClass="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
               renderCard={renderTodoCard}
               renderOverlayCard={(todo) => renderTodoCard(todo, true)}
               onGroupDrop={(todo, key) => {
@@ -1363,7 +1364,7 @@ export default function TodosPage() {
           {doneTodos.length > 0 && (smartList === 'all' || settledOnlyList) && (
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
-              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {doneTodos.map((todo) => renderTodoCard(todo))}
               </div>
             </div>
@@ -1371,7 +1372,7 @@ export default function TodosPage() {
           {abandonedTodos.length > 0 && (smartList === 'all' || smartList === 'abandoned') && (
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.abandoned')} ({abandonedTodos.length})</h3>
-              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {abandonedTodos.map((todo) => renderTodoCard(todo))}
               </div>
             </div>
