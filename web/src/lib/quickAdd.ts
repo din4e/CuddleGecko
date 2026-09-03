@@ -9,7 +9,7 @@ import type { TodoPriority } from '../types'
 //            monday..sunday / 周一..周日 / 星期一..星期日 (+optional 下/这),
 //            "in N days" / N天后
 //   times  : 24h HH:MM, 12h with am/pm, N点 (+optional 上午/下午/早上/晚上/凌晨)
-//   priority: !high/!1, !med/!medium/!2/!normal, !low/!3
+//   priority: !high/!1, !med/!medium/!2/!normal, !low/!3, !none/!0
 //   tags   : #tag (matched against existing workspace tags by the caller)
 
 export interface ParsedQuickAdd {
@@ -163,13 +163,15 @@ export function parseQuickAdd(input: string, now: Date = new Date()): ParsedQuic
   }
 
   // Priority: !high/!1, !med/!medium/!2/!normal, !low/!3 (TickTick's "!" syntax).
-  const pm = text.match(/!(high|1|med(?:ium)?|2|normal|low|3)\b/i)
+  const pm = text.match(/!(high|1|med(?:ium)?|2|normal|low|3|none|0)\b/i)
   if (pm) {
     const code = pm[1].toLowerCase()
     if (code === 'high' || code === '1') {
       priority = 'high'
     } else if (code === 'low' || code === '3') {
       priority = 'low'
+    } else if (code === 'none' || code === '0') {
+      priority = 'none'
     } else {
       priority = 'normal'
     }

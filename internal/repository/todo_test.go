@@ -655,3 +655,29 @@ func TestTodoRepo_CascadeDeleteRestore_DeepTree(t *testing.T) {
 }
 
 
+
+// --- Four priority tiers: 高 > 中 > 低 > 无 ---
+
+func TestTodoRepo_PriorityRankSortsNoneLast(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+
+	require.NoError(t, repo.Create(ctx, &model.Todo{UserID: 1, WorkspaceID: 1, Title: "low", Status: "pending", Priority: "low"}))
+	require.NoError(t, repo.Create(ctx, &model.Todo{UserID: 1, WorkspaceID: 1, Title: "high", Status: "pending", Priority: "high"}))
+	require.NoError(t, repo.Create(ctx, &model.Todo{UserID: 1, WorkspaceID: 1, Title: "none", Status: "pending", Priority: "none"}))
+	require.NoError(t, repo.Create(ctx, &model.Todo{UserID: 1, WorkspaceID: 1, Title: "normal", Status: "pending", Priority: "normal"}))
+
+	todos, _, err := repo.List(ctx, 1, model.TodoListQuery{Sort: model.TodoSortPriority})
+	require.NoError(t, err)
+	require.Len(t, todos, 4)
+	got := []string{todos[0].Title, todos[1].Title, todos[2].Title, todos[3].Title}
+	assert.Equal(t, []string{"high", "normal", "low", "none"}, got)
+
+	// The none tier is also filterable.
+	todos, total, err := repo.List(ctx, 1, model.TodoListQuery{Priority: "none"})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, todos, 1)
+	assert.Equal(t, "none", todos[0].Priority)
+}

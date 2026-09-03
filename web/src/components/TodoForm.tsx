@@ -55,7 +55,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   const [formTitle, setFormTitle] = useState(editing?.title ?? '')
   const [formDesc, setFormDesc] = useState(editing?.description ?? '')
   const [formStatus, setFormStatus] = useState<TodoStatus>(editing?.status ?? 'pending')
-  const [formPriority, setFormPriority] = useState<'low' | 'normal' | 'high'>(editing?.priority ?? 'normal')
+  const [formPriority, setFormPriority] = useState<'none' | 'low' | 'normal' | 'high'>(editing?.priority ?? 'normal')
   const [formDueTime, setFormDueTime] = useState(editing?.due_time ? isoToLocalInput(editing.due_time) : '')
   const [formStartTime, setFormStartTime] = useState(editing?.start_time ? isoToLocalInput(editing.start_time) : '')
   const [formAmount, setFormAmount] = useState(editing?.amount != null ? String(editing.amount) : '')
@@ -230,7 +230,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
           <div className="space-y-1">
             <Label>{t('todos.priority')}</Label>
             <div className="flex gap-1">
-              {(['low', 'normal', 'high'] as const).map((p) => (
+              {(['none', 'low', 'normal', 'high'] as const).map((p) => (
                 <Button
                   key={p}
                   type="button"

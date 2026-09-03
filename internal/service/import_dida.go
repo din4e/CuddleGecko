@@ -213,6 +213,8 @@ func parseDidaCSV(csvString string) ([]externalTodo, int, error) {
 			return "high"
 		case "3":
 			return "normal"
+		case "0":
+			return "none"
 		default:
 			return "low"
 		}

@@ -113,7 +113,7 @@ export default function KanbanBoard({
     localStorage.setItem(SWIMLANE_KEY, laneMode)
   }, [laneMode])
   const laneDefs = useMemo(
-    () => (laneMode === 'none' ? [{ id: 'all' }] : [{ id: 'high' }, { id: 'normal' }, { id: 'low' }]),
+    () => (laneMode === 'none' ? [{ id: 'all' }] : [{ id: 'high' }, { id: 'normal' }, { id: 'low' }, { id: 'none' }]),
     [laneMode],
   )
   const laneMatches = useCallback(
@@ -532,6 +532,7 @@ export default function KanbanBoard({
                           <SelectItem value="high">{t('todos.high')}</SelectItem>
                           <SelectItem value="normal">{t('todos.normal')}</SelectItem>
                           <SelectItem value="low">{t('todos.low')}</SelectItem>
+                          <SelectItem value="none">{t('todos.none')}</SelectItem>
                         </>}
                         {newColKind === 'tag' && tags.map((tg) => (
                           <SelectItem key={tg.id} value={String(tg.id)}>{tg.name}</SelectItem>
