@@ -133,7 +133,7 @@ export default function TodosPage() {
   })
   const [quickTitle, setQuickTitle] = useState('')
   const [quickDue, setQuickDue] = useState('')
-  const [priorityFilter, setPriorityFilter] = useState<'' | 'low' | 'normal' | 'high'>('')
+  const [priorityFilter, setPriorityFilter] = useState<'' | 'none' | 'low' | 'normal' | 'high'>('')
   // Multi-label filter (any-of): tasks tagged with ANY of the selected tags.
   const [tagFilters, setTagFilters] = useState<number[]>([])
   const [searchInput, setSearchInput] = useState('')
@@ -1074,6 +1074,7 @@ export default function TodosPage() {
           <option value="high">{t('todos.high')}</option>
           <option value="normal">{t('todos.normal')}</option>
           <option value="low">{t('todos.low')}</option>
+          <option value="none">{t('todos.none')}</option>
         </select>
         {/* Multi-label filter: any-of (OR) — a task shows when it carries any
            one of the checked tags. */}

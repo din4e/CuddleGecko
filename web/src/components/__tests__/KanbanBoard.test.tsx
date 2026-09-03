@@ -102,6 +102,7 @@ describe('KanbanBoard', () => {
     expect(screen.getByText('todos.high')).toBeInTheDocument()
     expect(screen.getByText('todos.normal')).toBeInTheDocument()
     expect(screen.getByText('todos.low')).toBeInTheDocument()
+    expect(screen.getByText('todos.none')).toBeInTheDocument()
     localStorage.removeItem('kanbanSwimlaneMode')
   })
 

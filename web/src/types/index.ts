@@ -207,7 +207,7 @@ export interface Workspace {
 }
 
 export type TodoStatus = 'pending' | 'done' | 'abandoned'
-export type TodoPriority = 'low' | 'normal' | 'high'
+export type TodoPriority = 'none' | 'low' | 'normal' | 'high'
 export type AmountType = '' | 'income' | 'expense'
 export type TodoSort = 'due_date' | 'priority' | 'title' | 'created' | 'manual'
 

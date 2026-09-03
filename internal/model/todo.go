@@ -131,7 +131,8 @@ const (
 )
 
 // PriorityRank maps a priority string to a sortable integer (high first).
-// Lower rank sorts earlier. Unknown priorities sort last.
+// Lower rank sorts earlier. The four tiers are 高 > 中 > 低 > 无
+// (high / normal / low / none); unknown priorities sort last.
 func PriorityRank(priority string) int {
 	switch priority {
 	case "high":
@@ -140,8 +141,10 @@ func PriorityRank(priority string) int {
 		return 1
 	case "low":
 		return 2
-	default:
+	case "none":
 		return 3
+	default:
+		return 4
 	}
 }
 

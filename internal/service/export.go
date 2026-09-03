@@ -1612,7 +1612,7 @@ func (s *ExportService) ImportTodosCSV(ctx context.Context, userID, workspaceID 
 		if st := t.field(row, "status"); st == "pending" || st == "done" {
 			todo.Status = st
 		}
-		if pr := t.field(row, "priority"); pr == "low" || pr == "normal" || pr == "high" {
+		if pr := t.field(row, "priority"); pr == "none" || pr == "low" || pr == "normal" || pr == "high" {
 			todo.Priority = pr
 		}
 		todo.DueTime = csvTime(t.field(row, "due_time"))

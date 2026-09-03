@@ -19,8 +19,9 @@ vi.mock('react-i18next', () => ({
         'todos.viewTimeline': '时间线',
         'todos.viewGrouped': '分组',
         'todos.viewKanban': '看板',
+        'todos.none': '无',
         'todos.low': '低',
-        'todos.normal': '普通',
+        'todos.normal': '中',
         'todos.high': '高',
         'todos.noDueDate': '无截止日期',
         'todos.completed': '已完成',
@@ -185,7 +186,7 @@ describe('TodosPage', () => {
       expect(screen.getByText('Buy milk')).toBeInTheDocument()
     })
     // The priority label appears both as the card badge and a filter option.
-    expect(screen.getAllByText('普通').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('中').length).toBeGreaterThan(0)
   })
 
   it('renders done todo with completed section', async () => {

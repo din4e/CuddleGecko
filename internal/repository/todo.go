@@ -136,7 +136,7 @@ func todoOrderClause(sort, order string) string {
 	const (
 		pendingFirst  = "CASE WHEN status = 'pending' THEN 0 ELSE 1 END"
 		pinnedFirst   = "CASE WHEN pinned THEN 0 ELSE 1 END"
-		priorityRank  = "CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 WHEN 'low' THEN 2 ELSE 3 END"
+		priorityRank  = "CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 WHEN 'low' THEN 2 WHEN 'none' THEN 3 ELSE 4 END"
 		dueNullsLast  = "due_time IS NULL"
 		createdTie    = "created_at DESC"
 	)
