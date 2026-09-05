@@ -1,14 +1,17 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Input } from './ui/input'
 
-const emojiGroups = [
-  { label: '常用', emojis: ['🏠', '💼', '🏢', '📚', '🎯', '⭐', '📌', '🔑', '💡', '🔧', '⚙️', '🛠️', '📊', '📈', '🗂️', '📁'] },
-  { label: '表情', emojis: ['😊', '😄', '😎', '🥰', '😌', '🙃', '😇', '🤗', '😋', '🤩', '😃', '😁'] },
-  { label: '动物', emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦜', '🐤', '🐢', '🐍', '🦎', '🐙', '🐠', '🐟', '🐬', '🐳', '🦋', '🐛', '🐝', '🐞'] },
-  { label: '自然', emojis: ['🌸', '🌺', '🌻', '🌹', '🌷', '🍀', '🌿', '🌲', '🌴', '🌵', '🍁', '🍂'] },
-  { label: '食物', emojis: ['🍎', '🍊', '🍋', '🍇', '🍓', '🍑', '🍒', '🥝', '🍌', '🍰', '🎂', '🍪'] },
-  { label: '物品', emojis: ['⭐', '🌟', '💫', '❤️', '💕', '🎵', '🎨', '📱', '💻', '🚗', '✈️'] },
-  { label: '符号', emojis: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚪', '⚫', '🔶', '🔷', '♈', '♉', '♊', '♋', '♌', '♍'] },
+// Group labels resolve through t(`emoji.groups.${key}`) — kept as key ids,
+// not display text.
+const emojiGroups: { key: string; emojis: string[] }[] = [
+  { key: 'frequently', emojis: ['🏠', '💼', '🏢', '📚', '🎯', '⭐', '📌', '🔑', '💡', '🔧', '⚙️', '🛠️', '📊', '📈', '🗂️', '📁'] },
+  { key: 'face', emojis: ['😊', '😄', '😎', '🥰', '😌', '🙃', '😇', '🤗', '😋', '🤩', '😃', '😁'] },
+  { key: 'animal', emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦜', '🐤', '🐢', '🐍', '🦎', '🐙', '🐠', '🐟', '🐬', '🐳', '🦋', '🐛', '🐝', '🐞'] },
+  { key: 'nature', emojis: ['🌸', '🌺', '🌻', '🌹', '🌷', '🍀', '🌿', '🌲', '🌴', '🌵', '🍁', '🍂'] },
+  { key: 'food', emojis: ['🍎', '🍊', '🍋', '🍇', '🍓', '🍑', '🍒', '🥝', '🍌', '🍰', '🎂', '🍪'] },
+  { key: 'object', emojis: ['⭐', '🌟', '💫', '❤️', '💕', '🎵', '🎨', '📱', '💻', '🚗', '✈️'] },
+  { key: 'symbol', emojis: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚪', '⚫', '🔶', '🔷', '♈', '♉', '♊', '♋', '♌', '♍'] },
 ]
 
 interface EmojiPickerProps {
@@ -17,6 +20,7 @@ interface EmojiPickerProps {
 }
 
 export default function EmojiPicker({ value, onChange }: EmojiPickerProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
   return (
@@ -32,7 +36,7 @@ export default function EmojiPicker({ value, onChange }: EmojiPickerProps) {
         <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="选择或输入"
+          placeholder={t('emoji.placeholder')}
           maxLength={4}
           className="w-24 h-10"
         />
@@ -42,15 +46,15 @@ export default function EmojiPicker({ value, onChange }: EmojiPickerProps) {
             onClick={() => onChange('')}
             className="text-xs text-muted-foreground hover:text-destructive shrink-0"
           >
-            清除
+            {t('common.clear')}
           </button>
         )}
       </div>
       {open && (
         <div className="absolute top-12 left-0 z-50 bg-popover border rounded-lg shadow-lg p-3 w-72 max-h-64 overflow-y-auto">
           {emojiGroups.map((group) => (
-            <div key={group.label} className="mb-2">
-              <div className="text-xs text-muted-foreground mb-1">{group.label}</div>
+            <div key={group.key} className="mb-2">
+              <div className="text-xs text-muted-foreground mb-1">{t(`emoji.groups.${group.key}`)}</div>
               <div className="flex flex-wrap gap-1">
                 {group.emojis.map((emoji) => (
                   <button

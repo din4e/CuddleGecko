@@ -660,7 +660,7 @@ export default function ContactDetailPage() {
                   </Button>
                   {editForm.avatar_url && (
                     <div className="flex items-center gap-1">
-                      <img src={editForm.avatar_url} alt="preview" className="h-8 w-8 rounded-full object-cover" />
+                      <img src={editForm.avatar_url} alt={t('contacts.avatar')} className="h-8 w-8 rounded-full object-cover" />
                       <button type="button" onClick={() => setEditForm({ ...editForm, avatar_url: '' })} className="text-muted-foreground hover:text-destructive">
                         <X className="h-3 w-3" />
                       </button>

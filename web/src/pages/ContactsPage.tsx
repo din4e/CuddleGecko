@@ -88,7 +88,7 @@ function LabelPicker({ selected, onChange, t }: {
           {selected.map((label) => (
             <Badge key={label} variant="secondary" className="gap-1">
               {label in labelColors ? t(`relationships.${label}`) : label}
-              <button type="button" className="text-muted-foreground hover:text-destructive" aria-label="Remove" onClick={() => onChange(selected.filter((l) => l !== label))}><X className="h-3 w-3" /></button>
+              <button type="button" className="text-muted-foreground hover:text-destructive" aria-label={t('common.remove')} onClick={() => onChange(selected.filter((l) => l !== label))}><X className="h-3 w-3" /></button>
             </Badge>
           ))}
         </div>
@@ -159,7 +159,7 @@ function ContactFormDialog({ open, onOpenChange, t }: ContactFormDialogProps) {
                 </Button>
                 {newContact.avatar_url && (
                   <div className="flex items-center gap-1">
-                    <img src={newContact.avatar_url} alt="preview" className="h-8 w-8 rounded-full object-cover" />
+                    <img src={newContact.avatar_url} alt={t('contacts.avatar')} className="h-8 w-8 rounded-full object-cover" />
                     <button type="button" onClick={() => setNewContact((prev) => ({ ...prev, avatar_url: '' }))} className="text-muted-foreground hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>

@@ -397,7 +397,7 @@ export default function FinancePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSubmit} disabled={!form.title || !form.amount || !form.date || createTx.isPending || updateTx.isPending}>
               {editing ? t('finance.title') : t('finance.newTransaction')}

@@ -1,11 +1,13 @@
+import { useTranslation } from 'react-i18next'
 import { Skeleton } from './ui/skeleton'
 
 // ListSkeleton is a generic loading placeholder for list/table pages, replacing
 // bare "Loading…" text and the EmptyState-misused-as-loading antipattern (which
 // flashes "no data" while still loading).
 export function ListSkeleton({ rows = 5 }: { rows?: number }) {
+  const { t } = useTranslation()
   return (
-    <div className="space-y-2" role="status" aria-label="Loading">
+    <div className="space-y-2" role="status" aria-label={t('common.loading')}>
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="flex items-center gap-3 rounded-md border p-3">
           <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
@@ -22,8 +24,9 @@ export function ListSkeleton({ rows = 5 }: { rows?: number }) {
 // StatGridSkeleton mirrors the dashboard's stat-card grid (small label row +
 // big number per card) so the placeholder matches the real layout.
 export function StatGridSkeleton({ count = 8 }: { count?: number }) {
+  const { t } = useTranslation()
   return (
-    <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6" role="status" aria-label="Loading">
+    <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6" role="status" aria-label={t('common.loading')}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="rounded-lg border p-4">
           <div className="flex items-center justify-between">
