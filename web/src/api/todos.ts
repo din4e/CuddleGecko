@@ -27,6 +27,9 @@ export const todosApi = {
   listTrash: () =>
     request.get<Todo[]>('/todos/trash').then((data) => ({ data })),
 
+  emptyTrash: () =>
+    request.delete<{ purged: number }>('/todos/trash').then((data) => ({ data })),
+
   restore: (id: number) =>
     request.post<void>(`/todos/${id}/restore`).then(() => {}),
 

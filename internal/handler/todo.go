@@ -179,6 +179,20 @@ func (h *TodoHandler) Restore(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// EmptyTrash permanently deletes every soft-deleted todo in the workspace.
+func (h *TodoHandler) EmptyTrash(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+
+	count, err := h.svc.EmptyTrash(c.Request.Context(), userID, workspaceID)
+	if err != nil {
+		response.InternalError(c, "failed to empty trash")
+		return
+	}
+
+	response.OK(c, gin.H{"purged": count})
+}
+
 type reorderTodoRequest struct {
 	AfterID *uint `json:"after_id"`
 }

@@ -72,7 +72,12 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
   useEffect(() => {
     const found = new Set<number>()
     for (const slice of childrenMap.values()) {
-      for (const c of slice.items) found.add(c.id)
+      for (const c of slice.items) {
+        // Leaf children get no slice of their own (child_count 0 can only
+        // return an empty list) — otherwise a parent with N children fires
+        // 1+N requests per drawer open. Mirrors the page's flat-view cascade.
+        if ((c.child_count ?? 0) > 0) found.add(c.id)
+      }
     }
     setExtraIds((prev) => {
       if (found.size === prev.size && [...found].every((id) => prev.has(id))) return prev
@@ -131,6 +136,7 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
         onMove={onMove}
         dragId={dragId}
         onDragIdChange={onDragIdChange}
+        collapseScope="drawer"
       />
     </div>
   )
@@ -160,7 +166,7 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
             </TabsList>
             <TabsContent value="detail" className="min-h-0 overflow-y-auto px-4 py-3">
               <TodoForm
-                key={todo.id}
+                key={`form-${todo.id}`}
                 editing={todo}
                 contacts={contacts}
                 tags={tags}
@@ -169,7 +175,7 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
                 onClose={onClose}
               />
               <DrawerSubtasks
-                key={todo.id}
+                key={`subs-${todo.id}`}
                 todo={todo}
                 onToggle={onToggleSubtask}
                 onDelete={onDeleteSubtask}

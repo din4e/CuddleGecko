@@ -47,6 +47,7 @@ type TodoRepository interface {
 	CascadeRestore(ctx context.Context, workspaceID uint, parentIDs []uint) (int64, error)
 	ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error)
 	Restore(ctx context.Context, workspaceID, id uint) error
+	EmptyTrash(ctx context.Context, workspaceID uint) (int64, error)
 }
 
 // TodoItemRepository handles checklist (subtask) persistence for a todo.
@@ -402,6 +403,20 @@ func (s *TodoService) Restore(ctx context.Context, userID, workspaceID, id uint)
 	s.recordActivity(ctx, userID, id, []model.TodoActivity{activityEntry(model.TodoActivityRestored, "", "", "")})
 	s.notify(ctx, workspaceID, ChangeUpdated, id, nil)
 	return nil
+}
+
+// EmptyTrash permanently deletes every soft-deleted todo in the workspace and
+// returns how many were purged. The purged rows' audit trail goes with them,
+// so no activity entry is recorded — the point is that nothing remains.
+func (s *TodoService) EmptyTrash(ctx context.Context, userID, workspaceID uint) (int64, error) {
+	count, err := s.repo.EmptyTrash(ctx, workspaceID)
+	if err != nil {
+		return 0, err
+	}
+	// Bulk-style refresh: trash listings and any cached lists on other devices
+	// must drop the purged rows.
+	s.notify(ctx, workspaceID, ChangeBulk, 0, nil)
+	return count, nil
 }
 
 // Reorder moves a todo within the workspace's manual order, after the todo with

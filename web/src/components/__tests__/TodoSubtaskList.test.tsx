@@ -158,20 +158,28 @@ describe('TodoSubtaskList', () => {
     expect(screen.getByText('Grandchild')).toBeInTheDocument()
   })
 
-  it('fold state is shared through the store (card and drawer stay in sync)', () => {
+  it('folds persist per scope — the same page shares, other surfaces stay open', () => {
+    // Fold a branch on the default (page) scope.
     const { unmount } = render(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={vi.fn()} onEdit={vi.fn()} />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'todos.collapse' }))
     unmount()
-    // A fresh instance (e.g. the drawer opened for the same todo) inherits
+    // A fresh instance of the SAME scope (same view re-rendered) inherits
     // the fold instead of popping the branch back open.
     render(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={vi.fn()} onEdit={vi.fn()} />,
     )
     expect(screen.queryByText('Grandchild')).not.toBeInTheDocument()
+    unmount()
+    // A DIFFERENT scope (the drawer) has its own folds — still expanded.
+    render(
+      <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
+        onToggle={vi.fn()} onEdit={vi.fn()} collapseScope="drawer" />,
+    )
+    expect(screen.getByText('Grandchild')).toBeInTheDocument()
   })
 
   it('hideDone drops settled done rows but keeps done rows with open descendants', () => {
@@ -256,7 +264,7 @@ describe('TodoSubtaskList', () => {
   it('nests a dragged subtask under another row and unfolds the target', () => {
     const onMove = vi.fn()
     // Child B starts folded — the drop must reveal it for the result to show.
-    useTodoCollapseStore.setState({ collapsed: new Set([4]) })
+    useTodoCollapseStore.setState({ collapsed: new Set(['page:4']) })
     render(
       <DndHarness todo={parent} childrenByParent={makeDndMap()}
         onToggle={vi.fn()} onEdit={vi.fn()} onMove={onMove} />,

@@ -23,7 +23,7 @@ func newTodoTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
-	require.NoError(t, db.AutoMigrate(&model.Todo{}, &model.TodoItem{}, &model.Tag{}))
+	require.NoError(t, db.AutoMigrate(&model.Todo{}, &model.TodoItem{}, &model.TodoActivity{}, &model.Tag{}))
 	return db
 }
 
@@ -32,6 +32,58 @@ func mustCreateTodo(t *testing.T, repo *TodoRepo, ws uint, title string) *model.
 	todo := &model.Todo{UserID: 1, WorkspaceID: ws, Title: title, Status: "pending", Priority: "normal"}
 	require.NoError(t, repo.Create(context.Background(), todo))
 	return todo
+}
+
+// --- Trash purge ---
+
+func TestTodoRepo_EmptyTrash(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+
+	// ws 1: one trashed todo (with an item, an activity line and a tag link)
+	// plus one live todo; ws 2: one trashed todo that must survive.
+	trashed := mustCreateTodo(t, repo, 1, "trashed")
+	live := mustCreateTodo(t, repo, 1, "live")
+	otherWs := mustCreateTodo(t, repo, 2, "other workspace")
+	item := &model.TodoItem{TodoID: trashed.ID, Content: "sub-item"}
+	require.NoError(t, repo.CreateItem(ctx, item))
+	activity := &model.TodoActivity{TodoID: trashed.ID, UserID: 1, Username: "u", Action: model.TodoActivityCreated}
+	require.NoError(t, db.Create(activity).Error)
+	tag := &model.Tag{UserID: 1, WorkspaceID: 1, Name: "t", Color: "#111111"}
+	require.NoError(t, db.Create(tag).Error)
+	require.NoError(t, db.Exec("INSERT INTO todo_tags (todo_id, tag_id) VALUES (?, ?)", trashed.ID, tag.ID).Error)
+
+	require.NoError(t, repo.Delete(ctx, 1, trashed.ID))
+	require.NoError(t, repo.Delete(ctx, 2, otherWs.ID))
+
+	count, err := repo.EmptyTrash(ctx, 1)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), count, "only ws 1's trashed todo is purged")
+
+	var ws1Rows, ws2Rows int64
+	db.Unscoped().Model(&model.Todo{}).Where("workspace_id = ?", 1).Count(&ws1Rows)
+	db.Unscoped().Model(&model.Todo{}).Where("workspace_id = ?", 2).Count(&ws2Rows)
+	assert.Equal(t, int64(1), ws1Rows, "the live todo stays, the trashed row is hard-gone")
+	assert.Equal(t, int64(1), ws2Rows, "other workspaces' trash is untouched")
+
+	var items, activities, tagLinks int64
+	db.Unscoped().Model(&model.TodoItem{}).Where("todo_id = ?", trashed.ID).Count(&items)
+	db.Model(&model.TodoActivity{}).Where("todo_id = ?", trashed.ID).Count(&activities)
+	db.Raw("SELECT COUNT(*) FROM todo_tags WHERE todo_id = ?", trashed.ID).Scan(&tagLinks)
+	assert.Equal(t, int64(0), items, "purged todo's checklist items go with it")
+	assert.Equal(t, int64(0), activities, "purged todo's audit trail goes with it")
+	assert.Equal(t, int64(0), tagLinks, "purged todo's tag associations go with it")
+
+	// The live todo keeps its rows.
+	var liveItems int64
+	db.Unscoped().Model(&model.TodoItem{}).Where("todo_id = ?", live.ID).Count(&liveItems)
+	assert.Equal(t, int64(0), liveItems) // none created — sanity only
+
+	// Emptying an already-empty trash is a no-op.
+	count, err = repo.EmptyTrash(ctx, 1)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), count)
 }
 
 // --- Checklist item count sync ---

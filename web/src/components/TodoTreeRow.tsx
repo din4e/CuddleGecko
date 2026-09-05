@@ -37,6 +37,11 @@ export interface TodoTreeHandlers {
   selectable?: boolean
   selectedIds?: Set<number>
   onSelectToggle?: (id: number) => void
+  /** Arrow-key navigation target: the row with this id carries the selection
+   *  highlight (the page moves it on ↑/↓ and folds around it on ←/→). */
+  selectedId?: number | null
+  /** Click-to-select: rows report mousedown so the selection tracks clicks. */
+  onSelect?: (id: number) => void
   /** Drag & drop reparenting. dragId is the id being dragged (null = none). */
   dragId?: number | null
   dragSubtreeSize?: number
@@ -100,6 +105,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   const {
     expanded, onToggleExpand, onToggle, onRename, onEdit, onDelete, onMove, onCreateChild, formatDate,
     selectable, selectedIds, onSelectToggle, onStartPomodoro, onTogglePin,
+    selectedId, onSelect,
     dragId, onDragIdChange, onLoadChildren,
   } = props
   const [dropZone, setDropZone] = useState<DropZone | null>(null)
@@ -116,6 +122,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   const hasChildren = visibleChildren.length > 0 || (todo.child_count ?? 0) > hiddenLoaded
   const isOpen = expanded.has(todo.id)
   const isDragged = dragId === todo.id
+  const isSelected = selectedId === todo.id
   // Dropping onto a descendant of the dragged node would create a cycle —
   // i.e. the dragged id appears in THIS row's ancestor chain.
   const canDropHere =
@@ -159,10 +166,16 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   }
 
   // Outliner keyboard: Tab indents under the previous sibling, Shift+Tab
-  // outdents to the grandparent. Prevent the browser's focus walk so the row
-  // keeps operating on the same todo.
+  // outdents to the grandparent. Hijacked only from the row's own navigation
+  // surfaces (the row container and the title span) — intercepting Tab from
+  // the controls inside (action buttons, rename input) would trap keyboard
+  // users in the row, since no Tab press would ever move focus out.
   const handleRowKey = (e: React.KeyboardEvent) => {
     if (e.key !== 'Tab') return
+    if (
+      e.target !== e.currentTarget &&
+      (e.target as HTMLElement).closest('button, input, textarea, select')
+    ) return
     if (e.shiftKey) {
       if (!canOutdent) return
       e.preventDefault()
@@ -211,7 +224,11 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
     <div>
       <div
         tabIndex={0}
+        data-nav-todo={todo.id}
         onKeyDown={handleRowKey}
+        // Clicking anywhere on the row makes it the arrow-key navigation
+        // target (title clicks still open the drawer via their own handler).
+        onMouseDown={() => onSelect?.(todo.id)}
         draggable={dragId === undefined ? false : true}
         onDragStart={(e) => {
           if (dragId === undefined || !onDragIdChange) return
@@ -240,8 +257,9 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
           onDragIdChange?.(null)
         }}
         className={cn(
-          'group flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+          'group relative flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
           isDragged && 'opacity-40',
+          isSelected && 'bg-accent/60',
           dropZone === 'child' && 'ring-2 ring-primary/70 bg-primary/5',
           dropZone === 'before' && 'border-t-2 border-primary',
           dropZone === 'after' && 'border-b-2 border-primary',
@@ -309,7 +327,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
               titleClickTimer.current = window.setTimeout(() => {
                 titleClickTimer.current = null
                 onEdit(todo)
-              }, 250)
+              }, 200)
             }}
             onDoubleClick={() => {
               cancelPendingTitleClick()
@@ -359,10 +377,11 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
           </span>
         )}
 
-        {/* hover actions — pinned to the row's right edge (ml-auto), pomodoro
-            first, mirroring TodoCard's floating toolbar. Always visible on
-            touch/small screens, hover-reveal on md+. */}
-        <div className="ml-auto flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+        {/* hover actions — a floating overlay on the row's right edge so the
+            row's meta runs flush right with no reserved gap; they fade in
+            only when the pointer reaches this strip (touch/small screens keep
+            them always visible; focus-within covers keyboard). */}
+        <div className="absolute inset-y-0 right-0 flex items-center gap-0.5 rounded bg-background/90 px-0.5 opacity-100 transition-opacity md:opacity-0 md:hover:opacity-100 md:focus-within:opacity-100">
           {onStartPomodoro && (
             <RowBtn onClick={() => onStartPomodoro(todo)} title={t('todos.pomoStart')}>
               <Timer className="h-3.5 w-3.5" />
@@ -470,6 +489,8 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             selectable={selectable}
             selectedIds={selectedIds}
             onSelectToggle={onSelectToggle}
+            selectedId={selectedId}
+            onSelect={onSelect}
             onLoadChildren={onLoadChildren}
           />
         ))}

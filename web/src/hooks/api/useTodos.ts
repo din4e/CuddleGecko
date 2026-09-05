@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import type { InfiniteData } from '@tanstack/react-query'
 import { todosApi } from '../../api/todos'
@@ -66,7 +66,14 @@ export function useTodoChildrenMap(parentIds: number[], filters: TodoListParams 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { page: _page, ...rest } = filters
   const [multByParent, setMultByParent] = useState<Record<number, number>>({})
-  return useQueries({
+  // combine returns a plain array of data-only records (no Map, no closures):
+  // the queries observer keeps the previous result identity via
+  // replaceEqualDeep when nothing changed, so the Map built from it below is
+  // identity-stable across renders — downstream memos (buildLazyTree,
+  // childrenByParent, subtaskProgress) and memoized rows then don't re-run on
+  // unrelated page state changes (a Map return value defeats that deep
+  // comparison and used to produce a fresh identity every render).
+  const slices = useQueries({
     queries: parentIds.map((parentId) => {
       const mult = Math.min(multByParent[parentId] ?? 1, CHILDREN_MAX_MULT)
       const page_size = CHILDREN_BASE_PAGE * mult
@@ -77,22 +84,39 @@ export function useTodoChildrenMap(parentIds: number[], filters: TodoListParams 
         placeholderData: (prev: PaginatedData<Todo> | undefined) => prev,
       }
     }),
-    combine: (queries) => {
-      const map = new Map<number, TodoChildrenState>()
-      queries.forEach((q, i) => {
+    combine: (queries) =>
+      queries.map((q, i) => {
         const parentId = parentIds[i]
         const items = q.data?.items ?? []
-        map.set(parentId, {
+        return {
+          parentId,
           items,
           total: q.data?.total ?? 0,
           loaded: !q.isPending,
           hasMore: items.length < (q.data?.total ?? 0) && (multByParent[parentId] ?? 1) < CHILDREN_MAX_MULT,
-          loadMore: () => setMultByParent((prev) => ({ ...prev, [parentId]: Math.min((prev[parentId] ?? 1) * 2, CHILDREN_MAX_MULT) })),
-        })
-      })
-      return map
-    },
+        }
+      }),
   })
+  return useMemo(() => {
+    const map = new Map<number, TodoChildrenState>()
+    for (const s of slices) {
+      map.set(s.parentId, {
+        items: s.items,
+        total: s.total,
+        loaded: s.loaded,
+        hasMore: s.hasMore,
+        loadMore: () =>
+          setMultByParent((prev) => ({
+            ...prev,
+            [s.parentId]: Math.min((prev[s.parentId] ?? 1) * 2, CHILDREN_MAX_MULT),
+          })),
+      })
+    }
+    return map
+    // setMultByParent is a stable setState reference — listed only because the
+    // loadMore closures capture it (react-hooks/preserve-manual-memoization
+    // demands it in the source deps); it can never invalidate the memo.
+  }, [slices, setMultByParent])
 }
 
 // A cached 'list' entry is either a plain page (useTodosList) or stacked pages
@@ -136,6 +160,20 @@ export function useRestoreTodo() {
   })
 }
 
+// Permanently deletes every trashed todo in the workspace.
+export function useEmptyTodoTrash() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => todosApi.emptyTrash(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [...allKey(), 'trash'] })
+      invalidateScope(qc, scope)
+    },
+    // TodosPage shows a specific purge-failed toast; suppress the global one.
+    meta: { localErrorHandling: true },
+  })
+}
+
 // --- Optimistic move/reorder/create helpers ---
 // Cached 'list' keys are [...allKey(), 'list', params]; params.parent_id (when
 // present) marks a children-slice entry, and its absence means a root list.
@@ -154,6 +192,16 @@ function listEntryStatus(key: TodoListKey): string | undefined {
   const params = key[3]
   if (params != null && typeof params === 'object' && 'status' in params) {
     return (params as { status?: string }).status
+  }
+  return undefined
+}
+
+// A string param off a cached list entry's key (its sort / order settings).
+function listEntryParam(key: TodoListKey, name: 'sort' | 'order'): string | undefined {
+  const params = key[3]
+  if (params != null && typeof params === 'object' && name in params) {
+    const v = (params as Record<string, unknown>)[name]
+    return typeof v === 'string' ? v : undefined
   }
   return undefined
 }
@@ -236,14 +284,95 @@ function optimisticallyMoveTodo(
 // Inserts a freshly created todo into the cached list entries it plausibly
 // belongs to (matching parent and, when the entry filters by status, matching
 // status). Entries it can't be placed in are left for the next refetch.
+const PRIORITY_RANK: Record<string, number> = { high: 0, normal: 1, low: 2, none: 3 }
+
+// Mirrors the backend's todoOrderClause (repository/todo.go): pinned first,
+// then pending; the sort key decides; NULL due dates sort last in due-date
+// positions regardless of direction; created_at DESC breaks ties. The cached
+// items are already in this order (the server produced them), so a first-fit
+// insert with this comparator lands the new todo where the refetch will.
+function createdInsertComparator(sort: string | undefined, order: string | undefined): (a: Todo, b: Todo) => number {
+  const dir = order === 'desc' ? -1 : 1
+  const rank = (t: Todo) => PRIORITY_RANK[t.priority ?? ''] ?? 4
+  const dueCmp = (a: Todo, b: Todo) => {
+    if (a.due_time == null && b.due_time == null) return 0
+    if (a.due_time == null) return 1 // dueNullsLast holds for both directions
+    if (b.due_time == null) return -1
+    return dir * a.due_time.localeCompare(b.due_time)
+  }
+  const createdDesc = (a: Todo, b: Todo) => (b.created_at ?? '').localeCompare(a.created_at ?? '')
+  return (a: Todo, b: Todo) => {
+    let c = (a.pinned ? 0 : 1) - (b.pinned ? 0 : 1)
+    if (c) return c
+    c = (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1)
+    if (c) return c
+    switch (sort) {
+      case 'manual':
+        return (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id
+      case 'priority':
+        c = rank(a) - rank(b)
+        if (c) return c
+        c = dueCmp(a, b)
+        if (c) return c
+        return createdDesc(a, b)
+      case 'title':
+        c = dir * a.title.localeCompare(b.title)
+        if (c) return c
+        return createdDesc(a, b)
+      case 'created':
+        return dir * (a.created_at ?? '').localeCompare(b.created_at ?? '')
+      case 'due_date':
+      default:
+        c = dueCmp(a, b)
+        if (c) return c
+        c = rank(a) - rank(b)
+        if (c) return c
+        return createdDesc(a, b)
+    }
+  }
+}
+
+// Insert into the entry's FIRST page only and bump its total: later pages are
+// offset-based (a row inserted there would surface as a duplicate once page 1
+// refetches), and the honest total keeps LoadMoreBar correct until the
+// refetch. Returns null for unknown cache shapes (stats, trash, …).
+function insertIntoFirstPage(
+  data: unknown,
+  created: Todo,
+  sort: string | undefined,
+  order: string | undefined,
+): unknown {
+  const insert = (items: Todo[]): Todo[] => {
+    if (items.some((t) => t.id === created.id)) return items
+    const cmp = createdInsertComparator(sort, order)
+    const idx = items.findIndex((t) => cmp(created, t) < 0)
+    return idx < 0 ? [...items, created] : [...items.slice(0, idx), created, ...items.slice(idx)]
+  }
+  if (data != null && typeof data === 'object' && 'pages' in data) {
+    const inf = data as unknown as InfiniteData<PaginatedData<Todo>>
+    const first = inf.pages[0]
+    if (first == null || insert(first.items ?? []) === (first.items ?? [])) return data
+    return {
+      ...data,
+      pages: inf.pages.map((p, i) =>
+        i === 0 ? { ...p, total: (p.total ?? 0) + 1, items: insert(p.items ?? []) } : p,
+      ),
+    }
+  }
+  if (data != null && typeof data === 'object' && 'items' in data) {
+    const page = data as unknown as PaginatedData<Todo>
+    if (insert(page.items ?? []) === (page.items ?? [])) return data
+    return { ...page, total: (page.total ?? 0) + 1, items: insert(page.items ?? []) }
+  }
+  return null
+}
+
 function insertCreatedTodo(qc: ReturnType<typeof useQueryClient>, created: Todo): void {
   for (const [key, data] of qc.getQueriesData({ queryKey: [...allKey(), 'list'] })) {
     if (listEntryParentId(key) !== (created.parent_id ?? null)) continue
     const status = listEntryStatus(key)
     if (status != null && status !== created.status) continue
-    const next = mapListItems(data, (items) =>
-      items.some((t) => t.id === created.id) ? items : [created, ...items],
-    )
+    const next = insertIntoFirstPage(data, created, listEntryParam(key, 'sort'), listEntryParam(key, 'order'))
     if (next != null && next !== data) qc.setQueryData(key, next)
   }
 
@@ -269,6 +398,10 @@ export function useCreateTodo() {
       // server-returned entity straight into the matching caches — no refetch.
       markLocalMutation(scope)
       insertCreatedTodo(qc, created)
+      // The zero-request list insert above can't update the stats strip's
+      // pending/done counts (and no other invalidation is coming: the WS echo
+      // is suppressed and refetchOnWindowFocus is off) — refetch just that.
+      void qc.invalidateQueries({ queryKey: [...allKey(), 'stats'] })
     },
   })
 }

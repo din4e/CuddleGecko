@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { lazy, memo, Suspense, useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { useContactsList } from '../hooks/api/useContacts'
@@ -36,11 +36,11 @@ import { matchesColumn } from '../lib/kanban'
 import { useKanbanColumns } from '../hooks/api/useKanbanColumns'
 import type { KanbanColumn } from '../api/settings'
 import TodoTree from '../components/TodoTreeRow'
-import { type KanbanLane } from '../components/KanbanBoard'
+import type { KanbanLane } from '../components/KanbanBoard'
 import { buildLazyTree, descendantIds, isSettledStatus, type TodoNode } from '../lib/buildTodoTree'
-import { subtreeProgressFromMap } from '../lib/todoProgress'
+import { subtreeProgressFromMap, type SubtreeProgress } from '../lib/todoProgress'
 import { usePomodoroStore } from '../stores/pomodoro'
-import { useTodoCollapseStore } from '../stores/todoCollapse'
+import { useTodoCollapseStore, collapseKey } from '../stores/todoCollapse'
 import {
   useTodosInfinite,
   useTodoChildrenMap,
@@ -58,6 +58,7 @@ import {
   useTodoStats,
   useTodoTrash,
   useRestoreTodo,
+  useEmptyTodoTrash,
   useReplaceTodoTags,
 } from '../hooks/api/useTodos'
 
@@ -116,6 +117,116 @@ function smartListParams(list: SmartList): TodoListParams {
 }
 
 
+// Everything a rendered card needs from the page, bundled into one object so
+// TodoCardRow can be memoized on a single stable prop. The page builds it with
+// useMemo over identity-stable values (useCallback handlers + memoized maps
+// backed by the now identity-stable children map), so an incidental page
+// re-render — search typing, dialog open, selection toggle — reuses the same
+// ctx and every memoized row bails out instead of re-rendering the whole list.
+interface CardRowCtx {
+  view: TodoView
+  hideDone: boolean
+  childrenByParent: Map<number, Todo[]>
+  subtaskProgress: Map<number, SubtreeProgress>
+  todoTitleById: Map<number, string>
+  treeDragId: number | null
+  getContactNames: (ids: number[]) => string
+  onSelectToggle: (id: number) => void
+  onToggle: (id: number) => void
+  onSetStatus: (id: number, status: Todo['status']) => void
+  onTogglePin: (todo: Todo) => void
+  onSync: (todo: Todo) => void
+  onEdit: (todo: Todo) => void
+  onRename: (id: number, title: string) => void
+  onDuplicate: (todo: Todo) => void
+  onDelete: (todo: Todo) => void
+  formatDate: (dateStr: string | null) => string
+  onCreateChild: (parent: Todo, title: string) => void
+  onStartPomodoro: (todo: Todo) => void
+  onPostpone: (todo: Todo) => void
+  onNest: (id: number, parentId: number) => void
+  onToggleSub: (sub: Todo) => void
+  onMoveSubtask: (id: number, parentId: number | null, afterId: number | null | 'last') => void
+  onDragIdChange: (id: number | null) => void
+  /** Arrow-key navigation (see the page's handleNavKey). */
+  navEnabled: boolean
+  selectedTodoId: number | null
+  onSelect: (todo: Todo) => void
+}
+
+// Memoized card wrapper: builds the card's subtask element HERE rather than in
+// the page render — a fresh element prop (or an inline closure) on every page
+// render would defeat TodoCard's own memo and re-render every visible card.
+const TodoCardRow = memo(function TodoCardRow({
+  ctx, todo, compact = false, selectable = false, selected = false,
+}: {
+  ctx: CardRowCtx
+  todo: Todo
+  compact?: boolean
+  selectable?: boolean
+  selected?: boolean
+}) {
+  // Flat views only: the tree renders rows (TodoTree), not cards.
+  const flat = ctx.view !== 'tree'
+  return (
+    <div
+      data-nav-todo={todo.id}
+      // Clicking anywhere on the card makes it the arrow-key navigation
+      // target (title clicks still open the drawer via their own handler).
+      onMouseDown={() => ctx.onSelect(todo)}
+      className={ctx.navEnabled && ctx.selectedTodoId === todo.id ? 'rounded-md ring-2 ring-ring' : undefined}
+    >
+      <TodoCard
+      todo={todo}
+      compact={compact}
+      selectable={selectable}
+      selected={selected}
+      onSelectToggle={ctx.onSelectToggle}
+      contactNames={ctx.getContactNames(todo.contact_ids || [])}
+      onToggle={ctx.onToggle}
+      onSetStatus={ctx.onSetStatus}
+      onTogglePin={ctx.onTogglePin}
+      onSync={ctx.onSync}
+      onEdit={ctx.onEdit}
+      onRename={ctx.onRename}
+      onDuplicate={ctx.onDuplicate}
+      onDelete={ctx.onDelete}
+      formatDate={ctx.formatDate}
+      parentTitle={todo.parent_id ? ctx.todoTitleById.get(todo.parent_id) : undefined}
+      subtaskProgress={ctx.subtaskProgress.get(todo.id)}
+      collapseScope={ctx.view}
+      onCreateChild={ctx.onCreateChild}
+      onStartPomodoro={ctx.onStartPomodoro}
+      onPostpone={ctx.onPostpone}
+      // Subtask drag & drop: rows carry the tree's tri-zone semantics, and a
+      // drop on the card body nests under this todo. Shares the tree's drag
+      // state, so drags interoperate across cards (one view renders at a time).
+      subtaskDragId={flat ? ctx.treeDragId : undefined}
+      onNestSubtask={flat ? ctx.onNest : undefined}
+      // Compact (kanban) cards DO get the subtask list, but TodoCard keeps it
+      // collapsed behind the progress chip: the board cell stays lean and a
+      // drag overlay (fresh mount) never carries the expanded list.
+      subtasks={flat ? (
+        <TodoSubtaskList
+          todo={todo}
+          childrenByParent={ctx.childrenByParent}
+          onToggle={ctx.onToggleSub}
+          onEdit={ctx.onEdit}
+          onCreateChild={ctx.onCreateChild}
+          collapseScope={ctx.view}
+          onDelete={ctx.onDelete}
+          onStartPomodoro={ctx.onStartPomodoro}
+          hideDone={ctx.hideDone}
+          onMove={ctx.onMoveSubtask}
+          dragId={ctx.treeDragId}
+          onDragIdChange={ctx.onDragIdChange}
+        />
+      ) : undefined}
+      />
+    </div>
+  )
+})
+
 export default function TodosPage() {
   const { t } = useTranslation()
   // Contacts/tags come from the shared React-Query cache (30s staleTime) instead
@@ -161,6 +272,11 @@ export default function TodosPage() {
     }
   })
   const [expandingAll, setExpandingAll] = useState(false)
+  // Arrow-key navigation target: the clicked row/card (highlighted). ↑/↓ move
+  // it through the visible rows, ←/→ fold/unfold around it (see handleNavKey).
+  const [selectedTodoId, setSelectedTodoId] = useState<number | null>(null)
+  const selectTodoId = useCallback((id: number) => setSelectedTodoId(id), [])
+  const handleSelectTodo = useCallback((todo: Todo) => setSelectedTodoId(todo.id), [])
   const searchRef = useRef<HTMLInputElement>(null)
   // One-click "hide completed & abandoned": keeps the working list lean.
   // Persisted so the choice survives reloads, like the view/smart-list choices
@@ -221,6 +337,7 @@ export default function TodosPage() {
   const { data: stats } = useTodoStats()
   const { data: trashTodos } = useTodoTrash(smartList === 'trash')
   const restoreTodo = useRestoreTodo()
+  const emptyTrash = useEmptyTodoTrash()
   const createTodo = useCreateTodo()
   const updateTodo = useUpdateTodo()
   const toggleTodo = useToggleTodoStatus()
@@ -347,6 +464,9 @@ export default function TodosPage() {
             // tag assignment is non-fatal
           }
         }
+        // Unknown tag names can't be resolved — say so instead of dropping
+        // them silently (the task itself was created).
+        if (tagIds.length < parsed.tags.length) toast.info(t('todos.quickAddTagSkipped'))
       }
       setQuickTitle('')
       setQuickDue('')
@@ -367,6 +487,10 @@ export default function TodosPage() {
       // ignore
     }
   }, [toggleTodo, t])
+
+  // Subtask rows hand over the whole todo — adapt to the id-taking toggle with
+  // ONE stable closure shared by every card's subtask list and the drawer.
+  const handleToggleSub = useCallback((sub: Todo) => { void handleToggle(sub.id) }, [handleToggle])
 
   const handleTogglePin = useCallback(async (todo: Todo) => {
     try {
@@ -395,6 +519,18 @@ export default function TodosPage() {
       toast.error(t('todos.restoreFailed'))
     }
   }, [restoreTodo, t])
+
+  // Permanently purge every trashed todo (irreversible — hence the confirm).
+  const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false)
+  const handleEmptyTrash = useCallback(async () => {
+    try {
+      const res = await emptyTrash.mutateAsync()
+      toast.success(t('todos.trashPurged', { n: res?.data?.purged ?? 0 }))
+      setConfirmEmptyTrash(false)
+    } catch {
+      toast.error(t('todos.trashPurgeFailed'))
+    }
+  }, [emptyTrash, t])
 
   // Export pending todos with due times as an iCalendar (.ics) download.
   const handleExportICS = useCallback(async () => {
@@ -760,6 +896,11 @@ export default function TodosPage() {
       return next
     })
   , [])
+  // Stable so TreeRow's memo isn't defeated by a fresh closure per render
+  // (childrenMap itself is identity-stable across renders).
+  const handleLoadChildren = useCallback((id: number) => {
+    childrenMap.get(id)?.loadMore()
+  }, [childrenMap])
 
   const todoTree = useMemo(() => buildLazyTree(displayTodos, childrenMap, { hideDone }), [displayTodos, childrenMap, hideDone])
 
@@ -817,6 +958,101 @@ export default function TodosPage() {
   // id → title for the "nested under <parent>" hint on cards in non-tree views.
   const todoTitleById = useMemo(() => new Map([...todoByIdLoaded.values()].map((t) => [t.id, t.title])), [todoByIdLoaded])
 
+  // --- Arrow-key navigation (↑/↓ switch the selected task, ←/→ fold) ---
+  // Arrows navigate the tree outliner style (visible rows in display order;
+  // → unfolds or dives into the first child, ← folds or jumps to the parent)
+  // and the flat views' top-level cards (←/→ fold/unfold the subtask section).
+  // The kanban board keeps its drag-first interaction model; trash has no nav.
+  const navEnabled = smartList !== 'trash' && view !== 'kanban'
+  const nav = useMemo(() => {
+    const ids: number[] = []
+    const parentById = new Map<number, number | null>()
+    const hasChildrenById = new Map<number, boolean>()
+    if (view === 'tree') {
+      const walk = (nodes: TodoNode[], parent: number | null) => {
+        for (const n of nodes) {
+          if (n.hidden) continue
+          ids.push(n.todo.id)
+          parentById.set(n.todo.id, parent)
+          // Same caret-visibility rule as TreeRow: unfetched children count
+          // (child_count) keeps a collapsed node expandable.
+          const visibleChildren = n.children.filter((c) => !c.hidden)
+          hasChildrenById.set(
+            n.todo.id,
+            visibleChildren.length > 0 || (n.todo.child_count ?? 0) > n.children.length - visibleChildren.length,
+          )
+          if (expanded.has(n.todo.id)) walk(n.children, n.todo.id)
+        }
+      }
+      walk(todoTree, null)
+    } else {
+      for (const t of pendingTodos) {
+        ids.push(t.id)
+        parentById.set(t.id, null)
+      }
+    }
+    return { ids, parentById, hasChildrenById }
+  }, [view, todoTree, expanded, pendingTodos])
+  const handleNavKey = useCallback((key: string) => {
+    const { ids, parentById, hasChildrenById } = nav
+    if (ids.length === 0) return
+    const idx = selectedTodoId != null ? ids.indexOf(selectedTodoId) : -1
+    const select = (id: number | undefined) => { if (id != null) setSelectedTodoId(id) }
+    if (key === 'ArrowDown') return select(idx < 0 ? ids[0] : ids[Math.min(idx + 1, ids.length - 1)])
+    if (key === 'ArrowUp') return select(idx < 0 ? ids[0] : ids[Math.max(idx - 1, 0)])
+    if (selectedTodoId == null || idx < 0) return
+    if (key === 'ArrowRight') {
+      if (view === 'tree') {
+        const isOpen = expanded.has(selectedTodoId)
+        if (hasChildrenById.get(selectedTodoId) && !isOpen) return toggleExpand(selectedTodoId)
+        // Already open: dive into the first visible child (the walk order
+        // guarantees it sits at idx + 1 when one is rendered).
+        if (isOpen && idx + 1 < ids.length) select(ids[idx + 1])
+        return
+      }
+      // Flat: unfold the selected card's subtask section.
+      const store = useTodoCollapseStore.getState()
+      if (store.collapsed.has(collapseKey(view, selectedTodoId))) store.toggle(view, selectedTodoId)
+      return
+    }
+    if (key === 'ArrowLeft') {
+      if (view === 'tree') {
+        if (expanded.has(selectedTodoId) && hasChildrenById.get(selectedTodoId)) return toggleExpand(selectedTodoId)
+        const parent = parentById.get(selectedTodoId)
+        if (parent != null) select(parent)
+        return
+      }
+      // Flat: fold the selected card's subtask section (only when it has one).
+      if ((subtaskProgress.get(selectedTodoId)?.total ?? 0) > 0) {
+        const store = useTodoCollapseStore.getState()
+        if (!store.collapsed.has(collapseKey(view, selectedTodoId))) store.toggle(view, selectedTodoId)
+      }
+    }
+  }, [nav, selectedTodoId, view, expanded, toggleExpand, subtaskProgress])
+  // Keep the keyboard-moved selection inside the viewport. (scrollIntoView is
+  // optional-chained: jsdom doesn't implement it.)
+  useEffect(() => {
+    if (selectedTodoId == null) return
+    document.querySelector(`[data-nav-todo="${selectedTodoId}"]`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [selectedTodoId])
+  // Arrow navigation gets its own listener (declared after handleNavKey) so
+  // the general shortcut effect higher up doesn't depend on it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      // Text entry owns its arrows (datetime pickers, the rename input).
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
+      if (dialogOpen || drawerOpen || confirmDelete || shortcutsOpen || !navEnabled) return
+      e.preventDefault() // arrows would scroll the page — the nav owns them
+      handleNavKey(e.key)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [dialogOpen, drawerOpen, confirmDelete, shortcutsOpen, navEnabled, handleNavKey])
+
   // Smart date groups for the grouped view. `target` is the due date a card
   // takes when dragged into the group (drop-to-reschedule): today/tomorrow map
   // to themselves, 本周 to the end of this week, 稍后 to next Monday, and the
@@ -872,53 +1108,61 @@ export default function TodosPage() {
     { key: 'tree', icon: ListTree, label: t('todos.viewTree') },
   ]
 
-  const renderTodoCard = (todo: Todo, compact = false) => (
-    <TodoCard
-      key={todo.id}
-      todo={todo}
-      compact={compact}
-      selectable={selectionMode}
-      selected={selectedIds.has(todo.id)}
-      onSelectToggle={toggleSelect}
-      contactNames={getContactNames(todo.contact_ids || [])}
-      onToggle={handleToggle}
-      onSetStatus={handleSetStatus}
-      onTogglePin={handleTogglePin}
-      onSync={handleSync}
-      onEdit={openEdit}
-      onRename={handleRename}
-      onDuplicate={handleDuplicate}
-      onDelete={setConfirmDelete}
-      formatDate={formatDate}
-      parentTitle={todo.parent_id ? todoTitleById.get(todo.parent_id) : undefined}
-      subtaskProgress={subtaskProgress.get(todo.id)}
-      onCreateChild={handleCreateChild}
-      onStartPomodoro={handleStartPomodoro}
-      onPostpone={handlePostpone}
-      // Subtask drag & drop: rows carry the tree's tri-zone semantics, and a
-      // drop on the card body nests under this todo. Shares the tree's drag
-      // state, so drags interoperate across cards (one view renders at a time).
-      subtaskDragId={view !== 'tree' ? treeDragId : undefined}
-      onNestSubtask={view !== 'tree' ? handleNest : undefined}
-      // Compact (kanban) cards DO get the subtask list, but TodoCard keeps it
-      // collapsed behind the progress chip: the board cell stays lean and a
-      // drag overlay (fresh mount) never carries the expanded list.
-      subtasks={view !== 'tree' ? (
-        <TodoSubtaskList
-          todo={todo}
-          childrenByParent={childrenByParent}
-          onToggle={(sub) => void handleToggle(sub.id)}
-          onEdit={openEdit}
-          onCreateChild={handleCreateChild}
-          onDelete={setConfirmDelete}
-          onStartPomodoro={handleStartPomodoro}
-          hideDone={hideDone}
-          onMove={handleTreeMove}
-          dragId={treeDragId}
-          onDragIdChange={setTreeDragId}
-        />
-      ) : undefined}
-    />
+  // The card-rendering context (see CardRowCtx): rebuilt only when real data
+  // or a handler changes — never on incidental page state like search text.
+  const cardCtx = useMemo<CardRowCtx>(() => ({
+    view,
+    hideDone,
+    childrenByParent,
+    subtaskProgress,
+    todoTitleById,
+    treeDragId,
+    getContactNames,
+    onSelectToggle: toggleSelect,
+    onToggle: handleToggle,
+    onSetStatus: handleSetStatus,
+    onTogglePin: handleTogglePin,
+    onSync: handleSync,
+    onEdit: openEdit,
+    onRename: handleRename,
+    onDuplicate: handleDuplicate,
+    onDelete: setConfirmDelete,
+    formatDate,
+    onCreateChild: handleCreateChild,
+    onStartPomodoro: handleStartPomodoro,
+    onPostpone: handlePostpone,
+    onNest: handleNest,
+    onToggleSub: handleToggleSub,
+    onMoveSubtask: handleTreeMove,
+    onDragIdChange: setTreeDragId,
+    navEnabled,
+    selectedTodoId,
+    onSelect: handleSelectTodo,
+    // setConfirmDelete / setTreeDragId are stable setState references — they
+    // appear in the deps only because the ctx object carries them (the
+    // compiler-based lint demands source deps match inferred deps); they can
+    // never invalidate the memo.
+  }), [view, hideDone, childrenByParent, subtaskProgress, todoTitleById, treeDragId, getContactNames, toggleSelect, handleToggle, handleSetStatus, handleTogglePin, handleSync, openEdit, handleRename, handleDuplicate, setConfirmDelete, formatDate, handleCreateChild, handleStartPomodoro, handlePostpone, handleNest, handleToggleSub, handleTreeMove, setTreeDragId, navEnabled, selectedTodoId, handleSelectTodo])
+
+  const renderTodoCard = useCallback(
+    (todo: Todo, compact = false) => (
+      <TodoCardRow
+        key={todo.id}
+        ctx={cardCtx}
+        todo={todo}
+        compact={compact}
+        selectable={selectionMode}
+        selected={selectedIds.has(todo.id)}
+      />
+    ),
+    [cardCtx, selectionMode, selectedIds],
+  )
+
+  // Manual-order list: O(1) position lookup for the up/down move buttons
+  // (indexOf inside renderCard made every reorder O(n²)).
+  const pendingIndexById = useMemo(
+    () => new Map(pendingTodos.map((todo, i) => [todo.id, i])),
+    [pendingTodos],
   )
 
   return (
@@ -938,7 +1182,7 @@ export default function TodosPage() {
                 variant={view === key ? 'default' : 'ghost'}
                 size="sm"
                 className="h-7 w-7 p-0 rounded-none"
-                onClick={() => setView(key)}
+                onClick={() => { setView(key); setSelectedTodoId(null) }}
                 title={label}
               >
                 <Icon className="h-4 w-4" />
@@ -1034,7 +1278,7 @@ export default function TodosPage() {
            the page's biggest source of button clutter. */}
         <select
           value={smartList}
-          onChange={(e) => setSmartList(e.target.value as SmartList)}
+          onChange={(e) => { setSmartList(e.target.value as SmartList); setSelectedTodoId(null) }}
           className="h-7 rounded-md border bg-background px-1.5 text-xs"
           aria-label={t('todos.smartList')}
         >
@@ -1195,17 +1439,34 @@ export default function TodosPage() {
           {(trashTodos ?? []).length === 0 ? (
             <EmptyState message={t('todos.trashEmpty')} />
           ) : (
-            (trashTodos ?? []).map((todo) => (
-              <div key={todo.id} className="flex items-center gap-2 rounded-md border p-2 opacity-70">
-                <Trash2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="flex-1 min-w-0 truncate text-sm">
-                  <InlineMarkdown text={todo.title} />
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {t('todos.trashCount', { n: (trashTodos ?? []).length })}
                 </span>
-                <Button size="sm" variant="outline" onClick={() => handleRestore(todo.id)}>
-                  {t('todos.restore')}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs text-destructive hover:text-destructive"
+                  disabled={emptyTrash.isPending}
+                  onClick={() => setConfirmEmptyTrash(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  {t('todos.trashPurge')}
                 </Button>
               </div>
-            ))
+              {(trashTodos ?? []).map((todo) => (
+                <div key={todo.id} className="flex items-center gap-2 rounded-md border p-2 opacity-70">
+                  <Trash2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="flex-1 min-w-0 truncate text-sm">
+                    <InlineMarkdown text={todo.title} />
+                  </span>
+                  <Button size="sm" variant="outline" onClick={() => handleRestore(todo.id)}>
+                    {t('todos.restore')}
+                  </Button>
+                </div>
+              ))}
+            </>
           )}
         </div>
       ) : loading ? (
@@ -1223,7 +1484,7 @@ export default function TodosPage() {
               groups={[{ key: 'manual', items: pendingTodos }]}
               itemAreaClass="space-y-1"
               renderCard={(todo) => {
-                const i = pendingTodos.indexOf(todo)
+                const i = pendingIndexById.get(todo.id) ?? -1
                 return (
                   <div className="flex items-stretch gap-1">
                     <div className="flex flex-col justify-center">
@@ -1307,7 +1568,9 @@ export default function TodosPage() {
               selectable={selectionMode}
               selectedIds={selectedIds}
               onSelectToggle={toggleSelect}
-              onLoadChildren={(id) => childrenMap.get(id)?.loadMore()}
+              selectedId={selectedTodoId}
+              onSelect={selectTodoId}
+              onLoadChildren={handleLoadChildren}
             />
           </div>
         </div>
@@ -1442,7 +1705,7 @@ export default function TodosPage() {
             parentCandidates={todos}
             onContactsChange={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
             onClose={() => setDrawerOpen(false)}
-            onToggleSubtask={(sub) => void handleToggle(sub.id)}
+            onToggleSubtask={handleToggleSub}
             onDeleteSubtask={setConfirmDelete}
             onStartPomodoro={handleStartPomodoro}
             onOpenTodo={openEdit}
@@ -1464,7 +1727,23 @@ export default function TodosPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDelete(null)}>{t('common.cancel')}</Button>
             <Button variant="destructive" onClick={() => confirmDelete && handleDelete(confirmDelete.id)}>
-              {t('todos.deleteConfirm').split('?')[0] || t('common.cancel')}
+              {t('common.confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Empty-trash Confirm Dialog (irreversible purge of every trashed todo) */}
+      <Dialog open={confirmEmptyTrash} onOpenChange={setConfirmEmptyTrash}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('todos.trashPurge')}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t('todos.trashPurgeConfirm')}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmEmptyTrash(false)}>{t('common.cancel')}</Button>
+            <Button variant="destructive" disabled={emptyTrash.isPending} onClick={handleEmptyTrash}>
+              {t('common.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1485,6 +1764,8 @@ export default function TodosPage() {
               ['3', t('todos.viewKanban')],
               ['4', t('todos.viewTree')],
               ['H', t('todos.toggleCompleted')],
+              ['↑ ↓', t('todos.navSwitch')],
+              ['← →', t('todos.navFold')],
               ['?', t('todos.shortcutsHelp')],
             ] as const).map(([key, label]) => (
               <li key={key} className="flex items-center justify-between">

@@ -736,6 +736,42 @@ func (r *TodoRepo) Restore(ctx context.Context, workspaceID, id uint) error {
 	})
 }
 
+// EmptyTrash permanently deletes every soft-deleted todo in the workspace,
+// together with the checklist items, tag associations and activity log of the
+// purged rows, and returns how many todos were removed. Descendants cascade-
+// deleted with a parent are already soft-deleted rows, so they are covered.
+func (r *TodoRepo) EmptyTrash(ctx context.Context, workspaceID uint) (int64, error) {
+	var purged int64
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var ids []uint
+		if err := tx.Unscoped().Model(&model.Todo{}).
+			Where("workspace_id = ? AND deleted_at IS NOT NULL", workspaceID).
+			Pluck("id", &ids).Error; err != nil {
+			return fmt.Errorf("list trashed todo ids: %w", err)
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		if err := tx.Unscoped().Where("todo_id IN ?", ids).Delete(&model.TodoItem{}).Error; err != nil {
+			return fmt.Errorf("purge todo items: %w", err)
+		}
+		if err := tx.Unscoped().Where("todo_id IN ?", ids).Delete(&model.TodoActivity{}).Error; err != nil {
+			return fmt.Errorf("purge todo activities: %w", err)
+		}
+		if err := tx.Exec("DELETE FROM todo_tags WHERE todo_id IN ?", ids).Error; err != nil {
+			return fmt.Errorf("purge todo tag associations: %w", err)
+		}
+		res := tx.Unscoped().Where("id IN ? AND workspace_id = ?", ids, workspaceID).
+			Delete(&model.Todo{})
+		if res.Error != nil {
+			return fmt.Errorf("purge trashed todos: %w", res.Error)
+		}
+		purged = res.RowsAffected
+		return nil
+	})
+	return purged, err
+}
+
 // BulkAction applies a complete-or-delete action to a set of todos, returning
 // the number of rows affected.
 func (r *TodoRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint, action string) (int64, error) {
