@@ -78,3 +78,24 @@ func TestJWTAuth_ExpiredToken(t *testing.T) {
 		t.Errorf("expected 401, got %d", w.Code)
 	}
 }
+
+func TestJWTAuth_NoExpiryToken(t *testing.T) {
+	// The default access_ttl=0 issues tokens WITHOUT an exp claim — they must
+	// stay valid (the never-expiring web session).
+	jwtCfg := &config.JWTConfig{Secret: "test-secret", AccessTTL: 0}
+	r := gin.New()
+	r.Use(JWTAuth(jwtCfg))
+	r.GET("/test", func(c *gin.Context) { c.Status(200) })
+	claims := jwt.MapClaims{"user_id": 42}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("test-secret"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for exp-less token, got %d", w.Code)
+	}
+}

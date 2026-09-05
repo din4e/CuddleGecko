@@ -91,7 +91,11 @@ func Load() (*Config, error) {
 	v.SetDefault("database.mysql_dsn", "")
 
 	v.SetDefault("jwt.secret", "")
-	v.SetDefault("jwt.access_ttl", "15m")
+	// 0 (never expires) is the default: this is a personal local-first app —
+	// the web client keeps its token until logout. Set a duration ("15m",
+	// "24h" …) for short-lived tokens with silent refresh, e.g. when the
+	// instance is exposed beyond the LAN (env: CG_JWT_ACCESS_TTL).
+	v.SetDefault("jwt.access_ttl", "0")
 	// 30 days by default: rotation slides the window on every refresh, so any
 	// use within the window keeps the session alive — this is the "how long
 	// can the user stay away before re-login" knob (env: CG_JWT_REFRESH_TTL).

@@ -69,7 +69,10 @@ func main() {
 
 	// Services
 	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
-	authSvc := service.NewAuthService(userRepo, &cfg.JWT, workspaceSvc)
+	// Per-user settings override the configured access-token TTL (设置页
+	// "登录有效期"); wired as an option so other constructors stay unchanged.
+	userSettingSvc := service.NewUserSettingService(userSettingRepo)
+	authSvc := service.NewAuthService(userRepo, &cfg.JWT, workspaceSvc, service.WithAuthSessionSettings(userSettingSvc))
 	captchaSvc := service.NewCaptchaService(cfg.Captcha, settingRepo)
 	// The realtime hub fans entity mutations out to connected WS clients.
 	// Built before the domain services so it can be wired in as their shared
@@ -102,7 +105,6 @@ func main() {
 		service.WithPomodoroRepo(pomodoroRepo),
 		service.WithFitnessRepos(exerciseLibraryRepo, workoutTemplateRepo, workoutSetLogRepo, fitnessGoalRepo),
 		service.WithAIRepo(aiRepo))
-	userSettingSvc := service.NewUserSettingService(userSettingRepo)
 
 	// MCP Server
 	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, fitnessSvc, transactionSvc, aiSvc, workspaceSvc, habitSvc, pomodoroSvc)

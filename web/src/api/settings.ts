@@ -39,10 +39,18 @@ export interface GraphSettings {
   chargeStrength: number
 }
 
+/** Web session (access token) lifetime; ttl_hours 0 = never expires. */
+export interface SessionConfig {
+  ttl_hours: number
+}
+
 export const settingsApi = {
   getCaptcha: () => request.get<CaptchaConfig>('/settings/captcha'),
   updateCaptcha: (config: Partial<CaptchaConfig>) =>
     request.put<CaptchaConfig>('/settings/captcha', config),
+  getSession: () => request.get<SessionConfig>('/settings/session'),
+  updateSession: (config: SessionConfig) =>
+    request.put<SessionConfig>('/settings/session', config),
   getNav: () => request.get<NavConfig>('/settings/nav'),
   updateNav: (config: NavConfig) => request.put<NavConfig>('/settings/nav', config),
   getDashboard: () => request.get<DashboardConfig>('/settings/dashboard'),

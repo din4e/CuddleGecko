@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
@@ -44,10 +46,74 @@ type AuthService struct {
 	repo      UserRepository
 	jwtCfg    *config.JWTConfig
 	wsSvc     *WorkspaceService
+	// sessionSettings, when wired (WithAuthSessionSettings), overrides the
+	// configured access-token TTL per user (the 设置页 "登录有效期" knob).
+	sessionSettings UserSettingStore
 }
 
-func NewAuthService(repo UserRepository, jwtCfg *config.JWTConfig, wsSvc *WorkspaceService) *AuthService {
-	return &AuthService{repo: repo, jwtCfg: jwtCfg, wsSvc: wsSvc}
+func NewAuthService(repo UserRepository, jwtCfg *config.JWTConfig, wsSvc *WorkspaceService, opts ...AuthServiceOption) *AuthService {
+	s := &AuthService{repo: repo, jwtCfg: jwtCfg, wsSvc: wsSvc}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// AuthServiceOption customizes an AuthService at construction time.
+type AuthServiceOption func(*AuthService)
+
+// WithAuthSessionSettings lets the user's stored session setting override the
+// access-token lifetime at issue time (login and refresh).
+func WithAuthSessionSettings(store UserSettingStore) AuthServiceOption {
+	return func(s *AuthService) { s.sessionSettings = store }
+}
+
+// sessionTTLSettingKey is the per-user UserSetting name carrying the web
+// session (access token) lifetime: JSON {"ttl_hours":n}; 0 = never expires.
+const sessionTTLSettingKey = "session"
+
+type sessionTTLSetting struct {
+	TTLHours int `json:"ttl_hours"`
+}
+
+// maxSessionTTLHours caps the per-user session lifetime (1 year).
+const maxSessionTTLHours = 24 * 365
+
+// SessionTTL returns the access-token lifetime currently in effect for the
+// user: their stored setting when present, else the server config. 0 means
+// tokens never expire.
+func (s *AuthService) SessionTTL(ctx context.Context, userID uint) (time.Duration, error) {
+	ttl := s.jwtCfg.AccessTTL
+	if s.sessionSettings != nil {
+		val, found, err := s.sessionSettings.Get(ctx, userID, sessionTTLSettingKey)
+		if err != nil {
+			return 0, err
+		}
+		if found {
+			var stored sessionTTLSetting
+			if json.Unmarshal([]byte(val), &stored) == nil && stored.TTLHours >= 0 {
+				ttl = time.Duration(stored.TTLHours) * time.Hour
+			}
+		}
+	}
+	return ttl, nil
+}
+
+// SetSessionTTL stores the user's preferred web session lifetime in hours
+// (0 = never expires). Takes effect on the next token issue (login/refresh —
+// the settings page triggers a refresh so it applies immediately).
+func (s *AuthService) SetSessionTTL(ctx context.Context, userID uint, hours int) error {
+	if s.sessionSettings == nil {
+		return errors.New("session settings not available")
+	}
+	if hours < 0 || hours > maxSessionTTLHours {
+		return fmt.Errorf("ttl_hours must be between 0 and %d", maxSessionTTLHours)
+	}
+	b, err := json.Marshal(sessionTTLSetting{TTLHours: hours})
+	if err != nil {
+		return err
+	}
+	return s.sessionSettings.Set(ctx, userID, sessionTTLSettingKey, string(b))
 }
 
 func (s *AuthService) Register(ctx context.Context, username, email, password string) (*AuthResult, error) {
@@ -166,7 +232,7 @@ func (s *AuthService) GetCurrentUser(ctx context.Context, userID uint) (*model.U
 }
 
 func (s *AuthService) generateTokens(ctx context.Context, user *model.User) (*AuthResult, error) {
-	accessToken, err := s.generateAccessToken(user)
+	accessToken, err := s.generateAccessToken(ctx, user)
 	if err != nil {
 		return nil, err
 	}
@@ -194,10 +260,12 @@ func (s *AuthService) generateTokens(ctx context.Context, user *model.User) (*Au
 	}, nil
 }
 
-func (s *AuthService) generateAccessToken(user *model.User) (string, error) {
-	claims := jwt.MapClaims{
-		"user_id": user.ID,
-		"exp":     time.Now().Add(s.jwtCfg.AccessTTL).Unix(),
+func (s *AuthService) generateAccessToken(ctx context.Context, user *model.User) (string, error) {
+	claims := jwt.MapClaims{"user_id": user.ID}
+	// ttl <= 0 (the default "never expires") omits exp — the token stays valid
+	// until logout/secret rotation.
+	if ttl, err := s.SessionTTL(ctx, user.ID); err == nil && ttl > 0 {
+		claims["exp"] = time.Now().Add(ttl).Unix()
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.jwtCfg.Secret))

@@ -38,8 +38,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.JWT.Secret != "" {
 		t.Errorf("JWT.Secret = %q, want empty string", cfg.JWT.Secret)
 	}
-	if cfg.JWT.AccessTTL != 15*time.Minute {
-		t.Errorf("JWT.AccessTTL = %v, want %v", cfg.JWT.AccessTTL, 15*time.Minute)
+	if cfg.JWT.AccessTTL != 0 {
+		t.Errorf("JWT.AccessTTL = %v, want 0 (never expires)", cfg.JWT.AccessTTL)
 	}
 	if cfg.JWT.RefreshTTL != 720*time.Hour {
 		t.Errorf("JWT.RefreshTTL = %v, want %v", cfg.JWT.RefreshTTL, 720*time.Hour)
@@ -78,7 +78,7 @@ func TestLoadEnvOverride(t *testing.T) {
 	if cfg.Server.Mode != "debug" {
 		t.Errorf("Server.Mode = %q, want %q (default)", cfg.Server.Mode, "debug")
 	}
-	if cfg.JWT.AccessTTL != 15*time.Minute {
-		t.Errorf("JWT.AccessTTL = %v, want %v (default)", cfg.JWT.AccessTTL, 15*time.Minute)
+	if cfg.JWT.AccessTTL != 0 {
+		t.Errorf("JWT.AccessTTL = %v, want 0 (default, never expires)", cfg.JWT.AccessTTL)
 	}
 }
