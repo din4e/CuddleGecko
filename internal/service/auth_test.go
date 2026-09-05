@@ -8,8 +8,10 @@ import (
 	"github.com/din4e/cuddlegecko/internal/model"
 	"github.com/din4e/cuddlegecko/internal/repository"
 	"github.com/din4e/cuddlegecko/pkg/config"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
 
@@ -247,4 +249,88 @@ func TestAuthService_Refresh_CASRace_KeepsFamily(t *testing.T) {
 	_, err := svc.Refresh(context.Background(), raw)
 	assert.ErrorIs(t, err, ErrInvalidToken)
 	repo.AssertNotCalled(t, "RevokeAllUserRefreshTokens", mock.Anything, mock.Anything)
+}
+
+// fakeSessionStore is an in-memory UserSettingStore for session-TTL tests.
+type fakeSessionStore struct {
+	values map[uint]map[string]string
+}
+
+func (f *fakeSessionStore) Get(_ context.Context, userID uint, name string) (string, bool, error) {
+	v, ok := f.values[userID][name]
+	return v, ok, nil
+}
+
+func (f *fakeSessionStore) Set(_ context.Context, userID uint, name, value string) error {
+	if f.values == nil {
+		f.values = map[uint]map[string]string{}
+	}
+	if f.values[userID] == nil {
+		f.values[userID] = map[string]string{}
+	}
+	f.values[userID][name] = value
+	return nil
+}
+
+// parseClaims decodes a signed test token's payload without validating it.
+func parseClaims(t *testing.T, tokenStr string) jwt.MapClaims {
+	t.Helper()
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	claims := jwt.MapClaims{}
+	_, _, err := parser.ParseUnverified(tokenStr, claims)
+	require.NoError(t, err)
+	return claims
+}
+
+func TestAuthService_SessionTTL_DefaultNeverExpires(t *testing.T) {
+	repo := new(mockUserRepo)
+	// access_ttl 0 = the new "never expires" default.
+	svc := NewAuthService(repo, &config.JWTConfig{Secret: "test-secret", AccessTTL: 0, RefreshTTL: time.Hour}, nil)
+
+	hashed, _ := HashPassword("password123")
+	repo.On("GetUserByUsername", mock.Anything, "alice").Return(&model.User{ID: 1, Username: "alice", PasswordHash: hashed}, nil)
+	repo.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*model.RefreshToken")).Return(nil)
+	repo.On("DeleteExpiredRefreshTokens", mock.Anything, mock.AnythingOfType("uint")).Return(nil)
+
+	result, err := svc.Login(context.Background(), "alice", "password123")
+	require.NoError(t, err)
+	claims := parseClaims(t, result.AccessToken)
+	assert.Equal(t, float64(1), claims["user_id"])
+	_, hasExp := claims["exp"]
+	assert.False(t, hasExp, "ttl 0 omits exp — the token never expires")
+}
+
+func TestAuthService_SessionTTL_UserSettingOverrides(t *testing.T) {
+	repo := new(mockUserRepo)
+	store := &fakeSessionStore{}
+	require.NoError(t, store.Set(context.Background(), 1, "session", `{"ttl_hours":2}`))
+	svc := NewAuthService(repo, &config.JWTConfig{Secret: "test-secret", AccessTTL: 0, RefreshTTL: time.Hour}, nil, WithAuthSessionSettings(store))
+
+	ttl, err := svc.SessionTTL(context.Background(), 1)
+	require.NoError(t, err)
+	assert.Equal(t, 2*time.Hour, ttl)
+
+	hashed, _ := HashPassword("password123")
+	repo.On("GetUserByUsername", mock.Anything, "alice").Return(&model.User{ID: 1, Username: "alice", PasswordHash: hashed}, nil)
+	repo.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*model.RefreshToken")).Return(nil)
+	repo.On("DeleteExpiredRefreshTokens", mock.Anything, mock.AnythingOfType("uint")).Return(nil)
+
+	result, err := svc.Login(context.Background(), "alice", "password123")
+	require.NoError(t, err)
+	claims := parseClaims(t, result.AccessToken)
+	exp, hasExp := claims["exp"].(float64)
+	require.True(t, hasExp, "a stored ttl_hours > 0 issues an expiring token")
+	assert.InDelta(t, time.Now().Add(2*time.Hour).Unix(), int64(exp), 5, "exp ≈ now + 2h")
+}
+
+func TestAuthService_SetSessionTTL_Validation(t *testing.T) {
+	svc := NewAuthService(new(mockUserRepo), testJWTConfig(), nil, WithAuthSessionSettings(&fakeSessionStore{}))
+	assert.Error(t, svc.SetSessionTTL(context.Background(), 1, -1))
+	assert.Error(t, svc.SetSessionTTL(context.Background(), 1, 24*365+1))
+	require.NoError(t, svc.SetSessionTTL(context.Background(), 1, 24))
+	ttl, err := svc.SessionTTL(context.Background(), 1)
+	require.NoError(t, err)
+	assert.Equal(t, 24*time.Hour, ttl)
+	// Without a settings store the knob is unavailable (base deployments).
+	assert.Error(t, NewAuthService(new(mockUserRepo), testJWTConfig(), nil).SetSessionTTL(context.Background(), 1, 24))
 }

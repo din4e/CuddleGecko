@@ -164,6 +164,43 @@ func isHTTPS(c *gin.Context) bool {
 	return c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 }
 
+type sessionConfigResponse struct {
+	// Access-token lifetime in hours; 0 = never expires.
+	TTLHours int `json:"ttl_hours"`
+}
+
+type sessionConfigRequest struct {
+	TTLHours *int `json:"ttl_hours" binding:"required,min=0,max=8760"`
+}
+
+// GetSession returns the user's web session (access token) lifetime.
+func (h *AuthHandler) GetSession(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	ttl, err := h.svc.SessionTTL(c.Request.Context(), userID)
+	if err != nil {
+		response.InternalError(c, "failed to load session config")
+		return
+	}
+	response.OK(c, sessionConfigResponse{TTLHours: int(ttl.Hours())})
+}
+
+// UpdateSession stores the user's web session lifetime. New tokens (issued on
+// login/refresh) carry it; the client refreshes right after saving so the new
+// lifetime applies to the current session immediately.
+func (h *AuthHandler) UpdateSession(c *gin.Context) {
+	var req sessionConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "ttl_hours must be between 0 and 8760")
+		return
+	}
+	userID := middleware.GetUserID(c)
+	if err := h.svc.SetSessionTTL(c.Request.Context(), userID, *req.TTLHours); err != nil {
+		response.BadRequest(c, "ttl_hours must be between 0 and 8760")
+		return
+	}
+	response.OK(c, sessionConfigResponse{TTLHours: *req.TTLHours})
+}
+
 func (h *AuthHandler) Logout(c *gin.Context) {
 	var req refreshRequest
 	_ = c.ShouldBindJSON(&req)
