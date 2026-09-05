@@ -51,7 +51,7 @@ describe('UpcomingBirthdaysCard', () => {
     render(<MemoryRouter><UpcomingBirthdaysCard /></MemoryRouter>)
     expect(screen.getByTestId('upcoming-birthdays')).toBeTruthy()
     expect(screen.getByText('小明')).toBeTruthy()
-    expect(screen.getByText('农历')).toBeTruthy()
+    expect(screen.getByText('contacts.cal_lunar')).toBeTruthy()
     expect(screen.getByText(/七月十五/)).toBeTruthy()
     expect(screen.getByText('contacts.birthdayInDays:7')).toBeTruthy()
     expect(screen.getByRole('link', { name: /小明/ })).toHaveProperty('href')
@@ -69,6 +69,6 @@ describe('UpcomingBirthdaysCard', () => {
     ]
     render(<MemoryRouter><UpcomingBirthdaysCard /></MemoryRouter>)
     expect(screen.getByText('contacts.birthdayToday')).toBeTruthy()
-    expect(screen.queryByText('农历')).toBeNull()
+    expect(screen.queryByText('contacts.cal_lunar')).toBeNull()
   })
 })

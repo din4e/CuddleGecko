@@ -55,6 +55,7 @@ function buildLast6Months(locale: string): MonthBucket[] {
 }
 
 function TrendChart({ buckets }: { buckets: MonthBucket[] }) {
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(800)
 
@@ -89,7 +90,7 @@ function TrendChart({ buckets }: { buckets: MonthBucket[] }) {
 
   return (
     <div ref={containerRef} className="w-full">
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="income vs expense trend" className="block">
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t('dashboard.incomeExpenseTrend')} className="block">
         {gridYs.map((g) => {
           const y = padT + innerH * (1 - g)
           return (

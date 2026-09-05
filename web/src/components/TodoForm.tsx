@@ -371,7 +371,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
                 />
               </div>
               <div className="space-y-1">
-                <Label>Color</Label>
+                <Label>{t('todos.color')}</Label>
                 <div className="flex gap-1.5">
                   {COLORS.map((c) => (
                     <button

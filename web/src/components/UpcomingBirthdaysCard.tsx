@@ -58,7 +58,7 @@ function BirthdayRow({ birthday }: { birthday: UpcomingBirthday }) {
         <div className="flex items-center gap-1.5">
           <span className="truncate font-medium">{c.name}</span>
           {birthday.calendar === 'lunar' && (
-            <Badge variant="outline" className="shrink-0 text-[10px]">农历</Badge>
+            <Badge variant="outline" className="shrink-0 text-[10px]">{t('contacts.cal_lunar')}</Badge>
           )}
         </div>
         <div className="text-xs text-muted-foreground">

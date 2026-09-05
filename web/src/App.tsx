@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { lazy, Suspense, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from './stores/auth'
 import AppLayout from './layouts/AppLayout'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -41,10 +42,11 @@ const FitnessPage = lazy(() => import('./pages/FitnessPage'))
 const TerminalPage = lazy(loadTerminalPage)
 
 function PageLoader() {
+  const { t } = useTranslation()
   return (
     <div className="flex h-[50vh] flex-col items-center justify-center gap-3 text-sm text-muted-foreground" role="status" aria-live="polite">
       <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      <span>Loading page</span>
+      <span>{t('common.loadingPage')}</span>
     </div>
   )
 }

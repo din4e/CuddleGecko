@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import i18n from '@/i18n'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -28,12 +29,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   render() {
     if (!this.state.error) return this.props.children
+    // Class component outside the React-i18next hook world: read the global
+    // i18n instance directly (it initializes synchronously from bundled
+    // resources, so it is available even when the tree below crashed).
+    const t = i18n.t.bind(i18n)
     return (
       <div className="fixed inset-0 z-[99999] overflow-auto bg-background p-6 text-foreground">
         <div className="mx-auto max-w-2xl space-y-3">
-          <h1 className="text-lg font-semibold text-destructive">页面出错了 / Something broke</h1>
+          <h1 className="text-lg font-semibold text-destructive">{t('error.title')}</h1>
           <p className="text-sm text-muted-foreground">
-            界面遇到未处理的错误。请把下面的红色文字截图或复制反馈，然后点击重载。
+            {t('error.description')}
           </p>
           <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs whitespace-pre-wrap text-destructive">
             {this.state.error.message}
@@ -49,14 +54,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               onClick={() => window.location.reload()}
               className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
             >
-              重新加载
+              {t('error.reload')}
             </button>
             <button
               type="button"
               onClick={() => this.setState({ error: null, info: null })}
               className="rounded-md border px-4 py-2 text-sm"
             >
-              尝试恢复
+              {t('error.recover')}
             </button>
           </div>
         </div>

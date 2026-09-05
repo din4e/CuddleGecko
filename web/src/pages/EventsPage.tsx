@@ -459,7 +459,7 @@ export default function EventsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSubmit} disabled={!form.title || !form.start_time || createEvent.isPending || updateEvent.isPending}>
               {editing ? t('events.editEvent') : t('events.newEvent')}

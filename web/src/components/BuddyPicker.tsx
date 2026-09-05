@@ -176,7 +176,7 @@ export default function BuddyPicker({ buddies, selectedIds, onChange, onBuddiesU
             </ul>
           ) : (
             <div className="px-3 py-3 text-sm text-muted-foreground text-center">
-              {search ? 'No match found' : 'All buddies selected'}
+              {search ? t('contacts.pickerNoMatch') : t('contacts.pickerAllSelected')}
             </div>
           )}
 
@@ -186,7 +186,7 @@ export default function BuddyPicker({ buddies, selectedIds, onChange, onBuddiesU
               <input
                 value={quickName}
                 onChange={(e) => setQuickName(e.target.value)}
-                placeholder="Quick create..."
+                placeholder={t('common.quickCreate')}
                 className="min-w-0 flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleQuickCreate() } }}
               />
@@ -197,7 +197,7 @@ export default function BuddyPicker({ buddies, selectedIds, onChange, onBuddiesU
                 className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 <Plus className="h-3 w-3" />
-                {creating ? '...' : 'Add'}
+                {creating ? '…' : t('common.add')}
               </button>
             </div>
           </div>

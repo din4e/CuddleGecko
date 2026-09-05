@@ -127,9 +127,9 @@ export default function TagsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12">Color</TableHead>
+                <TableHead className="w-12">{t('tags.color')}</TableHead>
                 <TableHead>{t('tags.name')}</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-right">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

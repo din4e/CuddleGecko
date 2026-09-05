@@ -679,7 +679,7 @@ export default function AIChatPage() {
                     type="button"
                     className="px-2.5 py-1 text-[10px] text-muted-foreground hover:text-foreground shrink-0"
                     onClick={() => setMentionPopup(false)}
-                    aria-label="Close"
+                    aria-label={t('common.close')}
                   >
                     Esc
                   </button>
