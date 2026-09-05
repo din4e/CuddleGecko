@@ -209,6 +209,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.POST("/todos/:id/pomodoro", h.Todo.IncrementPomodoro)
 			wsProtected.POST("/todos/:id/restore", h.Todo.Restore)
 			wsProtected.DELETE("/todos/:id", h.Todo.Delete)
+			wsProtected.DELETE("/todos/trash", h.Todo.EmptyTrash)
 			wsProtected.GET("/habits", h.Habit.List)
 			wsProtected.POST("/habits", h.Habit.Create)
 			wsProtected.PUT("/habits/:id", h.Habit.Update)

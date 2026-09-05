@@ -1,12 +1,18 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Ban, CheckCircle2, ChevronDown, Circle, Clock, CalendarClock, ListTodo, ListTree, Plus, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer } from 'lucide-react'
+import { Ban, CheckCircle2, ChevronDown, Circle, Clock, CalendarClock, ListTodo, ListTree, Plus, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer, MoreVertical } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
-import { useTodoCollapseStore } from '../stores/todoCollapse'
+import { collapseKey, useTodoCollapseStore } from '../stores/todoCollapse'
 import { priorityConfig } from '../lib/todoPriority'
 import { AddChildInput } from './AddChildInput'
 import type { SubtreeProgress } from '../lib/todoProgress'
@@ -41,6 +47,9 @@ export interface TodoCardProps {
    *  reveals a shared input under the card. The only add-subtask entry on the
    *  card — rows inside the subtask section carry their own right-side "+". */
   onCreateChild?: (parent: Todo, title: string) => void
+  /** Which surface's fold state the section chip toggles (see
+   *  todoCollapse) — each page keeps its own folds. */
+  collapseScope?: string
   /** Nested subtask renderer (flat views); rendered inside the card body.
    *  On compact (kanban) cards it exists too but stays collapsed until the
    *  progress chip is clicked — drag overlays mount fresh, so they never
@@ -80,6 +89,7 @@ const TodoCard = memo(function TodoCard({
   subtaskProgress,
   subtaskDragId,
   onNestSubtask,
+  collapseScope = 'page',
 }: TodoCardProps) {
   const { t } = useTranslation()
   const [editingTitle, setEditingTitle] = useState(false)
@@ -97,7 +107,7 @@ const TodoCard = memo(function TodoCard({
   // collapse store (synced with the drawer and every nesting depth inside).
   // Only meaningful while children exist — a stale fold must never hide the
   // "add subtask" entry of a todo whose children were all removed.
-  const collapseHas = useTodoCollapseStore((s) => s.collapsed.has(todo.id))
+  const collapseHas = useTodoCollapseStore((s) => s.collapsed.has(collapseKey(collapseScope, todo.id)))
   const toggleCollapse = useTodoCollapseStore((s) => s.toggle)
   const sectionFolded = !!subtaskProgress && subtaskProgress.total > 0 && collapseHas
   // Single click on the title opens the detail drawer; double-click renames.
@@ -119,6 +129,75 @@ const TodoCard = memo(function TodoCard({
   const repeatLabel = repeatLabelOf(t, todo.repeat)
   const closed = todo.status !== 'pending'
   const abandonTitle = todo.status === 'abandoned' ? t('todos.markPending') : t('todos.markAbandoned')
+
+  // Toolbar actions, rendered twice from one list: the md+ hover strip and the
+  // small-screen kebab menu (the 8-button strip would cover the card's
+  // title/meta on a phone-width card).
+  const actions: {
+    key: string
+    label: string
+    onClick: () => void
+    children: ReactNode
+    btnClass?: string
+    destructive?: boolean
+  }[] = [
+    ...(onStartPomodoro ? [{
+      key: 'pomo',
+      label: t('todos.pomoStart'),
+      onClick: () => onStartPomodoro(todo),
+      children: (<><Timer className="h-3 w-3" />{!!todo.pomodoro_count && <span className="tabular-nums">{todo.pomodoro_count}</span>}</>),
+      btnClass: 'h-5 gap-0.5 px-1 text-[10px]',
+    }] : []),
+    ...(onPostpone ? [{
+      key: 'postpone',
+      label: t('todos.postponeToTomorrow'),
+      onClick: () => onPostpone(todo),
+      children: <CalendarClock className="h-3 w-3" />,
+    }] : []),
+    ...(onSetStatus ? [{
+      key: 'abandon',
+      label: abandonTitle,
+      onClick: () => onSetStatus(todo.id, todo.status === 'abandoned' ? 'pending' : 'abandoned'),
+      children: <Ban className={`h-3 w-3 ${todo.status === 'abandoned' ? 'text-destructive' : 'text-muted-foreground'}`} />,
+    }] : []),
+    {
+      key: 'pin',
+      label: t('todos.pinAria'),
+      onClick: () => onTogglePin(todo),
+      children: <Star className={`h-3 w-3 ${todo.pinned ? 'fill-amber-400 text-amber-500' : 'text-muted-foreground'}`} />,
+    },
+    ...(onCreateChild ? [{
+      key: 'addChild',
+      label: t('todos.addChild'),
+      onClick: () => setAddingChild((v) => !v),
+      children: <Plus className="h-3 w-3" />,
+    }] : []),
+    {
+      key: 'sync',
+      label: syncLabel,
+      onClick: () => onSync(todo),
+      children: <ArrowRight className="h-3 w-3" />,
+    },
+    {
+      key: 'duplicate',
+      label: t('todos.duplicate'),
+      onClick: () => onDuplicate(todo),
+      children: <Copy className="h-3 w-3" />,
+    },
+    {
+      key: 'edit',
+      label: t('todos.editTodo'),
+      onClick: () => onEdit(todo),
+      children: <Pencil className="h-3 w-3" />,
+    },
+    {
+      key: 'delete',
+      label: t('todos.deleteAria'),
+      onClick: () => onDelete(todo),
+      children: <Trash2 className="h-3 w-3" />,
+      destructive: true,
+    },
+  ]
 
   const startRename = () => {
     setDraft(todo.title)
@@ -153,7 +232,7 @@ const TodoCard = memo(function TodoCard({
         setNestHover(false)
       }}
     >
-      <CardContent className={compact ? 'p-1.5 pr-16' : 'p-1.5 space-y-1'}>
+      <CardContent className={compact ? 'p-1.5' : 'p-1.5 space-y-1'}>
         <div className="flex items-start gap-1.5">
           {selectable && (
             <input
@@ -200,7 +279,7 @@ const TodoCard = memo(function TodoCard({
                   titleClickTimer.current = window.setTimeout(() => {
                     titleClickTimer.current = null
                     onEdit(todo)
-                  }, 250)
+                  }, 200)
                 }}
                 onDoubleClick={() => {
                   cancelPendingTitleClick()
@@ -265,7 +344,7 @@ const TodoCard = memo(function TodoCard({
             {subtaskProgress && subtaskProgress.total > 0 && (subtasks ? (
               <button
                 type="button"
-                onClick={() => toggleCollapse(todo.id)}
+                onClick={() => toggleCollapse(collapseScope, todo.id)}
                 aria-expanded={!sectionFolded}
                 title={t('todos.subtaskProgress', { done: subtaskProgress.done, total: subtaskProgress.total })}
                 className={cn(
@@ -369,59 +448,54 @@ const TodoCard = memo(function TodoCard({
         </div>
       )}
 
-      {/* Action toolbar — floating top-right so it costs no row height.
-          Hover-reveal on md+; always visible on touch/small screens. */}
-      <div className="absolute right-1 top-1 flex items-center gap-0.5 rounded-md border bg-background/95 px-0.5 shadow-sm opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-        {onStartPomodoro && (
-          <Button variant="ghost" size="sm" className="h-5 gap-0.5 px-1 text-[10px]" onClick={() => onStartPomodoro(todo)} aria-label={t('todos.pomoStart')} title={t('todos.pomoStart')}>
-            <Timer className="h-3 w-3" />
-            {!!todo.pomodoro_count && <span className="tabular-nums">{todo.pomodoro_count}</span>}
-          </Button>
-        )}
-        {onPostpone && (
-          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onPostpone(todo)} aria-label={t('todos.postponeToTomorrow')} title={t('todos.postponeToTomorrow')}>
-            <CalendarClock className="h-3 w-3" />
-          </Button>
-        )}
-        {onSetStatus && (
+      {/* Action toolbar — floating top-right so it costs no row height and no
+          reserved text gap. On md+ it's revealed only when the pointer reaches
+          the toolbar's own strip (focus-within covers keyboard). */}
+      <div className="absolute right-1 top-1 hidden items-center gap-0.5 rounded-md border bg-background/95 px-0.5 shadow-sm opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100 md:flex">
+        {actions.map((a) => (
           <Button
+            key={a.key}
             variant="ghost"
             size="sm"
-            className="h-5 w-5 p-0"
-            onClick={() => onSetStatus(todo.id, todo.status === 'abandoned' ? 'pending' : 'abandoned')}
-            aria-label={abandonTitle}
-            title={abandonTitle}
+            className={a.btnClass ?? (a.destructive ? 'h-5 w-5 p-0 text-destructive' : 'h-5 w-5 p-0')}
+            onClick={a.onClick}
+            aria-label={a.label}
+            title={a.label}
           >
-            <Ban className={`h-3 w-3 ${todo.status === 'abandoned' ? 'text-destructive' : 'text-muted-foreground'}`} />
+            {a.children}
           </Button>
-        )}
-        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onTogglePin(todo)} aria-label={t('todos.pinAria')} title={t('todos.pinAria')}>
-          <Star className={`h-3 w-3 ${todo.pinned ? 'fill-amber-400 text-amber-500' : 'text-muted-foreground'}`} />
-        </Button>
-        {onCreateChild && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 w-5 p-0"
-            onClick={() => setAddingChild((v) => !v)}
-            aria-label={t('todos.addChild')}
-            title={t('todos.addChild')}
+        ))}
+      </div>
+      {/* Small screens: the 8-button strip would cover the title/meta — the
+          same actions live in a kebab menu instead. */}
+      <div className="absolute right-1 top-1 md:hidden">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                aria-label={t('common.more')}
+                title={t('common.more')}
+              />
+            }
           >
-            <Plus className="h-3 w-3" />
-          </Button>
-        )}
-        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onSync(todo)} aria-label={syncLabel} title={syncLabel}>
-          <ArrowRight className="h-3 w-3" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onDuplicate(todo)} aria-label={t('todos.duplicate')} title={t('todos.duplicate')}>
-          <Copy className="h-3 w-3" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onEdit(todo)} aria-label={t('todos.editTodo')} title={t('todos.editTodo')}>
-          <Pencil className="h-3 w-3" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" onClick={() => onDelete(todo)} aria-label={t('todos.deleteAria')} title={t('todos.deleteAria')}>
-          <Trash2 className="h-3 w-3" />
-        </Button>
+            <MoreVertical className="h-3.5 w-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {actions.map((a) => (
+              <DropdownMenuItem
+                key={a.key}
+                onClick={a.onClick}
+                className={a.destructive ? 'text-destructive focus:text-destructive' : undefined}
+              >
+                <span className="mr-1.5 inline-flex w-3.5 items-center justify-center">{a.children}</span>
+                {a.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </Card>
   )

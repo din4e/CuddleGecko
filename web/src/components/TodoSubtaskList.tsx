@@ -7,7 +7,7 @@ import { formatDueLabel } from '../lib/dueLabel'
 import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 import { isSettledStatus, subtreeSettledFromMap } from '../lib/buildTodoTree'
-import { useTodoCollapseStore } from '../stores/todoCollapse'
+import { collapseKey, useTodoCollapseStore } from '../stores/todoCollapse'
 import type { Todo } from '../types'
 
 /** afterId targets: a sibling id to place after, null for the top of the
@@ -37,6 +37,11 @@ export interface TodoSubtaskListProps {
    *  vanishes with its parent. Progress chips keep counting the unfiltered
    *  map. */
   hideDone?: boolean
+  /** Which surface's fold state the rows read/write (see todoCollapse) —
+   *  each page keeps its own folds, so collapsing a branch in the grouped
+   *  view leaves the drawer's copy expanded. Defaults to the shared page
+   *  scope. */
+  collapseScope?: string
   /** Drag & drop reparenting (tree-view semantics, at any depth). When
    *  wired, rows become draggable and act as tri-zone drop targets: upper
    *  band = place before the row, middle = nest as its last child, lower
@@ -68,7 +73,7 @@ function resolveDropZone(e: React.DragEvent): DropZone {
  * Rows with children carry a caret to fold their own branch (shared,
  * persisted fold state).
  */
-export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEdit, onCreateChild, onDelete, onStartPomodoro, hideDone, onMove, dragId, onDragIdChange, ancestorIds }: TodoSubtaskListProps) {
+export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEdit, onCreateChild, onDelete, onStartPomodoro, hideDone, onMove, dragId, onDragIdChange, ancestorIds, collapseScope = 'page' }: TodoSubtaskListProps) {
   const { t } = useTranslation()
   const children = childrenByParent.get(todo.id)
   // Id of the row whose inline adder is open. null = hidden.
@@ -104,7 +109,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
           : grandChildren
         const hasChildren = !!visibleGrandChildren?.length
         const showsProgress = !!grandChildren?.length
-        const childFolded = hasChildren && collapsed.has(child.id)
+        const childFolded = hasChildren && collapsed.has(collapseKey(collapseScope, child.id))
         const prevSiblingId = i > 0 ? rows[i - 1].id : null
         const canDropHere = dragId != null && dragId !== child.id && !selfChain.has(dragId)
         const isDragged = dragId === child.id
@@ -160,7 +165,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
               commitDrop(hovered ?? resolveDropZone(e))
             }}
             className={cn(
-              'group/sub flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-muted/60',
+              'group/sub relative flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-muted/60',
               draggable && 'cursor-grab',
               isDragged && 'opacity-40',
               hovered === 'child' && 'ring-2 ring-primary/70 bg-primary/5',
@@ -174,7 +179,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
               <button
                 type="button"
                 className="shrink-0 text-muted-foreground hover:text-foreground"
-                onClick={() => toggleCollapse(child.id)}
+                onClick={() => toggleCollapse(collapseScope, child.id)}
                 aria-expanded={!childFolded}
                 aria-label={childFolded ? t('todos.expand') : t('todos.collapse')}
               >
@@ -229,41 +234,50 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
                 {grandChildren!.filter((c) => c.status === 'done').length}/{grandChildren!.length}
               </span>
             )}
-            {onStartPomodoro && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 shrink-0 p-0 text-muted-foreground opacity-0 transition-opacity group-hover/sub:opacity-100"
-                onClick={() => onStartPomodoro(child)}
-                aria-label={t('todos.pomoStart')}
-                title={t('todos.pomoStart')}
-              >
-                <Timer className="h-3 w-3" />
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 shrink-0 p-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/sub:opacity-100"
-                onClick={() => onDelete(child)}
-                aria-label={t('common.delete')}
-                title={t('common.delete')}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            )}
-            {onCreateChild && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 shrink-0 p-0 opacity-0 transition-opacity group-hover/sub:opacity-100"
-                onClick={() => setAddingFor(child.id)}
-                aria-label={t('todos.addChild')}
-                title={t('todos.addChild')}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
+            {/* Trailing actions float over the row's right edge — the row's
+                text runs flush to the right with no reserved gap, and the
+                buttons fade in only when the pointer reaches this strip on
+                md+ (touch/small screens keep them visible — touch has no
+                hover; focus-within keeps them reachable by keyboard). */}
+            {(onStartPomodoro || onDelete || onCreateChild) && (
+              <div className="absolute inset-y-0 right-0 flex items-center justify-end gap-0.5 rounded bg-background/90 px-0.5 opacity-100 transition-opacity md:opacity-0 md:hover:opacity-100 md:focus-within:opacity-100">
+                {onStartPomodoro && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 text-muted-foreground"
+                    onClick={() => onStartPomodoro(child)}
+                    aria-label={t('todos.pomoStart')}
+                    title={t('todos.pomoStart')}
+                  >
+                    <Timer className="h-3 w-3" />
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => onDelete(child)}
+                    aria-label={t('common.delete')}
+                    title={t('common.delete')}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
+                {onCreateChild && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0"
+                    onClick={() => setAddingFor(child.id)}
+                    aria-label={t('todos.addChild')}
+                    title={t('todos.addChild')}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
             )}
           </div>
           {/* Recurse: grandchildren render indented under their own parent row,
@@ -277,6 +291,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
                 onEdit={onEdit}
                 onCreateChild={onCreateChild}
                 onDelete={onDelete}
+                collapseScope={collapseScope}
                 onStartPomodoro={onStartPomodoro}
                 hideDone={hideDone}
                 onMove={onMove}

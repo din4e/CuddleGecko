@@ -257,9 +257,10 @@ export default function FitnessPage() {
 
       {/* key remounts the dialog per record so the form state re-initializes
           from `editing` — without it, "edit" opened the create form with stale
-          empty fields and Save produced a near-empty duplicate. */}
-      <WorkoutFormDialog key={editingWorkout?.id ?? 'new'} open={workoutDialogOpen} editing={editingWorkout} onClose={() => setWorkoutDialogOpen(false)} />
-      <BodyRecordFormDialog key={editingMetric?.id ?? 'new'} open={bodyDialogOpen} editing={editingMetric} onClose={() => setBodyDialogOpen(false)} />
+          empty fields and Save produced a near-empty duplicate. Distinct
+          fallbacks: the two dialogs are siblings, a shared 'new' collided. */}
+      <WorkoutFormDialog key={editingWorkout?.id ?? 'workout-new'} open={workoutDialogOpen} editing={editingWorkout} onClose={() => setWorkoutDialogOpen(false)} />
+      <BodyRecordFormDialog key={editingMetric?.id ?? 'metric-new'} open={bodyDialogOpen} editing={editingMetric} onClose={() => setBodyDialogOpen(false)} />
       <ConfirmDialog
         open={deleteMetricId != null}
         onOpenChange={(o) => { if (!o) setDeleteMetricId(null) }}

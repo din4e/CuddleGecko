@@ -3,7 +3,7 @@ import { renderHook, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { InfiniteData } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { useTodosList, useTodosInfinite, useTodoChildrenMap, useToggleTodoStatus, useTogglePin, useSetTodoStatus } from '../useTodos'
+import { useTodosList, useTodosInfinite, useTodoChildrenMap, useToggleTodoStatus, useTogglePin, useSetTodoStatus, useCreateTodo } from '../useTodos'
 import { todosApi } from '../../../api/todos'
 import type { Todo, TodoListParams, PaginatedData } from '../../../types'
 
@@ -20,6 +20,7 @@ vi.mock('../../../api/todos', () => ({
     toggleStatus: vi.fn(),
     setStatus: vi.fn(),
     togglePin: vi.fn(),
+    create: vi.fn(),
   },
 }))
 
@@ -220,6 +221,75 @@ describe('useTodoChildrenMap', () => {
     expect(children.result.current.get(5)?.hasMore).toBe(false)
     expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ parent_id: 5, page: 1, page_size: 100 }), expect.anything())
     expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ parent_id: 9, page: 1, page_size: 100 }), expect.anything())
+  })
+
+  it('keeps the returned Map identity across re-renders while data is unchanged', async () => {
+    const mockedList = vi.mocked(todosApi.list)
+    mockedList.mockImplementation(async (params?: TodoListParams) => ({
+      data: page([makeTodo({ id: (params?.parent_id ?? 0) + 100, parent_id: params?.parent_id ?? null })]),
+    }) as never)
+
+    const { Wrapper } = createWrapper()
+    const children = renderHook(() => useTodoChildrenMap([5], {}), { wrapper: Wrapper })
+    await waitFor(() => expect(children.result.current.get(5)?.loaded).toBe(true))
+    const first = children.result.current
+    // An unrelated re-render (parent state change) must NOT produce a fresh
+    // Map: downstream memos (buildLazyTree, childrenByParent, subtaskProgress)
+    // and memoized rows key on this identity — a fresh Map re-renders the
+    // whole list on every keystroke.
+    children.rerender()
+    expect(children.result.current).toBe(first)
+  })
+})
+
+describe('useCreateTodo', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('refreshes the stats query after placing the created todo (the stat strip has no other invalidation path)', async () => {
+    const mockedList = vi.mocked(todosApi.list)
+    mockedList.mockResolvedValue({ data: page([]) } as never)
+    vi.mocked(todosApi.create).mockResolvedValue({ data: makeTodo({ id: 42, title: 'New' }) } as never)
+
+    const { Wrapper, queryClient } = createWrapper()
+    const spy = vi.spyOn(queryClient, 'invalidateQueries')
+    const created = renderHook(() => useCreateTodo(), { wrapper: Wrapper })
+    await act(async () => {
+      await created.result.current.mutateAsync({ title: 'New' })
+    })
+    // The optimistic list insert is zero-request by design; without this
+    // invalidation the pending/done counts stay stale (refetchOnWindowFocus is
+    // off and the WS echo is suppressed as a local mutation).
+    expect(spy).toHaveBeenCalledWith({ queryKey: expect.arrayContaining(['stats']) })
+    spy.mockRestore()
+  })
+
+  it('inserts the created todo at its sorted position in the first page and bumps total', async () => {
+    const mkDated = (id: number, due: string | null, created: string): Todo =>
+      makeTodo({ id, title: `t${id}`, due_time: due, created_at: created })
+    const seedPages: InfiniteData<PaginatedData<Todo>> = {
+      pages: [page([mkDated(1, '2026-01-01T10:00:00Z', '2026-01-01T00:00:00Z'), mkDated(2, '2026-01-01T12:00:00Z', '2026-01-01T00:01:00Z')])],
+      pageParams: [1],
+    }
+    vi.mocked(todosApi.create)
+      .mockResolvedValueOnce({ data: mkDated(3, '2026-01-01T11:00:00Z', '2026-01-02T00:00:00Z') } as never)
+      .mockResolvedValueOnce({ data: mkDated(4, null, '2026-01-03T00:00:00Z') } as never)
+
+    const { Wrapper, queryClient } = createWrapper()
+    const key = ['todos', 'default', 'list', { sort: 'due_date', order: 'asc', page_size: 50 }]
+    queryClient.setQueryData(key, seedPages)
+    const created = renderHook(() => useCreateTodo(), { wrapper: Wrapper })
+
+    await act(async () => { await created.result.current.mutateAsync({ title: 't3' }) })
+    let entry = queryClient.getQueryData<InfiniteData<PaginatedData<Todo>>>(key)
+    // Sorted insert (due 11:00 between 10:00 and 12:00), honest total.
+    expect(entry?.pages[0].items.map((t) => t.id)).toEqual([1, 3, 2])
+    expect(entry?.pages[0].total).toBe(3)
+
+    // An undated todo lands last (the backend's dueNullsLast), not on top.
+    await act(async () => { await created.result.current.mutateAsync({ title: 't4' }) })
+    entry = queryClient.getQueryData<InfiniteData<PaginatedData<Todo>>>(key)
+    expect(entry?.pages[0].items.map((t) => t.id)).toEqual([1, 3, 2, 4])
+    expect(entry?.pages[0].total).toBe(4)
   })
 })
 

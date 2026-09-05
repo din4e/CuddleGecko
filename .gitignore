@@ -20,8 +20,10 @@ go.work.sum
 
 # --- Frontend (Vite + React, run from web/) ---
 web/node_modules/
+node_modules/
 web/dist/
 web/.vite/
+node_modules/.vite/
 web/.eslintcache
 web/coverage/
 web/*.local

@@ -98,6 +98,11 @@ func (m *mockTodoRepo) Restore(ctx context.Context, workspaceID, id uint) error 
 	return m.Called(ctx, workspaceID, id).Error(0)
 }
 
+func (m *mockTodoRepo) EmptyTrash(ctx context.Context, workspaceID uint) (int64, error) {
+	args := m.Called(ctx, workspaceID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 func (m *mockTodoRepo) PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID uint) (*model.Todo, error) {
 	args := m.Called(ctx, userID, workspaceID, todoID, itemID)
 	if args.Get(0) == nil {

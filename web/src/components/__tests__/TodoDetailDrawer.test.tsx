@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TodoDetailDrawer } from '../TodoDetailDrawer'
 import type { Todo } from '../../types'
@@ -156,6 +156,29 @@ describe('TodoDetailDrawer', () => {
     // Subtask rows are drag-reorderable; a non-manual fetch sort (default
     // due_date) would snap a dropped row back to its old slot on refetch.
     expect(mocks.childrenMapArgs).toHaveBeenCalledWith([7], { sort: 'manual', order: 'asc' })
+  })
+
+  it('only grows the children queries for loaded children that have their own children', async () => {
+    // A leaf child (child_count 0) would only ever fetch an empty list —
+    // querying it is pure request overhead (1+N per drawer open otherwise).
+    const leaf = { ...todo({ id: 8, title: 'Leaf subtask', parent_id: 7 }) }
+    const parent = { ...todo({ id: 9, title: 'Parent subtask', parent_id: 7, child_count: 2 }) }
+    mocks.childrenMap.mockReturnValue(new Map([[7, { items: [leaf, parent], total: 2, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
+    render(
+      <TodoDetailDrawer
+        todo={todo()}
+        open
+        contacts={[]}
+        tags={[]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    await waitFor(() => {
+      expect(mocks.childrenMapArgs).toHaveBeenCalledWith([7, 9], { sort: 'manual', order: 'asc' })
+    })
+    const requestedParents = mocks.childrenMapArgs.mock.calls.flatMap(([ids]) => ids as number[])
+    expect(requestedParents).not.toContain(8)
   })
 
   it('renders nothing when no todo is set', () => {

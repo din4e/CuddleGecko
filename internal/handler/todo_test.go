@@ -146,6 +146,11 @@ func (m *mockTodoSvcRepo) Restore(ctx context.Context, workspaceID, id uint) err
 	return m.Called(ctx, workspaceID, id).Error(0)
 }
 
+func (m *mockTodoSvcRepo) EmptyTrash(ctx context.Context, workspaceID uint) (int64, error) {
+	args := m.Called(ctx, workspaceID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 func (m *mockTodoSvcRepo) ReplaceTags(ctx context.Context, todoID uint, tags []model.Tag) error {
 	return m.Called(ctx, todoID, tags).Error(0)
 }

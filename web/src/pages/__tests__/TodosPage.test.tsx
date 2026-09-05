@@ -46,6 +46,7 @@ vi.mock('../../api/todos', () => ({
     stats: vi.fn(),
     listTrash: vi.fn(),
     restore: vi.fn(),
+    emptyTrash: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     toggleStatus: vi.fn(),
@@ -92,6 +93,7 @@ vi.mock('../../api/tags', () => ({
 import { todosApi } from '../../api/todos'
 import { contactsApi } from '../../api/contacts'
 import { tagsApi } from '../../api/tags'
+import { useTodoCollapseStore, collapseKey } from '../../stores/todoCollapse'
 import type { AxiosResponse } from 'axios'
 
 const mockedList = vi.mocked(todosApi.list)
@@ -100,6 +102,7 @@ const mockedUpdate = vi.mocked(todosApi.update)
 const mockedReplaceTags = vi.mocked(todosApi.replaceTags)
 const mockedStats = vi.mocked(todosApi.stats)
 const mockedTrash = vi.mocked(todosApi.listTrash)
+const mockedEmptyTrash = vi.mocked(todosApi.emptyTrash)
 const mockedContactsList = vi.mocked(contactsApi.list)
 const mockedTagsList = vi.mocked(tagsApi.list)
 
@@ -145,6 +148,21 @@ describe('TodosPage', () => {
     mockedTrash.mockResolvedValue({ data: [] })
     mockedContactsList.mockResolvedValue(mockAxios<PaginatedData<Contact>>({ items: [], total: 0, page: 1, page_size: 100 }))
     mockedTagsList.mockResolvedValue(mockAxios<PaginatedData<Tag>>({ items: [], total: 0, page: 1, page_size: 200 }))
+  })
+
+  it('empties the trash after confirmation', async () => {
+    localStorage.setItem('todoSmartList', 'trash')
+    const trashed = { id: 9, title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, completed_at: null, created_at: '', updated_at: '' } as Todo
+    mockedTrash.mockResolvedValue({ data: [trashed] })
+    mockedEmptyTrash.mockResolvedValue({ data: { purged: 1 } })
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Buy milk')).toBeInTheDocument())
+
+    // The purge button asks for confirmation before the irreversible call.
+    await user.click(screen.getByRole('button', { name: 'todos.trashPurge' }))
+    await user.click(await screen.findByText('common.confirm'))
+    await waitFor(() => expect(mockedEmptyTrash).toHaveBeenCalled())
   })
 
   it('renders empty state', async () => {
@@ -421,6 +439,60 @@ describe('TodosPage', () => {
     await waitFor(() => expect(screen.getByText('Child')).toBeInTheDocument())
   })
 
+  it('arrow keys navigate the tree: select, expand, dive, collapse', async () => {
+    localStorage.setItem('todoView', 'tree')
+    const root = { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const child = { id: 2, title: 'Child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    mockedList.mockImplementation(async (params?: TodoListParams) =>
+      params?.parent_id === 1
+        ? mockPage<Todo>([child])
+        : mockPage<Todo>([root]),
+    )
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Root')).toBeInTheDocument())
+    expect(screen.queryByText('Child')).not.toBeInTheDocument()
+
+    // Clicking a row selects it; → expands the collapsed parent (lazy load).
+    fireEvent.mouseDown(screen.getByText('Root'))
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    await waitFor(() => expect(screen.getByText('Child')).toBeInTheDocument())
+
+    // ↓ dives into the first child; ← on the leaf jumps back to the parent…
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    // …where a second ← collapses it. (If the selection had stayed on the
+    // leaf, this ← would be a no-op and Child would remain visible.)
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    await waitFor(() => expect(screen.queryByText('Child')).not.toBeInTheDocument())
+  })
+
+  it('arrow keys switch the selected card and fold its subtask section (flat views)', async () => {
+    useTodoCollapseStore.setState({ collapsed: new Set() })
+    const solo = { id: 1, title: 'Solo card', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const parent = { id: 2, title: 'Parent card', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, sort_order: 1, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const child = { id: 3, title: 'Sub card', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 2, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    mockedList.mockImplementation(async (params?: TodoListParams) =>
+      params?.parent_id === 2
+        ? mockPage<Todo>([child])
+        : mockPage<Todo>([solo, parent]),
+    )
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Solo card')).toBeInTheDocument())
+    // The parent's subtask section loads its slice.
+    await waitFor(() => expect(screen.getByText('Sub card')).toBeInTheDocument())
+
+    // Select the first card; ↓ moves the selection onto the parent card…
+    fireEvent.mouseDown(screen.getByText('Solo card'))
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    // …so ← folds THAT card's subtask section and → unfolds it. (If the
+    // selection were still on the childless solo card, ← would not touch the
+    // parent's fold key.)
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(useTodoCollapseStore.getState().collapsed.has(collapseKey('grouped', 2))).toBe(true)
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(useTodoCollapseStore.getState().collapsed.has(collapseKey('grouped', 2))).toBe(false)
+  })
+
   it('tree view pins manual sort and hides the sort picker', async () => {
     localStorage.setItem('todoView', 'tree')
     const root = { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 0, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
@@ -477,7 +549,7 @@ describe('TodosPage', () => {
       expect(screen.getByText('Buy milk')).toBeInTheDocument()
     })
 
-    // Single click opens the right-side drawer (fires after the 250ms
+    // Single click opens the right-side drawer (fires after the 200ms
     // double-click disambiguation window).
     await user.click(screen.getByText('Buy milk'))
     await waitFor(() => {

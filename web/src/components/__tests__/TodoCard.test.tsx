@@ -134,6 +134,17 @@ describe('TodoCard', () => {
     expect(onDuplicate).toHaveBeenCalledWith(makeTodo())
   })
 
+  it('the small-screen kebab menu carries the same actions', async () => {
+    const onDelete = vi.fn()
+    renderCard({}, { onDelete })
+    // Both surfaces render; CSS decides which is visible by breakpoint.
+    await userEvent.click(screen.getByRole('button', { name: 'common.more' }))
+    // The menu item shows the action's label as text (the toolbar buttons
+    // only carry it as aria-label), so this targets the menu entry.
+    await userEvent.click(await screen.findByText('todos.deleteAria'))
+    expect(onDelete).toHaveBeenCalledWith(makeTodo())
+  })
+
   it('the selection checkbox calls onSelectToggle', async () => {
     const onSelectToggle = vi.fn()
     render(
@@ -186,7 +197,7 @@ describe('TodoCard', () => {
   })
 
   it('a stale fold never hides the add-subtask entry of a childless todo', () => {
-    useTodoCollapseStore.setState({ collapsed: new Set([1]) })
+    useTodoCollapseStore.setState({ collapsed: new Set(['page:1']) })
     render(
       <TodoCard
         todo={makeTodo()}
