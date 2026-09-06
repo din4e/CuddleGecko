@@ -222,6 +222,8 @@ export interface TodoListParams {
   started?: boolean
   /** Pending todos whose start_time is still in the future. */
   deferred?: boolean
+  /** Only todos without a due_time — the Inbox capture queue. */
+  no_due?: boolean
   /** completed_at at or after this time (done-today / done-this-week lists). */
   done_after?: string
   /** Single tag id, or several for an any-of (OR) filter. */

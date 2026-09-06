@@ -515,6 +515,23 @@ func TestTodoRepo_DeferredFilter(t *testing.T) {
 	assert.Equal(t, "deferred", todos[0].Title)
 }
 
+func TestTodoRepo_NoDueFilter(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+
+	// The Inbox query the frontend smart list sends: pending + no due_time.
+	mustCreateTodo(t, repo, 1, "capture")
+	due := time.Now().Add(24 * time.Hour)
+	require.NoError(t, repo.Create(ctx, &model.Todo{UserID: 1, WorkspaceID: 1, Title: "scheduled", Status: "pending", DueTime: &due}))
+
+	todos, total, err := repo.List(ctx, 1, model.TodoListQuery{Status: "pending", NoDue: true})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, todos, 1)
+	assert.Equal(t, "capture", todos[0].Title)
+}
+
 func TestTodoRepo_DoneAfterFilter(t *testing.T) {
 	db := newTodoTestDB(t)
 	repo := NewTodoRepo(db)

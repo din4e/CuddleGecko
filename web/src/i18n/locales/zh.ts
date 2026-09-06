@@ -247,6 +247,8 @@ export default {
   },
   todos: {
     title: '待办',
+    inbox: '收集箱',
+    inboxPin: '收集箱置顶',
     newTodo: '新建待办',
     editTodo: '编辑待办',
     deleteConfirm: '确定删除此待办？',
