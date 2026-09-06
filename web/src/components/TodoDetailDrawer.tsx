@@ -9,6 +9,7 @@ import TodoSubtaskList from './TodoSubtaskList'
 import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 import { TodoHistory } from './TodoHistory'
+import TodoPriorityBadge from './TodoPriorityBadge'
 import { useTodoChildrenMap } from '../hooks/api/useTodos'
 import type { SubtaskMoveAfterId } from './TodoSubtaskList'
 import type { Todo, Contact, Tag } from '../types'
@@ -154,8 +155,13 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
     <Sheet open={open && todo != null} onOpenChange={(o) => { if (!o) onClose() }}>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle className="pr-8">
-            {todo ? <InlineMarkdown text={todo.title} /> : t('todos.editTodo')}
+          <SheetTitle className="pr-8 flex items-center gap-1.5 min-w-0">
+            {todo ? (
+              <>
+                <TodoPriorityBadge priority={todo.priority} />
+                <span className="min-w-0 truncate"><InlineMarkdown text={todo.title} /></span>
+              </>
+            ) : t('todos.editTodo')}
           </SheetTitle>
         </SheetHeader>
         {todo && (

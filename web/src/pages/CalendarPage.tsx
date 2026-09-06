@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
-import { Ban, ChevronLeft, ChevronRight, CalendarDays, LayoutGrid, Circle, CheckCircle2, Flag } from 'lucide-react'
+import { Ban, ChevronLeft, ChevronRight, CalendarDays, LayoutGrid, Circle, CheckCircle2 } from 'lucide-react'
 import EmptyState from '../components/EmptyState'
+import TodoPriorityBadge from '../components/TodoPriorityBadge'
 import type { Event, Todo } from '../types'
 import { useEventsList } from '../hooks/api/useEvents'
 import { useTodosList } from '../hooks/api/useTodos'
@@ -177,7 +178,7 @@ function Matrix({ todos, t, now }: { todos: Todo[]; t: (k: string) => string; no
         <div className="space-y-1">
           {items.map((td) => (
             <div key={td.id} className="rounded border border-border px-2 py-1 text-xs flex items-center gap-1">
-              {td.priority === 'high' && <Flag className="h-3 w-3 text-red-500 shrink-0" />}
+              <TodoPriorityBadge priority={td.priority} />
               <span className="truncate flex-1">{td.title}</span>
               {td.due_time && <span className="text-[10px] text-muted-foreground shrink-0">{new Date(td.due_time).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}</span>}
             </div>

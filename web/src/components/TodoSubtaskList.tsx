@@ -6,6 +6,7 @@ import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
 import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
+import TodoPriorityBadge from './TodoPriorityBadge'
 import { isSettledStatus, subtreeSettledFromMap } from '../lib/buildTodoTree'
 import { collapseKey, useTodoCollapseStore } from '../stores/todoCollapse'
 import type { Todo } from '../types'
@@ -217,6 +218,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
             >
               <InlineMarkdown text={child.title} />
             </span>
+            <TodoPriorityBadge priority={child.priority} className="ml-1" />
             {child.due_time && (
               <span
                 className={cn(
