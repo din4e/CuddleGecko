@@ -9,8 +9,7 @@ import type { TodoNode } from '../lib/buildTodoTree'
 import { subtreeProgressFromNode } from '../lib/todoProgress'
 import { cn } from '@/lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
-import { Badge } from './ui/badge'
-import { priorityConfig } from '../lib/todoPriority'
+import TodoPriorityBadge from './TodoPriorityBadge'
 import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 
@@ -352,9 +351,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
         {todo.pinned && (
           <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
         )}
-        <Badge variant="secondary" className={`shrink-0 px-1 py-0 text-[10px] leading-none ${priorityConfig[todo.priority]?.bg || ''}`}>
-          <span className={priorityConfig[todo.priority]?.color}>{t(`todos.${todo.priority}`)}</span>
-        </Badge>
+        <TodoPriorityBadge priority={todo.priority} />
         {todo.due_time && (
           <span className={cn(
             'flex items-center gap-0.5 whitespace-nowrap text-[10px]',

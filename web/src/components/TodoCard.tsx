@@ -13,7 +13,7 @@ import {
 import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
 import { collapseKey, useTodoCollapseStore } from '../stores/todoCollapse'
-import { priorityConfig } from '../lib/todoPriority'
+import TodoPriorityBadge from './TodoPriorityBadge'
 import { AddChildInput } from './AddChildInput'
 import type { SubtreeProgress } from '../lib/todoProgress'
 import type { Todo } from '../types'
@@ -124,7 +124,6 @@ const TodoCard = memo(function TodoCard({
     if (titleClickTimer.current != null) window.clearTimeout(titleClickTimer.current)
   }, [])
 
-  const priorityLabel = t(`todos.${todo.priority}`)
   const syncLabel = t('todos.syncToEvent')
   const repeatLabel = repeatLabelOf(t, todo.repeat)
   const closed = todo.status !== 'pending'
@@ -297,6 +296,9 @@ const TodoCard = memo(function TodoCard({
                 <InlineMarkdown text={todo.title} />
               </span>
             )}
+            {/* compact (kanban) cards have no meta row — keep the priority
+                chip visible right under the title instead. */}
+            {compact && <div className="mt-0.5"><TodoPriorityBadge priority={todo.priority} /></div>}
             {todo.description && !compact && (
               <p className="text-[11px] leading-snug text-muted-foreground line-clamp-1">
                 <InlineMarkdown text={todo.description} />
@@ -310,9 +312,7 @@ const TodoCard = memo(function TodoCard({
             {todo.pinned && (
               <Star className="h-3 w-3 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
             )}
-            <Badge variant="secondary" className={`px-1 py-0 text-[10px] leading-none shrink-0 ${priorityConfig[todo.priority]?.bg || ''}`}>
-              <span className={priorityConfig[todo.priority]?.color}>{priorityLabel}</span>
-            </Badge>
+            <TodoPriorityBadge priority={todo.priority} />
             {parentTitle && (
               <span className="flex items-center gap-0.5 text-muted-foreground/80">
                 <CornerDownRight className="h-3 w-3" />
