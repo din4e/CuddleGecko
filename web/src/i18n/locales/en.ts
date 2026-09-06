@@ -247,6 +247,8 @@ export default {
   },
   todos: {
     title: 'Todos',
+    inbox: 'Inbox',
+    inboxPin: 'Pin the Inbox to the top',
     newTodo: 'New Todo',
     editTodo: 'Edit Todo',
     deleteConfirm: 'Delete this todo?',

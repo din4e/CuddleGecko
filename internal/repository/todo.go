@@ -64,6 +64,10 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQ
 	if q.DueBefore != nil {
 		query = query.Where("due_time <= ?", *q.DueBefore)
 	}
+	if q.NoDue {
+		// The Inbox filter: captured but not yet scheduled.
+		query = query.Where("due_time IS NULL")
+	}
 	if q.Overdue {
 		now := time.Now()
 		query = query.Where("status = ? AND due_time IS NOT NULL AND due_time < ?", "pending", now)

@@ -111,6 +111,7 @@ type TodoListQuery struct {
 	Overdue   bool       // pending todos whose due_time is in the past
 	Started   bool       // hide tasks whose start_time is still in the future
 	Deferred  bool       // only pending todos whose start_time is still in the future
+	NoDue     bool       // only todos without a due_time — the Inbox capture queue
 	DoneAfter *time.Time // completed_at at or after this time (done-today / done-this-week lists)
 	TagIDs    []uint     // only todos tagged with any of these
 	ParentID  *uint      // only direct children of this todo

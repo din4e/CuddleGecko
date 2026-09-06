@@ -93,6 +93,9 @@ func (h *TodoHandler) List(c *gin.Context) {
 	if v := c.Query("deferred"); v == "1" || v == "true" {
 		q.Deferred = true
 	}
+	if v := c.Query("no_due"); v == "1" || v == "true" {
+		q.NoDue = true
+	}
 	if v := c.Query("roots_only"); v == "1" || v == "true" {
 		q.RootsOnly = true
 	}

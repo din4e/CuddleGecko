@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../components/ui/dialog'
-import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical, Eye, EyeOff, Tags } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical, Eye, EyeOff, Tags, Inbox } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,7 +71,8 @@ const TodoFormDialog = lazy(() => import('../components/TodoFormDialog').then((m
 const TodoDetailDrawer = lazy(() => import('../components/TodoDetailDrawer').then((m) => ({ default: m.TodoDetailDrawer })))
 
 // TickTick-style smart lists. Each maps to a set of backend list params.
-type SmartList = 'all' | 'today' | 'next7' | 'overdue' | 'pending' | 'deferred' | 'doneToday' | 'doneThisWeek' | 'completed' | 'abandoned' | 'trash'
+// 'inbox' is the GTD capture queue: pending, actionable, not yet scheduled.
+type SmartList = 'inbox' | 'all' | 'today' | 'next7' | 'overdue' | 'pending' | 'deferred' | 'doneToday' | 'doneThisWeek' | 'completed' | 'abandoned' | 'trash'
 
 function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
@@ -88,6 +89,10 @@ function startOfWeek(d: Date) {
 function smartListParams(list: SmartList): TodoListParams {
   const todayStart = startOfDay(new Date())
   switch (list) {
+    case 'inbox':
+      // The capture queue: pending and actionable (not deferred by a future
+      // start_time) but with no due_time yet — quick-adds land here by default.
+      return { status: 'pending', started: true, no_due: true }
     case 'today':
       // TickTick's "Today" shows tasks due today AND anything overdue, but not deferred ones.
       return { status: 'pending', started: true, due_before: new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString() }
@@ -282,6 +287,10 @@ export default function TodosPage() {
   // Persisted so the choice survives reloads, like the view/smart-list choices
   // above.
   const [hideCompleted, setHideCompleted] = useState(() => localStorage.getItem('todoHideCompleted') === '1')
+  // Inbox-first: the undated bucket (收集箱) leads the grouped/timeline views
+  // instead of trailing them, so the capture queue is always in view.
+  // Default on; remembered like the other view preferences.
+  const [inboxFirst, setInboxFirst] = useState(() => localStorage.getItem('todoInboxFirst') !== '0')
 
   // Debounce the search box so typing doesn't fire a request per keystroke.
   // Filter changes swap the query key, which resets pagination to page 1.
@@ -303,6 +312,9 @@ export default function TodosPage() {
   useEffect(() => {
     localStorage.setItem('todoHideCompleted', hideCompleted ? '1' : '0')
   }, [hideCompleted])
+  useEffect(() => {
+    localStorage.setItem('todoInboxFirst', inboxFirst ? '1' : '0')
+  }, [inboxFirst])
   // One-time cleanup of the pre-lazy-tree collapse-state key.
   useEffect(() => {
     localStorage.removeItem('todoTreeCollapsed')
@@ -1072,7 +1084,7 @@ export default function TodosPage() {
       { key: 'tomorrow', label: t('todos.tomorrow'), target: tomorrow, items: [] },
       { key: 'thisWeek', label: t('todos.thisWeek'), target: weekEnd, items: [] },
       { key: 'later', label: t('todos.later'), target: nextMonday, items: [] },
-      { key: 'noDue', label: t('todos.noDueDate'), target: null, items: [] },
+      { key: 'noDue', label: inboxFirst ? t('todos.inbox') : t('todos.noDueDate'), target: null, items: [] },
     ]
     for (const todo of pendingTodos) {
       if (!todo.due_time) { groups[4].items.push(todo); continue }
@@ -1081,8 +1093,9 @@ export default function TodosPage() {
       if (isThisWeek(todo.due_time)) { groups[2].items.push(todo); continue }
       groups[3].items.push(todo)
     }
-    return groups
-  }, [pendingTodos, t])
+    // Inbox-first: the capture queue leads the board instead of trailing it.
+    return inboxFirst ? [groups[4], ...groups.slice(0, 4)] : groups
+  }, [pendingTodos, inboxFirst, t])
   // pendingTodos is already top-level-only (see its derivation).
 
   // Timeline groups keyed by calendar day; `target` reschedules a dropped card
@@ -1098,8 +1111,18 @@ export default function TodosPage() {
       }
       map.get(key)!.items.push(todo)
     }
-    return Array.from(map.entries()).map(([key, g]) => ({ key, ...g }))
-  }, [displayTodos, isTopLevel, t])
+    const arr = Array.from(map.entries()).map(([key, g]) => ({ key, ...g }))
+    // Inbox-first applies here too: the no-date group leads and is labelled
+    // as the capture queue.
+    if (inboxFirst) {
+      const i = arr.findIndex((g) => g.key === 'none')
+      if (i >= 0) {
+        const [none] = arr.splice(i, 1)
+        arr.unshift({ ...none, label: t('todos.inbox') })
+      }
+    }
+    return arr
+  }, [displayTodos, isTopLevel, inboxFirst, t])
 
   const viewButtons: { key: TodoView; icon: typeof ListChecks; label: string }[] = [
     { key: 'timeline', icon: AlignJustify, label: t('todos.viewTimeline') },
@@ -1282,7 +1305,7 @@ export default function TodosPage() {
           className="h-7 rounded-md border bg-background px-1.5 text-xs"
           aria-label={t('todos.smartList')}
         >
-          {(['all', 'today', 'next7', 'overdue', 'pending', 'deferred', 'completed', 'doneToday', 'doneThisWeek', 'abandoned', 'trash'] as SmartList[]).map((s) => (
+          {(['inbox', 'all', 'today', 'next7', 'overdue', 'pending', 'deferred', 'completed', 'doneToday', 'doneThisWeek', 'abandoned', 'trash'] as SmartList[]).map((s) => (
             <option key={s} value={s}>
               {t(`todos.${s}`)}
             </option>
@@ -1412,6 +1435,21 @@ export default function TodosPage() {
             aria-label={hideDone ? t('todos.showCompleted') : t('todos.hideCompleted')}
           >
             {hideDone ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+          </Button>
+        )}
+        {/* Inbox-first toggle: pin the 收集箱 (undated) group to the top of
+            the grouped/timeline views. Hidden where there are no date groups. */}
+        {(view === 'grouped' || view === 'timeline') && (
+          <Button
+            variant={inboxFirst ? 'secondary' : 'outline'}
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => setInboxFirst((v) => !v)}
+            title={t('todos.inboxPin')}
+            aria-label={t('todos.inboxPin')}
+            aria-pressed={inboxFirst}
+          >
+            <Inbox className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
