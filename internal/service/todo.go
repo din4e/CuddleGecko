@@ -68,6 +68,7 @@ type TodoClear struct {
 	DueTime   bool
 	StartTime bool
 	Amount    bool
+	Progress  bool
 }
 
 type EventRepositoryForSync interface {
@@ -132,6 +133,9 @@ func (s *TodoService) Create(ctx context.Context, userID, workspaceID uint, todo
 	if err := validateTodoStatus(todo.Status); err != nil {
 		return nil, err
 	}
+	if err := validateTodoProgress(todo.Progress); err != nil {
+		return nil, err
+	}
 	// Only done tasks carry a completion timestamp (it powers done-today stats).
 	if todo.Status == "done" && todo.CompletedAt == nil {
 		now := time.Now()
@@ -165,6 +169,9 @@ func (s *TodoService) List(ctx context.Context, userID, workspaceID uint, q mode
 
 func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Todo, clear TodoClear) (*model.Todo, error) {
 	if err := validateTodoStatus(updates.Status); err != nil {
+		return nil, err
+	}
+	if err := validateTodoProgress(updates.Progress); err != nil {
 		return nil, err
 	}
 	todo, err := s.repo.GetByID(ctx, workspaceID, id)
@@ -202,6 +209,11 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 		todo.Amount = nil
 	} else if updates.Amount != nil {
 		todo.Amount = updates.Amount
+	}
+	if clear.Progress {
+		todo.Progress = nil
+	} else if updates.Progress != nil {
+		todo.Progress = updates.Progress
 	}
 	todo.AmountType = updates.AmountType
 	todo.ContactIDs = updates.ContactIDs

@@ -257,6 +257,7 @@ export default {
     title_field: '标题',
     description: '描述',
     priority: '优先级',
+    progress: '进度',
     none: '无',
     low: '低',
     normal: '中',

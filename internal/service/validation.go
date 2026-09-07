@@ -76,3 +76,12 @@ func validateTodoStatus(status string) error {
 		return fmt.Errorf("%w: status must be 'pending', 'done', or 'abandoned'", ErrInvalidTodo)
 	}
 }
+
+// validateTodoProgress checks the manual percent override is within 0-100 when
+// set (nil means "not configured" and is always fine).
+func validateTodoProgress(p *int) error {
+	if p != nil && (*p < 0 || *p > 100) {
+		return fmt.Errorf("%w: progress must be between 0 and 100", ErrInvalidTodo)
+	}
+	return nil
+}

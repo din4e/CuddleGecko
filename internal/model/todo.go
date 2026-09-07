@@ -38,6 +38,9 @@ type Todo struct {
 	ItemDone   int            `gorm:"not null;default:0" json:"item_done"`
 	// Pomodoros completed on this todo (25-min focus sessions).
 	PomodoroCount int         `gorm:"not null;default:0" json:"pomodoro_count"`
+	// Manual progress override in percent (0-100). NULL = not configured;
+	// views then fall back to status/subtask roll-up for display.
+	Progress *int `json:"progress"`
 	// Live count of direct children (computed subquery, read-only — never a
 	// stored column). Lets the lazy tree show the expand caret before the
 	// children have been fetched.

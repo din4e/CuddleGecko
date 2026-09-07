@@ -257,6 +257,7 @@ export default {
     title_field: 'Title',
     description: 'Description',
     priority: 'Priority',
+    progress: 'Progress',
     none: 'None',
     low: 'Low',
     normal: 'Medium',

@@ -45,6 +45,7 @@ func (s *MCPServer) registerTodoTools() {
 			"due_time":     map[string]interface{}{"type": "string", "description": "Due time (RFC3339)"},
 			"amount":       map[string]interface{}{"type": "number", "description": "Associated amount"},
 			"amount_type":  map[string]interface{}{"type": "string", "description": "Amount type: income or expense"},
+			"progress":     map[string]interface{}{"type": "integer", "description": "Manual progress in percent (0-100; omit for none)"},
 			"contact_ids":  map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "integer"}, "description": "Related contact IDs"},
 			"color":        map[string]interface{}{"type": "string", "description": "Todo color"},
 			"repeat":       map[string]interface{}{"type": "string", "description": "Recurrence: daily, weekly, weekdays, monthly or yearly (empty to disable)"},
@@ -66,6 +67,7 @@ func (s *MCPServer) registerTodoTools() {
 			DueTime:     toTimePtr(getArg(args, "due_time")),
 			Amount:      toFloat64Ptr(getArg(args, "amount")),
 			AmountType:  toString(getArg(args, "amount_type")),
+			Progress:    toIntPtr(getArg(args, "progress")),
 			ContactIDs:  toUintSlice(getArg(args, "contact_ids")),
 			Color:       toString(getArg(args, "color")),
 			Repeat:      toString(getArg(args, "repeat")),
@@ -87,6 +89,8 @@ func (s *MCPServer) registerTodoTools() {
 			"amount":         map[string]interface{}{"type": "number", "description": "Associated amount"},
 			"clear_amount":   map[string]interface{}{"type": "boolean", "description": "Clear the associated amount"},
 			"amount_type":    map[string]interface{}{"type": "string", "description": "Amount type: income or expense"},
+			"progress":       map[string]interface{}{"type": "integer", "description": "Manual progress in percent (0-100)"},
+			"clear_progress": map[string]interface{}{"type": "boolean", "description": "Clear the manual progress"},
 			"contact_ids":    map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "integer"}, "description": "Related contact IDs"},
 			"color":          map[string]interface{}{"type": "string", "description": "Todo color"},
 			"repeat":         map[string]interface{}{"type": "string", "description": "Recurrence: daily, weekly, weekdays, monthly or yearly (empty to disable)"},
@@ -102,13 +106,15 @@ func (s *MCPServer) registerTodoTools() {
 			DueTime:     toTimePtr(getArg(args, "due_time")),
 			Amount:      toFloat64Ptr(getArg(args, "amount")),
 			AmountType:  toString(getArg(args, "amount_type")),
+			Progress:    toIntPtr(getArg(args, "progress")),
 			ContactIDs:  toUintSlice(getArg(args, "contact_ids")),
 			Color:       toString(getArg(args, "color")),
 			Repeat:      toString(getArg(args, "repeat")),
 		}
 		clear := service.TodoClear{
-			DueTime: toBool(getArg(args, "clear_due_time")),
-			Amount:  toBool(getArg(args, "clear_amount")),
+			DueTime:  toBool(getArg(args, "clear_due_time")),
+			Amount:   toBool(getArg(args, "clear_amount")),
+			Progress: toBool(getArg(args, "clear_progress")),
 		}
 		return s.todoSvc.Update(ctx, userID, workspaceID, id, updates, clear)
 	})
