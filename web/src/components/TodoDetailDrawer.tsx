@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus } from 'lucide-react'
+import { Eye, EyeOff, Plus } from 'lucide-react'
+import { isSettledStatus } from '../lib/buildTodoTree'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs'
 import { Button } from './ui/button'
@@ -98,6 +99,14 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
   // list only renders rows, so this is the parent todo's single add control,
   // mirroring the card toolbar's right-side "+".
   const [addingRoot, setAddingRoot] = useState(false)
+  // Local show/hide-completed toggle: starts from the page's global setting
+  // but then acts independently — the toolbar button must not reach inside
+  // the detail view. Keyed remount per todo.id resets it.
+  const [hideDoneLocal, setHideDoneLocal] = useState(!!hideDone)
+  let settledCount = 0
+  for (const list of childrenByParent.values()) {
+    for (const c of list) if (isSettledStatus(c.status)) settledCount++
+  }
 
   return (
     <div className="mt-3">
@@ -105,18 +114,32 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
         <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {t('todos.subtasks')}
         </h3>
-        {onCreateChild && (
+        <div className="flex items-center gap-0.5">
           <Button
             variant="ghost"
             size="sm"
-            className="h-5 w-5 p-0 text-muted-foreground"
-            onClick={() => setAddingRoot((v) => !v)}
-            aria-label={t('todos.addChild')}
-            title={t('todos.addChild')}
+            className={`h-5 gap-1 px-1 text-[10px] ${hideDoneLocal ? '' : 'text-muted-foreground'}`}
+            onClick={() => setHideDoneLocal((v) => !v)}
+            aria-pressed={hideDoneLocal}
+            aria-label={hideDoneLocal ? t('todos.showCompleted') : t('todos.hideCompleted')}
+            title={hideDoneLocal ? t('todos.showCompleted') : t('todos.hideCompleted')}
           >
-            <Plus className="h-3 w-3" />
+            {hideDoneLocal ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+            {hideDoneLocal && settledCount > 0 && <span className="tabular-nums">{settledCount}</span>}
           </Button>
-        )}
+          {onCreateChild && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 text-muted-foreground"
+              onClick={() => setAddingRoot((v) => !v)}
+              aria-label={t('todos.addChild')}
+              title={t('todos.addChild')}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
       {addingRoot && onCreateChild && (
         <div className="mb-1">
@@ -136,7 +159,7 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
         onCreateChild={onCreateChild}
         onDelete={onDelete}
         onStartPomodoro={onStartPomodoro}
-        hideDone={hideDone}
+        hideDone={hideDoneLocal}
         onMove={onMove}
         dragId={dragId}
         onDragIdChange={onDragIdChange}
