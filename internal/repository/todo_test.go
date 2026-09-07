@@ -532,6 +532,34 @@ func TestTodoRepo_NoDueFilter(t *testing.T) {
 	assert.Equal(t, "capture", todos[0].Title)
 }
 
+// Regression: Update writes through an explicit column allowlist — a field
+// missing from that Select() is silently dropped (progress was, before this
+// test). Guards every future column too by checking the round-trip.
+func TestTodoRepo_UpdatePersistsProgress(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+
+	todo := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "with-progress", Status: "pending"}
+	require.NoError(t, repo.Create(ctx, todo))
+
+	pct := 60
+	todo.Progress = &pct
+	require.NoError(t, repo.Update(ctx, todo))
+
+	reloaded, err := repo.GetByID(ctx, 1, todo.ID)
+	require.NoError(t, err)
+	require.NotNil(t, reloaded.Progress)
+	assert.Equal(t, 60, *reloaded.Progress)
+
+	// And clearing it back to NULL persists too.
+	reloaded.Progress = nil
+	require.NoError(t, repo.Update(ctx, reloaded))
+	again, err := repo.GetByID(ctx, 1, todo.ID)
+	require.NoError(t, err)
+	assert.Nil(t, again.Progress)
+}
+
 func TestTodoRepo_DoneAfterFilter(t *testing.T) {
 	db := newTodoTestDB(t)
 	repo := NewTodoRepo(db)

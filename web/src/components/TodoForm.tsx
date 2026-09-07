@@ -270,20 +270,8 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
               step={5}
               value={formProgress ?? 0}
               onChange={(e) => setFormProgress(Number(e.target.value))}
-              className="h-8 flex-1 accent-primary"
+              className="h-6 flex-1 accent-primary"
               aria-label={t('todos.progress')}
-            />
-            <Input
-              type="number"
-              min={0}
-              max={100}
-              value={formProgress ?? ''}
-              placeholder="—"
-              onChange={(e) => {
-                const v = e.target.value
-                setFormProgress(v === '' ? null : Math.min(100, Math.max(0, parseInt(v, 10) || 0)))
-              }}
-              className="h-8 w-16 text-center"
             />
             {formProgress !== null && (
               <Button type="button" variant="outline" size="sm" className="h-8" onClick={() => setFormProgress(null)}>{t('todos.clear')}</Button>
