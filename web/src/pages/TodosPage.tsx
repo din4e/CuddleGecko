@@ -373,6 +373,12 @@ export default function TodosPage() {
   }, [view, rootQuery.data, flatQuery.data])
   const total = (view === 'tree' ? rootQuery.data : flatQuery.data)?.pages[0]?.total ?? 0
   const loading = view === 'tree' ? rootQuery.isPending : flatQuery.isPending
+  // keepPreviousData (placeholderData in useTodosInfinite) keeps the PREVIOUS
+  // list's rows on screen while a new smart-list/filter query is in flight —
+  // e.g. "All" (every status) flashing first, then the completed tasks
+  // vanishing once "Today" lands. Treat that window as loading so the
+  // skeleton shows instead of mismatched content.
+  const listStale = (view === 'tree' ? rootQuery : flatQuery).isPlaceholderData
 
   // One-click visibility filter. Meaningless on the settled-only lists
   // (Completed / Abandoned / Done today / Done this week — everything there is
@@ -1507,7 +1513,7 @@ export default function TodosPage() {
             </>
           )}
         </div>
-      ) : loading ? (
+      ) : loading || listStale ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
