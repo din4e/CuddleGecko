@@ -10,6 +10,8 @@ import { subtreeProgressFromNode } from '../lib/todoProgress'
 import { cn } from '@/lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
 import TodoPriorityBadge from './TodoPriorityBadge'
+import TodoProgressBar from './TodoProgressBar'
+import { todoProgressPercent } from '../lib/todoProgress'
 import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 
@@ -354,6 +356,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
         {todo.pinned && (
           <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
         )}
+        {todoProgressPercent(todo) != null && <TodoProgressBar percent={todoProgressPercent(todo)!} />}
         {todo.due_time && (
           <span className={cn(
             'flex items-center gap-0.5 whitespace-nowrap text-[10px]',

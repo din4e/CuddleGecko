@@ -30,6 +30,7 @@ type createTodoRequest struct {
 	StartTime   string   `json:"start_time"`
 	Amount      *float64 `json:"amount"`
 	AmountType  string   `json:"amount_type"`
+	Progress    *int     `json:"progress"`
 	ContactIDs  []uint   `json:"contact_ids"`
 	Color       string   `json:"color"`
 	Repeat      string   `json:"repeat"`
@@ -49,6 +50,8 @@ type updateTodoRequest struct {
 	Amount       *float64 `json:"amount"`
 	ClearAmount  bool     `json:"clear_amount"`
 	AmountType   string   `json:"amount_type"`
+	Progress     *int     `json:"progress"`
+	ClearProgress bool    `json:"clear_progress"`
 	ContactIDs   []uint   `json:"contact_ids"`
 	Color        string   `json:"color"`
 	Repeat       string   `json:"repeat"`
@@ -308,6 +311,7 @@ func (h *TodoHandler) Create(c *gin.Context) {
 		Priority:    req.Priority,
 		Amount:      req.Amount,
 		AmountType:  req.AmountType,
+		Progress:    req.Progress,
 		ContactIDs:  req.ContactIDs,
 		Color:       req.Color,
 		Repeat:      req.Repeat,
@@ -368,6 +372,7 @@ func (h *TodoHandler) Update(c *gin.Context) {
 		Priority:    req.Priority,
 		Amount:      req.Amount,
 		AmountType:  req.AmountType,
+		Progress:    req.Progress,
 		ContactIDs:  req.ContactIDs,
 		Color:       req.Color,
 		Repeat:      req.Repeat,
@@ -377,6 +382,7 @@ func (h *TodoHandler) Update(c *gin.Context) {
 		DueTime:   req.ClearDueTime,
 		StartTime: req.ClearStartTime,
 		Amount:    req.ClearAmount,
+		Progress:  req.ClearProgress,
 	}
 
 	if req.DueTime != "" {

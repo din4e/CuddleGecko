@@ -244,6 +244,7 @@ export interface TodoUpdateInput extends Partial<Omit<Todo, 'due_time' | 'amount
   clear_due_time?: boolean
   clear_start_time?: boolean
   clear_amount?: boolean
+  clear_progress?: boolean
 }
 
 export interface Habit {
@@ -313,6 +314,8 @@ export interface Todo {
   item_total?: number
   item_done?: number
   pomodoro_count?: number
+  /** Manual progress in percent (0-100). null/undefined = not configured. */
+  progress?: number | null
   // Server-computed count of live direct children — drives the lazy tree's
   // expand caret before the children have been fetched.
   child_count?: number

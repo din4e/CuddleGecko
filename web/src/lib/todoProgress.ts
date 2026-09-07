@@ -13,6 +13,13 @@ export interface SubtreeProgress {
   total: number
 }
 
+/** Display percent for a todo: a done task is always 100; otherwise the
+ *  manually configured value. null = nothing to show (no bar). */
+export function todoProgressPercent(todo: Pick<Todo, 'progress' | 'status'>): number | null {
+  if (todo.status === 'done') return todo.progress != null ? 100 : null
+  return todo.progress ?? null
+}
+
 /** Progress over a todo's descendants via a children map (flat views /
  *  drawer). Cycle-safe; grandchildren count through nested recursion. */
 export function subtreeProgressFromMap(

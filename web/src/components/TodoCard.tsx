@@ -14,6 +14,8 @@ import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
 import { collapseKey, useTodoCollapseStore } from '../stores/todoCollapse'
 import TodoPriorityBadge from './TodoPriorityBadge'
+import TodoProgressBar from './TodoProgressBar'
+import { todoProgressPercent } from '../lib/todoProgress'
 import { AddChildInput } from './AddChildInput'
 import type { SubtreeProgress } from '../lib/todoProgress'
 import type { Todo } from '../types'
@@ -127,6 +129,7 @@ const TodoCard = memo(function TodoCard({
   const syncLabel = t('todos.syncToEvent')
   const repeatLabel = repeatLabelOf(t, todo.repeat)
   const closed = todo.status !== 'pending'
+  const progressPct = todoProgressPercent(todo)
   const abandonTitle = todo.status === 'abandoned' ? t('todos.markPending') : t('todos.markAbandoned')
 
   // Toolbar actions, rendered twice from one list: the md+ hover strip and the
@@ -297,6 +300,7 @@ const TodoCard = memo(function TodoCard({
                 >
                   <InlineMarkdown text={todo.title} />
                 </span>
+                {compact && progressPct != null && <TodoProgressBar percent={progressPct} className="mt-0.5" />}
               </div>
             )}
             {todo.description && !compact && (
@@ -324,6 +328,7 @@ const TodoCard = memo(function TodoCard({
                 {formatDueLabel(todo.due_time, new Date(), t)}
               </span>
             )}
+            {progressPct != null && <TodoProgressBar percent={progressPct} />}
             {todo.start_time && new Date(todo.start_time) > new Date() && (
               <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
                 <CalendarClock className="h-3 w-3" />
