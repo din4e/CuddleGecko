@@ -45,6 +45,10 @@ export default function TodoProgressBar({
   const handlePointerDown = (e: ReactPointerEvent<HTMLSpanElement>) => {
     if (!interactive) return
     e.stopPropagation()
+    // preventDefault kills the row's native HTML5 drag (draggable rows would
+    // otherwise start moving together with the scrub) and text selection.
+    // stopPropagation alone can't stop a native dragstart; this can.
+    e.preventDefault()
     // Capture keeps tracking the drag outside the bar; synthetic pointers
     // (tests, some automation) have no active pointer entry and throw — the
     // drag works without capture, so never let it abort the interaction.
@@ -59,6 +63,7 @@ export default function TodoProgressBar({
   const handlePointerMove = (e: ReactPointerEvent<HTMLSpanElement>) => {
     if (!dragging) return
     e.stopPropagation()
+    e.preventDefault()
     setDragValue(pctFromEvent(e))
   }
   const handlePointerUp = (e: ReactPointerEvent<HTMLSpanElement>) => {
@@ -82,6 +87,11 @@ export default function TodoProgressBar({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onDragStart={(e) => {
+        // Belt-and-suspenders: the bar must never become the source of a
+        // row's HTML5 drag (some browsers re-evaluate draggable mid-press).
+        e.preventDefault()
+      }}
       onDoubleClick={(e) => {
         if (!interactive || percent == null) return
         e.stopPropagation()
