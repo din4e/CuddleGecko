@@ -414,6 +414,31 @@ export function useUpdateTodo() {
   })
 }
 
+// Row-bar drag: write ONLY the percent via the dedicated endpoint (the full
+// Update is a PUT-style whole-entity save and would clobber other fields).
+// Optimistically patch every cached list so the bar snaps instantly; rollback
+// on error, reconcile via refetch on settle.
+export function useSetTodoProgress() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, progress }: { id: number; progress: number | null }) => todosApi.setProgress(id, progress),
+    onMutate: async ({ id, progress }) => {
+      await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
+      const previous = qc.getQueriesData({ queryKey: [...allKey(), 'list'] })
+      for (const [key, old] of previous) {
+        qc.setQueryData(key, patchTodoItems(old, (t) => (t.id === id ? { ...t, progress } : t)))
+      }
+      return { previous: new Map(previous) }
+    },
+    onError: (_err, _vars, ctx) => {
+      ctx?.previous.forEach((data, key) => qc.setQueryData(key, data))
+    },
+    onSettled: () => {
+      invalidateScope(qc, scope)
+    },
+  })
+}
+
 // Optimistically flip a todo's status in every cached list page so the checkbox
 // responds instantly; rollback on error, and reconcile with the server on
 // settle (the refetch also picks up re-sorting and recurring-task advancement).

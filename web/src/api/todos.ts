@@ -42,6 +42,9 @@ export const todosApi = {
   toggleStatus: (id: number) =>
     request.patch<Todo>(`/todos/${id}/toggle`).then((data) => ({ data })),
 
+  setProgress: (id: number, progress: number | null) =>
+    request.patch<void>(`/todos/${id}/progress`, progress === null ? { clear: true } : { progress }).then(() => {}),
+
   setStatus: (id: number, status: TodoStatus) =>
     request.patch<Todo>(`/todos/${id}/status`, { status }).then((data) => ({ data })),
 

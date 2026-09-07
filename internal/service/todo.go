@@ -42,6 +42,7 @@ type TodoRepository interface {
 	SetParent(ctx context.Context, workspaceID, id uint, parentID *uint) error
 	UpdateCreatedAt(ctx context.Context, id uint, at time.Time) error
 	IncrementPomodoro(ctx context.Context, workspaceID, id uint) error
+	SetProgress(ctx context.Context, workspaceID, id uint, progress *int) error
 	BulkAction(ctx context.Context, workspaceID uint, ids []uint, action string) (int64, error)
 	CascadeComplete(ctx context.Context, workspaceID uint, parentIDs []uint, now time.Time) (int64, error)
 	CascadeRestore(ctx context.Context, workspaceID uint, parentIDs []uint) (int64, error)
@@ -537,6 +538,21 @@ func (s *TodoService) IncrementPomodoro(ctx context.Context, userID, workspaceID
 		return err
 	}
 	if err := s.repo.IncrementPomodoro(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	s.notify(ctx, workspaceID, ChangeUpdated, id, nil)
+	return nil
+}
+
+// SetProgress updates only the manual percent (row-bar drag). nil clears it.
+func (s *TodoService) SetProgress(ctx context.Context, userID, workspaceID, id uint, progress *int) error {
+	if err := validateTodoProgress(progress); err != nil {
+		return err
+	}
+	if err := s.ensureTodoOwned(ctx, workspaceID, id); err != nil {
+		return err
+	}
+	if err := s.repo.SetProgress(ctx, workspaceID, id, progress); err != nil {
 		return err
 	}
 	s.notify(ctx, workspaceID, ChangeUpdated, id, nil)

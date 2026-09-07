@@ -294,6 +294,42 @@ func (h *TodoHandler) IncrementPomodoro(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// SetProgress writes only the manual percent (row-bar drag control):
+// {"progress": 0-100} sets it, {"clear": true} clears it.
+func (h *TodoHandler) SetProgress(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, ok := h.parseTodoID(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		Progress *int `json:"progress"`
+		Clear    bool `json:"clear"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	progress := req.Progress
+	if req.Clear {
+		progress = nil
+	}
+	if err := h.svc.SetProgress(c.Request.Context(), userID, workspaceID, id, progress); err != nil {
+		if errors.Is(err, service.ErrTodoNotFound) {
+			response.NotFound(c, "todo not found")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidTodo) {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.InternalError(c, "failed to set progress")
+		return
+	}
+	response.OK(c, nil)
+}
+
 func (h *TodoHandler) Create(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)

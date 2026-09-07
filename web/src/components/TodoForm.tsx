@@ -64,8 +64,6 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   const [formColor, setFormColor] = useState(editing?.color ?? '')
   const [formRepeat, setFormRepeat] = useState<string>(editing?.repeat ?? '')
   const [formRepeatInterval, setFormRepeatInterval] = useState<number>(editing?.repeat_interval && editing.repeat_interval > 0 ? editing.repeat_interval : 1)
-  // Manual percent progress; null = not configured (bar hidden).
-  const [formProgress, setFormProgress] = useState<number | null>(editing?.progress ?? null)
   const [formTagIds, setFormTagIds] = useState<number[]>(editing?.tags?.map((tg) => tg.id) ?? [])
   const [formParentId, setFormParentId] = useState<number | null>(editing?.parent_id ?? null)
   // Description is markdown: the textarea swaps to a rendered preview while the
@@ -99,13 +97,13 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
         color: formColor,
         repeat: formRepeat,
         repeat_interval: formRepeatInterval,
-        progress: formProgress ?? undefined,
       }
       // Clearing a populated nullable field removes it server-side.
+      // Progress is deliberately NOT sent here: the row-bar drag owns it
+      // (PATCH /progress), and an omitted field leaves the column untouched.
       if (editing.due_time && !formDueTime) data.clear_due_time = true
       if (editing.start_time && !formStartTime) data.clear_start_time = true
       if (editing.amount != null && !formAmount) data.clear_amount = true
-      if (editing.progress != null && formProgress === null) data.clear_progress = true
       await updateTodo.mutateAsync({ id: editing.id, data })
       todoId = editing.id
     } else {
@@ -122,7 +120,6 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
         color: formColor,
         repeat: formRepeat || undefined,
         repeat_interval: formRepeatInterval || undefined,
-        progress: formProgress ?? undefined,
         parent_id: formParentId ?? undefined,
       }
       const created = await createTodo.mutateAsync(payload)
@@ -146,7 +143,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
       }
     }
     onClose()
-  }, [editing, formTitle, formDesc, formStatus, formPriority, formDueTime, formStartTime, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formProgress, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
+  }, [editing, formTitle, formDesc, formStatus, formPriority, formDueTime, formStartTime, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
 
   return (
     <>
@@ -258,24 +255,6 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
               <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setFormDueTime(dueChipValue(7))}>{t('todos.thisWeek')}</Button>
               <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setFormDueTime('')}>{t('todos.clear')}</Button>
             </div>
-          </div>
-        </div>
-        <div className="space-y-1">
-          <Label>{t('todos.progress')}</Label>
-          <div className="flex items-center gap-2">
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={formProgress ?? 0}
-              onChange={(e) => setFormProgress(Number(e.target.value))}
-              className="h-6 flex-1 accent-primary"
-              aria-label={t('todos.progress')}
-            />
-            {formProgress !== null && (
-              <Button type="button" variant="outline" size="sm" className="h-8" onClick={() => setFormProgress(null)}>{t('todos.clear')}</Button>
-            )}
           </div>
         </div>
         <div className="space-y-1">

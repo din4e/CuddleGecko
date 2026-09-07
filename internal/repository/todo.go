@@ -700,6 +700,17 @@ func (r *TodoRepo) IncrementPomodoro(ctx context.Context, workspaceID, id uint) 
 	return nil
 }
 
+// SetProgress writes just the manual percent column (nil clears it). Used by
+// the row-bar drag control, which must not replay the full Update payload.
+func (r *TodoRepo) SetProgress(ctx context.Context, workspaceID, id uint, progress *int) error {
+	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
+		Where("id = ? AND workspace_id = ?", id, workspaceID).
+		UpdateColumn("progress", progress).Error; err != nil {
+		return fmt.Errorf("set todo progress: %w", err)
+	}
+	return nil
+}
+
 // ListTrash returns soft-deleted todos for a workspace, newest-deleted first.
 func (r *TodoRepo) ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error) {
 	var todos []model.Todo

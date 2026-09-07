@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+// TodoCard/TodoTreeRow call useSetTodoProgress (row-bar drag) — they need a
+// QueryClient in tests.
+const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+function renderWithClient(ui: React.ReactElement) {
+  return render(<QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>)
+}
 import userEvent from '@testing-library/user-event'
 import TodoCard from '../TodoCard'
 import type { TodoCardProps } from '../TodoCard'
@@ -46,7 +54,7 @@ function renderCard(overrides: Partial<Todo> = {}, handlers: Partial<Handlers> =
     onDelete: handlers.onDelete ?? vi.fn(),
     formatDate: () => 'Jan 1',
   }
-  return { props, ...render(<TodoCard {...props} />) }
+  return { props, ...renderWithClient(<TodoCard {...props} />) }
 }
 
 describe('TodoCard', () => {
@@ -71,7 +79,7 @@ describe('TodoCard', () => {
   })
 
   it('shows the parent title hint when nested', () => {
-    render(
+    renderWithClient(
       <TodoCard
         todo={makeTodo({ title: 'Child' })}
         contactNames=""
@@ -147,7 +155,7 @@ describe('TodoCard', () => {
 
   it('the selection checkbox calls onSelectToggle', async () => {
     const onSelectToggle = vi.fn()
-    render(
+    renderWithClient(
       <TodoCard
         todo={makeTodo()}
         contactNames=""
@@ -180,7 +188,7 @@ describe('TodoCard', () => {
       onDelete: vi.fn(),
       formatDate: () => 'Jan 1',
     }
-    render(
+    renderWithClient(
       <TodoCard
         {...base}
         todo={makeTodo()}
@@ -198,7 +206,7 @@ describe('TodoCard', () => {
 
   it('a stale fold never hides the add-subtask entry of a childless todo', () => {
     useTodoCollapseStore.setState({ collapsed: new Set(['page:1']) })
-    render(
+    renderWithClient(
       <TodoCard
         todo={makeTodo()}
         contactNames=""
@@ -234,7 +242,7 @@ describe('TodoCard', () => {
       subtaskDragId: 7 as number | null,
       onNestSubtask,
     }
-    render(<TodoCard {...props} todo={makeTodo()} />)
+    renderWithClient(<TodoCard {...props} todo={makeTodo()} />)
     const card = screen.getByText('Buy milk').closest('[data-slot="card"]')!
     fireEvent.dragOver(card, { dataTransfer: dtStub() })
     fireEvent.drop(card, { dataTransfer: dtStub() })
@@ -243,7 +251,7 @@ describe('TodoCard', () => {
 
   it('ignores a subtask drop of the card onto itself', () => {
     const onNestSubtask = vi.fn()
-    render(
+    renderWithClient(
       <TodoCard
         todo={makeTodo()}
         contactNames=""
