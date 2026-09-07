@@ -234,7 +234,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
                     : 'text-muted-foreground',
                 )}
               >
-                {formatDueLabel(child.due_time, new Date(), t)}
+                {formatDueLabel(child.due_time, new Date(), t, { settled: child.status !== 'pending' })}
               </span>
             )}
             {showsProgress && (

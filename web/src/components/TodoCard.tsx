@@ -329,7 +329,7 @@ const TodoCard = memo(function TodoCard({
             {todo.due_time && (
               <span className={`flex items-center gap-1 ${todo.status === 'pending' && new Date(todo.due_time) < new Date() ? 'text-red-600 dark:text-red-400 font-medium' : ''}`}>
                 <Clock className="h-3 w-3" />
-                {formatDueLabel(todo.due_time, new Date(), t)}
+                {formatDueLabel(todo.due_time, new Date(), t, { settled: closed })}
               </span>
             )}
             <TodoProgressBar percent={progressPct} onCommit={commitProgress} />

@@ -48,15 +48,31 @@ export function dueLabelParts(due: Date, now: Date): DueLabelParts {
 
 type TFunc = (key: string, opts?: Record<string, unknown>) => string
 
+/** Neutral 月日 [年] + clock-time label (the 'later' rendering). */
+function laterLabel(p: DueLabelParts, now: Date): string {
+  const time = p.time ? ` ${p.time}` : ''
+  const sameYear = p.date.getFullYear() === now.getFullYear()
+  const md = p.date.toLocaleDateString(undefined, {
+    ...(sameYear ? {} : { year: 'numeric' }),
+    month: 'short',
+    day: 'numeric',
+  })
+  return `${md}${time}`
+}
+
 /**
  * Render a DueLabelParts into display text using the app's i18n keys
  * (todos.today / todos.tomorrow / todos.dayAfterTomorrow / todos.yesterday /
  * todos.overdueDays). Weekday and 月日 come from Intl with the user locale.
+ *
+ * `settled` (done/abandoned todos): past dates never say 已逾期 — a finished
+ * task isn't overdue, it just has a date. They render the neutral 月日 label.
  */
 export function formatDueLabel(
   dueISO: string,
   now: Date,
   t: TFunc,
+  opts?: { settled?: boolean },
 ): string {
   const p = dueLabelParts(new Date(dueISO), now)
   const time = p.time ? ` ${p.time}` : ''
@@ -71,16 +87,10 @@ export function formatDueLabel(
       const wd = p.date.toLocaleDateString(undefined, { weekday: 'short' })
       return `${wd}${time}`
     }
-    case 'later': {
-      const sameYear = p.date.getFullYear() === now.getFullYear()
-      const md = p.date.toLocaleDateString(undefined, {
-        ...(sameYear ? {} : { year: 'numeric' }),
-        month: 'short',
-        day: 'numeric',
-      })
-      return `${md}${time}`
-    }
+    case 'later':
+      return laterLabel(p, now)
     case 'overdue': {
+      if (opts?.settled) return laterLabel(p, now)
       if (p.overdueDays === 1) return t('todos.yesterday')
       // Still show the clock time — rescheduling context matters when overdue.
       return `${t('todos.overdueDays', { n: p.overdueDays })}${time}`
