@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+// TodoCard/TodoTreeRow call useSetTodoProgress (row-bar drag) — they need a
+// QueryClient in tests.
+const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+function renderWithClient(ui: React.ReactElement) {
+  return render(<QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>)
+}
 import { useState } from 'react'
 import TodoTree from '../TodoTreeRow'
 import { buildTodoTree, type TodoNode } from '../../lib/buildTodoTree'
@@ -46,7 +54,7 @@ function renderTree(expanded?: Set<number>) {
       />
     )
   }
-  const utils = render(<Harness />)
+  const utils = renderWithClient(<Harness />)
   return { onDragIdChange, ...utils }
 }
 

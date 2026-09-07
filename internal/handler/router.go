@@ -204,6 +204,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.PATCH("/todos/:id/toggle", h.Todo.ToggleStatus)
 			wsProtected.PATCH("/todos/:id/status", h.Todo.SetStatus)
 			wsProtected.PATCH("/todos/:id/pin", h.Todo.TogglePin)
+			wsProtected.PATCH("/todos/:id/progress", h.Todo.SetProgress)
 			wsProtected.PATCH("/todos/:id/reorder", h.Todo.Reorder)
 			wsProtected.PATCH("/todos/:id/move", h.Todo.Move)
 			wsProtected.POST("/todos/:id/sync-event", h.Todo.SyncToEvent)

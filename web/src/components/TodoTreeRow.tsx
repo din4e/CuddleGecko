@@ -12,6 +12,7 @@ import { formatDueLabel } from '../lib/dueLabel'
 import TodoPriorityBadge from './TodoPriorityBadge'
 import TodoProgressBar from './TodoProgressBar'
 import { todoProgressPercent } from '../lib/todoProgress'
+import { useSetTodoProgress } from '../hooks/api/useTodos'
 import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 
@@ -138,6 +139,8 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   const canDown = index < siblings.length - 1
 
   const { t } = useTranslation()
+  // Row-bar drag writes only the percent via the dedicated endpoint.
+  const setProgress = useSetTodoProgress()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(todo.title)
   // Single click on the title opens the detail drawer; double-click renames.
@@ -356,7 +359,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
         {todo.pinned && (
           <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
         )}
-        {todoProgressPercent(todo) != null && <TodoProgressBar percent={todoProgressPercent(todo)!} />}
+        <TodoProgressBar percent={todoProgressPercent(todo)} onCommit={(pct) => setProgress.mutate({ id: todo.id, progress: pct })} />
         {todo.due_time && (
           <span className={cn(
             'flex items-center gap-0.5 whitespace-nowrap text-[10px]',

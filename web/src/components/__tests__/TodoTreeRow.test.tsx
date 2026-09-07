@@ -1,5 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+// TodoCard/TodoTreeRow call useSetTodoProgress (row-bar drag) — they need a
+// QueryClient in tests.
+const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+function renderWithClient(ui: React.ReactElement) {
+  return render(<QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>)
+}
 import userEvent from '@testing-library/user-event'
 import TodoTree from '../TodoTreeRow'
 import type { TodoTreeHandlers } from '../TodoTreeRow'
@@ -36,21 +44,21 @@ function handlers(overrides: Partial<TodoTreeHandlers> = {}): TodoTreeHandlers {
 describe('TodoTree', () => {
   it('renders roots and nested children', () => {
     const tree = [node(makeTodo(1), [node(makeTodo(2))])]
-    render(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
+    renderWithClient(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
     expect(screen.getByText('todo-1')).toBeInTheDocument()
     expect(screen.getByText('todo-2')).toBeInTheDocument()
   })
 
   it('renders markdown titles inline (bold) while plain titles stay plain', () => {
     const tree = [node(makeTodo(1, { title: '**bold** task' })), node(makeTodo(2))]
-    render(<TodoTree nodes={tree} {...handlers()} />)
+    renderWithClient(<TodoTree nodes={tree} {...handlers()} />)
     expect(screen.getByText('bold').tagName).toBe('STRONG')
     expect(screen.getByText('todo-2')).toBeInTheDocument()
   })
 
   it('opens the drawer from the keyboard on the title (Enter)', () => {
     const onEdit = vi.fn()
-    render(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onEdit })} />)
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onEdit })} />)
     fireEvent.keyDown(screen.getByText('todo-1'), { key: 'Enter' })
     expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }))
   })
@@ -58,7 +66,7 @@ describe('TodoTree', () => {
   it('toggles expand via the caret', async () => {
     const user = userEvent.setup()
     const onToggleExpand = vi.fn()
-    render(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onToggleExpand })} />)
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onToggleExpand })} />)
     await user.click(screen.getByRole('button', { name: 'todos.expand' }))
     expect(onToggleExpand).toHaveBeenCalledWith(1)
   })
@@ -67,14 +75,14 @@ describe('TodoTree', () => {
     const user = userEvent.setup()
     const onToggleExpand = vi.fn()
     // Lazy tree: server says the node has a child, but the slice isn't fetched.
-    render(<TodoTree nodes={[node(makeTodo(1, { child_count: 1 }))]} {...handlers({ onToggleExpand })} />)
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1, { child_count: 1 }))]} {...handlers({ onToggleExpand })} />)
     await user.click(screen.getByRole('button', { name: 'todos.expand' }))
     expect(onToggleExpand).toHaveBeenCalledWith(1)
   })
 
   it('renders a loading row while an expanded node\u2019s children are fetching', () => {
     const tree = [{ todo: makeTodo(1), children: [], childrenLoading: true }]
-    render(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
+    renderWithClient(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
     expect(screen.getByText('todos.loadingChildren')).toBeInTheDocument()
   })
 
@@ -82,7 +90,7 @@ describe('TodoTree', () => {
     const user = userEvent.setup()
     const onLoadChildren = vi.fn()
     const tree = [{ todo: makeTodo(1), children: [node(makeTodo(2))], childrenHasMore: true }]
-    render(
+    renderWithClient(
       <TodoTree
         nodes={tree}
         {...handlers({ expanded: new Set([1]), onLoadChildren })}
@@ -95,7 +103,7 @@ describe('TodoTree', () => {
   it('toggles done via the circle button', async () => {
     const user = userEvent.setup()
     const onToggle = vi.fn()
-    render(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onToggle })} />)
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onToggle })} />)
     await user.click(screen.getByRole('button', { name: 'todos.markDone' }))
     expect(onToggle).toHaveBeenCalledWith(1)
   })
@@ -104,7 +112,7 @@ describe('TodoTree', () => {
     const user = userEvent.setup()
     const onMove = vi.fn()
     // Two roots: todo-2 can indent under its previous sibling todo-1.
-    render(<TodoTree nodes={[node(makeTodo(1)), node(makeTodo(2))]} {...handlers({ onMove })} />)
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1)), node(makeTodo(2))]} {...handlers({ onMove })} />)
     const indentBtns = screen.getAllByRole('button', { name: 'todos.indent' })
     await user.click(indentBtns[indentBtns.length - 1]) // todo-2's indent
     expect(onMove).toHaveBeenCalledWith(2, 1, null)
@@ -114,7 +122,7 @@ describe('TodoTree', () => {
     const user = userEvent.setup()
     const onMove = vi.fn()
     // todo-1 > todo-2: outdenting todo-2 makes it a root placed after todo-1.
-    render(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onMove, expanded: new Set([1]) })} />)
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onMove, expanded: new Set([1]) })} />)
     const outdentBtns = screen.getAllByRole('button', { name: 'todos.outdent' })
     await user.click(outdentBtns[outdentBtns.length - 1]) // todo-2's outdent (todo-1's is disabled)
     expect(onMove).toHaveBeenCalledWith(2, null, 1)
@@ -123,7 +131,7 @@ describe('TodoTree', () => {
   it('move-up on the 3rd sibling places it after the 1st', async () => {
     const user = userEvent.setup()
     const onMove = vi.fn()
-    render(<TodoTree nodes={[node(makeTodo(1)), node(makeTodo(2)), node(makeTodo(3))]} {...handlers({ onMove })} />)
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1)), node(makeTodo(2)), node(makeTodo(3))]} {...handlers({ onMove })} />)
     const upBtns = screen.getAllByRole('button', { name: 'todos.moveUp' })
     await user.click(upBtns[2]) // todo-3 (index 2 → after_id = siblings[0] = 1)
     expect(onMove).toHaveBeenCalledWith(3, null, 1)
@@ -132,7 +140,7 @@ describe('TodoTree', () => {
   it('move-down places after the next sibling', async () => {
     const user = userEvent.setup()
     const onMove = vi.fn()
-    render(<TodoTree nodes={[node(makeTodo(1)), node(makeTodo(2))]} {...handlers({ onMove })} />)
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1)), node(makeTodo(2))]} {...handlers({ onMove })} />)
     const downBtns = screen.getAllByRole('button', { name: 'todos.moveDown' })
     await user.click(downBtns[0]) // todo-1 → after todo-2
     expect(onMove).toHaveBeenCalledWith(1, null, 2)
@@ -141,7 +149,7 @@ describe('TodoTree', () => {
   it('add-child becomes an inline input that creates children on Enter', async () => {
     const user = userEvent.setup()
     const onCreateChild = vi.fn()
-    render(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onCreateChild })} />)
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onCreateChild })} />)
     await user.click(screen.getByRole('button', { name: 'todos.addChild' }))
     const input = screen.getByPlaceholderText('todos.addSubtaskPlaceholder')
     await user.type(input, '快速子任务{Enter}')
@@ -153,7 +161,7 @@ describe('TodoTree', () => {
   it('renders a selection checkbox in bulk mode', async () => {
     const user = userEvent.setup()
     const onSelectToggle = vi.fn()
-    render(
+    renderWithClient(
       <TodoTree
         nodes={[node(makeTodo(1))]}
         {...handlers({ onSelectToggle })}
@@ -167,7 +175,7 @@ describe('TodoTree', () => {
 
   it('Tab indents the row under its previous sibling', () => {
     const onMove = vi.fn()
-    render(<TodoTree nodes={[node(makeTodo(1)), node(makeTodo(2))]} {...handlers({ onMove })} />)
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1)), node(makeTodo(2))]} {...handlers({ onMove })} />)
     // keydown bubbles from the title span to the row's onKeyDown.
     fireEvent.keyDown(screen.getByText('todo-2'), { key: 'Tab' })
     expect(onMove).toHaveBeenCalledWith(2, 1, null)
@@ -175,7 +183,7 @@ describe('TodoTree', () => {
 
   it('Shift+Tab outdents the row to the grandparent', () => {
     const onMove = vi.fn()
-    render(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onMove, expanded: new Set([1]) })} />)
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1), [node(makeTodo(2))])]} {...handlers({ onMove, expanded: new Set([1]) })} />)
     fireEvent.keyDown(screen.getByText('todo-2'), { key: 'Tab', shiftKey: true })
     expect(onMove).toHaveBeenCalledWith(2, null, 1)
   })
@@ -187,7 +195,7 @@ describe('TodoTree', () => {
     const tree = [node(makeTodo(1, { child_count: 1 }), [
       { todo: makeTodo(2, { status: 'done' }), children: [], hidden: true },
     ])]
-    render(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
+    renderWithClient(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
     expect(screen.getByText('todo-1')).toBeInTheDocument()
     expect(screen.queryByText('todo-2')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'todos.collapse' })).not.toBeInTheDocument()
@@ -199,7 +207,7 @@ describe('TodoTree', () => {
     const tree = [node(makeTodo(1, { child_count: 2 }), [
       { todo: makeTodo(2, { status: 'done' }), children: [], hidden: true },
     ])]
-    render(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
+    renderWithClient(<TodoTree nodes={tree} {...handlers({ expanded: new Set([1]) })} />)
     expect(screen.queryByText('todo-2')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'todos.collapse' })).toBeInTheDocument()
   })

@@ -132,6 +132,10 @@ func (m *mockTodoRepo) IncrementPomodoro(ctx context.Context, workspaceID, id ui
 	return m.Called(ctx, workspaceID, id).Error(0)
 }
 
+func (m *mockTodoRepo) SetProgress(ctx context.Context, workspaceID, id uint, progress *int) error {
+	return m.Called(ctx, workspaceID, id, progress).Error(0)
+}
+
 func (m *mockTodoRepo) SetParent(ctx context.Context, workspaceID, id uint, parentID *uint) error {
 	return m.Called(ctx, workspaceID, id, parentID).Error(0)
 }

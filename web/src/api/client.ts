@@ -1,8 +1,17 @@
 import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios'
 import type { AuthResponse, ApiResponse } from '@/types'
 
-let cachedToken = localStorage.getItem('access_token')
-let cachedWorkspaceId = localStorage.getItem('current_workspace_id')
+// Guarded: some test environments evaluate this module before localStorage
+// exists. The cache starts empty there and only fills when auth succeeds.
+function readLocal(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+let cachedToken = readLocal('access_token')
+let cachedWorkspaceId = readLocal('current_workspace_id')
 
 export function setCachedToken(token: string | null) {
   cachedToken = token
