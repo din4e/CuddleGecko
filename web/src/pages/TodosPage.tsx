@@ -455,6 +455,15 @@ export default function TodosPage() {
     setDrawerOpen(true)
   }, [])
 
+  // Keep the drawer's todo snapshot fresh: mutations (progress scrub,
+  // renames, status flips elsewhere) patch the list caches, and without this
+  // the drawer would keep rendering the stale copy captured at open time.
+  useEffect(() => {
+    if (!editing) return
+    const fresh = todoByIdLoaded.get(editing.id)
+    if (fresh && fresh !== editing) setEditing(fresh)
+  }, [todoByIdLoaded, editing])
+
   const handleQuickAdd = async () => {
     const raw = quickTitle.trim()
     if (!raw) return
