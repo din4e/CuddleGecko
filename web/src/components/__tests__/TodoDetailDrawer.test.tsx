@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+// The subtask rows call useSetTodoProgress — they need a QueryClient here.
+const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+function renderWithClient(ui: React.ReactElement) {
+  return render(<QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>)
+}
 import userEvent from '@testing-library/user-event'
 import { TodoDetailDrawer } from '../TodoDetailDrawer'
 import type { Todo } from '../../types'
@@ -20,6 +27,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../hooks/api/useTodos', () => ({
   useCreateTodo: () => ({ mutateAsync: mocks.createTodo, isPending: false }),
   useUpdateTodo: () => ({ mutateAsync: mocks.updateTodo, isPending: false }),
+  useSetTodoProgress: () => ({ mutate: vi.fn() }),
   useReplaceTodoTags: () => ({ mutateAsync: mocks.replaceTags }),
   useMoveTodo: () => ({ mutateAsync: mocks.moveTodo, isPending: false }),
   useTodoItems: () => ({ data: [] }),
@@ -68,7 +76,7 @@ describe('TodoDetailDrawer', () => {
   })
 
   it('shows the todo title in the header and pre-fills the form', () => {
-    render(
+    renderWithClient(
       <TodoDetailDrawer
         todo={todo()}
         open
@@ -87,7 +95,7 @@ describe('TodoDetailDrawer', () => {
 
   it('saves edits through the shared form', async () => {
     const user = userEvent.setup()
-    render(
+    renderWithClient(
       <TodoDetailDrawer
         todo={todo()}
         open
@@ -106,7 +114,7 @@ describe('TodoDetailDrawer', () => {
     const sub = { ...todo({ id: 8, title: 'Deep subtask', parent_id: 7 }) }
     mocks.childrenMap.mockReturnValue(new Map([[7, { items: [sub], total: 1, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
     const onToggleSubtask = vi.fn()
-    render(
+    renderWithClient(
       <TodoDetailDrawer
         todo={todo()}
         open
@@ -127,7 +135,7 @@ describe('TodoDetailDrawer', () => {
     const doneSub = todo({ id: 8, title: 'Done subtask', parent_id: 7, status: 'done', completed_at: '2026-05-01' })
     const openSub = todo({ id: 9, title: 'Open subtask', parent_id: 7 })
     mocks.childrenMap.mockReturnValue(new Map([[7, { items: [doneSub, openSub], total: 2, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
-    render(
+    renderWithClient(
       <TodoDetailDrawer
         todo={todo()}
         open
@@ -143,7 +151,7 @@ describe('TodoDetailDrawer', () => {
   })
 
   it('fetches subtask slices in pinned manual order (a drop must stick on refetch)', () => {
-    render(
+    renderWithClient(
       <TodoDetailDrawer
         todo={todo()}
         open
@@ -164,7 +172,7 @@ describe('TodoDetailDrawer', () => {
     const leaf = { ...todo({ id: 8, title: 'Leaf subtask', parent_id: 7 }) }
     const parent = { ...todo({ id: 9, title: 'Parent subtask', parent_id: 7, child_count: 2 }) }
     mocks.childrenMap.mockReturnValue(new Map([[7, { items: [leaf, parent], total: 2, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
-    render(
+    renderWithClient(
       <TodoDetailDrawer
         todo={todo()}
         open
@@ -182,7 +190,7 @@ describe('TodoDetailDrawer', () => {
   })
 
   it('renders nothing when no todo is set', () => {
-    const { container } = render(
+    const { container } = renderWithClient(
       <TodoDetailDrawer
         todo={null}
         open={false}
