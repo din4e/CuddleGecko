@@ -69,4 +69,14 @@ describe('formatDueLabel', () => {
     expect(formatDueLabel('2026-08-25T12:00:00', now, t)).toBe('昨天')
     expect(formatDueLabel('2026-08-22T12:00:00', now, t)).toBe('已逾期 4 天 12:00')
   })
+
+  it('settled (done/abandoned) todos never say 已逾期 — neutral date instead', () => {
+    // 2026-08-22 is 4 days past; yesterday would normally render 昨天.
+    // Locale-independent assertions: no overdue wording, neutral 月日 + time.
+    const label = formatDueLabel('2026-08-22T12:00:00', now, t, { settled: true })
+    expect(label).not.toContain('已逾期')
+    expect(label.endsWith('12:00')).toBe(true)
+    // yesterday also drops the overdue flavor for settled todos
+    expect(formatDueLabel('2026-08-25T12:00:00', now, t, { settled: true })).not.toContain('昨天')
+  })
 })

@@ -366,7 +366,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             dueOverdue ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground',
           )}>
             <Clock className="h-3 w-3" />
-            {formatDueLabel(todo.due_time, new Date(), t)}
+            {formatDueLabel(todo.due_time, new Date(), t, { settled: todo.status !== 'pending' })}
           </span>
         )}
         {subProgress.total > 0 && (
