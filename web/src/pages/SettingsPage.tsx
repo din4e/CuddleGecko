@@ -16,26 +16,38 @@ import { CUSTOMIZABLE_NAV } from '../lib/nav'
 import { useNavConfigStore } from '../stores/navConfig'
 import type { AIProvider, AIProviderPreset } from '../types'
 
+// Provider logos vendored locally from @lobehub/icons-static-svg v1.95.0
+// (MIT). Inlined as raw SVG instead of a remote <img>: no network
+// dependency, and their fill="currentColor" follows the theme text color
+// (visible in dark mode too).
+import deepseekIcon from '../assets/provider-icons/deepseek.svg?raw'
+import zhipuIcon from '../assets/provider-icons/zhipu.svg?raw'
+import minimaxIcon from '../assets/provider-icons/minimax.svg?raw'
+import moonshotIcon from '../assets/provider-icons/moonshot.svg?raw'
+import qwenIcon from '../assets/provider-icons/qwen.svg?raw'
+import openaiIcon from '../assets/provider-icons/openai.svg?raw'
+
 const PROVIDER_ICONS: Record<string, string> = {
-  deepseek: 'deepseek',
-  glm: 'zhipu',
-  minimax: 'minimax',
-  kimi: 'moonshot',
-  qwen: 'qwen',
-  openai: 'openai',
+  deepseek: deepseekIcon,
+  glm: zhipuIcon,
+  minimax: minimaxIcon,
+  kimi: moonshotIcon,
+  qwen: qwenIcon,
+  openai: openaiIcon,
 }
 
 function ProviderIcon({ type, size = 24 }: { type: string; size?: number }) {
-  const slug = PROVIDER_ICONS[type]
-  if (!slug) return <Bot className="text-muted-foreground" style={{ width: size, height: size }} />
+  const svg = PROVIDER_ICONS[type]
+  if (!svg) return <Bot className="text-muted-foreground" style={{ width: size, height: size }} />
+  // The vendored SVGs are 1em×1em: fontSize scales them, and the span's
+  // color drives their currentColor fill.
   return (
-    <img
-      src={`https://unpkg.com/@lobehub/icons-static-svg@latest/icons/${slug}.svg`}
-      alt={type}
-      width={size}
-      height={size}
-      className="object-contain"
-      style={{ minWidth: size, minHeight: size }}
+    <span
+      role="img"
+      aria-label={type}
+      className="inline-flex shrink-0 text-foreground [&>svg]:block"
+      style={{ width: size, height: size, fontSize: size }}
+      dangerouslySetInnerHTML={{ __html: svg }}
     />
   )
 }
