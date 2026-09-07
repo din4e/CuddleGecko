@@ -318,40 +318,42 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
         ) : (
           // span 而非 button:标题内可渲染 Markdown 链接,锚点按规范不能
           // 嵌套在 button(交互内容)里;键盘 Enter/Space 直接开抽屉。
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              cancelPendingTitleClick()
-              titleClickTimer.current = window.setTimeout(() => {
-                titleClickTimer.current = null
-                onEdit(todo)
-              }, 200)
-            }}
-            onDoubleClick={() => {
-              cancelPendingTitleClick()
-              startEdit()
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                onEdit(todo)
-              }
-            }}
-            className={cn(
-              'min-w-0 flex-1 truncate text-left text-sm font-medium',
-              todo.status !== 'pending' && 'text-muted-foreground line-through',
-            )}
-          >
-            <InlineMarkdown text={todo.title} />
-          </span>
+          <>
+            <TodoPriorityBadge priority={todo.priority} />
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                cancelPendingTitleClick()
+                titleClickTimer.current = window.setTimeout(() => {
+                  titleClickTimer.current = null
+                  onEdit(todo)
+                }, 200)
+              }}
+              onDoubleClick={() => {
+                cancelPendingTitleClick()
+                startEdit()
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onEdit(todo)
+                }
+              }}
+              className={cn(
+                'min-w-0 flex-1 truncate text-left text-sm font-medium',
+                todo.status !== 'pending' && 'text-muted-foreground line-through',
+              )}
+            >
+              <InlineMarkdown text={todo.title} />
+            </span>
+          </>
         )}
 
         {/* compact meta — same visual language as TodoCard's meta row */}
         {todo.pinned && (
           <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
         )}
-        <TodoPriorityBadge priority={todo.priority} />
         {todo.due_time && (
           <span className={cn(
             'flex items-center gap-0.5 whitespace-nowrap text-[10px]',

@@ -203,6 +203,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
             </button>
             {/* span 而非 button:标题内可渲染 Markdown 链接,锚点按规范不能
                 嵌套在 button(交互内容)里。 */}
+            <TodoPriorityBadge priority={child.priority} />
             <span
               role="button"
               tabIndex={0}
@@ -218,7 +219,6 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
             >
               <InlineMarkdown text={child.title} />
             </span>
-            <TodoPriorityBadge priority={child.priority} className="ml-1" />
             {child.due_time && (
               <span
                 className={cn(
