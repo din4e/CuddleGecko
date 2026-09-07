@@ -10,6 +10,9 @@ import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 import { TodoHistory } from './TodoHistory'
 import TodoPriorityBadge from './TodoPriorityBadge'
+import TodoProgressBar from './TodoProgressBar'
+import { todoProgressPercent } from '../lib/todoProgress'
+import { useSetTodoProgress } from '../hooks/api/useTodos'
 import { useTodoChildrenMap } from '../hooks/api/useTodos'
 import type { SubtaskMoveAfterId } from './TodoSubtaskList'
 import type { Todo, Contact, Tag } from '../types'
@@ -150,6 +153,8 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
  *  being viewed. */
 export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates, onContactsChange, onClose, onToggleSubtask, onDeleteSubtask, onStartPomodoro, onOpenTodo, onCreateChild, hideDone, subtaskDragId, onSubtaskDragIdChange, onMoveSubtask }: TodoDetailDrawerProps) {
   const { t } = useTranslation()
+  // Same drag-to-set control as the rows, wider and with a percent label.
+  const setProgress = useSetTodoProgress()
 
   return (
     <Sheet open={open && todo != null} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -163,6 +168,16 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
               </>
             ) : t('todos.editTodo')}
           </SheetTitle>
+          {todo && (
+            <div className="-mt-1 flex items-center gap-1 pr-8">
+              <TodoProgressBar
+                percent={todoProgressPercent(todo)}
+                onCommit={(pct) => setProgress.mutate({ id: todo.id, progress: pct })}
+                showLabel
+                className="w-28"
+              />
+            </div>
+          )}
         </SheetHeader>
         {todo && (
           <Tabs defaultValue="detail" className="min-h-0 flex-1">

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
+import { cn } from '../lib/utils'
 
 /** Draggable progress control for todo rows.
  *
@@ -16,10 +17,13 @@ const STEP = 5
 export default function TodoProgressBar({
   percent,
   onCommit,
+  showLabel = false,
   className = '',
 }: {
   percent: number | null
   onCommit?: (pct: number | null) => void
+  /** Render the numeric percent after the bar (detail surfaces). */
+  showLabel?: boolean
   className?: string
 }) {
   const [dragging, setDragging] = useState(false)
@@ -97,7 +101,11 @@ export default function TodoProgressBar({
         e.stopPropagation()
         onCommit?.(null)
       }}
-      className={`group/bar relative flex h-3 w-10 shrink-0 cursor-default items-center ${interactive ? 'cursor-ew-resize touch-none' : ''} ${className}`}
+      className={cn(
+        'group/bar relative flex h-3 w-10 shrink-0 cursor-default items-center',
+        interactive && 'cursor-ew-resize touch-none',
+        className,
+      )}
     >
       <span
         className={`block h-[3px] w-full overflow-hidden rounded-full transition-opacity ${
@@ -109,6 +117,11 @@ export default function TodoProgressBar({
           style={{ width: `${show ?? 0}%` }}
         />
       </span>
+      {showLabel && (
+        <span className="shrink-0 pl-1 text-[10px] tabular-nums text-muted-foreground">
+          {show != null ? `${show}%` : '—'}
+        </span>
+      )}
     </span>
   )
 }
