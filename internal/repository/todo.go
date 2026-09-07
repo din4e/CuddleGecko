@@ -162,7 +162,7 @@ func todoOrderClause(sort, order string) string {
 
 func (r *TodoRepo) Update(ctx context.Context, todo *model.Todo) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{ID: todo.ID}).
-		Select("title", "description", "status", "priority", "due_time", "start_time", "amount", "amount_type", "contact_ids", "color", "repeat", "repeat_interval", "completed_at", "status_before_cascade").
+		Select("title", "description", "status", "priority", "due_time", "start_time", "amount", "amount_type", "progress", "contact_ids", "color", "repeat", "repeat_interval", "completed_at", "status_before_cascade").
 		Updates(todo).Error; err != nil {
 		return fmt.Errorf("update todo: %w", err)
 	}

@@ -105,6 +105,7 @@ type todoExport struct {
 	StartTime      *time.Time   `json:"start_time"`
 	Amount         *float64     `json:"amount"`
 	AmountType     string       `json:"amount_type"`
+	Progress       *int         `json:"progress"`
 	ContactIDs     []uint       `json:"contact_ids"`
 	Color          string       `json:"color"`
 	Repeat         string       `json:"repeat"`
@@ -395,7 +396,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 		todoExports = append(todoExports, todoExport{
 			ID: td.ID, ParentID: td.ParentID, SortOrder: td.SortOrder,
 			Title: td.Title, Description: td.Description, Status: td.Status, Priority: td.Priority,
-			DueTime: td.DueTime, StartTime: td.StartTime, Amount: td.Amount, AmountType: td.AmountType,
+			DueTime: td.DueTime, StartTime: td.StartTime, Amount: td.Amount, AmountType: td.AmountType, Progress: td.Progress,
 			ContactIDs: td.ContactIDs, Color: td.Color, Repeat: td.Repeat, RepeatInterval: td.RepeatInterval,
 			Pinned: td.Pinned, CompletedAt: td.CompletedAt, TagNames: tagNames, Items: itemsOut,
 		})
@@ -908,6 +909,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 			StartTime:   te.StartTime,
 			Amount:      te.Amount,
 			AmountType:  te.AmountType,
+			Progress:    te.Progress,
 			ContactIDs:  remappedContacts,
 			Color:       te.Color,
 			Repeat:      te.Repeat,
