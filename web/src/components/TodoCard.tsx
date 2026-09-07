@@ -270,35 +270,35 @@ const TodoCard = memo(function TodoCard({
             ) : (
               // span 而非 button:标题内可渲染 Markdown 链接,锚点按规范不能
               // 嵌套在 button(交互内容)里;键盘 Enter/Space 直接开抽屉。
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  cancelPendingTitleClick()
-                  titleClickTimer.current = window.setTimeout(() => {
-                    titleClickTimer.current = null
-                    onEdit(todo)
-                  }, 200)
-                }}
-                onDoubleClick={() => {
-                  cancelPendingTitleClick()
-                  startRename()
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    onEdit(todo)
-                  }
-                }}
-                className={`block max-w-full text-left text-sm font-medium leading-snug cursor-text ${closed ? 'line-through text-muted-foreground' : ''}`}
-                title={todo.title}
-              >
-                <InlineMarkdown text={todo.title} />
-              </span>
+              <div className="flex items-start gap-1.5">
+                <TodoPriorityBadge priority={todo.priority} className="mt-0.5" />
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    cancelPendingTitleClick()
+                    titleClickTimer.current = window.setTimeout(() => {
+                      titleClickTimer.current = null
+                      onEdit(todo)
+                    }, 200)
+                  }}
+                  onDoubleClick={() => {
+                    cancelPendingTitleClick()
+                    startRename()
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onEdit(todo)
+                    }
+                  }}
+                  className={`min-w-0 flex-1 text-left text-sm font-medium leading-snug cursor-text ${closed ? 'line-through text-muted-foreground' : ''}`}
+                  title={todo.title}
+                >
+                  <InlineMarkdown text={todo.title} />
+                </span>
+              </div>
             )}
-            {/* compact (kanban) cards have no meta row — keep the priority
-                chip visible right under the title instead. */}
-            {compact && <div className="mt-0.5"><TodoPriorityBadge priority={todo.priority} /></div>}
             {todo.description && !compact && (
               <p className="text-[11px] leading-snug text-muted-foreground line-clamp-1">
                 <InlineMarkdown text={todo.description} />
@@ -312,7 +312,6 @@ const TodoCard = memo(function TodoCard({
             {todo.pinned && (
               <Star className="h-3 w-3 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
             )}
-            <TodoPriorityBadge priority={todo.priority} />
             {parentTitle && (
               <span className="flex items-center gap-0.5 text-muted-foreground/80">
                 <CornerDownRight className="h-3 w-3" />
