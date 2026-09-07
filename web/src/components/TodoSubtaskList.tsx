@@ -7,6 +7,9 @@ import { formatDueLabel } from '../lib/dueLabel'
 import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 import TodoPriorityBadge from './TodoPriorityBadge'
+import TodoProgressBar from './TodoProgressBar'
+import { todoProgressPercent } from '../lib/todoProgress'
+import { useSetTodoProgress } from '../hooks/api/useTodos'
 import { isSettledStatus, subtreeSettledFromMap } from '../lib/buildTodoTree'
 import { collapseKey, useTodoCollapseStore } from '../stores/todoCollapse'
 import type { Todo } from '../types'
@@ -76,6 +79,8 @@ function resolveDropZone(e: React.DragEvent): DropZone {
  */
 export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEdit, onCreateChild, onDelete, onStartPomodoro, hideDone, onMove, dragId, onDragIdChange, ancestorIds, collapseScope = 'page' }: TodoSubtaskListProps) {
   const { t } = useTranslation()
+  // Subtask rows carry the same draggable progress bar as cards/tree rows.
+  const setProgress = useSetTodoProgress()
   const children = childrenByParent.get(todo.id)
   // Id of the row whose inline adder is open. null = hidden.
   const [addingFor, setAddingFor] = useState<number | null>(null)
@@ -166,7 +171,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
               commitDrop(hovered ?? resolveDropZone(e))
             }}
             className={cn(
-              'group/sub relative flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-muted/60',
+              'group group/sub relative flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-muted/60',
               draggable && 'cursor-grab',
               isDragged && 'opacity-40',
               hovered === 'child' && 'ring-2 ring-primary/70 bg-primary/5',
@@ -219,6 +224,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
             >
               <InlineMarkdown text={child.title} />
             </span>
+            <TodoProgressBar percent={todoProgressPercent(child)} onCommit={(pct) => setProgress.mutate({ id: child.id, progress: pct })} />
             {child.due_time && (
               <span
                 className={cn(

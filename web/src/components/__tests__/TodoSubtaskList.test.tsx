@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useState } from 'react'
 import { render, screen, fireEvent, createEvent, within } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+// The subtask rows call useSetTodoProgress — they need a QueryClient here.
+const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+function renderWithClient(ui: React.ReactElement) {
+  return render(<QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>)
+}
 import userEvent from '@testing-library/user-event'
 import TodoSubtaskList from '../TodoSubtaskList'
 import type { TodoSubtaskListProps } from '../TodoSubtaskList'
@@ -72,7 +79,7 @@ describe('TodoSubtaskList', () => {
   })
 
   it('renders nothing for a todo without children', () => {
-    const { container } = render(
+    const { container } = renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={new Map()}
         onToggle={vi.fn()} onEdit={vi.fn()} />,
     )
@@ -80,7 +87,7 @@ describe('TodoSubtaskList', () => {
   })
 
   it('renders children and nested grandchildren (arbitrary depth)', () => {
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={vi.fn()} onEdit={vi.fn()} />,
     )
@@ -91,7 +98,7 @@ describe('TodoSubtaskList', () => {
   it('toggles a subtask and opens edit via the title', () => {
     const onToggle = vi.fn()
     const onEdit = vi.fn()
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={onToggle} onEdit={onEdit} />,
     )
@@ -102,7 +109,7 @@ describe('TodoSubtaskList', () => {
   })
 
   it('offers a trailing adder on every row at any depth (one per row, no text entries)', () => {
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={vi.fn()} onEdit={vi.fn()}
         onCreateChild={vi.fn()} />,
@@ -117,7 +124,7 @@ describe('TodoSubtaskList', () => {
   it('opens the deepest row-level adder and commits to that row', async () => {
     const onCreateChild = vi.fn()
     const user = userEvent.setup()
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={vi.fn()} onEdit={vi.fn()}
         onCreateChild={onCreateChild} />,
@@ -136,7 +143,7 @@ describe('TodoSubtaskList', () => {
   it('shows the due label and routes delete through onDelete', () => {
     const onDelete = vi.fn()
     const dated = { ...child, due_time: '2999-01-01T10:00:00Z' }
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={new Map([[1, [dated]]])}
         onToggle={vi.fn()} onEdit={vi.fn()} onDelete={onDelete} />,
     )
@@ -145,7 +152,7 @@ describe('TodoSubtaskList', () => {
   })
 
   it('folds and unfolds a nested branch via the row caret', () => {
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={vi.fn()} onEdit={vi.fn()} />,
     )
@@ -160,7 +167,7 @@ describe('TodoSubtaskList', () => {
 
   it('folds persist per scope — the same page shares, other surfaces stay open', () => {
     // Fold a branch on the default (page) scope.
-    const { unmount } = render(
+    const { unmount } = renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={vi.fn()} onEdit={vi.fn()} />,
     )
@@ -168,14 +175,14 @@ describe('TodoSubtaskList', () => {
     unmount()
     // A fresh instance of the SAME scope (same view re-rendered) inherits
     // the fold instead of popping the branch back open.
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={vi.fn()} onEdit={vi.fn()} />,
     )
     expect(screen.queryByText('Grandchild')).not.toBeInTheDocument()
     unmount()
     // A DIFFERENT scope (the drawer) has its own folds — still expanded.
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={makeMap()}
         onToggle={vi.fn()} onEdit={vi.fn()} collapseScope="drawer" />,
     )
@@ -187,7 +194,7 @@ describe('TodoSubtaskList', () => {
     const openChild = base({ id: 5, title: 'Open child', parent_id: 1 })
     const doneParentOfOpen = base({ id: 6, title: 'Done parent of open', parent_id: 1, status: 'done', completed_at: '2026-05-01', child_count: 1 })
     const openGrandchild = base({ id: 7, title: 'Open grandchild', parent_id: 6 })
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent}
         childrenByParent={new Map<number, Todo[]>([
           [1, [doneChild, openChild, doneParentOfOpen]],
@@ -207,7 +214,7 @@ describe('TodoSubtaskList', () => {
     const abandonedChild = base({ id: 12, title: 'Abandoned child', parent_id: 1, status: 'abandoned' })
     const abandonedParentOfOpen = base({ id: 13, title: 'Abandoned parent of open', parent_id: 1, status: 'abandoned', child_count: 1 })
     const openGrandchild = base({ id: 14, title: 'Open under abandoned', parent_id: 13 })
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent}
         childrenByParent={new Map<number, Todo[]>([
           [1, [abandonedChild, abandonedParentOfOpen]],
@@ -226,7 +233,7 @@ describe('TodoSubtaskList', () => {
     // child_count > 0 with no slice in the map: the descendants are unknown,
     // so the row stays until they load (pending work never disappears).
     const unloaded = base({ id: 8, title: 'Unloaded done', parent_id: 1, status: 'done', completed_at: '2026-05-01', child_count: 2 })
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={new Map([[1, [unloaded]]])}
         onToggle={vi.fn()} onEdit={vi.fn()} hideDone />,
     )
@@ -235,7 +242,7 @@ describe('TodoSubtaskList', () => {
 
   it('hideDone renders nothing when every row is settled-done and no adder is wired', () => {
     const onlyDone = base({ id: 9, title: 'Only done', parent_id: 1, status: 'done', completed_at: '2026-05-01' })
-    const { container } = render(
+    const { container } = renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={new Map([[1, [onlyDone]]])}
         onToggle={vi.fn()} onEdit={vi.fn()} hideDone />,
     )
@@ -245,7 +252,7 @@ describe('TodoSubtaskList', () => {
   it('hideDone keeps the progress chip truthful while hiding the done rows themselves', () => {
     const pendingParent = base({ id: 10, title: 'Pending row', parent_id: 1 })
     const doneGrand = base({ id: 11, title: 'Done grand', parent_id: 10, status: 'done', completed_at: '2026-05-01' })
-    render(
+    renderWithClient(
       <TodoSubtaskList todo={parent}
         childrenByParent={new Map<number, Todo[]>([
           [1, [pendingParent]],
@@ -265,7 +272,7 @@ describe('TodoSubtaskList', () => {
     const onMove = vi.fn()
     // Child B starts folded — the drop must reveal it for the result to show.
     useTodoCollapseStore.setState({ collapsed: new Set(['page:4']) })
-    render(
+    renderWithClient(
       <DndHarness todo={parent} childrenByParent={makeDndMap()}
         onToggle={vi.fn()} onEdit={vi.fn()} onMove={onMove} />,
     )
@@ -282,7 +289,7 @@ describe('TodoSubtaskList', () => {
 
   it('upper/lower row bands drop the drag as a sibling of the row', () => {
     const onMove = vi.fn()
-    render(
+    renderWithClient(
       <DndHarness todo={parent} childrenByParent={makeDndMap()}
         onToggle={vi.fn()} onEdit={vi.fn()} onMove={onMove} />,
     )
@@ -302,7 +309,7 @@ describe('TodoSubtaskList', () => {
 
   it('refuses a drop onto the drag\'s own descendant (cycle)', () => {
     const onMove = vi.fn()
-    render(
+    renderWithClient(
       <DndHarness todo={parent} childrenByParent={makeDndMap()}
         onToggle={vi.fn()} onEdit={vi.fn()} onMove={onMove} />,
     )
