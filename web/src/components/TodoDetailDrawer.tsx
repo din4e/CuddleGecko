@@ -110,11 +110,14 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
 
   return (
     <div className="mt-3">
-      <div className="mb-1 flex items-center justify-between">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      {/* Divider-style heading: the label sits on a hairline that runs to the
+          right-side controls, so the eye toggle and "+" attach to the line. */}
+      <div className="mb-1 flex items-center gap-2">
+        <h3 className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {t('todos.subtasks')}
         </h3>
-        <div className="flex items-center gap-0.5">
+        <div className="h-px min-w-4 flex-1 bg-border" />
+        <div className="flex shrink-0 items-center gap-0.5">
           <Button
             variant="ghost"
             size="sm"
