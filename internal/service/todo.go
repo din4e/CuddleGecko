@@ -43,7 +43,7 @@ type TodoRepository interface {
 	UpdateCreatedAt(ctx context.Context, id uint, at time.Time) error
 	IncrementPomodoro(ctx context.Context, workspaceID, id uint) error
 	SetProgress(ctx context.Context, workspaceID, id uint, progress *int) error
-	BulkAction(ctx context.Context, workspaceID uint, ids []uint, action string) (int64, error)
+	BulkAction(ctx context.Context, workspaceID uint, ids []uint, action, priority string) (int64, error)
 	CascadeComplete(ctx context.Context, workspaceID uint, parentIDs []uint, now time.Time) (int64, error)
 	CascadeRestore(ctx context.Context, workspaceID uint, parentIDs []uint) (int64, error)
 	ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error)
@@ -70,6 +70,13 @@ type TodoClear struct {
 	StartTime bool
 	Amount    bool
 	Progress  bool
+	Duration  bool
+}
+
+// BulkActionOptions carries the parameters of parameterized bulk actions —
+// currently the target priority of the "priority" action.
+type BulkActionOptions struct {
+	Priority string
 }
 
 type EventRepositoryForSync interface {
@@ -137,6 +144,9 @@ func (s *TodoService) Create(ctx context.Context, userID, workspaceID uint, todo
 	if err := validateTodoProgress(todo.Progress); err != nil {
 		return nil, err
 	}
+	if err := validateTodoDuration(todo.Duration); err != nil {
+		return nil, err
+	}
 	// Only done tasks carry a completion timestamp (it powers done-today stats).
 	if todo.Status == "done" && todo.CompletedAt == nil {
 		now := time.Now()
@@ -173,6 +183,9 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 		return nil, err
 	}
 	if err := validateTodoProgress(updates.Progress); err != nil {
+		return nil, err
+	}
+	if err := validateTodoDuration(updates.Duration); err != nil {
 		return nil, err
 	}
 	todo, err := s.repo.GetByID(ctx, workspaceID, id)
@@ -215,6 +228,11 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 		todo.Progress = nil
 	} else if updates.Progress != nil {
 		todo.Progress = updates.Progress
+	}
+	if clear.Duration {
+		todo.Duration = 0
+	} else if updates.Duration > 0 {
+		todo.Duration = updates.Duration
 	}
 	todo.AmountType = updates.AmountType
 	todo.ContactIDs = updates.ContactIDs
@@ -500,9 +518,21 @@ func (s *TodoService) Duplicate(ctx context.Context, userID, workspaceID, id uin
 	return clone, nil
 }
 
-// BulkAction applies a complete-or-delete action to many todos at once.
-func (s *TodoService) BulkAction(ctx context.Context, userID, workspaceID uint, ids []uint, action string) (int64, error) {
-	affected, err := s.repo.BulkAction(ctx, workspaceID, ids, action)
+// BulkAction applies one of the batch actions to many todos at once:
+// complete | delete | postpone (+1 day, keeping the time of day; undated tasks
+// land at tomorrow 23:59 — same rule as the card's postpone action) | priority
+// (set every selected todo to opts.Priority).
+func (s *TodoService) BulkAction(ctx context.Context, userID, workspaceID uint, ids []uint, action string, opts BulkActionOptions) (int64, error) {
+	switch action {
+	case "complete", "delete", "postpone":
+	case "priority":
+		if !validTodoPriority(opts.Priority) {
+			return 0, fmt.Errorf("%w: priority must be 'high', 'normal', 'low' or 'none'", ErrInvalidTodo)
+		}
+	default:
+		return 0, fmt.Errorf("%w: action must be 'complete', 'delete', 'postpone' or 'priority'", ErrInvalidTodo)
+	}
+	affected, err := s.repo.BulkAction(ctx, workspaceID, ids, action, opts.Priority)
 	if err != nil || affected == 0 {
 		return affected, err
 	}

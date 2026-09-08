@@ -28,13 +28,14 @@ type createTodoRequest struct {
 	Priority    string   `json:"priority"`
 	DueTime     string   `json:"due_time"`
 	StartTime   string   `json:"start_time"`
+	Duration    int      `json:"duration"`
 	Amount      *float64 `json:"amount"`
 	AmountType  string   `json:"amount_type"`
 	Progress    *int     `json:"progress"`
 	ContactIDs  []uint   `json:"contact_ids"`
 	Color       string   `json:"color"`
 	Repeat      string   `json:"repeat"`
-	RepeatInterval int    `json:"repeat_interval"`
+	RepeatInterval int   `json:"repeat_interval"`
 	ParentID    *uint    `json:"parent_id"`
 }
 
@@ -47,6 +48,8 @@ type updateTodoRequest struct {
 	ClearDueTime bool     `json:"clear_due_time"`
 	StartTime    string   `json:"start_time"`
 	ClearStartTime bool   `json:"clear_start_time"`
+	Duration     int      `json:"duration"`
+	ClearDuration bool    `json:"clear_duration"`
 	Amount       *float64 `json:"amount"`
 	ClearAmount  bool     `json:"clear_amount"`
 	AmountType   string   `json:"amount_type"`
@@ -345,6 +348,7 @@ func (h *TodoHandler) Create(c *gin.Context) {
 		Description: req.Description,
 		Status:      req.Status,
 		Priority:    req.Priority,
+		Duration:    req.Duration,
 		Amount:      req.Amount,
 		AmountType:  req.AmountType,
 		Progress:    req.Progress,
@@ -406,6 +410,7 @@ func (h *TodoHandler) Update(c *gin.Context) {
 		Description: req.Description,
 		Status:      req.Status,
 		Priority:    req.Priority,
+		Duration:    req.Duration,
 		Amount:      req.Amount,
 		AmountType:  req.AmountType,
 		Progress:    req.Progress,
@@ -419,6 +424,7 @@ func (h *TodoHandler) Update(c *gin.Context) {
 		StartTime: req.ClearStartTime,
 		Amount:    req.ClearAmount,
 		Progress:  req.ClearProgress,
+		Duration:  req.ClearDuration,
 	}
 
 	if req.DueTime != "" {
@@ -843,11 +849,13 @@ func (h *TodoHandler) TogglePin(c *gin.Context) {
 }
 
 type bulkTodoRequest struct {
-	IDs    []uint `json:"ids"`
-	Action string `json:"action"` // "complete" | "delete"
+	IDs      []uint `json:"ids"`
+	Action   string `json:"action"` // "complete" | "delete" | "postpone" | "priority"
+	Priority string `json:"priority"`
 }
 
-// BulkAction completes or deletes many todos at once.
+// BulkAction applies a batch action (complete / delete / postpone / priority)
+// to many todos at once.
 func (h *TodoHandler) BulkAction(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
@@ -857,8 +865,10 @@ func (h *TodoHandler) BulkAction(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	if req.Action != "complete" && req.Action != "delete" {
-		response.BadRequest(c, "action must be 'complete' or 'delete'")
+	switch req.Action {
+	case "complete", "delete", "postpone", "priority":
+	default:
+		response.BadRequest(c, "action must be 'complete', 'delete', 'postpone' or 'priority'")
 		return
 	}
 	if len(req.IDs) == 0 {
@@ -866,8 +876,12 @@ func (h *TodoHandler) BulkAction(c *gin.Context) {
 		return
 	}
 
-	affected, err := h.svc.BulkAction(c.Request.Context(), userID, workspaceID, req.IDs, req.Action)
+	affected, err := h.svc.BulkAction(c.Request.Context(), userID, workspaceID, req.IDs, req.Action, service.BulkActionOptions{Priority: req.Priority})
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidTodo) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		response.InternalError(c, "failed to apply bulk action")
 		return
 	}

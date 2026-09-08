@@ -113,8 +113,8 @@ func (m *mockTodoSvcRepo) Duplicate(ctx context.Context, userID, workspaceID, id
 	return args.Get(0).(*model.Todo), args.Error(1)
 }
 
-func (m *mockTodoSvcRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint, action string) (int64, error) {
-	args := m.Called(ctx, workspaceID, ids, action)
+func (m *mockTodoSvcRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint, action, priority string) (int64, error) {
+	args := m.Called(ctx, workspaceID, ids, action, priority)
 	return args.Get(0).(int64), args.Error(1)
 }
 
@@ -368,7 +368,7 @@ func TestTodoHandler_BulkAction(t *testing.T) {
 	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
-	repo.On("BulkAction", mock.Anything, uint(1), []uint{1, 2, 3}, "complete").Return(int64(2), nil)
+	repo.On("BulkAction", mock.Anything, uint(1), []uint{1, 2, 3}, "complete", "").Return(int64(2), nil)
 
 	body, _ := json.Marshal(map[string]interface{}{"ids": []int{1, 2, 3}, "action": "complete"})
 	w := httptest.NewRecorder()
@@ -378,6 +378,40 @@ func TestTodoHandler_BulkAction(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_BulkAction_Priority(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("BulkAction", mock.Anything, uint(1), []uint{4, 5}, "priority", "high").Return(int64(2), nil)
+
+	body, _ := json.Marshal(map[string]interface{}{"ids": []int{4, 5}, "action": "priority", "priority": "high"})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/todos/bulk", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_BulkAction_PriorityInvalidTier(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	body, _ := json.Marshal(map[string]interface{}{"ids": []int{4}, "action": "priority", "priority": "urgent"})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/todos/bulk", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	repo.AssertNotCalled(t, "BulkAction")
 }
 
 func TestTodoHandler_TogglePin(t *testing.T) {

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -125,6 +126,9 @@ func diffTodoUpdates(before, after *model.Todo) []model.TodoActivity {
 	}
 	if before.Repeat != after.Repeat {
 		add("repeat", before.Repeat, after.Repeat)
+	}
+	if before.Duration != after.Duration {
+		add("duration", strconv.Itoa(before.Duration), strconv.Itoa(after.Duration))
 	}
 	if !timePtrEqual(before.DueTime, after.DueTime) {
 		add("due_time", timePtrString(before.DueTime), timePtrString(after.DueTime))

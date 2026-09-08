@@ -80,9 +80,9 @@ func TestTodoNotifier_CreateItem(t *testing.T) {
 func TestTodoNotifier_BulkAction(t *testing.T) {
 	n := &captureNotifier{}
 	svc, repo := newNotifiedService(n)
-	repo.On("BulkAction", mock.Anything, uint(2), []uint{10, 11}, "complete").Return(int64(2), nil)
+	repo.On("BulkAction", mock.Anything, uint(2), []uint{10, 11}, "complete", "").Return(int64(2), nil)
 
-	affected, err := svc.BulkAction(context.Background(), 1, 2, []uint{10, 11}, "complete")
+	affected, err := svc.BulkAction(context.Background(), 1, 2, []uint{10, 11}, "complete", BulkActionOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2), affected)
 	// Bulk fans out a workspace-wide refresh (todo_id 0).
@@ -92,9 +92,9 @@ func TestTodoNotifier_BulkAction(t *testing.T) {
 func TestTodoNotifier_BulkAction_NoopWhenUnaffected(t *testing.T) {
 	n := &captureNotifier{}
 	svc, repo := newNotifiedService(n)
-	repo.On("BulkAction", mock.Anything, uint(2), []uint{99}, "complete").Return(int64(0), nil)
+	repo.On("BulkAction", mock.Anything, uint(2), []uint{99}, "complete", "").Return(int64(0), nil)
 
-	_, err := svc.BulkAction(context.Background(), 1, 2, []uint{99}, "complete")
+	_, err := svc.BulkAction(context.Background(), 1, 2, []uint{99}, "complete", BulkActionOptions{})
 	assert.NoError(t, err)
 	assert.Empty(t, n.events, "no notification when nothing was affected")
 }

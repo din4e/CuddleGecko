@@ -119,8 +119,8 @@ func (m *mockTodoRepo) Duplicate(ctx context.Context, userID, workspaceID, id ui
 	return args.Get(0).(*model.Todo), args.Error(1)
 }
 
-func (m *mockTodoRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint, action string) (int64, error) {
-	args := m.Called(ctx, workspaceID, ids, action)
+func (m *mockTodoRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint, action, priority string) (int64, error) {
+	args := m.Called(ctx, workspaceID, ids, action, priority)
 	return args.Get(0).(int64), args.Error(1)
 }
 
@@ -626,12 +626,66 @@ func TestTodoService_BulkAction(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("BulkAction", mock.Anything, uint(1), []uint{1, 2}, "delete").Return(int64(2), nil)
+	repo.On("BulkAction", mock.Anything, uint(1), []uint{1, 2}, "delete", "").Return(int64(2), nil)
 
-	affected, err := svc.BulkAction(context.Background(), 1, 1, []uint{1, 2}, "delete")
+	affected, err := svc.BulkAction(context.Background(), 1, 1, []uint{1, 2}, "delete", BulkActionOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2), affected)
 	repo.AssertExpectations(t)
+}
+
+func TestTodoService_BulkAction_Priority(t *testing.T) {
+	repo := new(mockTodoRepo)
+	eventRepo := new(mockEventRepoForSync)
+	svc := NewTodoService(repo, eventRepo, repo)
+
+	repo.On("BulkAction", mock.Anything, uint(1), []uint{1, 2}, "priority", "high").Return(int64(2), nil)
+
+	affected, err := svc.BulkAction(context.Background(), 1, 1, []uint{1, 2}, "priority", BulkActionOptions{Priority: "high"})
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), affected)
+	repo.AssertExpectations(t)
+
+	// Unknown tiers are rejected before touching the repo.
+	_, err = svc.BulkAction(context.Background(), 1, 1, []uint{1, 2}, "priority", BulkActionOptions{Priority: "urgent"})
+	assert.ErrorIs(t, err, ErrInvalidTodo)
+
+	// So are unknown actions.
+	_, err = svc.BulkAction(context.Background(), 1, 1, []uint{1, 2}, "explode", BulkActionOptions{})
+	assert.ErrorIs(t, err, ErrInvalidTodo)
+	repo.AssertNotCalled(t, "BulkAction", mock.Anything, uint(1), []uint{1, 2}, "priority", "urgent")
+}
+
+func TestTodoService_Update_Duration(t *testing.T) {
+	repo := new(mockTodoRepo)
+	eventRepo := new(mockEventRepoForSync)
+	svc := NewTodoService(repo, eventRepo, repo)
+
+	existing := &model.Todo{ID: 1, Title: "task", Status: "pending"}
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil).Twice()
+	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil).Twice()
+
+	updated, err := svc.Update(context.Background(), 1, 1, 1, &model.Todo{Title: "task", Duration: 90}, TodoClear{})
+	assert.NoError(t, err)
+	assert.Equal(t, 90, updated.Duration)
+
+	updated, err = svc.Update(context.Background(), 1, 1, 1, &model.Todo{Title: "task"}, TodoClear{Duration: true})
+	assert.NoError(t, err)
+	assert.Equal(t, 0, updated.Duration)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoService_Create_RejectsInvalidDuration(t *testing.T) {
+	repo := new(mockTodoRepo)
+	eventRepo := new(mockEventRepoForSync)
+	svc := NewTodoService(repo, eventRepo, repo)
+
+	_, err := svc.Create(context.Background(), 1, 1, &model.Todo{Title: "task", Duration: -5})
+	assert.ErrorIs(t, err, ErrInvalidTodo)
+
+	_, err = svc.Create(context.Background(), 1, 1, &model.Todo{Title: "task", Duration: 31 * 24 * 60})
+	assert.ErrorIs(t, err, ErrInvalidTodo)
+	repo.AssertNotCalled(t, "Create")
 }
 
 func TestTodoService_TogglePin(t *testing.T) {
