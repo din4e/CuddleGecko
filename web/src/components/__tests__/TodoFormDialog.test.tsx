@@ -48,7 +48,7 @@ describe('TodoFormDialog', () => {
     render(
       <TodoFormDialog
         open
-        editing={todo({ due_time: '2026-05-01T09:00:00.000Z' }) }
+        editing={todo({ due_time: '2026-05-01T09:00:00.000Z' })}
         contacts={[]}
         tags={[]}
         onContactsChange={vi.fn()}
@@ -63,6 +63,51 @@ describe('TodoFormDialog', () => {
     expect(mocks.updateTodo).toHaveBeenCalledTimes(1)
     const arg = mocks.updateTodo.mock.calls[0][0] as { data: { clear_due_time?: boolean } }
     expect(arg.data.clear_due_time).toBe(true)
+  })
+
+  it('sends the estimated duration on create', async () => {
+    const user = userEvent.setup()
+    render(
+      <TodoFormDialog
+        open
+        editing={null}
+        contacts={[]}
+        tags={[]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    // The duration field lives in the collapsible extras; open it first.
+    await user.click(screen.getByText('todos.moreSettings'))
+    const durationInput = document.querySelector('input[aria-label="todos.duration"]') as HTMLInputElement
+    await user.type(durationInput, '45')
+    await user.type(document.querySelector('input') as HTMLInputElement, 'Timed task')
+    await user.click(screen.getByText('common.create'))
+
+    expect(mocks.createTodo).toHaveBeenCalledTimes(1)
+    expect(mocks.createTodo.mock.calls[0][0]).toMatchObject({ duration: 45 })
+  })
+
+  it('clearing a populated duration on edit sends clear_duration', async () => {
+    const user = userEvent.setup()
+    render(
+      <TodoFormDialog
+        open
+        editing={todo({ duration: 45 })}
+        contacts={[]}
+        tags={[]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    const editDuration = document.querySelector('input[aria-label="todos.duration"]') as HTMLInputElement
+    expect(editDuration.value).toBe('45')
+    await user.clear(editDuration)
+    await user.click(screen.getByText('common.save'))
+
+    expect(mocks.updateTodo).toHaveBeenCalledTimes(1)
+    const arg = mocks.updateTodo.mock.calls[0][0] as { data: { clear_duration?: boolean } }
+    expect(arg.data.clear_duration).toBe(true)
   })
 
   it('opens with an empty title for a new todo', () => {

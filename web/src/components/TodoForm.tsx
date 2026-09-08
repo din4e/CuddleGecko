@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, Eye, PenLine, Repeat, Loader2 } from 'lucide-react'
+import { ChevronDown, Eye, Hourglass, PenLine, Repeat, Loader2 } from 'lucide-react'
 import { isoToLocalInput } from '../lib/utils'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -40,12 +40,15 @@ export interface TodoFormProps {
   parentCandidates?: Todo[]
   onContactsChange: (contacts: Contact[]) => void
   onClose: () => void
+  /** Prefilled due time for create (local datetime-local string) — the
+   *  calendar view's per-day quick create. Ignored when editing. */
+  initialDueTime?: string
 }
 
 /** Shared todo create/edit fields — hosted by TodoFormDialog (create modal)
  *  and TodoDetailDrawer (right slide-over). State initializes from `editing`
  *  once per mount; both shells remount via a key on the todo id. */
-export function TodoForm({ editing, contacts, tags, parentCandidates, onContactsChange, onClose }: TodoFormProps) {
+export function TodoForm({ editing, contacts, tags, parentCandidates, onContactsChange, onClose, initialDueTime }: TodoFormProps) {
   const { t } = useTranslation()
   const createTodo = useCreateTodo()
   const updateTodo = useUpdateTodo()
@@ -56,8 +59,10 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   const [formDesc, setFormDesc] = useState(editing?.description ?? '')
   const [formStatus, setFormStatus] = useState<TodoStatus>(editing?.status ?? 'pending')
   const [formPriority, setFormPriority] = useState<'none' | 'low' | 'normal' | 'high'>(editing?.priority ?? 'normal')
-  const [formDueTime, setFormDueTime] = useState(editing?.due_time ? isoToLocalInput(editing.due_time) : '')
+  const [formDueTime, setFormDueTime] = useState(editing?.due_time ? isoToLocalInput(editing.due_time) : initialDueTime ?? '')
   const [formStartTime, setFormStartTime] = useState(editing?.start_time ? isoToLocalInput(editing.start_time) : '')
+  // Estimated effort in minutes (TickTick 持续时长); '' = unset.
+  const [formDuration, setFormDuration] = useState(editing?.duration ? String(editing.duration) : '')
   const [formAmount, setFormAmount] = useState(editing?.amount != null ? String(editing.amount) : '')
   const [formAmountType, setFormAmountType] = useState<'' | 'income' | 'expense'>(editing?.amount_type ?? '')
   const [formContactIds, setFormContactIds] = useState<number[]>(editing?.contact_ids ?? [])
@@ -71,10 +76,10 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   const [descPreview, setDescPreview] = useState(false)
   // Non-todo extras (amount, buddies, color) fold away by default; start
   // expanded when the edited todo already carries values so nothing hides.
-  const hasExtras = editing != null && (editing.amount != null || (editing.contact_ids?.length ?? 0) > 0 || !!editing.color)
+  const hasExtras = editing != null && (editing.amount != null || (editing.contact_ids?.length ?? 0) > 0 || !!editing.color || (editing.duration ?? 0) > 0)
   const [moreOpen, setMoreOpen] = useState(hasExtras)
   // Live count of set extras, shown as a badge while the section is collapsed.
-  const extrasSet = [formAmount !== '', formContactIds.length > 0, formColor !== ''].filter(Boolean).length
+  const extrasSet = [formAmount !== '', formContactIds.length > 0, formColor !== '', formDuration !== ''].filter(Boolean).length
 
   // Disallow picking self or a descendant as the new parent (backend would reject
   // the cycle); keeps the picker honest when editing.
@@ -91,6 +96,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
         priority: formPriority,
         due_time: formDueTime ? new Date(formDueTime).toISOString() : null,
         start_time: formStartTime ? new Date(formStartTime).toISOString() : null,
+        duration: formDuration ? parseInt(formDuration, 10) : 0,
         amount: formAmount ? parseFloat(formAmount) : null,
         amount_type: formAmountType,
         contact_ids: formContactIds,
@@ -104,6 +110,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
       if (editing.due_time && !formDueTime) data.clear_due_time = true
       if (editing.start_time && !formStartTime) data.clear_start_time = true
       if (editing.amount != null && !formAmount) data.clear_amount = true
+      if ((editing.duration ?? 0) > 0 && !formDuration) data.clear_duration = true
       await updateTodo.mutateAsync({ id: editing.id, data })
       todoId = editing.id
     } else {
@@ -114,6 +121,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
         priority: formPriority,
         due_time: formDueTime ? new Date(formDueTime).toISOString() : undefined,
         start_time: formStartTime ? new Date(formStartTime).toISOString() : undefined,
+        duration: formDuration ? parseInt(formDuration, 10) : undefined,
         amount: formAmount ? parseFloat(formAmount) : undefined,
         amount_type: formAmountType,
         contact_ids: formContactIds,
@@ -143,7 +151,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
       }
     }
     onClose()
-  }, [editing, formTitle, formDesc, formStatus, formPriority, formDueTime, formStartTime, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
+  }, [editing, formTitle, formDesc, formStatus, formPriority, formDueTime, formStartTime, formDuration, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
 
   return (
     <>
@@ -334,6 +342,42 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
           </button>
           {moreOpen && (
             <>
+              {/* Estimated effort (持续时长): minutes with quick presets —
+                  feeds planning and pairs naturally with pomodoro sessions. */}
+              <div className="space-y-1">
+                <Label className="flex items-center gap-1"><Hourglass className="h-3.5 w-3.5" />{t('todos.duration')}</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={formDuration}
+                    onChange={(e) => setFormDuration(e.target.value)}
+                    placeholder="0"
+                    className="h-8 w-20"
+                    aria-label={t('todos.duration')}
+                  />
+                  <span className="text-xs text-muted-foreground">{t('todos.durationUnit')}</span>
+                  <div className="flex gap-1">
+                    {[15, 30, 60, 120].map((mins) => (
+                      <Button
+                        key={mins}
+                        type="button"
+                        variant={formDuration === String(mins) ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setFormDuration(String(mins))}
+                      >
+                        {mins < 60 ? `${mins}m` : mins % 60 === 0 ? `${mins / 60}h` : `${mins}m`}
+                      </Button>
+                    ))}
+                    {formDuration !== '' && (
+                      <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setFormDuration('')}>
+                        {t('todos.clear')}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>{t('todos.amount')}</Label>

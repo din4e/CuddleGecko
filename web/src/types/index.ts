@@ -211,6 +211,9 @@ export type TodoPriority = 'none' | 'low' | 'normal' | 'high'
 export type AmountType = '' | 'income' | 'expense'
 export type TodoSort = 'due_date' | 'priority' | 'title' | 'created' | 'manual'
 
+/** Batch actions for POST /todos/bulk ("priority" also carries a value). */
+export type TodoBulkAction = 'complete' | 'delete' | 'postpone' | 'priority'
+
 /** Query parameters for listing todos (TickTick-style filter/sort/smart-list). */
 export interface TodoListParams {
   status?: TodoStatus
@@ -245,6 +248,7 @@ export interface TodoUpdateInput extends Partial<Omit<Todo, 'due_time' | 'amount
   clear_start_time?: boolean
   clear_amount?: boolean
   clear_progress?: boolean
+  clear_duration?: boolean
 }
 
 export interface Habit {
@@ -299,6 +303,8 @@ export interface Todo {
   priority: TodoPriority
   due_time: string | null
   start_time?: string | null
+  /** Estimated effort in minutes (TickTick 持续时长). 0/undefined = unset. */
+  duration?: number
   amount: number | null
   amount_type: AmountType
   contact_ids: number[]

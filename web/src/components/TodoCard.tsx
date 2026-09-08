@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Ban, CheckCircle2, ChevronDown, Circle, Clock, CalendarClock, ListTodo, ListTree, Plus, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer, MoreVertical } from 'lucide-react'
+import { Ban, CheckCircle2, ChevronDown, Circle, Clock, CalendarClock, Hourglass, ListTodo, ListTree, Plus, Repeat, ArrowRight, Copy, Pencil, Trash2, Star, CornerDownRight, Timer, MoreVertical } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
@@ -12,6 +12,7 @@ import {
 } from './ui/dropdown-menu'
 import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
+import { formatDuration } from '../lib/duration'
 import { collapseKey, useTodoCollapseStore } from '../stores/todoCollapse'
 import TodoPriorityBadge from './TodoPriorityBadge'
 import TodoProgressBar from './TodoProgressBar'
@@ -105,6 +106,21 @@ const TodoCard = memo(function TodoCard({
   const [addingChild, setAddingChild] = useState(false)
   // Native subtask drag hovering this card (nest target highlight).
   const [nestHover, setNestHover] = useState(false)
+  // Completion celebration (TickTick's little check pop): fires once when the
+  // status flips pending → done while this card is on screen.
+  const prevStatus = useRef(todo.status)
+  const [justDone, setJustDone] = useState(false)
+  useEffect(() => {
+    if (prevStatus.current !== todo.status) {
+      const completed = prevStatus.current === 'pending' && todo.status === 'done'
+      prevStatus.current = todo.status
+      if (completed) {
+        setJustDone(true)
+        const timer = window.setTimeout(() => setJustDone(false), 950)
+        return () => window.clearTimeout(timer)
+      }
+    }
+  }, [todo.status])
   const canNest = subtaskDragId != null && subtaskDragId !== todo.id && onNestSubtask != null
   // Flat views fold the card's subtask list through the shared persisted
   // collapse store (synced with the drawer and every nesting depth inside).
@@ -238,6 +254,9 @@ const TodoCard = memo(function TodoCard({
         setNestHover(false)
       }}
     >
+      {/* Completion flash: a one-shot green wash that fades out under the
+          freshly-checked card (purely decorative; pointer-transparent). */}
+      {justDone && <div aria-hidden className="animate-todo-done-flash pointer-events-none absolute inset-0 rounded-lg bg-green-500/30" />}
       <CardContent className={compact ? 'p-1' : 'p-1 space-y-0.5'}>
         <div className="flex items-start gap-1.5">
           {selectable && (
@@ -252,7 +271,7 @@ const TodoCard = memo(function TodoCard({
           <button
             onClick={() => onToggle(todo.id)}
             aria-label={todo.status === 'pending' ? t('todos.markDone') : t('todos.markPending')}
-            className="mt-0.5 shrink-0 cursor-pointer bg-transparent border-none"
+            className={`mt-0.5 shrink-0 cursor-pointer bg-transparent border-none ${justDone ? 'animate-todo-done-pop' : ''}`}
           >
             {todo.status === 'done'
               ? <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -337,6 +356,12 @@ const TodoCard = memo(function TodoCard({
               <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
                 <CalendarClock className="h-3 w-3" />
                 {formatDate(todo.start_time)}
+              </span>
+            )}
+            {(todo.duration ?? 0) > 0 && (
+              <span className="flex items-center gap-1" title={t('todos.duration')}>
+                <Hourglass className="h-3 w-3" />
+                {formatDuration(todo.duration ?? 0, t)}
               </span>
             )}
             {(todo.item_total ?? 0) > 0 && (

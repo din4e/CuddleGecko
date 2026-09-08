@@ -103,6 +103,7 @@ const mockedReplaceTags = vi.mocked(todosApi.replaceTags)
 const mockedStats = vi.mocked(todosApi.stats)
 const mockedTrash = vi.mocked(todosApi.listTrash)
 const mockedEmptyTrash = vi.mocked(todosApi.emptyTrash)
+const mockedBulk = vi.mocked(todosApi.bulk)
 const mockedContactsList = vi.mocked(contactsApi.list)
 const mockedTagsList = vi.mocked(tagsApi.list)
 
@@ -640,6 +641,122 @@ describe('TodosPage', () => {
     await waitFor(() => {
       expect(screen.getByText('todos.bulkComplete')).toBeInTheDocument()
       expect(screen.getByText('todos.bulkDelete')).toBeInTheDocument()
+    })
+  })
+
+  it('bulk-postpones the selected todos (+1 day)', async () => {
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 1, title: 'Postpone me', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+    ]))
+    mockedBulk.mockResolvedValue({ data: { affected: 1 } })
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Postpone me')).toBeInTheDocument())
+
+    // [0] = the header overflow menu (cards carry same-labelled kebab buttons).
+    await user.click(screen.getAllByRole('button', { name: 'common.more' })[0])
+    await user.click(await screen.findByText('todos.select'))
+    await user.click(screen.getByRole('checkbox', { name: 'Postpone me' }))
+    await user.click(screen.getByRole('button', { name: /todos\.bulkPostpone/ }))
+
+    await waitFor(() => {
+      expect(mockedBulk).toHaveBeenCalledWith([1], 'postpone', undefined)
+    })
+  })
+
+  it('bulk-sets the priority of the selected todos', async () => {
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 2, title: 'Rank me', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+    ]))
+    mockedBulk.mockResolvedValue({ data: { affected: 1 } })
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Rank me')).toBeInTheDocument())
+
+    await user.click(screen.getAllByRole('button', { name: 'common.more' })[0])
+    await user.click(await screen.findByText('todos.select'))
+    await user.click(screen.getByRole('checkbox', { name: 'Rank me' }))
+    await user.click(screen.getByRole('button', { name: /todos\.bulkSetPriority/ }))
+    // t('todos.high') resolves to 高 in the mock; pick the menu item, not the
+    // filter <option>/card badge that carry the same text.
+    await user.click(await screen.findByRole('menuitem', { name: '高' }))
+
+    await waitFor(() => {
+      expect(mockedBulk).toHaveBeenCalledWith([2], 'priority', 'high')
+    })
+  })
+
+  it('switches to the Tomorrow smart list (due bounded to tomorrow)', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('暂无待办')).toBeInTheDocument()
+    })
+
+    await user.selectOptions(screen.getByLabelText('todos.smartList'), 'tomorrow')
+
+    await waitFor(() => {
+      // Tomorrow = pending + both due bounds, no overdue leakage.
+      expect(mockedList).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'pending', due_after: expect.any(String), due_before: expect.any(String) }),
+        expect.any(AbortSignal),
+      )
+      const call = mockedList.mock.calls.at(-1)?.[0] as TodoListParams
+      expect(new Date(call.due_before!).getTime() - new Date(call.due_after!).getTime()).toBe(24 * 60 * 60 * 1000)
+    })
+  })
+
+  it('groups the grouped view by priority when 分组方式 = priority', async () => {
+    localStorage.setItem('todoView', 'grouped')
+    localStorage.setItem('todoGroupBy', 'priority')
+    mockedList.mockResolvedValue(mockPage<Todo>([
+      { id: 1, title: 'Urgent thing', status: 'pending', priority: 'high', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      { id: 2, title: 'Chill thing', status: 'pending', priority: 'none', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+    ]))
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Urgent thing')).toBeInTheDocument()
+      expect(screen.getByText('Chill thing')).toBeInTheDocument()
+    })
+    // The bucketing selector is offered, and both priority buckets render as
+    // group headings (高 for the high task, 无 for the none task).
+    expect(screen.getByLabelText('todos.groupBy')).toBeInTheDocument()
+    expect(screen.getAllByText('高').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('无').length).toBeGreaterThan(0)
+  })
+
+  it('renders the calendar view with month-range query and chips on due days', async () => {
+    localStorage.setItem('todoView', 'calendar')
+    const today = new Date()
+    const dueToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 30).toISOString()
+    const undatedDue = new Date(today.getFullYear(), today.getMonth() + 1, 15).toISOString()
+    mockedList.mockImplementation(async (params?: TodoListParams) => {
+      // The month-range query feeds the grid; the inbox query feeds the strip.
+      if (params?.no_due) {
+        return mockPage<Todo>([
+          { id: 2, title: 'Inbox capture', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+        ])
+      }
+      return mockPage<Todo>([
+        { id: 1, title: 'Dated task', status: 'pending', priority: 'high', due_time: dueToday, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+        { id: 3, title: 'Next month task', status: 'pending', priority: 'normal', due_time: undatedDue, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      ])
+    })
+    renderPage()
+
+    // The calendar fetches by month range (both bounds), never by smart list.
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledWith(
+        expect.objectContaining({ due_after: expect.any(String), due_before: expect.any(String) }),
+        expect.any(AbortSignal),
+      )
+    })
+    await waitFor(() => {
+      // A chip for the task due today and the inbox strip's capture chip.
+      expect(screen.getByTitle('Dated task')).toBeInTheDocument()
+      expect(screen.getByTitle('Inbox capture')).toBeInTheDocument()
+      // The out-of-month task is filtered by the range query, so no chip.
+      expect(screen.queryByTitle('Next month task')).not.toBeInTheDocument()
     })
   })
 

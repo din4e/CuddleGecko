@@ -31,10 +31,14 @@ export default function TodoProgressBar({
   const [dragValue, setDragValue] = useState<number | null>(null)
   const trackRef = useRef<HTMLSpanElement>(null)
 
+  // A committed change (new percent from the server/cache) ends any in-flight
+  // drag — the bar snaps to the authoritative value.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setDragValue(null)
     setDragging(false)
   }, [percent])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const pctFromEvent = (e: ReactPointerEvent) => {
     const rect = trackRef.current?.getBoundingClientRect()

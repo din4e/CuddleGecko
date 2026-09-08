@@ -4,7 +4,7 @@ import type { InfiniteData } from '@tanstack/react-query'
 import { todosApi } from '../../api/todos'
 import { rootKey } from './keys'
 import { invalidateScope, markLocalMutation } from '@/lib/querySync'
-import type { Todo, TodoItem, TodoActivity, TodoStats, PaginatedData, TodoListParams, TodoStatus, TodoUpdateInput } from '../../types'
+import type { Todo, TodoItem, TodoActivity, TodoStats, PaginatedData, TodoListParams, TodoStatus, TodoUpdateInput, TodoBulkAction, TodoPriority } from '../../types'
 
 const scope = 'todos'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
@@ -629,8 +629,8 @@ export function useDeleteTodo() {
 export function useBulkActionTodo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ ids, action }: { ids: number[]; action: 'complete' | 'delete' }) =>
-      todosApi.bulk(ids, action),
+    mutationFn: ({ ids, action, priority }: { ids: number[]; action: TodoBulkAction; priority?: TodoPriority }) =>
+      todosApi.bulk(ids, action, priority),
     onSuccess: () => invalidateScope(qc, scope),
     // TodosPage shows a specific bulk-failed toast; suppress the global one.
     meta: { localErrorHandling: true },

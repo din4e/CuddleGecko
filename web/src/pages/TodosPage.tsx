@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../components/ui/dialog'
-import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical, Eye, EyeOff, Tags, Inbox } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical, Eye, EyeOff, Tags, Inbox, CalendarDays, CalendarClock, Flag } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +25,7 @@ import {
   DropdownMenuCheckboxItem,
 } from '../components/ui/dropdown-menu'
 import { toast } from 'sonner'
-import type { Todo, TodoSort, TodoListParams, TodoUpdateInput } from '../types'
+import type { Todo, TodoSort, TodoListParams, TodoUpdateInput, TodoBulkAction, TodoPriority } from '../types'
 import EmptyState from '../components/EmptyState'
 import TodoCard from '../components/TodoCard'
 import TodoSubtaskList from '../components/TodoSubtaskList'
@@ -62,17 +62,23 @@ import {
   useReplaceTodoTags,
 } from '../hooks/api/useTodos'
 
-type TodoView = 'timeline' | 'grouped' | 'kanban' | 'tree'
+type TodoView = 'timeline' | 'grouped' | 'kanban' | 'tree' | 'calendar'
+
+// How the grouped view buckets tasks. 'date' is the classic TickTick 今天/明天/
+// 本周 board; the others re-bucket the same list by priority, status or tag —
+// dropping a card into a group applies that group's meaning to it.
+type TodoGroupBy = 'date' | 'priority' | 'status' | 'tag'
 
 // The tree/list experience is the default path. Load editing and board-only
 // UI only after the user asks for it, keeping the first Todo render lean.
 const KanbanBoard = lazy(() => import('../components/KanbanBoard'))
+const TodoCalendarGrid = lazy(() => import('../components/TodoCalendarGrid'))
 const TodoFormDialog = lazy(() => import('../components/TodoFormDialog').then((m) => ({ default: m.TodoFormDialog })))
 const TodoDetailDrawer = lazy(() => import('../components/TodoDetailDrawer').then((m) => ({ default: m.TodoDetailDrawer })))
 
 // TickTick-style smart lists. Each maps to a set of backend list params.
 // 'inbox' is the GTD capture queue: pending, actionable, not yet scheduled.
-type SmartList = 'inbox' | 'all' | 'today' | 'next7' | 'overdue' | 'pending' | 'deferred' | 'doneToday' | 'doneThisWeek' | 'completed' | 'abandoned' | 'trash'
+type SmartList = 'inbox' | 'all' | 'today' | 'tomorrow' | 'next7' | 'overdue' | 'pending' | 'deferred' | 'doneToday' | 'doneThisWeek' | 'completed' | 'abandoned' | 'trash'
 
 function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
@@ -96,6 +102,13 @@ function smartListParams(list: SmartList): TodoListParams {
     case 'today':
       // TickTick's "Today" shows tasks due today AND anything overdue, but not deferred ones.
       return { status: 'pending', started: true, due_before: new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString() }
+    case 'tomorrow':
+      return {
+        status: 'pending',
+        started: true,
+        due_after: new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        due_before: new Date(todayStart.getTime() + 48 * 60 * 60 * 1000).toISOString(),
+      }
     case 'next7':
       return { status: 'pending', due_after: todayStart.toISOString(), due_before: new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString() }
     case 'overdue':
@@ -287,6 +300,10 @@ export default function TodosPage() {
   // Persisted so the choice survives reloads, like the view/smart-list choices
   // above.
   const [hideCompleted, setHideCompleted] = useState(() => localStorage.getItem('todoHideCompleted') === '1')
+  // Grouped-view bucketing: by date (default) / priority / status / tag.
+  const [groupBy, setGroupBy] = useState<TodoGroupBy>(() => (localStorage.getItem('todoGroupBy') as TodoGroupBy) || 'date')
+  // Prefilled due date for the create dialog (the calendar's per-day "+").
+  const [createDue, setCreateDue] = useState<string | undefined>(undefined)
   // Inbox-first: the undated bucket (收集箱) leads the grouped/timeline views
   // instead of trailing them, so the capture queue is always in view.
   // Default on; remembered like the other view preferences.
@@ -315,6 +332,9 @@ export default function TodosPage() {
   useEffect(() => {
     localStorage.setItem('todoInboxFirst', inboxFirst ? '1' : '0')
   }, [inboxFirst])
+  useEffect(() => {
+    localStorage.setItem('todoGroupBy', groupBy)
+  }, [groupBy])
   // One-time cleanup of the pre-lazy-tree collapse-state key.
   useEffect(() => {
     localStorage.removeItem('todoTreeCollapsed')
@@ -331,8 +351,9 @@ export default function TodosPage() {
   }
   // Flat views (timeline / grouped / kanban / manual) share one accumulating
   // "load more" query; the lazy tree fetches roots only and pulls children per
-  // expanded node. Only the active view's query is enabled.
-  const flatQuery = useTodosInfinite(listParams, { enabled: view !== 'tree' && smartList !== 'trash' })
+  // expanded node. The calendar owns its own month-range + inbox queries, so
+  // the shared flat query is disabled there. Only the active view's query runs.
+  const flatQuery = useTodosInfinite(listParams, { enabled: view !== 'tree' && view !== 'calendar' && smartList !== 'trash' })
   // The tree is an outliner — sibling order IS the manual sort_order. Its
   // queries are pinned to manual/asc: fetching with the toolbar sort (default
   // due_date) would make every drop snap back to its old slot on refetch.
@@ -406,7 +427,17 @@ export default function TodosPage() {
     return m
   }, [todos, childrenMap])
 
-  const openCreate = useCallback(() => { setEditing(null); setDialogOpen(true) }, [])
+  const openCreate = useCallback(() => { setEditing(null); setCreateDue(undefined); setDialogOpen(true) }, [])
+  // Calendar per-day quick create: open the full form with the due prefilled
+  // (end of that day — the same convention as the form's Today/Tomorrow chips).
+  const openCreateAt = useCallback((date: Date) => {
+    const d = new Date(date)
+    d.setHours(23, 59, 0, 0)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    setEditing(null)
+    setCreateDue(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`)
+    setDialogOpen(true)
+  }, [])
   // Inline child quick-add (card subtask area / tree "+"): create directly,
   // no dialog. In the tree view the parent auto-expands so the new child is
   // visible immediately.
@@ -441,6 +472,7 @@ export default function TodosPage() {
         case '2': setView('grouped'); break
         case '3': setView('kanban'); break
         case '4': setView('tree'); break
+        case '5': setView('calendar'); break
         case 'h': case 'H':
           setHideCompleted((v) => !v); break
         case '?': setShortcutsOpen(true); break
@@ -458,11 +490,13 @@ export default function TodosPage() {
   // Keep the drawer's todo snapshot fresh: mutations (progress scrub,
   // renames, status flips elsewhere) patch the list caches, and without this
   // the drawer would keep rendering the stale copy captured at open time.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!editing) return
     const fresh = todoByIdLoaded.get(editing.id)
     if (fresh && fresh !== editing) setEditing(fresh)
   }, [todoByIdLoaded, editing])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleQuickAdd = async () => {
     const raw = quickTitle.trim()
@@ -477,7 +511,16 @@ export default function TodosPage() {
         ? parsed.due.toISOString()
         : undefined
     try {
-      const created = await createTodo.mutateAsync({ title: parsed.title, due_time: dueISO, priority: parsed.priority })
+      const created = await createTodo.mutateAsync({
+        title: parsed.title,
+        due_time: dueISO,
+        priority: parsed.priority,
+        // Recurrence / duration tokens parsed out of the text (每天 / 每周三 /
+        // 每2周 / ~30m / 30分钟 …) ride along on the create payload.
+        repeat: parsed.repeat,
+        repeat_interval: parsed.repeatInterval,
+        duration: parsed.duration,
+      })
       // Resolve any #tag tokens to existing workspace tags and assign them.
       const todoId = created?.data?.id
       if (todoId != null && parsed.tags.length > 0) {
@@ -737,11 +780,11 @@ export default function TodosPage() {
     setSelectionMode(false)
     setSelectedIds(new Set())
   }
-  const runBulk = async (action: 'complete' | 'delete', successKey: string) => {
+  const runBulk = async (action: TodoBulkAction, successKey: string, priority?: TodoPriority) => {
     const ids = [...selectedIds]
     if (ids.length === 0) return
     try {
-      await bulkTodo.mutateAsync({ ids, action })
+      await bulkTodo.mutateAsync({ ids, action, priority })
       toast.success(t(successKey, { n: ids.length }))
       exitSelection()
     } catch {
@@ -828,7 +871,7 @@ export default function TodosPage() {
   // the id set so every depth renders (same accumulation as the drawer).
   const [deepChildIds, setDeepChildIds] = useState<Set<number>>(() => new Set())
   const flatChildrenMap = useTodoChildrenMap(
-    view !== 'tree' && smartList !== 'trash' ? [...new Set([...flatChildParents, ...deepChildIds])] : [],
+    view !== 'tree' && view !== 'calendar' && smartList !== 'trash' ? [...new Set([...flatChildParents, ...deepChildIds])] : [],
     { sort: 'manual', order: 'asc' },
   )
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -989,8 +1032,9 @@ export default function TodosPage() {
   // Arrows navigate the tree outliner style (visible rows in display order;
   // → unfolds or dives into the first child, ← folds or jumps to the parent)
   // and the flat views' top-level cards (←/→ fold/unfold the subtask section).
-  // The kanban board keeps its drag-first interaction model; trash has no nav.
-  const navEnabled = smartList !== 'trash' && view !== 'kanban'
+  // The kanban board keeps its drag-first interaction model; the calendar is
+  // chip-drag only. Trash has no nav either.
+  const navEnabled = smartList !== 'trash' && view !== 'kanban' && view !== 'calendar'
   const nav = useMemo(() => {
     const ids: number[] = []
     const parentById = new Map<number, number | null>()
@@ -1084,7 +1128,7 @@ export default function TodosPage() {
   // takes when dragged into the group (drop-to-reschedule): today/tomorrow map
   // to themselves, 本周 to the end of this week, 稍后 to next Monday, and the
   // no-date group clears the due time.
-  const groupedTodos = useMemo(() => {
+  const dateGroups = useMemo(() => {
     const now = new Date()
     const today = startOfDay(now)
     const tomorrow = new Date(today)
@@ -1111,6 +1155,75 @@ export default function TodosPage() {
     // Inbox-first: the capture queue leads the board instead of trailing it.
     return inboxFirst ? [groups[4], ...groups.slice(0, 4)] : groups
   }, [pendingTodos, inboxFirst, t])
+
+  // Grouped-view bucketing by priority / status / tag (TickTick's 分组方式).
+  // Dropping a card into a group APPLIES the group's meaning: priority groups
+  // rewrite the priority, status groups change the status, tag groups add the
+  // tag (the 无标签 group clears tags) — mirroring the kanban's column drops.
+  const displayGroups = useMemo(() => {
+    if (groupBy === 'priority') {
+      const order: Todo['priority'][] = ['high', 'normal', 'low', 'none']
+      return order.map((p) => ({
+        key: `p-${p}`,
+        label: t(`todos.${p}`),
+        items: pendingTodos.filter((td) => (td.priority ?? 'normal') === p),
+      }))
+    }
+    if (groupBy === 'status') {
+      return (['pending', 'done', 'abandoned'] as const).map((s) => ({
+        key: `s-${s}`,
+        label: t(`todos.${s}`),
+        items: displayTodos.filter((td) => td.status === s && isTopLevel(td)),
+      }))
+    }
+    if (groupBy === 'tag') {
+      const groups = tags.map((tag) => ({
+        key: `t-${tag.id}`,
+        label: tag.name,
+        items: pendingTodos.filter((td) => (td.tags ?? []).some((x) => x.id === tag.id)),
+      }))
+      groups.push({
+        key: 't-none',
+        label: t('todos.untagged'),
+        items: pendingTodos.filter((td) => (td.tags ?? []).length === 0),
+      })
+      return groups
+    }
+    return dateGroups
+  }, [groupBy, dateGroups, pendingTodos, displayTodos, isTopLevel, tags, t])
+
+  // Grouped-view cross-group drop: apply the target group's meaning.
+  const handleGroupDrop = useCallback((todo: Todo, key: string) => {
+    if (groupBy === 'date') {
+      const g = dateGroups.find((it) => it.key === key)
+      handleReschedule(todo, g?.target ?? null)
+      return
+    }
+    if (groupBy === 'priority') {
+      const p = key.slice(2) as Todo['priority']
+      updateTodo.mutate({ id: todo.id, data: fullUpdateData(todo, { priority: p }) })
+      return
+    }
+    if (groupBy === 'status') {
+      const s = key.slice(2) as Todo['status']
+      // The plain pending→done flip keeps the toggle (recurring tasks advance
+      // to their next occurrence there); other transitions are explicit.
+      if (todo.status === 'pending' && s === 'done') handleToggle(todo.id)
+      else handleSetStatus(todo.id, s)
+      return
+    }
+    // tag
+    if (key === 't-none') {
+      replaceTags.mutate({ todoId: todo.id, tagIds: [] })
+      return
+    }
+    const tagId = Number(key.slice(2))
+    const tag = tags.find((tg) => tg.id === tagId)
+    if (!tag) return
+    const next = [...(todo.tags ?? [])]
+    if (!next.some((tg) => tg.id === tag.id)) next.push(tag)
+    replaceTags.mutate({ todoId: todo.id, tagIds: next.map((tg) => tg.id) })
+  }, [groupBy, dateGroups, handleReschedule, updateTodo, fullUpdateData, handleToggle, handleSetStatus, replaceTags, tags])
   // pendingTodos is already top-level-only (see its derivation).
 
   // Timeline groups keyed by calendar day; `target` reschedules a dropped card
@@ -1144,6 +1257,7 @@ export default function TodosPage() {
     { key: 'grouped', icon: ListChecks, label: t('todos.viewGrouped') },
     { key: 'kanban', icon: Columns, label: t('todos.viewKanban') },
     { key: 'tree', icon: ListTree, label: t('todos.viewTree') },
+    { key: 'calendar', icon: CalendarDays, label: t('todos.viewCalendar') },
   ]
 
   // The card-rendering context (see CardRowCtx): rebuilt only when real data
@@ -1313,19 +1427,22 @@ export default function TodosPage() {
       {/* Smart-list switcher + filters in one toolbar row (wraps on narrow screens) */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Smart lists as one dropdown — the old 8-button segmented bar was
-           the page's biggest source of button clutter. */}
-        <select
-          value={smartList}
-          onChange={(e) => { setSmartList(e.target.value as SmartList); setSelectedTodoId(null) }}
-          className="h-7 rounded-md border bg-background px-1.5 text-xs"
-          aria-label={t('todos.smartList')}
-        >
-          {(['inbox', 'all', 'today', 'next7', 'overdue', 'pending', 'deferred', 'completed', 'doneToday', 'doneThisWeek', 'abandoned', 'trash'] as SmartList[]).map((s) => (
-            <option key={s} value={s}>
-              {t(`todos.${s}`)}
-            </option>
-          ))}
-        </select>
+           the page's biggest source of button clutter. Hidden in the calendar
+           view: the month range replaces the smart list as the data source. */}
+        {view !== 'calendar' && (
+          <select
+            value={smartList}
+            onChange={(e) => { setSmartList(e.target.value as SmartList); setSelectedTodoId(null) }}
+            className="h-7 rounded-md border bg-background px-1.5 text-xs"
+            aria-label={t('todos.smartList')}
+          >
+            {(['inbox', 'all', 'today', 'tomorrow', 'next7', 'overdue', 'pending', 'deferred', 'completed', 'doneToday', 'doneThisWeek', 'abandoned', 'trash'] as SmartList[]).map((s) => (
+              <option key={s} value={s}>
+                {t(`todos.${s}`)}
+              </option>
+            ))}
+          </select>
+        )}
 
         <div className="relative min-w-[160px] flex-1 max-w-xs">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1410,9 +1527,9 @@ export default function TodosPage() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* Sort controls are meaningless in the tree view — the tree's order
-            is always manual (see the pinned rootQuery/childrenMap sort). */}
-        {view !== 'tree' && (
+        {/* Sort controls are meaningless in the tree view (the tree's order
+            is always manual) and in the calendar (the grid IS the order). */}
+        {view !== 'tree' && view !== 'calendar' && (
           <>
             <select
               value={sort}
@@ -1452,9 +1569,23 @@ export default function TodosPage() {
             {hideDone ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
           </Button>
         )}
+        {/* Grouped-view bucketing: date (default) / priority / status / tag. */}
+        {view === 'grouped' && (
+          <select
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value as TodoGroupBy)}
+            className="h-7 rounded-md border bg-background px-1.5 text-xs"
+            aria-label={t('todos.groupBy')}
+          >
+            <option value="date">{t('todos.groupDate')}</option>
+            <option value="priority">{t('todos.groupPriority')}</option>
+            <option value="status">{t('todos.groupStatus')}</option>
+            <option value="tag">{t('todos.groupTag')}</option>
+          </select>
+        )}
         {/* Inbox-first toggle: pin the 收集箱 (undated) group to the top of
-            the grouped/timeline views. Hidden where there are no date groups. */}
-        {(view === 'grouped' || view === 'timeline') && (
+            the grouped/timeline views. Only meaningful for date grouping. */}
+        {(view === 'timeline' || (view === 'grouped' && groupBy === 'date')) && (
           <Button
             variant={inboxFirst ? 'secondary' : 'outline'}
             size="sm"
@@ -1478,6 +1609,27 @@ export default function TodosPage() {
             <CheckCircle2 className="h-4 w-4 mr-1" />
             {t('todos.bulkComplete')}
           </Button>
+          <Button size="sm" variant="outline" disabled={selectedIds.size === 0 || bulkTodo.isPending} onClick={() => runBulk('postpone', 'todos.bulkPostponed')}>
+            <CalendarClock className="h-4 w-4 mr-1" />
+            {t('todos.bulkPostpone')}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button size="sm" variant="outline" disabled={selectedIds.size === 0 || bulkTodo.isPending} />
+              }
+            >
+              <Flag className="h-4 w-4 mr-1" />
+              {t('todos.bulkSetPriority')}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {(['high', 'normal', 'low', 'none'] as const).map((p) => (
+                <DropdownMenuItem key={p} onClick={() => runBulk('priority', 'todos.bulkPrioritySet', p)}>
+                  {t(`todos.${p}`)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" variant="destructive" disabled={selectedIds.size === 0 || bulkTodo.isPending} onClick={() => runBulk('delete', 'todos.bulkDeleted')}>
             <Trash2 className="h-4 w-4 mr-1" />
             {t('todos.bulkDelete')}
@@ -1522,13 +1674,13 @@ export default function TodosPage() {
             </>
           )}
         </div>
-      ) : loading || listStale ? (
+      ) : view !== 'calendar' && (loading || listStale) ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      ) : displayTodos.length === 0 ? (
+      ) : view !== 'calendar' && displayTodos.length === 0 ? (
         <EmptyState message={t('todos.noTodos')} />
-      ) : sort === 'manual' && view !== 'kanban' && view !== 'tree' ? (
+      ) : sort === 'manual' && view !== 'kanban' && view !== 'tree' && view !== 'calendar' ? (
         /* Manual-order flat list: drag to reorder (the up/down buttons remain
            for precise/keyboard moves). */
         <div className="space-y-3">
@@ -1657,11 +1809,12 @@ export default function TodosPage() {
       ) : view === 'grouped' ? (
         /* Date-grouped View — drag a card into another bucket to reschedule:
            今天/明天 → that day, 本周 → end of this week, 稍后 → next Monday,
-           无日期 → clear the due time. */
+           无日期 → clear the due time. With 分组方式 set to priority/status/
+           tag the same board re-buckets, and drops apply the group instead. */
         <div className="space-y-3">
           {!settledOnlyList && (
             <TodoSortableGroups
-              groups={groupedTodos
+              groups={displayGroups
                 .map((g) => ({
                   key: g.key,
                   label: <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{g.label}</h3>,
@@ -1670,14 +1823,13 @@ export default function TodosPage() {
               itemAreaClass="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
               renderCard={renderTodoCard}
               renderOverlayCard={(todo) => renderTodoCard(todo, true)}
-              onGroupDrop={(todo, key) => {
-                const g = groupedTodos.find((it) => it.key === key)
-                handleReschedule(todo, g?.target ?? null)
-              }}
+              onGroupDrop={handleGroupDrop}
               onNest={handleNest}
             />
           )}
-          {doneTodos.length > 0 && (smartList === 'all' || settledOnlyList) && (
+          {/* Status grouping already renders the settled lists as groups —
+              skip the duplicate trailing sections. */}
+          {doneTodos.length > 0 && (smartList === 'all' || settledOnlyList) && groupBy !== 'status' && (
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
               <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1685,7 +1837,7 @@ export default function TodosPage() {
               </div>
             </div>
           )}
-          {abandonedTodos.length > 0 && (smartList === 'all' || smartList === 'abandoned') && (
+          {abandonedTodos.length > 0 && (smartList === 'all' || smartList === 'abandoned') && groupBy !== 'status' && (
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.abandoned')} ({abandonedTodos.length})</h3>
               <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1694,6 +1846,20 @@ export default function TodosPage() {
             </div>
           )}
         </div>
+      ) : view === 'calendar' ? (
+        /* Calendar View — TickTick's month grid: chips per due day, drag a
+           chip onto another day to reschedule (time of day preserved), drop it
+           on the Inbox strip to unschedule. Owns its month-range query, so the
+           smart list is bypassed; search/priority/tag filters still apply. */
+        <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+          <TodoCalendarGrid
+            filters={{ q: q || undefined, priority: priorityFilter || undefined, tag_id: tagFilters.length > 0 ? tagFilters : undefined }}
+            hideDone={hideDone}
+            onReschedule={handleReschedule}
+            onEdit={openEdit}
+            onCreateAt={openCreateAt}
+          />
+        </Suspense>
       ) : (
         /* Kanban View — GitLab-style board (components/KanbanBoard.tsx):
            horizontal scrolling columns, cross-column drag applies the column
@@ -1716,14 +1882,15 @@ export default function TodosPage() {
         </Suspense>
       )}
 
-      {smartList !== 'trash' && view === 'tree' ? (
+      {/* The calendar runs its own queries — no shared load-more bar there. */}
+      {view === 'tree' && smartList !== 'trash' ? (
         <LoadMoreBar
           loaded={todos.length}
           total={total}
           loading={rootQuery.isFetching}
           onMore={() => void rootQuery.fetchNextPage()}
         />
-      ) : smartList !== 'trash' ? (
+      ) : smartList !== 'trash' && view !== 'calendar' ? (
         <LoadMoreBar
           loaded={todos.length}
           total={total}
@@ -1732,7 +1899,8 @@ export default function TodosPage() {
         />
       ) : null}
 
-      {/* Create Dialog (editing lives in the detail drawer below) */}
+      {/* Create Dialog (editing lives in the detail drawer below). Carries the
+          calendar's per-day prefilled due date, if any. */}
       {dialogOpen && (
         <Suspense fallback={null}>
           <TodoFormDialog
@@ -1742,7 +1910,8 @@ export default function TodosPage() {
             tags={tags}
             parentCandidates={todos}
             onContactsChange={() => qc.invalidateQueries({ queryKey: rootKey('contacts') })}
-            onClose={() => setDialogOpen(false)}
+            onClose={() => { setDialogOpen(false); setCreateDue(undefined) }}
+            initialDueTime={createDue}
           />
         </Suspense>
       )}
@@ -1816,6 +1985,7 @@ export default function TodosPage() {
               ['2', t('todos.viewGrouped')],
               ['3', t('todos.viewKanban')],
               ['4', t('todos.viewTree')],
+              ['5', t('todos.viewCalendar')],
               ['H', t('todos.toggleCompleted')],
               ['↑ ↓', t('todos.navSwitch')],
               ['← →', t('todos.navFold')],
