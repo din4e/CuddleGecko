@@ -43,6 +43,7 @@ func (s *MCPServer) registerTodoTools() {
 			"status":       map[string]interface{}{"type": "string", "description": "Status: pending, done or abandoned (default pending)"},
 			"priority":     map[string]interface{}{"type": "string", "description": "Priority: none, low, normal or high (default normal)"},
 			"due_time":     map[string]interface{}{"type": "string", "description": "Due time (RFC3339)"},
+			"duration":     map[string]interface{}{"type": "integer", "description": "Estimated effort in minutes (0 = unset)"},
 			"amount":       map[string]interface{}{"type": "number", "description": "Associated amount"},
 			"amount_type":  map[string]interface{}{"type": "string", "description": "Amount type: income or expense"},
 			"progress":     map[string]interface{}{"type": "integer", "description": "Manual progress in percent (0-100; omit for none)"},
@@ -65,6 +66,7 @@ func (s *MCPServer) registerTodoTools() {
 			Status:      toString(getArg(args, "status")),
 			Priority:    toString(getArg(args, "priority")),
 			DueTime:     toTimePtr(getArg(args, "due_time")),
+			Duration:    int(toUint(getArg(args, "duration"))),
 			Amount:      toFloat64Ptr(getArg(args, "amount")),
 			AmountType:  toString(getArg(args, "amount_type")),
 			Progress:    toIntPtr(getArg(args, "progress")),
@@ -86,6 +88,8 @@ func (s *MCPServer) registerTodoTools() {
 			"priority":       map[string]interface{}{"type": "string", "description": "Priority: none, low, normal or high"},
 			"due_time":       map[string]interface{}{"type": "string", "description": "Due time (RFC3339)"},
 			"clear_due_time": map[string]interface{}{"type": "boolean", "description": "Clear the due time"},
+			"duration":       map[string]interface{}{"type": "integer", "description": "Estimated effort in minutes (0 = unset)"},
+			"clear_duration": map[string]interface{}{"type": "boolean", "description": "Clear the estimated duration"},
 			"amount":         map[string]interface{}{"type": "number", "description": "Associated amount"},
 			"clear_amount":   map[string]interface{}{"type": "boolean", "description": "Clear the associated amount"},
 			"amount_type":    map[string]interface{}{"type": "string", "description": "Amount type: income or expense"},
@@ -104,6 +108,7 @@ func (s *MCPServer) registerTodoTools() {
 			Status:      toString(getArg(args, "status")),
 			Priority:    toString(getArg(args, "priority")),
 			DueTime:     toTimePtr(getArg(args, "due_time")),
+			Duration:    int(toUint(getArg(args, "duration"))),
 			Amount:      toFloat64Ptr(getArg(args, "amount")),
 			AmountType:  toString(getArg(args, "amount_type")),
 			Progress:    toIntPtr(getArg(args, "progress")),
@@ -113,6 +118,7 @@ func (s *MCPServer) registerTodoTools() {
 		}
 		clear := service.TodoClear{
 			DueTime:  toBool(getArg(args, "clear_due_time")),
+			Duration: toBool(getArg(args, "clear_duration")),
 			Amount:   toBool(getArg(args, "clear_amount")),
 			Progress: toBool(getArg(args, "clear_progress")),
 		}
@@ -318,7 +324,7 @@ func (s *MCPServer) registerTodoTools() {
 		"required": []string{"ids"},
 	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
 		ids := toUintSlice(getArg(args, "ids"))
-		affected, err := s.todoSvc.BulkAction(ctx, userID, workspaceID, ids, "complete")
+		affected, err := s.todoSvc.BulkAction(ctx, userID, workspaceID, ids, "complete", service.BulkActionOptions{})
 		if err != nil {
 			return nil, err
 		}

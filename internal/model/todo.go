@@ -17,6 +17,8 @@ type Todo struct {
 	Pinned       bool           `gorm:"not null;default:false" json:"pinned"`
 	DueTime     *time.Time     `gorm:"index:idx_todo_ws_status_due" json:"due_time"`
 	StartTime   *time.Time     `json:"start_time"`
+	// Estimated effort in minutes (TickTick's 持续时长). 0 = unset.
+	Duration    int            `gorm:"not null;default:0" json:"duration"`
 	Amount      *float64       `json:"amount"`
 	AmountType  string         `gorm:"size:20" json:"amount_type"` // "" / income / expense
 	ContactIDs  []uint         `gorm:"type:longtext;serializer:json" json:"contact_ids"`
@@ -108,7 +110,7 @@ func TruncateActivityValue(s string) string {
 type TodoListQuery struct {
 	Status    string     // "pending" | "done" | "abandoned" | "" (all)
 	Priority  string     // "low" | "normal" | "high" | "" (all)
-	Search    string     // case-insensitive substring match on title
+	Search    string     // case-insensitive substring match on title OR description
 	DueBefore *time.Time // include todos due at or before this time
 	DueAfter  *time.Time // include todos due at or after this time
 	Overdue   bool       // pending todos whose due_time is in the past

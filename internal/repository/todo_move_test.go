@@ -205,7 +205,7 @@ func TestTodoRepo_BulkDelete_Cascades(t *testing.T) {
 
 	// Bulk-delete only the root → the whole subtree is removed (consistent with
 	// single Delete, which cascades).
-	affected, err := repo.BulkAction(ctx, 1, []uint{root.ID}, "delete")
+	affected, err := repo.BulkAction(ctx, 1, []uint{root.ID}, "delete", "")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, affected, int64(3))
 	for _, id := range []uint{root.ID, a.ID, b.ID} {

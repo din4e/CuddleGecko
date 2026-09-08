@@ -85,3 +85,18 @@ func validateTodoProgress(p *int) error {
 	}
 	return nil
 }
+
+// validateTodoDuration checks the estimated-effort minutes are within 0..30d.
+// 0 means "unset" and is always fine.
+func validateTodoDuration(minutes int) error {
+	if minutes < 0 || minutes > 30*24*60 {
+		return fmt.Errorf("%w: duration must be between 0 and %d minutes", ErrInvalidTodo, 30*24*60)
+	}
+	return nil
+}
+
+// validTodoPriority reports whether p is one of the four rankable tiers
+// (high / normal / low / none).
+func validTodoPriority(p string) bool {
+	return p == "high" || p == "normal" || p == "low" || p == "none"
+}

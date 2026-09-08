@@ -56,7 +56,8 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQ
 	if q.Search != "" {
 		// LIKE matching is case-insensitive under MySQL's default collation;
 		// wrap with LOWER so SQLite-backed tests also match case-insensitively.
-		query = query.Where("LOWER(title) LIKE ?", "%"+strings.ToLower(q.Search)+"%")
+		// Title OR description — TickTick's search covers the task body.
+		query = query.Where("LOWER(title) LIKE ? OR LOWER(description) LIKE ?", "%"+strings.ToLower(q.Search)+"%", "%"+strings.ToLower(q.Search)+"%")
 	}
 	if q.DueAfter != nil {
 		query = query.Where("due_time >= ?", *q.DueAfter)
@@ -162,7 +163,7 @@ func todoOrderClause(sort, order string) string {
 
 func (r *TodoRepo) Update(ctx context.Context, todo *model.Todo) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{ID: todo.ID}).
-		Select("title", "description", "status", "priority", "due_time", "start_time", "amount", "amount_type", "progress", "contact_ids", "color", "repeat", "repeat_interval", "completed_at", "status_before_cascade").
+		Select("title", "description", "status", "priority", "due_time", "start_time", "duration", "amount", "amount_type", "progress", "contact_ids", "color", "repeat", "repeat_interval", "completed_at", "status_before_cascade").
 		Updates(todo).Error; err != nil {
 		return fmt.Errorf("update todo: %w", err)
 	}
@@ -787,15 +788,23 @@ func (r *TodoRepo) EmptyTrash(ctx context.Context, workspaceID uint) (int64, err
 	return purged, err
 }
 
-// BulkAction applies a complete-or-delete action to a set of todos, returning
-// the number of rows affected.
-func (r *TodoRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint, action string) (int64, error) {
+// BulkAction applies a batch action to a set of todos, returning the number of
+// rows affected. `priority` is only read by the "priority" action (the service
+// layer validates the catalogue and the value).
+func (r *TodoRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint, action, priority string) (int64, error) {
 	if len(ids) == 0 {
 		return 0, nil
 	}
 	switch action {
 	case "complete":
 		return r.bulkComplete(ctx, workspaceID, ids)
+	case "postpone":
+		return r.bulkPostpone(ctx, workspaceID, ids)
+	case "priority":
+		res := r.db.WithContext(ctx).Model(&model.Todo{}).
+			Where("id IN ? AND workspace_id = ?", ids, workspaceID).
+			Update("priority", priority)
+		return res.RowsAffected, wrapIfErr(res.Error, "bulk set todo priority")
 	case "delete":
 		// Cascade to descendants so bulk-deleting a parent removes its subtree
 		// too — consistent with single Delete (which also cascades).
@@ -808,6 +817,56 @@ func (r *TodoRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint,
 	default:
 		return 0, fmt.Errorf("unknown bulk action: %s", action)
 	}
+}
+
+// bulkPostpone pushes every selected todo's due time back one day, preserving
+// the time of day; undated tasks land at tomorrow 23:59 — the same rule as the
+// card's single postpone action. Dated rows each need their own new value, so
+// they are written with one CASE-id UPDATE (the renumberSortOrder shape) instead
+// of a per-row round-trip; the undated rows share one constant value.
+func (r *TodoRepo) bulkPostpone(ctx context.Context, workspaceID uint, ids []uint) (int64, error) {
+	affected := int64(0)
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var todos []model.Todo
+		if err := tx.Where("id IN ? AND workspace_id = ?", ids, workspaceID).Find(&todos).Error; err != nil {
+			return fmt.Errorf("load todos for bulk postpone: %w", err)
+		}
+		now := time.Now()
+		var datedIDs []uint
+		caseExpr := "CASE id"
+		args := make([]any, 0, len(todos)*2)
+		var undatedIDs []uint
+		for _, t := range todos {
+			if t.DueTime != nil {
+				next := t.DueTime.AddDate(0, 0, 1)
+				datedIDs = append(datedIDs, t.ID)
+				caseExpr += " WHEN ? THEN ?"
+				args = append(args, t.ID, next)
+			} else {
+				undatedIDs = append(undatedIDs, t.ID)
+			}
+		}
+		if len(datedIDs) > 0 {
+			caseExpr += " ELSE due_time END"
+			res := tx.Model(&model.Todo{}).Where("id IN ?", datedIDs).
+				Update("due_time", gorm.Expr(caseExpr, args...))
+			if err := wrapIfErr(res.Error, "bulk postpone todos"); err != nil {
+				return err
+			}
+			affected += res.RowsAffected
+		}
+		if len(undatedIDs) > 0 {
+			tomorrow := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 0, 0, now.Location()).AddDate(0, 0, 1)
+			res := tx.Model(&model.Todo{}).Where("id IN ?", undatedIDs).
+				Update("due_time", tomorrow)
+			if err := wrapIfErr(res.Error, "bulk postpone undated todos"); err != nil {
+				return err
+			}
+			affected += res.RowsAffected
+		}
+		return nil
+	})
+	return affected, err
 }
 
 // descendantIDsInclusive returns the given ids together with all of their

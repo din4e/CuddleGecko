@@ -312,7 +312,7 @@ func TestTodoRepo_BulkAction(t *testing.T) {
 	b := mustCreateTodo(t, repo, 1, "b")
 	c := mustCreateTodo(t, repo, 1, "c")
 
-	affected, err := repo.BulkAction(ctx, 1, []uint{a.ID, b.ID}, "complete")
+	affected, err := repo.BulkAction(ctx, 1, []uint{a.ID, b.ID}, "complete", "")
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), affected)
 
@@ -320,7 +320,7 @@ func TestTodoRepo_BulkAction(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, done, 2)
 
-	affected, err = repo.BulkAction(ctx, 1, []uint{c.ID}, "delete")
+	affected, err = repo.BulkAction(ctx, 1, []uint{c.ID}, "delete", "")
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), affected)
 
@@ -328,7 +328,7 @@ func TestTodoRepo_BulkAction(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), total, "deleted todo is excluded from list")
 
-	affected, err = repo.BulkAction(ctx, 1, nil, "complete")
+	affected, err = repo.BulkAction(ctx, 1, nil, "complete", "")
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), affected)
 }
@@ -343,7 +343,7 @@ func TestTodoRepo_BulkComplete_RecurringAdvances(t *testing.T) {
 	require.NoError(t, repo.Create(ctx, rec))
 	plain := mustCreateTodo(t, repo, 1, "one-off")
 
-	affected, err := repo.BulkAction(ctx, 1, []uint{rec.ID, plain.ID}, "complete")
+	affected, err := repo.BulkAction(ctx, 1, []uint{rec.ID, plain.ID}, "complete", "")
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), affected)
 
@@ -355,6 +355,68 @@ func TestTodoRepo_BulkComplete_RecurringAdvances(t *testing.T) {
 
 	loadedPlain, _ := repo.GetByID(ctx, 1, plain.ID)
 	assert.Equal(t, "done", loadedPlain.Status)
+}
+
+func TestTodoRepo_BulkPostpone(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+
+	due := time.Now().Add(-2 * time.Hour).Truncate(time.Second)
+	dated := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "dated", Status: "pending", DueTime: &due}
+	require.NoError(t, repo.Create(ctx, dated))
+	undated := mustCreateTodo(t, repo, 1, "undated")
+
+	affected, err := repo.BulkAction(ctx, 1, []uint{dated.ID, undated.ID}, "postpone", "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), affected)
+
+	loadedDated, err := repo.GetByID(ctx, 1, dated.ID)
+	require.NoError(t, err)
+	require.NotNil(t, loadedDated.DueTime)
+	assert.WithinDuration(t, due.AddDate(0, 0, 1), *loadedDated.DueTime, time.Minute,
+		"dated task moves +1 day at the same time of day")
+
+	loadedUndated, err := repo.GetByID(ctx, 1, undated.ID)
+	require.NoError(t, err)
+	require.NotNil(t, loadedUndated.DueTime)
+	assert.Equal(t, 23, loadedUndated.DueTime.Hour())
+	assert.Equal(t, 59, loadedUndated.DueTime.Minute())
+	assert.WithinDuration(t, time.Now().AddDate(0, 0, 1), *loadedUndated.DueTime, 24*time.Hour,
+		"undated task lands at tomorrow 23:59")
+}
+
+func TestTodoRepo_BulkPriority(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+	a := mustCreateTodo(t, repo, 1, "a")
+	b := mustCreateTodo(t, repo, 1, "b")
+
+	affected, err := repo.BulkAction(ctx, 1, []uint{a.ID, b.ID}, "priority", "high")
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), affected)
+
+	for _, id := range []uint{a.ID, b.ID} {
+		loaded, err := repo.GetByID(ctx, 1, id)
+		require.NoError(t, err)
+		assert.Equal(t, "high", loaded.Priority)
+	}
+}
+
+func TestTodoRepo_SearchMatchesDescription(t *testing.T) {
+	db := newTodoTestDB(t)
+	repo := NewTodoRepo(db)
+	ctx := context.Background()
+	mustCreateTodo(t, repo, 1, "plain title")
+	needle := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "other", Status: "pending", Description: "buy oat milk notes"}
+	require.NoError(t, repo.Create(ctx, needle))
+
+	todos, total, err := repo.List(ctx, 1, model.TodoListQuery{Search: "oat milk"})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, todos, 1)
+	assert.Equal(t, needle.ID, todos[0].ID)
 }
 
 func TestTodoRepo_UpdateItem_DueAndSortOrder(t *testing.T) {
