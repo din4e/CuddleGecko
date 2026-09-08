@@ -11,11 +11,13 @@ interface TodoFormDialogProps {
   parentCandidates?: Todo[]
   onContactsChange: (contacts: Contact[]) => void
   onClose: () => void
+  /** Prefilled due time (datetime-local string) for create — calendar quick add. */
+  initialDueTime?: string
 }
 
 /** Create-only modal shell around the shared TodoForm — editing lives in the
  *  TodoDetailDrawer slide-over. */
-export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates, onContactsChange, onClose }: TodoFormDialogProps) {
+export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates, onContactsChange, onClose, initialDueTime }: TodoFormDialogProps) {
   const { t } = useTranslation()
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -30,6 +32,7 @@ export function TodoFormDialog({ open, editing, contacts, tags, parentCandidates
           parentCandidates={parentCandidates}
           onContactsChange={onContactsChange}
           onClose={onClose}
+          initialDueTime={initialDueTime}
         />
       </DialogContent>
     </Dialog>

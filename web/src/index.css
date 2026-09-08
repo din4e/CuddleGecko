@@ -184,3 +184,22 @@
     animation: none;
   }
 }
+/* —— Todo completion celebration（完成小动效；prefers-reduced-motion 下关闭）—— */
+@keyframes todo-done-pop {
+  0% { transform: scale(0.5); opacity: 0.4; }
+  55% { transform: scale(1.35); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes todo-done-flash {
+  0% { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+.animate-todo-done-pop { animation: todo-done-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.animate-todo-done-flash { animation: todo-done-flash 0.9s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-todo-done-pop,
+  .animate-todo-done-flash {
+    animation: none;
+  }
+}

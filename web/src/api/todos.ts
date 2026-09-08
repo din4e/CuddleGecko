@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { Todo, TodoItem, TodoActivity, TodoStatus, Tag, TodoStats, Event, PaginatedData, TodoListParams, TodoUpdateInput } from '../types'
+import type { Todo, TodoItem, TodoActivity, TodoStatus, TodoPriority, TodoBulkAction, Tag, TodoStats, Event, PaginatedData, TodoListParams, TodoUpdateInput } from '../types'
 
 function buildParams(params?: TodoListParams) {
   const out: Record<string, unknown> = { page: params?.page ?? 1, page_size: params?.page_size ?? 50 }
@@ -69,8 +69,8 @@ export const todosApi = {
   delete: (id: number) =>
     request.delete<void>(`/todos/${id}`).then(() => {}),
 
-  bulk: (ids: number[], action: 'complete' | 'delete') =>
-    request.post<{ affected: number }>('/todos/bulk', { ids, action }).then((data) => ({ data })),
+  bulk: (ids: number[], action: TodoBulkAction, priority?: TodoPriority) =>
+    request.post<{ affected: number }>('/todos/bulk', { ids, action, priority }).then((data) => ({ data })),
 
   // --- Checklist (subtask) items ---
 

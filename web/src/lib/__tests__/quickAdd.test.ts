@@ -213,3 +213,94 @@ describe('parseQuickAdd — no date/time', () => {
     expect(due).toBeNull()
   })
 })
+
+describe('parseQuickAdd — repeat parsing', () => {
+  it('parses 每天 as daily', () => {
+    const { title, repeat, repeatInterval } = parseQuickAdd('晨跑 每天', NOW)
+    expect(title).toBe('晨跑')
+    expect(repeat).toBe('daily')
+    expect(repeatInterval).toBeUndefined()
+  })
+
+  it('parses 每2周 as weekly with interval 2', () => {
+    const { title, repeat, repeatInterval } = parseQuickAdd('复盘 每2周', NOW)
+    expect(title).toBe('复盘')
+    expect(repeat).toBe('weekly')
+    expect(repeatInterval).toBe(2)
+  })
+
+  it('parses 工作日 as weekdays', () => {
+    const { repeat } = parseQuickAdd('通勤 工作日', NOW)
+    expect(repeat).toBe('weekdays')
+  })
+
+  it('parses 每周三 as weekly anchored on next Wednesday', () => {
+    const { title, repeat, due } = parseQuickAdd('例会 每周三', NOW)
+    expect(title).toBe('例会')
+    expect(repeat).toBe('weekly')
+    expect(due).toEqual(atEndOfDay(WEDNESDAY))
+  })
+
+  it('parses every 3 days as daily with interval 3', () => {
+    const { title, repeat, repeatInterval } = parseQuickAdd('water plants every 3 days', NOW)
+    expect(title).toBe('water plants')
+    expect(repeat).toBe('daily')
+    expect(repeatInterval).toBe(3)
+  })
+
+  it('parses every monday as weekly anchored next Monday', () => {
+    const { repeat, due } = parseQuickAdd('standup every monday', NOW)
+    expect(repeat).toBe('weekly')
+    expect(due).toEqual(atEndOfDay(NEXT_MONDAY))
+  })
+
+  it('does not treat a bare adjective like "Weekly" as a rule', () => {
+    const { title, repeat } = parseQuickAdd('Weekly report ~30m', NOW)
+    expect(title).toBe('Weekly report')
+    expect(repeat).toBeUndefined()
+  })
+
+  it('combines 每天 + 9点: due today at 09:00', () => {
+    const { repeat, due } = parseQuickAdd('晨跑 每天9点', NOW)
+    expect(repeat).toBe('daily')
+    expect(due).toEqual(new Date(2024, 0, 1, 9, 0, 0, 0))
+  })
+})
+
+describe('parseQuickAdd — duration parsing', () => {
+  it('parses ~30m as 30 minutes', () => {
+    const { title, duration } = parseQuickAdd('deep work ~30m', NOW)
+    expect(title).toBe('deep work')
+    expect(duration).toBe(30)
+  })
+
+  it('parses ~1.5h as 90 minutes', () => {
+    const { duration } = parseQuickAdd('session ~1.5h', NOW)
+    expect(duration).toBe(90)
+  })
+
+  it('parses 30分钟', () => {
+    const { title, duration } = parseQuickAdd('会议 30分钟', NOW)
+    expect(title).toBe('会议')
+    expect(duration).toBe(30)
+  })
+
+  it('parses 1小时 as 60 and 半小时 as 30', () => {
+    expect(parseQuickAdd('a 1小时', NOW).duration).toBe(60)
+    expect(parseQuickAdd('b 半小时', NOW).duration).toBe(30)
+  })
+
+  it('parses 持续45分钟 and "for 30 min"', () => {
+    expect(parseQuickAdd('a 持续45分钟', NOW).duration).toBe(45)
+    expect(parseQuickAdd('b for 30 min', NOW).duration).toBe(30)
+  })
+
+  it('combines repeat + time + duration + tag', () => {
+    const { title, repeat, duration, due, tags } = parseQuickAdd('晨跑 每天9点 30分钟 #健康', NOW)
+    expect(title).toBe('晨跑')
+    expect(repeat).toBe('daily')
+    expect(duration).toBe(30)
+    expect(due).toEqual(new Date(2024, 0, 1, 9, 0, 0, 0))
+    expect(tags).toEqual(['健康'])
+  })
+})
