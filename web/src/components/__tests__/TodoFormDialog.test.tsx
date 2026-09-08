@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TodoFormDialog } from '../TodoFormDialog'
 import type { Todo } from '../../types'
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createTodo: vi.fn(),
   replaceTags: vi.fn(),
   moveTodo: vi.fn(),
+  list: vi.fn<(params?: unknown, options?: unknown) => { data: { items: Todo[]; total: number; page: number; page_size: number } | undefined; isFetching: boolean }>(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -20,6 +21,8 @@ vi.mock('../../hooks/api/useTodos', () => ({
   useUpdateTodo: () => ({ mutateAsync: mocks.updateTodo, isPending: false }),
   useReplaceTodoTags: () => ({ mutateAsync: mocks.replaceTags }),
   useMoveTodo: () => ({ mutateAsync: mocks.moveTodo, isPending: false }),
+  // Parent picker search: no results by default (overridable per test).
+  useTodosList: (params: Record<string, unknown>, options?: { enabled?: boolean }) => mocks.list(params, options),
 }))
 
 vi.mock('../../api/contacts', () => ({
@@ -41,6 +44,66 @@ describe('TodoFormDialog', () => {
     mocks.createTodo.mockReset()
     mocks.replaceTags.mockReset()
     mocks.moveTodo.mockReset()
+    mocks.list.mockReset()
+    mocks.list.mockReturnValue({ data: undefined, isFetching: false })
+  })
+
+  it('finds a parent through the searchable picker and reparents on save', async () => {
+    // Local candidates are empty — the parent only exists server-side, found
+    // through the q search (exactly the case the picker exists for).
+    mocks.list.mockReturnValue({
+      data: { items: [todo({ id: 7, title: 'Deep parent' })], total: 1, page: 1, page_size: 20 },
+      isFetching: false,
+    })
+    const user = userEvent.setup()
+    render(
+      <TodoFormDialog
+        open
+        editing={todo({ id: 1, parent_id: null })}
+        contacts={[]}
+        tags={[]}
+        parentCandidates={[]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    // Closed state shows "no parent"; clicking opens the search input.
+    await user.click(screen.getByRole('button', { name: 'todos.parent' }))
+    const input = screen.getByLabelText('todos.parent')
+    await user.type(input, 'deep')
+
+    // Debounced server search fires with the typed query…
+    await waitFor(() => {
+      expect(mocks.list).toHaveBeenCalledWith(
+        expect.objectContaining({ q: 'deep', page_size: 20 }),
+        expect.objectContaining({ enabled: true }),
+      )
+    })
+    // …and its result is offered as an option; picking it closes the picker.
+    await user.click(await screen.findByText('Deep parent'))
+    await user.click(screen.getByText('common.save'))
+
+    // Save kept the title payload intact and reparented via the move endpoint.
+    expect(mocks.updateTodo).toHaveBeenCalledTimes(1)
+    expect(mocks.moveTodo).toHaveBeenCalledWith({ id: 1, parentId: 7, afterId: null })
+  })
+
+  it('keeps the parent unchanged when the picker is never touched', async () => {
+    const user = userEvent.setup()
+    render(
+      <TodoFormDialog
+        open
+        editing={todo({ parent_id: 5 })}
+        contacts={[]}
+        tags={[]}
+        parentCandidates={[todo({ id: 5, title: 'Current parent' })]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    await user.click(screen.getByText('common.save'))
+    expect(mocks.moveTodo).not.toHaveBeenCalled()
   })
 
   it('clearing a populated due time on edit sends clear_due_time', async () => {

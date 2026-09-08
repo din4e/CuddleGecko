@@ -9,13 +9,14 @@ import type { Todo, TodoItem, TodoActivity, TodoStats, PaginatedData, TodoListPa
 const scope = 'todos'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
 
-export function useTodosList(params: TodoListParams = {}) {
+export function useTodosList(params: TodoListParams = {}, options?: { enabled?: boolean }) {
   const { page = 1, page_size = 50, ...filters } = params
   const queryKey = [...allKey(), 'list', { ...filters, page, page_size }] as const
   return useQuery<PaginatedData<Todo>>({
     queryKey,
     queryFn: ({ signal }) => todosApi.list({ page, page_size, ...filters }, signal).then((r) => r.data),
     placeholderData: (prev) => prev,
+    enabled: options?.enabled ?? true,
   })
 }
 

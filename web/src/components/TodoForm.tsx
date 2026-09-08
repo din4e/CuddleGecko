@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, Eye, Hourglass, PenLine, Repeat, Loader2 } from 'lucide-react'
 import { isoToLocalInput } from '../lib/utils'
@@ -9,6 +9,7 @@ import { Textarea } from './ui/textarea'
 import { DialogFooter } from './ui/dialog'
 import { Markdown } from './Markdown'
 import BuddyPicker from './BuddyPicker'
+import TodoParentPicker from './TodoParentPicker'
 import { useCreateTodo, useUpdateTodo, useReplaceTodoTags, useMoveTodo } from '../hooks/api/useTodos'
 import { descendantIds } from '../lib/buildTodoTree'
 import type { Todo, Contact, Tag, TodoStatus, TodoUpdateInput } from '../types'
@@ -83,7 +84,10 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
 
   // Disallow picking self or a descendant as the new parent (backend would reject
   // the cycle); keeps the picker honest when editing.
-  const blockedParents = editing ? descendantIds(parentCandidates ?? [], editing.id) : new Set<number>()
+  const blockedParents = useMemo(
+    () => (editing ? new Set([editing.id, ...descendantIds(parentCandidates ?? [], editing.id)]) : new Set<number>()),
+    [editing, parentCandidates],
+  )
 
   const handleSave = useCallback(async () => {
     if (!formTitle.trim()) return
@@ -202,21 +206,18 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             <Textarea value={formDesc} onChange={(e) => setFormDesc(e.target.value)} rows={2} placeholder={t('todos.descMarkdownHint')} />
           )}
         </div>
-        {parentCandidates && parentCandidates.length > 0 && (
+        {parentCandidates && (
           <div className="space-y-1">
             <Label>{t('todos.parent')}</Label>
-            <select
-              value={formParentId ?? ''}
-              onChange={(e) => setFormParentId(e.target.value ? Number(e.target.value) : null)}
-              className="h-8 w-full rounded-md border bg-background px-2 text-sm"
-            >
-              <option value="">{t('todos.parentNone')}</option>
-              {parentCandidates
-                .filter((c) => c.id !== editing?.id && !blockedParents.has(c.id))
-                .map((c) => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
-                ))}
-            </select>
+            {/* Searchable combobox: filters the loaded candidates instantly and
+                searches the whole workspace (title + description) once you
+                type — finds parents beyond the current view's loaded pages. */}
+            <TodoParentPicker
+              value={formParentId}
+              onChange={setFormParentId}
+              candidates={parentCandidates}
+              blocked={blockedParents}
+            />
           </div>
         )}
         <div className="space-y-1">
