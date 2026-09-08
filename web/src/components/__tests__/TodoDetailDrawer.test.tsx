@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   createTodo: vi.fn(),
   replaceTags: vi.fn(),
   moveTodo: vi.fn(),
+  list: vi.fn<(params?: unknown, options?: unknown) => { data: { items: Todo[]; total: number; page: number; page_size: number } | undefined; isFetching: boolean }>(),
   childrenMap: vi.fn(() => new Map()),
   childrenMapArgs: vi.fn(),
 }))
@@ -30,6 +31,8 @@ vi.mock('../../hooks/api/useTodos', () => ({
   useSetTodoProgress: () => ({ mutate: vi.fn() }),
   useReplaceTodoTags: () => ({ mutateAsync: mocks.replaceTags }),
   useMoveTodo: () => ({ mutateAsync: mocks.moveTodo, isPending: false }),
+  // Parent picker search: no results by default (overridable per test).
+  useTodosList: (params: Record<string, unknown>, options?: { enabled?: boolean }) => mocks.list(params, options),
   useTodoItems: () => ({ data: [] }),
   // Drawer subtask area: empty children slices by default (overridable).
   // childrenMapArgs records the (parentIds, filters) the drawer queries with.
@@ -73,6 +76,8 @@ describe('TodoDetailDrawer', () => {
     mocks.childrenMap.mockReset()
     mocks.childrenMapArgs.mockReset()
     mocks.childrenMap.mockReturnValue(new Map())
+    mocks.list.mockReset()
+    mocks.list.mockReturnValue({ data: undefined, isFetching: false })
   })
 
   it('shows the todo title in the header and pre-fills the form', () => {
