@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render as renderUI, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { TodoFormDialog } from '../TodoFormDialog'
-import type { Todo } from '../../types'
+import type { Tag, Todo } from '../../types'
+
+// Node's global localStorage is undefined in tests; rootKey reads it at call
+// time for query keys (the label picker's search hook runs on mount).
+vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
 
 const mocks = vi.hoisted(() => ({
   updateTodo: vi.fn(),
@@ -28,6 +33,11 @@ vi.mock('../../hooks/api/useTodos', () => ({
 vi.mock('../../api/contacts', () => ({
   contactsApi: { list: vi.fn() },
 }))
+
+function render(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  return renderUI(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 function todo(over: Partial<Todo> = {}): Todo {
   return {
@@ -148,7 +158,7 @@ describe('TodoFormDialog', () => {
     await user.click(screen.getByText('common.create'))
 
     expect(mocks.createTodo).toHaveBeenCalledTimes(1)
-    expect(mocks.createTodo.mock.calls[0][0]).toMatchObject({ duration: 45 })
+    expect(mocks.createTodo.mock.calls[0][0]).toMatchObject({ duration: 45, priority: 'none' })
   })
 
   it('clearing a populated duration on edit sends clear_duration', async () => {
@@ -207,4 +217,35 @@ describe('TodoFormDialog', () => {
     expect(mocks.updateTodo).toHaveBeenCalledTimes(1)
     expect(mocks.moveTodo).not.toHaveBeenCalled()
   })
+  it('keeps failed tag saves open and retries a created task without duplicating it', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    mocks.createTodo.mockResolvedValue({ data: todo({ id: 99 }) })
+    mocks.replaceTags.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(undefined)
+    render(<TodoFormDialog open editing={null} contacts={[]} tags={[{ id: 7, name: 'Work', color: '#22c55e' } as Tag]} onContactsChange={vi.fn()} onClose={onClose} />)
+    await user.type(screen.getByLabelText('todos.title_field *'), 'New task')
+    await user.click(screen.getByRole('button', { name: 'todos.labels' }))
+    await user.click(screen.getByRole('option', { name: 'Work' }))
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByText('common.create'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('todos.saveRetry')
+    expect(onClose).not.toHaveBeenCalled()
+    await user.click(screen.getByText('common.create'))
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    expect(mocks.createTodo).toHaveBeenCalledTimes(1)
+    expect(mocks.updateTodo).toHaveBeenCalledWith(expect.objectContaining({ id: 99 }))
+    expect(mocks.replaceTags).toHaveBeenLastCalledWith({ todoId: 99, tagIds: [7] })
+  })
+
+  it('preserves existing labels when saving unrelated fields and can clear all labels', async () => {
+    const user = userEvent.setup()
+    const tag = { id: 250, name: 'Beyond first page', color: '#22c55e' } as Tag
+    render(<TodoFormDialog open editing={todo({ tags: [tag] })} contacts={[]} tags={[]} onContactsChange={vi.fn()} onClose={vi.fn()} />)
+    await user.click(screen.getByText('common.save'))
+    expect(mocks.replaceTags).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'todos.labelsRemove' }))
+    await user.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.replaceTags).toHaveBeenCalledWith({ todoId: 1, tagIds: [] }))
+  })
+
 })

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, Eye, Hourglass, PenLine, Repeat, Loader2 } from 'lucide-react'
 import { isoToLocalInput } from '../lib/utils'
@@ -10,6 +10,7 @@ import { DialogFooter } from './ui/dialog'
 import { Markdown } from './Markdown'
 import BuddyPicker from './BuddyPicker'
 import TodoParentPicker from './TodoParentPicker'
+import TodoLabelPicker from './TodoLabelPicker'
 import { useCreateTodo, useUpdateTodo, useReplaceTodoTags, useMoveTodo } from '../hooks/api/useTodos'
 import { descendantIds } from '../lib/buildTodoTree'
 import type { Todo, Contact, Tag, TodoStatus, TodoUpdateInput } from '../types'
@@ -51,6 +52,7 @@ export interface TodoFormProps {
  *  once per mount; both shells remount via a key on the todo id. */
 export function TodoForm({ editing, contacts, tags, parentCandidates, onContactsChange, onClose, initialDueTime }: TodoFormProps) {
   const { t } = useTranslation()
+  const formId = useId()
   const createTodo = useCreateTodo()
   const updateTodo = useUpdateTodo()
   const replaceTags = useReplaceTodoTags()
@@ -59,7 +61,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   const [formTitle, setFormTitle] = useState(editing?.title ?? '')
   const [formDesc, setFormDesc] = useState(editing?.description ?? '')
   const [formStatus, setFormStatus] = useState<TodoStatus>(editing?.status ?? 'pending')
-  const [formPriority, setFormPriority] = useState<'none' | 'low' | 'normal' | 'high'>(editing?.priority ?? 'normal')
+  const [formPriority, setFormPriority] = useState<'none' | 'low' | 'normal' | 'high'>(editing?.priority ?? 'none')
   const [formDueTime, setFormDueTime] = useState(editing?.due_time ? isoToLocalInput(editing.due_time) : initialDueTime ?? '')
   const [formStartTime, setFormStartTime] = useState(editing?.start_time ? isoToLocalInput(editing.start_time) : '')
   // Estimated effort in minutes (TickTick 持续时长); '' = unset.
@@ -72,6 +74,18 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   const [formRepeatInterval, setFormRepeatInterval] = useState<number>(editing?.repeat_interval && editing.repeat_interval > 0 ? editing.repeat_interval : 1)
   const [formTagIds, setFormTagIds] = useState<number[]>(editing?.tags?.map((tg) => tg.id) ?? [])
   const [formParentId, setFormParentId] = useState<number | null>(editing?.parent_id ?? null)
+  const savingRef = useRef(false)
+  const savedTodoId = useRef(editing?.id)
+  const savedParentId = useRef(editing?.parent_id ?? null)
+  const savedTagIds = useRef(editing?.tags?.map((tag) => tag.id) ?? [])
+  const [saving, setSaving] = useState(false)
+  const [labelCreating, setLabelCreating] = useState(false)
+  const [saveError, setSaveError] = useState(false)
+  const labelCandidates = useMemo(() => {
+    const map = new Map((editing?.tags ?? []).map((tag) => [tag.id, tag]))
+    for (const tag of tags) map.set(tag.id, tag)
+    return [...map.values()]
+  }, [editing?.tags, tags])
   // Description is markdown: the textarea swaps to a rendered preview while the
   // field has content; clearing the text returns to the editor.
   const [descPreview, setDescPreview] = useState(false)
@@ -90,72 +104,78 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   )
 
   const handleSave = useCallback(async () => {
-    if (!formTitle.trim()) return
-    let todoId: number | undefined
-    if (editing) {
-      const data: TodoUpdateInput = {
-        title: formTitle.trim(),
-        description: formDesc,
-        status: formStatus,
-        priority: formPriority,
-        due_time: formDueTime ? new Date(formDueTime).toISOString() : null,
-        start_time: formStartTime ? new Date(formStartTime).toISOString() : null,
-        duration: formDuration ? parseInt(formDuration, 10) : 0,
-        amount: formAmount ? parseFloat(formAmount) : null,
-        amount_type: formAmountType,
-        contact_ids: formContactIds,
-        color: formColor,
-        repeat: formRepeat,
-        repeat_interval: formRepeatInterval,
+    if (!formTitle.trim() || savingRef.current || labelCreating) return
+    savingRef.current = true
+    setSaving(true)
+    setSaveError(false)
+    try {
+      let todoId = savedTodoId.current
+      if (todoId != null) {
+        const data: TodoUpdateInput = {
+          title: formTitle.trim(),
+          description: formDesc,
+          status: formStatus,
+          priority: formPriority,
+          due_time: formDueTime ? new Date(formDueTime).toISOString() : null,
+          start_time: formStartTime ? new Date(formStartTime).toISOString() : null,
+          duration: formDuration ? parseInt(formDuration, 10) : 0,
+          amount: formAmount ? parseFloat(formAmount) : null,
+          amount_type: formAmountType,
+          contact_ids: formContactIds,
+          color: formColor,
+          repeat: formRepeat,
+          repeat_interval: formRepeatInterval,
+        }
+        // Clearing a populated nullable field removes it server-side.
+        // Progress is deliberately NOT sent here: the row-bar drag owns it
+        // (PATCH /progress), and an omitted field leaves the column untouched.
+        if (!formDueTime) data.clear_due_time = true
+        if (!formStartTime) data.clear_start_time = true
+        if (!formAmount) data.clear_amount = true
+        if (!formDuration) data.clear_duration = true
+        await updateTodo.mutateAsync({ id: todoId, data })
+      } else {
+        const payload: Partial<Todo> = {
+          title: formTitle.trim(),
+          description: formDesc,
+          status: formStatus === 'pending' ? undefined : formStatus,
+          priority: formPriority,
+          due_time: formDueTime ? new Date(formDueTime).toISOString() : undefined,
+          start_time: formStartTime ? new Date(formStartTime).toISOString() : undefined,
+          duration: formDuration ? parseInt(formDuration, 10) : undefined,
+          amount: formAmount ? parseFloat(formAmount) : undefined,
+          amount_type: formAmountType,
+          contact_ids: formContactIds,
+          color: formColor,
+          repeat: formRepeat || undefined,
+          repeat_interval: formRepeatInterval || undefined,
+          parent_id: formParentId ?? undefined,
+        }
+        const created = await createTodo.mutateAsync(payload)
+        todoId = created?.data?.id
+        savedTodoId.current = todoId
+        savedParentId.current = formParentId
       }
-      // Clearing a populated nullable field removes it server-side.
-      // Progress is deliberately NOT sent here: the row-bar drag owns it
-      // (PATCH /progress), and an omitted field leaves the column untouched.
-      if (editing.due_time && !formDueTime) data.clear_due_time = true
-      if (editing.start_time && !formStartTime) data.clear_start_time = true
-      if (editing.amount != null && !formAmount) data.clear_amount = true
-      if ((editing.duration ?? 0) > 0 && !formDuration) data.clear_duration = true
-      await updateTodo.mutateAsync({ id: editing.id, data })
-      todoId = editing.id
-    } else {
-      const payload: Partial<Todo> = {
-        title: formTitle.trim(),
-        description: formDesc,
-        status: formStatus === 'pending' ? undefined : formStatus,
-        priority: formPriority,
-        due_time: formDueTime ? new Date(formDueTime).toISOString() : undefined,
-        start_time: formStartTime ? new Date(formStartTime).toISOString() : undefined,
-        duration: formDuration ? parseInt(formDuration, 10) : undefined,
-        amount: formAmount ? parseFloat(formAmount) : undefined,
-        amount_type: formAmountType,
-        contact_ids: formContactIds,
-        color: formColor,
-        repeat: formRepeat || undefined,
-        repeat_interval: formRepeatInterval || undefined,
-        parent_id: formParentId ?? undefined,
+      // Remember each successful step: a failed label/move request leaves the
+      // form open, and retrying a new task updates its saved id instead of
+      // creating a duplicate. Unchanged labels are never overwritten.
+      if (todoId != null && formParentId !== savedParentId.current) {
+        await moveTodo.mutateAsync({ id: todoId, parentId: formParentId, afterId: null })
+        savedParentId.current = formParentId
       }
-      const created = await createTodo.mutateAsync(payload)
-      todoId = created?.data?.id
-    }
-    // Reparenting goes through the dedicated move endpoint — Update doesn't
-    // persist parent_id. Skipped on create (parent_id is already in the payload).
-    if (editing && formParentId !== (editing.parent_id ?? null)) {
-      try {
-        await moveTodo.mutateAsync({ id: editing.id, parentId: formParentId, afterId: null })
-      } catch {
-        // backend rejects cycles; the change just won't apply
-      }
-    }
-    // Persist tag selection (idempotent replace). Non-fatal if it fails.
-    if (todoId) {
-      try {
+      const tagsChanged = formTagIds.length !== savedTagIds.current.length || formTagIds.some((id) => !savedTagIds.current.includes(id))
+      if (todoId != null && tagsChanged) {
         await replaceTags.mutateAsync({ todoId, tagIds: formTagIds })
-      } catch {
-        // ignore tag sync failure
+        savedTagIds.current = [...formTagIds]
       }
+      onClose()
+    } catch {
+      setSaveError(true)
+    } finally {
+      savingRef.current = false
+      setSaving(false)
     }
-    onClose()
-  }, [editing, formTitle, formDesc, formStatus, formPriority, formDueTime, formStartTime, formDuration, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
+  }, [labelCreating, formTitle, formDesc, formStatus, formPriority, formDueTime, formStartTime, formDuration, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
 
   return (
     <>
@@ -163,16 +183,17 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
           flex column, so the footer below stays pinned and never overlaps the
           last fields (the old sticky-inside-scroll approach always covered
           them at full scroll). */}
-      <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto py-1">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-1">
         <div className="space-y-1">
-          <Label>{t('todos.title_field')} *</Label>
+          <Label htmlFor={`${formId}-title`}>{t('todos.title_field')} *</Label>
           <Input
+            id={`${formId}-title`}
             value={formTitle}
             onChange={(e) => setFormTitle(e.target.value)}
             // Fast create flow: focus the title on open, Enter submits.
             autoFocus
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && formTitle.trim()) {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing && formTitle.trim()) {
                 e.preventDefault()
                 void handleSave()
               }
@@ -220,6 +241,19 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             />
           </div>
         )}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <Label>{t('todos.labels')}</Label>
+            <span className="text-xs text-muted-foreground">{t('todos.labelsMultiple')}</span>
+          </div>
+          <TodoLabelPicker
+            value={formTagIds}
+            onChange={setFormTagIds}
+            candidates={labelCandidates}
+            disabled={saving}
+            onPendingChange={setLabelCreating}
+          />
+        </div>
         <div className="space-y-1">
           <Label>{t('todos.status')}</Label>
           <div className="flex gap-1">
@@ -230,6 +264,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
                 variant={formStatus === s ? 'default' : 'outline'}
                 size="sm"
                 className="flex-1 text-xs"
+                aria-pressed={formStatus === s}
                 onClick={() => setFormStatus(s)}
               >
                 {t(`todos.${s}`)}
@@ -237,7 +272,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3">
           <div className="space-y-1">
             <Label>{t('todos.priority')}</Label>
             <div className="flex gap-1">
@@ -248,6 +283,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
                   variant={formPriority === p ? 'default' : 'outline'}
                   size="sm"
                   className="flex-1 text-xs"
+                  aria-pressed={formPriority === p}
                   onClick={() => setFormPriority(p)}
                 >
                   {t(`todos.${p}`)}
@@ -302,29 +338,6 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             )}
           </div>
         </div>
-        {tags.length > 0 && (
-          <div className="space-y-1">
-            <Label>{t('todos.tags')}</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {tags.map((tag) => {
-                const selected = formTagIds.includes(tag.id)
-                return (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => setFormTagIds((ids) => (selected ? ids.filter((i) => i !== tag.id) : [...ids, tag.id]))}
-                    className="px-2 py-0.5 rounded-full text-xs border transition-colors"
-                    style={selected
-                      ? { backgroundColor: tag.color || '#6b7280', borderColor: tag.color || '#6b7280', color: '#fff' }
-                      : { borderColor: tag.color || '#d1d5db', color: tag.color || '#6b7280' }}
-                  >
-                    {tag.name}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
         {/* Non-todo extras (finance amount, buddies, color) live behind a
             collapsible so the form stays focused on task fields; the badge
             hints at how many are set while collapsed. */}
@@ -436,10 +449,11 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
           )}
         </div>
       </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button onClick={handleSave} disabled={!formTitle.trim() || createTodo.isPending || updateTodo.isPending}>
-          {(createTodo.isPending || updateTodo.isPending) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+      {saveError && <p role="alert" className="mt-2 text-xs text-destructive">{t('todos.saveRetry')}</p>}
+      <DialogFooter className="mt-3 border-t pt-3">
+        <Button variant="outline" onClick={onClose} disabled={saving || labelCreating}>{t('common.cancel')}</Button>
+        <Button onClick={handleSave} disabled={!formTitle.trim() || saving || labelCreating}>
+          {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
           {editing ? t('common.save') : t('common.create')}
         </Button>
       </DialogFooter>

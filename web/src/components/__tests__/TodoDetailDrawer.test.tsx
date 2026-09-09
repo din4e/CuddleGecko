@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
+// Node's global localStorage is undefined in tests; rootKey reads it at call
+// time (the form's label picker mounts a search query).
+vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
+
 // The subtask rows call useSetTodoProgress — they need a QueryClient here.
 const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
 function renderWithClient(ui: React.ReactElement) {

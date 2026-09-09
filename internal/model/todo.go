@@ -13,7 +13,7 @@ type Todo struct {
 	Title       string         `gorm:"size:200;not null" json:"title"`
 	Description string         `gorm:"type:longtext" json:"description"`
 	Status      string         `gorm:"size:20;not null;default:'pending';index:idx_todo_ws_status_due" json:"status"`   // pending / done / abandoned
-	Priority    string         `gorm:"size:20;not null;default:'normal'" json:"priority"` // low / normal / high
+	Priority    string     `gorm:"size:20;not null;default:'none'" json:"priority"`                               // none / low / normal / high
 	Pinned       bool           `gorm:"not null;default:false" json:"pinned"`
 	DueTime     *time.Time     `gorm:"index:idx_todo_ws_status_due" json:"due_time"`
 	StartTime   *time.Time     `json:"start_time"`

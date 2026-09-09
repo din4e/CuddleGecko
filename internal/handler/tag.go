@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/din4e/cuddlegecko/internal/model"
@@ -32,7 +33,7 @@ func (h *TagHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
 	page, pageSize := parsePagination(c, 50)
-	tags, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize)
+	tags, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, c.Query("q"))
 	if err != nil {
 		response.InternalError(c, "failed to list tags")
 		return
@@ -54,6 +55,10 @@ func (h *TagHandler) Create(c *gin.Context) {
 		Color: req.Color,
 	})
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidTag) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		response.InternalError(c, "failed to create tag")
 		return
 	}
@@ -81,6 +86,10 @@ func (h *TagHandler) Update(c *gin.Context) {
 		Color: req.Color,
 	})
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidTag) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		response.NotFound(c, "tag not found")
 		return
 	}

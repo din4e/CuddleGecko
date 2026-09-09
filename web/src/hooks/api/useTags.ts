@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { tagsApi } from '../../api/tags'
 import { rootKey } from './keys'
 import { invalidateScope } from '@/lib/querySync'
@@ -20,6 +20,17 @@ export function useCreateTag() {
   return useMutation({
     mutationFn: (input: { name: string; color: string }) => tagsApi.create(input),
     onSuccess: () => invalidateScope(qc, scope),
+  })
+}
+
+/** Search the workspace's complete label library, loading only visible pages. */
+export function useTagSearch(query: string, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: [...allKey(), 'list', 'search', query] as const,
+    queryFn: ({ pageParam, signal }) => tagsApi.list(pageParam, 50, signal, query).then((r) => r.data),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.page * lastPage.page_size < lastPage.total ? lastPage.page + 1 : undefined,
+    enabled,
   })
 }
 

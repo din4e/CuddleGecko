@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"gorm.io/gorm"
@@ -31,9 +32,16 @@ func (r *TagRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Tag
 	return &tag, nil
 }
 
-func (r *TagRepo) List(ctx context.Context, workspaceID uint, page, pageSize int) ([]model.Tag, int64, error) {
+func (r *TagRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, search ...string) ([]model.Tag, int64, error) {
 	var tags []model.Tag
 	query := r.db.WithContext(ctx).Model(&model.Tag{}).Where("workspace_id = ?", workspaceID)
+	if len(search) > 0 && strings.TrimSpace(search[0]) != "" {
+		// Treat wildcard characters literally, using an escape supported by
+		// both SQLite and MySQL (and independent of MySQL's backslash mode).
+		needle := strings.ToLower(strings.TrimSpace(search[0]))
+		needle = strings.NewReplacer("!", "!!", "%", "!%", "_", "!_").Replace(needle)
+		query = query.Where("LOWER(name) LIKE ? ESCAPE '!'", "%"+needle+"%")
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
