@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, Circle, ChevronDown, ChevronRight, Pencil, Trash2, Clock, Flame, MapPin, Dumbbell } from 'lucide-react'
+import { CheckCircle2, Circle, ChevronDown, ChevronRight, Pencil, Trash2, Clock, Flame, MapPin, Dumbbell, NotebookPen } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
@@ -77,6 +77,13 @@ export function WorkoutCard({ workout, onEdit, formatDate }: WorkoutCardProps) {
               {workout.location && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{workout.location}</span>}
             </div>
             <LabelChips tags={workout.tags} className="mt-1.5" />
+
+            {workout.notes.trim() !== '' && (
+              <div className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+                <NotebookPen className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                <p className="min-w-0 flex-1 whitespace-pre-wrap break-words">{workout.notes}</p>
+              </div>
+            )}
 
             {total > 0 && (
               <div className="mt-2">
