@@ -448,7 +448,8 @@ func seedWorkouts(db *gorm.DB, user model.User) {
 		{
 			w: model.Workout{Name: "晨跑 5 公里", Type: "cardio", Status: model.WorkoutStatusCompleted,
 				Intensity: "medium", ScheduledAt: at(-2, 7), DurationMin: iptr(32), Calories: fptr(320),
-				Color: "#22c55e", Location: "奥林匹克森林公园", CompletedAt: completedAt(2)},
+				Color: "#22c55e", Location: "奥林匹克森林公园", CompletedAt: completedAt(2),
+				Notes: "平均配速 6 分 24 秒，最后一公里提速尝试。\n跑完左膝略有酸胀，拉伸 5 分钟后缓解；整体状态不错，下周尝试 5.5 公里。"},
 			exercises: []exDef{
 				{name: "跑步", distance: fptr(5), duration: iptr(1800), done: true},
 				{name: "拉伸放松", duration: iptr(300), done: true},
@@ -457,7 +458,8 @@ func seedWorkouts(db *gorm.DB, user model.User) {
 		{
 			w: model.Workout{Name: "上肢力量训练", Type: "strength", Status: model.WorkoutStatusPlanned,
 				Intensity: "high", ScheduledAt: at(1, 19), DurationMin: iptr(60), Calories: fptr(0),
-				Color: "#ef4444", Location: "健身房"},
+				Color: "#ef4444", Location: "健身房",
+				Notes: "本次重点卧推：上次第 4 组力竭，这次降 2.5kg 保证每组 8 个动作质量。\n引体向上目标 4×6，组间休息 90 秒。"},
 			exercises: []exDef{
 				{name: "卧推", sets: iptr(4), reps: iptr(8), weight: fptr(60), done: false},
 				{name: "引体向上", sets: iptr(4), reps: iptr(6), done: false},
@@ -466,7 +468,8 @@ func seedWorkouts(db *gorm.DB, user model.User) {
 		},
 		{
 			w: model.Workout{Name: "瑜伽拉伸", Type: "flexibility", Status: model.WorkoutStatusInProgress,
-				Intensity: "low", ScheduledAt: at(0, 21), DurationMin: iptr(45), Color: "#8b5cf6", Location: "家中"},
+				Intensity: "low", ScheduledAt: at(0, 21), DurationMin: iptr(45), Color: "#8b5cf6", Location: "家中",
+				Notes: "肩颈有些紧张，多安排了两组下犬式放松。\n呼吸节奏比上周平稳，战士一式保持时间延长到 60 秒。"},
 			exercises: []exDef{
 				{name: "下犬式", duration: iptr(60), done: true},
 				{name: "战士一式", duration: iptr(60), done: false},
@@ -482,7 +485,7 @@ func seedWorkouts(db *gorm.DB, user model.User) {
 		db.Model(&w).Updates(map[string]interface{}{
 			"type": w.Type, "status": w.Status, "intensity": w.Intensity, "scheduled_at": w.ScheduledAt,
 			"duration_min": w.DurationMin, "calories": w.Calories, "color": w.Color, "location": w.Location,
-			"completed_at": w.CompletedAt,
+			"completed_at": w.CompletedAt, "notes": w.Notes,
 		})
 		return w
 	}
