@@ -230,8 +230,8 @@ All endpoints at `/api`:
 | POST | /todos/:id/sync-event | Sync todo to event |
 | DELETE | /todos/:id | Delete todo |
 | GET/POST | /workouts | List/Create workouts |
-| GET | /workouts/body-metrics | List body records (sleep detail: `bedtime`/`wake_time`/`sleep_score`) |
-| POST | /workouts/body-metrics/import | Bulk-import body/sleep data (Garmin Connect, Apple Health, …) |
+| GET | /body-metrics | List body records (sleep detail: `bedtime`/`wake_time`/`sleep_score`) |
+| POST | /body-metrics/import | Bulk-import body/sleep data (Garmin Connect, Apple Health, …) |
 | GET/POST | /transactions | List/Create transactions |
 | GET | /transactions/summary | Transaction summary |
 | GET | /transactions/monthly | Monthly income/expense aggregate (dashboard trend) |
@@ -251,12 +251,12 @@ All endpoints at `/api`:
 | POST | /ai/analyze | Comprehensive analysis |
 | POST | /mcp | MCP server endpoint |
 
-### Body Data Import (`POST /api/workouts/body-metrics/import`)
+### Body Data Import (`POST /api/body-metrics/import`)
 
 Imports sleep/body records from external platforms (Garmin Connect 导出、Apple 健康、WHOOP 等). Idempotent: a record whose `recorded_at` already exists is skipped, so re-running the same export is a no-op.
 
 ```bash
-curl -X POST http://<host>/api/workouts/body-metrics/import \
+curl -X POST http://<host>/api/body-metrics/import \
   -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
   -d '{
     "source": "garmin",
