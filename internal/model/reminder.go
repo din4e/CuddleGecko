@@ -19,6 +19,8 @@ type Reminder struct {
 	Description string          `gorm:"type:longtext" json:"description"`
 	RemindAt    time.Time       `gorm:"not null;index:idx_reminder_ws_remind;index:idx_reminder_ws_status_remind,priority:3;index:idx_reminder_ws_contact_remind" json:"remind_at"`
 	Status      ReminderStatus  `gorm:"size:20;default:'pending';index:idx_reminder_ws_status_remind,priority:2" json:"status"`
+	// Virtual (not DB) — populated from the polymorphic taggings table.
+	Tags        []Tag          `gorm:"-" json:"tags"`
 	CreatedAt   time.Time       `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time       `gorm:"autoUpdateTime" json:"updated_at"`
 }

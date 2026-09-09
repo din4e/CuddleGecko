@@ -6,7 +6,7 @@ import { useCreateTag, useTagSearch } from '../hooks/api/useTags'
 import { cn } from '../lib/utils'
 import type { Tag } from '../types'
 
-interface TodoLabelPickerProps {
+interface LabelPickerProps {
   value: number[]
   onChange: (ids: number[]) => void
   candidates: Tag[]
@@ -14,9 +14,11 @@ interface TodoLabelPickerProps {
   onPendingChange: (pending: boolean) => void
 }
 
-/** Workspace-wide labels, styled like the parent picker, with persistent
- * multi-selection. The portalled popup stays visible inside a scrolling drawer. */
-export default function TodoLabelPicker({ value, onChange, candidates, disabled, onPendingChange }: TodoLabelPickerProps) {
+/** Entity-agnostic workspace-wide label picker, styled like the parent picker,
+ * with persistent multi-selection. The portalled popup stays visible inside a
+ * scrolling drawer. Shared by todos, events, transactions, workouts, habits
+ * and reminders — labels live on the polymorphic taggings table. */
+export default function LabelPicker({ value, onChange, candidates, disabled, onPendingChange }: LabelPickerProps) {
   const { t } = useTranslation()
   const listId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -106,20 +108,20 @@ export default function TodoLabelPicker({ value, onChange, candidates, disabled,
       }}>
         <Popover.Trigger
           disabled={busy}
-          aria-label={t('todos.labels')}
+          aria-label={t('labels.title')}
           className="flex h-8 w-full items-center justify-between gap-2 rounded-md border bg-background px-2 text-sm outline-none transition-colors hover:border-ring/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20 disabled:opacity-50"
         >
           <span className="flex min-w-0 items-center gap-1.5">
             <Tags className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <span className={cn('truncate', value.length === 0 && 'text-muted-foreground')}>
-              {value.length ? t('todos.labelsSelected', { count: value.length }) : t('todos.labelsPlaceholder')}
+              {value.length ? t('labels.selected', { count: value.length }) : t('labels.placeholder')}
             </span>
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Positioner align="start" sideOffset={4} className="z-[60] outline-none">
-            <Popover.Popup initialFocus={inputRef} aria-label={t('todos.labels')} className="flex max-h-(--available-height) w-(--anchor-width) max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md outline-none">
+            <Popover.Popup initialFocus={inputRef} aria-label={t('labels.title')} className="flex max-h-(--available-height) w-(--anchor-width) max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md outline-none">
               <div className="flex shrink-0 items-center gap-1.5 border-b px-2">
                 <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <input
@@ -127,8 +129,8 @@ export default function TodoLabelPicker({ value, onChange, candidates, disabled,
                   value={query}
                   disabled={busy}
                   maxLength={50}
-                  placeholder={t('todos.labelsSearchPlaceholder')}
-                  aria-label={t('todos.labelsSearchPlaceholder')}
+                  placeholder={t('labels.searchPlaceholder')}
+                  aria-label={t('labels.searchPlaceholder')}
                   role="combobox"
                   aria-autocomplete="list"
                   aria-expanded={open}
@@ -148,9 +150,9 @@ export default function TodoLabelPicker({ value, onChange, candidates, disabled,
                     }
                   }}
                 />
-                {searching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-label={t('todos.parentSearching')} />}
+                {searching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-label={t('labels.searching')} />}
               </div>
-              <div ref={listRef} id={listId} role="listbox" aria-label={t('todos.labels')} aria-multiselectable="true" className="min-h-0 max-h-52 overflow-y-auto p-1">
+              <div ref={listRef} id={listId} role="listbox" aria-label={t('labels.title')} aria-multiselectable="true" className="min-h-0 max-h-52 overflow-y-auto p-1">
                 {options.map((tag, index) => (
                   <button
                     key={tag.id}
@@ -172,32 +174,32 @@ export default function TodoLabelPicker({ value, onChange, candidates, disabled,
                   </button>
                 ))}
                 {!options.length && !searching && !search.isError && (
-                  <p className="px-2 py-3 text-center text-xs text-muted-foreground">{needle ? t('todos.labelsNoResults') : t('todos.labelsEmpty')}</p>
+                  <p className="px-2 py-3 text-center text-xs text-muted-foreground">{needle ? t('labels.noResults') : t('labels.empty')}</p>
                 )}
               </div>
               {search.hasNextPage && (
-                <button type="button" disabled={searching || busy} onClick={() => { void search.fetchNextPage() }} className="px-3 py-2 text-xs text-primary disabled:opacity-50">{t('todos.loadMore')}</button>
+                <button type="button" disabled={searching || busy} onClick={() => { void search.fetchNextPage() }} className="px-3 py-2 text-xs text-primary disabled:opacity-50">{t('labels.loadMore')}</button>
               )}
               {search.isError && (
-                <button type="button" onClick={() => { void search.refetch() }} className="px-3 py-2 text-xs text-destructive">{t('todos.labelsLoadError')}</button>
+                <button type="button" onClick={() => { void search.refetch() }} className="px-3 py-2 text-xs text-destructive">{t('labels.loadError')}</button>
               )}
               {(canCreate || createTag.isPending) && (
                 <button type="button" disabled={busy} onClick={() => { void create() }} className="flex items-center gap-1.5 border-t px-3 py-2 text-left text-sm text-primary hover:bg-accent disabled:opacity-50">
                   {createTag.isPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <Plus className="h-3.5 w-3.5 shrink-0" />}
-                  <span className="min-w-0 break-words">{t('todos.labelsCreate', { name: query.trim() })}</span>
+                  <span className="min-w-0 break-words">{t('labels.create', { name: query.trim() })}</span>
                 </button>
               )}
-              {createError && <p role="alert" className="px-3 py-2 text-xs text-destructive">{t('todos.labelsCreateError')}</p>}
+              {createError && <p role="alert" className="px-3 py-2 text-xs text-destructive">{t('labels.createError')}</p>}
               <div className="flex shrink-0 items-center justify-between gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
-                <span>{t('todos.labelsHint')}</span>
-                <Popover.Close disabled={busy} className="rounded px-1 text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring">{t('todos.labelsDone')}</Popover.Close>
+                <span>{t('labels.hint')}</span>
+                <Popover.Close disabled={busy} className="rounded px-1 text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring">{t('labels.done')}</Popover.Close>
               </div>
             </Popover.Popup>
           </Popover.Positioner>
         </Popover.Portal>
       </Popover.Root>
       {value.length > 0 && (
-        <div className="flex flex-wrap gap-1.5" aria-label={t('todos.labelsSelected', { count: value.length })}>
+        <div className="flex flex-wrap gap-1.5" aria-label={t('labels.selected', { count: value.length })}>
           {value.map((id) => {
             const tag = known.get(id)
             const name = tag?.name ?? `#${id}`
@@ -205,7 +207,7 @@ export default function TodoLabelPicker({ value, onChange, candidates, disabled,
               <span key={id} className="inline-flex max-w-full items-center gap-1.5 rounded-md border bg-muted/30 py-0.5 pl-2 pr-1 text-xs">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: tag?.color || '#6b7280' }} />
                 <span className="min-w-0 break-words">{name}</span>
-                <button type="button" disabled={busy} onClick={() => onChange(value.filter((item) => item !== id))} aria-label={t('todos.labelsRemove', { name })} className="shrink-0 rounded p-0.5 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+                <button type="button" disabled={busy} onClick={() => onChange(value.filter((item) => item !== id))} aria-label={t('labels.remove', { name })} className="shrink-0 rounded p-0.5 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
                   <X className="h-3 w-3" />
                 </button>
               </span>

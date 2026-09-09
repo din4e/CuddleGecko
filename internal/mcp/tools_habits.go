@@ -14,7 +14,7 @@ func (s *MCPServer) registerHabitTools() {
 		},
 	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
 		include := toString(getArg(args, "archived")) == "true"
-		return s.habitSvc.List(ctx, userID, workspaceID, include)
+		return s.habitSvc.List(ctx, userID, workspaceID, include, nil)
 	})
 
 	s.registerTool("create_habit", "Create a daily habit tracker.", map[string]interface{}{

@@ -45,3 +45,11 @@ export function useCheckinHabit() {
     onSuccess: () => invalidateScope(qc, scope),
   })
 }
+
+export function useReplaceHabitTags() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => habitsApi.replaceTags(id, tagIds),
+    onSuccess: () => invalidateScope(qc, scope),
+  })
+}

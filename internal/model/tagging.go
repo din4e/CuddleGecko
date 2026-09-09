@@ -4,8 +4,13 @@ import "time"
 
 // Tag target types — the entity a tag is attached to.
 const (
-	TagTargetContact = "contact"
-	TagTargetTodo    = "todo"
+	TagTargetContact     = "contact"
+	TagTargetTodo        = "todo"
+	TagTargetEvent       = "event"
+	TagTargetTransaction = "transaction"
+	TagTargetWorkout     = "workout"
+	TagTargetHabit       = "habit"
+	TagTargetReminder    = "reminder"
 )
 
 // Tagging is a polymorphic association between a Tag and any taggable entity

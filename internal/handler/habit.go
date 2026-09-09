@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/din4e/cuddlegecko/internal/model"
@@ -40,7 +41,7 @@ func (h *HabitHandler) List(c *gin.Context) {
 	workspaceID := middleware.GetWorkspaceID(c)
 	includeArchived := c.Query("archived") == "true"
 
-	habits, err := h.svc.List(c.Request.Context(), userID, workspaceID, includeArchived)
+	habits, err := h.svc.List(c.Request.Context(), userID, workspaceID, includeArchived, parseTagIDs(c))
 	if err != nil {
 		response.InternalError(c, "failed to list habits")
 		return
@@ -49,6 +50,49 @@ func (h *HabitHandler) List(c *gin.Context) {
 		habits = []model.Habit{}
 	}
 	response.OK(c, habits)
+}
+
+func (h *HabitHandler) GetTags(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid habit id")
+		return
+	}
+
+	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, uint(id))
+	if err != nil {
+		response.NotFound(c, "habit not found")
+		return
+	}
+	response.OK(c, tags)
+}
+
+func (h *HabitHandler) ReplaceTags(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid habit id")
+		return
+	}
+
+	var req replaceTagsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
+		if errors.Is(err, model.ErrInvalidTagIDs) {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.NotFound(c, "habit not found")
+		return
+	}
+	response.OK(c, nil)
 }
 
 func (h *HabitHandler) Create(c *gin.Context) {

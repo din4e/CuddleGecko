@@ -31,7 +31,7 @@ func (s *MCPServer) registerTransactionTools() {
 			contactID = &u
 		}
 
-		txs, total, err := s.transactionSvc.List(ctx, userID, workspaceID, page, pageSize, txType, contactID, search)
+		txs, total, err := s.transactionSvc.List(ctx, userID, workspaceID, page, pageSize, txType, contactID, search, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -24,3 +24,16 @@ func parsePagination(c *gin.Context, defaultPageSize int) (page, pageSize int) {
 	}
 	return page, pageSize
 }
+
+// parseTagIDs reads repeated ?tag_ids= query params into a uint slice for the
+// list endpoints that filter by label. Invalid values are skipped, mirroring
+// how other optional filters degrade.
+func parseTagIDs(c *gin.Context) []uint {
+	var ids []uint
+	for _, raw := range c.QueryArray("tag_ids") {
+		if id, err := strconv.ParseUint(raw, 10, 32); err == nil {
+			ids = append(ids, uint(id))
+		}
+	}
+	return ids
+}

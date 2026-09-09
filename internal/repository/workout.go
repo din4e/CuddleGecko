@@ -58,6 +58,13 @@ func (r *WorkoutRepo) List(ctx context.Context, workspaceID uint, q model.Workou
 	if q.DateBefore != nil {
 		query = query.Where("scheduled_at <= ?", *q.DateBefore)
 	}
+	if len(q.TagIDs) > 0 {
+		// EXISTS avoids duplicate workout rows when multiple selected tags match.
+		query = query.Where(
+			"EXISTS (SELECT 1 FROM taggings WHERE taggings.workspace_id = ? AND taggings.target_type = ? AND taggings.target_id = workouts.id AND taggings.tag_id IN ?)",
+			workspaceID, model.TagTargetWorkout, q.TagIDs,
+		)
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {

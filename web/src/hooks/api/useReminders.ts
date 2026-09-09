@@ -43,3 +43,11 @@ export function useDeleteReminder() {
     onError: mutationErrorToast,
   })
 }
+
+export function useReplaceReminderTags() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => remindersApi.replaceTags(id, tagIds),
+    onSuccess: () => invalidateScope(qc, scope),
+  })
+}

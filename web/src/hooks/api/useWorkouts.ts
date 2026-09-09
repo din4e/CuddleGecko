@@ -192,3 +192,11 @@ export function useSetLogMutations(workoutId: number, exerciseId: number) {
   })
   return { create, update, remove }
 }
+
+export function useReplaceWorkoutTags() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => workoutsApi.replaceTags(id, tagIds),
+    onSuccess: () => invalidateScope(qc, scope),
+  })
+}

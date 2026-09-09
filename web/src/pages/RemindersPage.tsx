@@ -14,10 +14,15 @@ import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
 import { ListSkeleton } from '../components/ListSkeleton'
 import ListPageHeader from '../components/ListPageHeader'
+import LabelPicker from '../components/LabelPicker'
+import { mergeLabelCandidates } from '../lib/labels'
+import LabelChips from '../components/LabelChips'
+import { useTagsList } from '../hooks/api/useTags'
 import {
   useRemindersList,
   useUpdateReminder,
   useDeleteReminder,
+  useReplaceReminderTags,
 } from '../hooks/api/useReminders'
 
 export default function RemindersPage() {
@@ -37,6 +42,8 @@ export default function RemindersPage() {
   const { data, isPending } = useRemindersList(statusFilter, page, pageSize)
   const updateReminder = useUpdateReminder()
   const deleteReminder = useDeleteReminder()
+  const replaceReminderTags = useReplaceReminderTags()
+  const { data: tagsData } = useTagsList(1, 200)
 
   const reminders = data?.items ?? []
   const total = data?.total ?? 0
@@ -47,6 +54,9 @@ export default function RemindersPage() {
   const [formDesc, setFormDesc] = useState('')
   const [formRemindAt, setFormRemindAt] = useState('')
   const [formStatus, setFormStatus] = useState<ReminderStatus>('pending')
+  const [formLabelIds, setFormLabelIds] = useState<number[]>([])
+  const [labelCreating, setLabelCreating] = useState(false)
+  const labelCandidates = mergeLabelCandidates(tagsData?.items, editing?.tags)
 
   const changeStatusFilter = (s: ReminderStatus | '') => {
     setStatusFilter(s)
@@ -59,6 +69,7 @@ export default function RemindersPage() {
     setFormDesc(r.description || '')
     setFormRemindAt(r.remind_at ? r.remind_at.slice(0, 16) : '')
     setFormStatus(r.status)
+    setFormLabelIds((r.tags ?? []).map((tg) => tg.id))
     setDialogOpen(true)
   }
 
@@ -73,6 +84,11 @@ export default function RemindersPage() {
         status: formStatus,
       },
     })
+    // Labels go through the dedicated association endpoint; skip when unchanged.
+    const original = (editing.tags ?? []).map((tg) => tg.id)
+    if (formLabelIds.length !== original.length || formLabelIds.some((id) => !original.includes(id))) {
+      await replaceReminderTags.mutateAsync({ id: editing.id, tagIds: formLabelIds })
+    }
     setDialogOpen(false)
   }
 
@@ -132,7 +148,12 @@ export default function RemindersPage() {
                 return (
                   <TableRow key={r.id}>
                     <TableCell><Icon className="h-4 w-4 text-muted-foreground" /></TableCell>
-                    <TableCell className="font-medium">{r.title}</TableCell>
+                    <TableCell className="font-medium">
+                      <div>
+                        {r.title}
+                        <LabelChips tags={r.tags} className="mt-1" />
+                      </div>
+                    </TableCell>
                     <TableCell className="text-muted-foreground max-w-[200px] truncate">{r.description || '—'}</TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">{new Date(r.remind_at).toLocaleString()}</TableCell>
                     <TableCell>
@@ -167,6 +188,7 @@ export default function RemindersPage() {
                     <span className="font-medium truncate">{r.title}</span>
                   </div>
                   {r.description && <p className="text-sm text-muted-foreground line-clamp-2">{r.description}</p>}
+                  <LabelChips tags={r.tags} />
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">{new Date(r.remind_at).toLocaleString()}</span>
                     <Badge
@@ -220,10 +242,24 @@ export default function RemindersPage() {
                 ))}
               </div>
             </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">{t('labels.title')}</label>
+                <span className="text-xs text-muted-foreground">{t('labels.multiple')}</span>
+              </div>
+              <div className="mt-1">
+                <LabelPicker
+                  value={formLabelIds}
+                  onChange={setFormLabelIds}
+                  candidates={labelCandidates}
+                  onPendingChange={setLabelCreating}
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('reminders.cancel')}</Button>
-            <Button onClick={handleSave} disabled={updateReminder.isPending}>{t('reminders.save')}</Button>
+            <Button onClick={handleSave} disabled={updateReminder.isPending || labelCreating}>{t('reminders.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

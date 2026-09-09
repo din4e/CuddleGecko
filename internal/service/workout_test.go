@@ -21,7 +21,7 @@ func newWorkoutSvcTestDB(t *testing.T) (*WorkoutService, *gorm.DB) {
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
 	require.NoError(t, db.AutoMigrate(&model.Workout{}, &model.WorkoutExercise{}, &model.BodyMetric{}, &model.WorkoutSetLog{}))
-	svc := NewWorkoutService(repository.NewWorkoutRepo(db), repository.NewWorkoutExerciseRepo(db), repository.NewBodyMetricRepo(db))
+	svc := NewWorkoutService(repository.NewWorkoutRepo(db), repository.NewWorkoutExerciseRepo(db), repository.NewBodyMetricRepo(db), repository.NewTaggingRepo(db))
 	return svc, db
 }
 

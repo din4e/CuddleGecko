@@ -35,7 +35,7 @@ func (r *TransactionRepo) GetByID(ctx context.Context, workspaceID, id uint) (*m
 	return &tx, nil
 }
 
-func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string) ([]model.Transaction, int64, error) {
+func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string, tagIDs []uint) ([]model.Transaction, int64, error) {
 	var txs []model.Transaction
 	var total int64
 
@@ -58,6 +58,13 @@ func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, page
 
 	if search != "" {
 		query = query.Where("LOWER(title) LIKE ?", "%"+strings.ToLower(search)+"%")
+	}
+	if len(tagIDs) > 0 {
+		// EXISTS avoids duplicate transaction rows when multiple selected tags match.
+		query = query.Where(
+			"EXISTS (SELECT 1 FROM taggings WHERE taggings.workspace_id = ? AND taggings.target_type = ? AND taggings.target_id = transactions.id AND taggings.tag_id IN ?)",
+			workspaceID, model.TagTargetTransaction, tagIDs,
+		)
 	}
 
 	if err := query.Model(&model.Transaction{}).Count(&total).Error; err != nil {

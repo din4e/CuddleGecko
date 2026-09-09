@@ -38,19 +38,19 @@ func TestReminderRepo_List_ContactFilter(t *testing.T) {
 	mk(3, "for-3")
 
 	c1 := uint(1)
-	reminders, total, err := repo.List(ctx, 1, "", &c1, 1, 100)
+	reminders, total, err := repo.List(ctx, 1, "", &c1, 1, 100, nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), total)
 	assert.Len(t, reminders, 2)
 
 	// No contact filter -> all reminders.
-	_, total, err = repo.List(ctx, 1, "", nil, 1, 100)
+	_, total, err = repo.List(ctx, 1, "", nil, 1, 100, nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(4), total)
 
 	// A contact with no reminders -> empty.
 	c99 := uint(99)
-	_, total, err = repo.List(ctx, 1, "", &c99, 1, 100)
+	_, total, err = repo.List(ctx, 1, "", &c99, 1, 100, nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), total)
 }

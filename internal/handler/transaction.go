@@ -58,13 +58,56 @@ func (h *TransactionHandler) List(c *gin.Context) {
 
 	search := c.Query("q")
 
-	txs, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, txType, contactID, search)
+	txs, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, txType, contactID, search, parseTagIDs(c))
 	if err != nil {
 		response.InternalError(c, "failed to list transactions")
 		return
 	}
 
 	response.OKPaginated(c, txs, total, page, pageSize)
+}
+
+func (h *TransactionHandler) GetTags(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid transaction id")
+		return
+	}
+
+	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, uint(id))
+	if err != nil {
+		response.NotFound(c, "transaction not found")
+		return
+	}
+	response.OK(c, tags)
+}
+
+func (h *TransactionHandler) ReplaceTags(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid transaction id")
+		return
+	}
+
+	var req replaceTagsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
+		if errors.Is(err, model.ErrInvalidTagIDs) {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.NotFound(c, "transaction not found")
+		return
+	}
+	response.OK(c, nil)
 }
 
 func (h *TransactionHandler) MonthlyTrend(c *gin.Context) {

@@ -7,7 +7,10 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog'
-import { useCreateWorkout, useUpdateWorkout } from '../hooks/api/useWorkouts'
+import LabelPicker from './LabelPicker'
+import { mergeLabelCandidates } from '../lib/labels'
+import { useCreateWorkout, useUpdateWorkout, useReplaceWorkoutTags } from '../hooks/api/useWorkouts'
+import { useTagsList } from '../hooks/api/useTags'
 import type { Workout, WorkoutType, WorkoutStatus, WorkoutIntensity, WorkoutUpdateInput } from '../types'
 
 const COLORS = [
@@ -33,6 +36,9 @@ export function WorkoutFormDialog({ open, editing, onClose }: WorkoutFormDialogP
   const { t } = useTranslation()
   const createWorkout = useCreateWorkout()
   const updateWorkout = useUpdateWorkout()
+  const replaceWorkoutTags = useReplaceWorkoutTags()
+  const { data: tagsData } = useTagsList(1, 200)
+  const labelCandidates = mergeLabelCandidates(tagsData?.items, editing?.tags)
 
   const [name, setName] = useState(editing?.name ?? '')
   const [wType, setWType] = useState<WorkoutType>(editing?.type ?? 'other')
@@ -44,9 +50,12 @@ export function WorkoutFormDialog({ open, editing, onClose }: WorkoutFormDialogP
   const [location, setLocation] = useState(editing?.location ?? '')
   const [notes, setNotes] = useState(editing?.notes ?? '')
   const [color, setColor] = useState(editing?.color ?? '')
+  const [labelIds, setLabelIds] = useState<number[]>(editing?.tags?.map((tg) => tg.id) ?? [])
+  const [labelCreating, setLabelCreating] = useState(false)
 
   const handleSave = useCallback(async () => {
     if (!name.trim()) return
+    let workoutId = editing?.id
     if (editing) {
       const data: WorkoutUpdateInput = {
         name: name.trim(),
@@ -65,7 +74,7 @@ export function WorkoutFormDialog({ open, editing, onClose }: WorkoutFormDialogP
       if (editing.calories != null && !calories) data.clear_calories = true
       await updateWorkout.mutateAsync({ id: editing.id, data })
     } else {
-      await createWorkout.mutateAsync({
+      workoutId = (await createWorkout.mutateAsync({
         name: name.trim(),
         type: wType,
         status,
@@ -76,10 +85,15 @@ export function WorkoutFormDialog({ open, editing, onClose }: WorkoutFormDialogP
         scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
         duration_min: duration ? parseInt(duration, 10) : undefined,
         calories: calories ? parseFloat(calories) : undefined,
-      })
+      }))?.data?.id
+    }
+    // Labels go through the dedicated association endpoint; skip when unchanged.
+    const original = (editing?.tags ?? []).map((tg) => tg.id)
+    if (workoutId != null && (labelIds.length !== original.length || labelIds.some((id) => !original.includes(id)))) {
+      await replaceWorkoutTags.mutateAsync({ id: workoutId, tagIds: labelIds })
     }
     onClose()
-  }, [editing, name, wType, status, intensity, location, notes, color, scheduledAt, duration, calories, createWorkout, updateWorkout, onClose])
+  }, [editing, name, wType, status, intensity, location, notes, color, scheduledAt, duration, calories, labelIds, createWorkout, updateWorkout, replaceWorkoutTags, onClose])
 
   const cls = 'h-9 w-full rounded-md border bg-background px-2 text-sm'
 
@@ -141,8 +155,20 @@ export function WorkoutFormDialog({ open, editing, onClose }: WorkoutFormDialogP
             <Input value={location} onChange={(e) => setLocation(e.target.value)} maxLength={200} />
           </div>
           <div className="space-y-1.5">
-            <Label>{t('fitness.notes')}</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+            <Label>{t('fitness.trainingLog')}</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder={t('fitness.trainingLogPlaceholder')} />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label>{t('labels.title')}</Label>
+              <span className="text-xs text-muted-foreground">{t('labels.multiple')}</span>
+            </div>
+            <LabelPicker
+              value={labelIds}
+              onChange={setLabelIds}
+              candidates={labelCandidates}
+              onPendingChange={setLabelCreating}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>{t('fitness.color')}</Label>
@@ -162,7 +188,7 @@ export function WorkoutFormDialog({ open, editing, onClose }: WorkoutFormDialogP
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button onClick={handleSave} disabled={!name.trim() || createWorkout.isPending || updateWorkout.isPending}>
+          <Button onClick={handleSave} disabled={!name.trim() || labelCreating || createWorkout.isPending || updateWorkout.isPending}>
             {(createWorkout.isPending || updateWorkout.isPending) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {t('common.create')}
           </Button>

@@ -6,6 +6,7 @@ import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ExerciseList } from './ExerciseList'
+import LabelChips from './LabelChips'
 import { useToggleWorkout, useDeleteWorkout } from '../hooks/api/useWorkouts'
 import type { Workout } from '../types'
 
@@ -75,6 +76,7 @@ export function WorkoutCard({ workout, onEdit, formatDate }: WorkoutCardProps) {
               {workout.calories != null && <span className="inline-flex items-center gap-1"><Flame className="h-3 w-3" />{workout.calories} kcal</span>}
               {workout.location && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{workout.location}</span>}
             </div>
+            <LabelChips tags={workout.tags} className="mt-1.5" />
 
             {total > 0 && (
               <div className="mt-2">

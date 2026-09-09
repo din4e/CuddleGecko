@@ -283,6 +283,10 @@ func (h *ContactHandler) ReplaceTags(c *gin.Context) {
 	}
 
 	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
+		if errors.Is(err, model.ErrInvalidTagIDs) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		response.NotFound(c, "contact not found")
 		return
 	}

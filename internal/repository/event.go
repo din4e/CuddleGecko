@@ -42,7 +42,7 @@ func (r *EventRepo) GetByIDs(ctx context.Context, workspaceID uint, ids []uint) 
 	return events, nil
 }
 
-func (r *EventRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, startAfter, endBefore *string, search string) ([]model.Event, int64, error) {
+func (r *EventRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, startAfter, endBefore *string, search string, tagIDs []uint) ([]model.Event, int64, error) {
 	var events []model.Event
 	var total int64
 
@@ -56,6 +56,13 @@ func (r *EventRepo) List(ctx context.Context, workspaceID uint, page, pageSize i
 	}
 	if search != "" {
 		query = query.Where("LOWER(title) LIKE ?", "%"+strings.ToLower(search)+"%")
+	}
+	if len(tagIDs) > 0 {
+		// EXISTS avoids duplicate event rows when multiple selected tags match.
+		query = query.Where(
+			"EXISTS (SELECT 1 FROM taggings WHERE taggings.workspace_id = ? AND taggings.target_type = ? AND taggings.target_id = events.id AND taggings.tag_id IN ?)",
+			workspaceID, model.TagTargetEvent, tagIDs,
+		)
 	}
 
 	if err := query.Model(&model.Event{}).Count(&total).Error; err != nil {

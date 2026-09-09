@@ -60,14 +60,15 @@ type WorkoutClear struct {
 }
 
 type WorkoutService struct {
-	repo      WorkoutRepository
-	exRepo    WorkoutExerciseRepository
-	bodyRepo  BodyMetricRepository
-	notifier  ChangeNotifier
+	repo        WorkoutRepository
+	exRepo      WorkoutExerciseRepository
+	bodyRepo    BodyMetricRepository
+	taggingRepo TaggingRepository
+	notifier    ChangeNotifier
 }
 
-func NewWorkoutService(repo WorkoutRepository, exRepo WorkoutExerciseRepository, bodyRepo BodyMetricRepository, notifier ...ChangeNotifier) *WorkoutService {
-	return &WorkoutService{repo: repo, exRepo: exRepo, bodyRepo: bodyRepo, notifier: firstNotifier(notifier)}
+func NewWorkoutService(repo WorkoutRepository, exRepo WorkoutExerciseRepository, bodyRepo BodyMetricRepository, taggingRepo TaggingRepository, notifier ...ChangeNotifier) *WorkoutService {
+	return &WorkoutService{repo: repo, exRepo: exRepo, bodyRepo: bodyRepo, taggingRepo: taggingRepo, notifier: firstNotifier(notifier)}
 }
 
 // --- Workouts ---
@@ -89,11 +90,25 @@ func (s *WorkoutService) Create(ctx context.Context, userID, workspaceID uint, w
 }
 
 func (s *WorkoutService) GetByID(ctx context.Context, userID, workspaceID, id uint) (*model.Workout, error) {
-	return s.repo.GetByID(ctx, workspaceID, id)
+	w, err := s.repo.GetByID(ctx, workspaceID, id)
+	if err != nil {
+		return nil, err
+	}
+	s.populateTags(ctx, workspaceID, []*model.Workout{w})
+	return w, nil
 }
 
 func (s *WorkoutService) List(ctx context.Context, userID, workspaceID uint, q model.WorkoutListQuery) ([]model.Workout, int64, error) {
-	return s.repo.List(ctx, workspaceID, q)
+	workouts, total, err := s.repo.List(ctx, workspaceID, q)
+	if err != nil {
+		return nil, 0, err
+	}
+	ptrs := make([]*model.Workout, len(workouts))
+	for i := range workouts {
+		ptrs[i] = &workouts[i]
+	}
+	s.populateTags(ctx, workspaceID, ptrs)
+	return workouts, total, nil
 }
 
 func (s *WorkoutService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Workout, clear WorkoutClear) (*model.Workout, error) {
@@ -175,8 +190,48 @@ func (s *WorkoutService) Delete(ctx context.Context, userID, workspaceID, id uin
 	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}
+	// Clean up dangling tag associations.
+	_ = s.taggingRepo.RemoveAll(ctx, workspaceID, model.TagTargetWorkout, id)
 	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeDeleted, id, nil)
 	return nil
+}
+
+// --- Tags ---
+
+func (s *WorkoutService) ReplaceTags(ctx context.Context, userID, workspaceID, workoutID uint, tagIDs []uint) error {
+	if err := s.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
+		return err
+	}
+	if err := s.taggingRepo.SetTags(ctx, workspaceID, model.TagTargetWorkout, workoutID, tagIDs); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeUpdated, workoutID, nil)
+	return nil
+}
+
+func (s *WorkoutService) GetTags(ctx context.Context, userID, workspaceID, workoutID uint) ([]model.Tag, error) {
+	if err := s.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
+		return nil, err
+	}
+	return s.taggingRepo.GetTags(ctx, workspaceID, model.TagTargetWorkout, workoutID)
+}
+
+// populateTags fills the virtual Tags field for a batch of workouts.
+func (s *WorkoutService) populateTags(ctx context.Context, workspaceID uint, workouts []*model.Workout) {
+	if s.taggingRepo == nil || len(workouts) == 0 {
+		return
+	}
+	ids := make([]uint, len(workouts))
+	for i, w := range workouts {
+		ids[i] = w.ID
+	}
+	tagMap, err := s.taggingRepo.GetTagsByTargets(ctx, workspaceID, model.TagTargetWorkout, ids)
+	if err != nil {
+		return
+	}
+	for _, w := range workouts {
+		w.Tags = tagMap[w.ID]
+	}
 }
 
 func (s *WorkoutService) Reorder(ctx context.Context, userID, workspaceID, id uint, afterID *uint) error {

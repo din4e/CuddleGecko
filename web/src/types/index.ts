@@ -70,6 +70,8 @@ export interface Reminder {
   status: ReminderStatus
   created_at: string
   updated_at: string
+  /** Workspace labels (polymorphic taggings table). */
+  tags?: Tag[]
 }
 
 export interface ContactRelation {
@@ -133,6 +135,8 @@ export interface Event {
   color: string
   created_at: string
   updated_at: string
+  /** Workspace labels (polymorphic taggings table). */
+  tags?: Tag[]
 }
 
 export interface Transaction {
@@ -147,6 +151,8 @@ export interface Transaction {
   notes: string
   created_at: string
   updated_at: string
+  /** Workspace labels (polymorphic taggings table). */
+  tags?: Tag[]
 }
 
 export interface TransactionSummary {
@@ -269,6 +275,8 @@ export interface Habit {
   best: number
   rate_30: number
   recent: string[] // checked-in dates YYYY-MM-DD within the heatmap window
+  /** Workspace labels (polymorphic taggings table). */
+  tags?: Tag[]
 }
 
 export type PomodoroKind = 'focus' | 'break'
@@ -390,6 +398,8 @@ export interface Workout {
   /** Denormalized exercise progress (optional on the client for resilience). */
   item_total?: number
   item_done?: number
+  /** Workspace labels (polymorphic taggings table). */
+  tags?: Tag[]
   created_at: string
   updated_at: string
 }

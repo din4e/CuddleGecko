@@ -31,7 +31,7 @@ func (r *ReminderRepo) GetByID(ctx context.Context, workspaceID, id uint) (*mode
 	return &reminder, nil
 }
 
-func (r *ReminderRepo) List(ctx context.Context, workspaceID uint, status model.ReminderStatus, contactID *uint, page, pageSize int) ([]model.Reminder, int64, error) {
+func (r *ReminderRepo) List(ctx context.Context, workspaceID uint, status model.ReminderStatus, contactID *uint, page, pageSize int, tagIDs []uint) ([]model.Reminder, int64, error) {
 	var reminders []model.Reminder
 	query := r.db.WithContext(ctx).Model(&model.Reminder{}).Where("workspace_id = ?", workspaceID)
 	if status != "" {
@@ -39,6 +39,13 @@ func (r *ReminderRepo) List(ctx context.Context, workspaceID uint, status model.
 	}
 	if contactID != nil {
 		query = query.Where("contact_id = ?", *contactID)
+	}
+	if len(tagIDs) > 0 {
+		// EXISTS avoids duplicate reminder rows when multiple selected tags match.
+		query = query.Where(
+			"EXISTS (SELECT 1 FROM taggings WHERE taggings.workspace_id = ? AND taggings.target_type = ? AND taggings.target_id = reminders.id AND taggings.tag_id IN ?)",
+			workspaceID, model.TagTargetReminder, tagIDs,
+		)
 	}
 
 	var total int64

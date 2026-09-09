@@ -31,11 +31,18 @@ func (r *HabitRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.H
 	return &h, nil
 }
 
-func (r *HabitRepo) List(ctx context.Context, workspaceID uint, includeArchived bool) ([]model.Habit, error) {
+func (r *HabitRepo) List(ctx context.Context, workspaceID uint, includeArchived bool, tagIDs []uint) ([]model.Habit, error) {
 	var habits []model.Habit
 	q := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID)
 	if !includeArchived {
 		q = q.Where("archived = ?", false)
+	}
+	if len(tagIDs) > 0 {
+		// EXISTS avoids duplicate habit rows when multiple selected tags match.
+		q = q.Where(
+			"EXISTS (SELECT 1 FROM taggings WHERE taggings.workspace_id = ? AND taggings.target_type = ? AND taggings.target_id = habits.id AND taggings.tag_id IN ?)",
+			workspaceID, model.TagTargetHabit, tagIDs,
+		)
 	}
 	if err := q.Order("archived ASC, sort_order ASC, id ASC").Find(&habits).Error; err != nil {
 		return nil, fmt.Errorf("list habits: %w", err)

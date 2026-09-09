@@ -36,6 +36,8 @@ type Workout struct {
 	// Denormalized exercise progress, kept in sync with WorkoutExercise changes.
 	ItemTotal  int            `gorm:"not null;default:0" json:"item_total"`
 	ItemDone   int            `gorm:"not null;default:0" json:"item_done"`
+	// Virtual (not DB) — populated from the polymorphic taggings table.
+	Tags       []Tag          `gorm:"-" json:"tags"`
 	CreatedAt  time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt  time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
@@ -93,6 +95,7 @@ type WorkoutListQuery struct {
 	Search     string     // case-insensitive substring match on name
 	DateAfter  *time.Time // scheduled_at >=
 	DateBefore *time.Time // scheduled_at <=
+	TagIDs     []uint     // workouts carrying any of these tags (taggings table)
 	Sort       string     // scheduled (default) | created | manual
 	Order      string     // asc (default) | desc
 	Page       int

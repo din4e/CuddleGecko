@@ -100,13 +100,56 @@ func (h *EventHandler) List(c *gin.Context) {
 
 	search := c.Query("q")
 
-	events, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, startAfter, endBefore, search)
+	events, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, startAfter, endBefore, search, parseTagIDs(c))
 	if err != nil {
 		response.InternalError(c, "failed to list events")
 		return
 	}
 
 	response.OKPaginated(c, events, total, page, pageSize)
+}
+
+func (h *EventHandler) GetTags(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid event id")
+		return
+	}
+
+	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, uint(id))
+	if err != nil {
+		response.NotFound(c, "event not found")
+		return
+	}
+	response.OK(c, tags)
+}
+
+func (h *EventHandler) ReplaceTags(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid event id")
+		return
+	}
+
+	var req replaceTagsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
+		if errors.Is(err, model.ErrInvalidTagIDs) {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.NotFound(c, "event not found")
+		return
+	}
+	response.OK(c, nil)
 }
 
 func (h *EventHandler) Create(c *gin.Context) {

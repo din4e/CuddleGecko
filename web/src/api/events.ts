@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { Event, PaginatedData } from '../types'
+import type { Event, PaginatedData, Tag } from '../types'
 
 export const eventsApi = {
   list: (params?: { page?: number; page_size?: number; start_after?: string; end_before?: string; q?: string }, signal?: AbortSignal) =>
@@ -13,4 +13,12 @@ export const eventsApi = {
 
   delete: (id: number) =>
     request.delete<void>(`/events/${id}`).then(() => {}),
+
+  // --- Workspace labels ---
+
+  getTags: (id: number) =>
+    request.get<Tag[]>(`/events/${id}/tags`).then((data) => ({ data })),
+
+  replaceTags: (id: number, tagIds: number[]) =>
+    request.put<void>(`/events/${id}/tags`, { tag_ids: tagIds }).then(() => {}),
 }

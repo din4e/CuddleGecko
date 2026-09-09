@@ -185,6 +185,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.GET("/reminders", h.Reminder.List)
 			wsProtected.PUT("/reminders/:id", h.Reminder.Update)
 			wsProtected.DELETE("/reminders/:id", h.Reminder.Delete)
+			wsProtected.GET("/reminders/:id/tags", h.Reminder.GetTags)
+			wsProtected.PUT("/reminders/:id/tags", h.Reminder.ReplaceTags)
 
 			wsProtected.DELETE("/relations/:id", h.Graph.DeleteRelation)
 
@@ -194,6 +196,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.POST("/events", h.Event.Create)
 			wsProtected.PUT("/events/:id", h.Event.Update)
 			wsProtected.DELETE("/events/:id", h.Event.Delete)
+			wsProtected.GET("/events/:id/tags", h.Event.GetTags)
+			wsProtected.PUT("/events/:id/tags", h.Event.ReplaceTags)
 
 			wsProtected.GET("/todos", h.Todo.List)
 			wsProtected.GET("/todos/stats", h.Todo.Stats)
@@ -218,6 +222,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.PUT("/habits/:id", h.Habit.Update)
 			wsProtected.DELETE("/habits/:id", h.Habit.Delete)
 			wsProtected.POST("/habits/:id/checkin", h.Habit.CheckIn)
+			wsProtected.GET("/habits/:id/tags", h.Habit.GetTags)
+			wsProtected.PUT("/habits/:id/tags", h.Habit.ReplaceTags)
 
 			wsProtected.GET("/pomodoros", h.Pomodoro.List)
 			wsProtected.GET("/pomodoros/summary", h.Pomodoro.Summary)
@@ -247,6 +253,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.PATCH("/workouts/:id/toggle", h.Workout.ToggleStatus)
 			wsProtected.PATCH("/workouts/:id/reorder", h.Workout.Reorder)
 			wsProtected.DELETE("/workouts/:id", h.Workout.Delete)
+			wsProtected.GET("/workouts/:id/tags", h.Workout.GetTags)
+			wsProtected.PUT("/workouts/:id/tags", h.Workout.ReplaceTags)
 			wsProtected.GET("/workouts/:id/exercises", h.Workout.ListExercises)
 			wsProtected.POST("/workouts/:id/exercises", h.Workout.CreateExercise)
 			wsProtected.PUT("/workouts/:id/exercises/:exerciseId", h.Workout.UpdateExercise)
@@ -291,6 +299,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.POST("/transactions", h.Transaction.Create)
 			wsProtected.PUT("/transactions/:id", h.Transaction.Update)
 			wsProtected.DELETE("/transactions/:id", h.Transaction.Delete)
+			wsProtected.GET("/transactions/:id/tags", h.Transaction.GetTags)
+			wsProtected.PUT("/transactions/:id/tags", h.Transaction.ReplaceTags)
 
 			ai := wsProtected.Group("/ai")
 			{

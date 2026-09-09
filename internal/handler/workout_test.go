@@ -24,7 +24,7 @@ func setupWorkoutIntegrationRouter(t *testing.T) *gin.Engine {
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
 	require.NoError(t, db.AutoMigrate(&model.Workout{}, &model.WorkoutExercise{}, &model.BodyMetric{}, &model.WorkoutSetLog{}))
-	svc := service.NewWorkoutService(repository.NewWorkoutRepo(db), repository.NewWorkoutExerciseRepo(db), repository.NewBodyMetricRepo(db))
+	svc := service.NewWorkoutService(repository.NewWorkoutRepo(db), repository.NewWorkoutExerciseRepo(db), repository.NewBodyMetricRepo(db), repository.NewTaggingRepo(db))
 	h := NewWorkoutHandler(svc)
 
 	r := gin.New()
