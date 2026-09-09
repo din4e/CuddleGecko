@@ -7,6 +7,7 @@ import {
   prFor,
   epley1rm,
   goalPercent,
+  trendDomain,
 } from '../fitness'
 import type { BodyMetric, FitnessGoal, WorkoutPR } from '../../types'
 
@@ -125,5 +126,31 @@ describe('goalPercent', () => {
   })
   it('returns 0 for non-positive target', () => {
     expect(goalPercent(goal(0, 3))).toBe(0)
+  })
+})
+
+describe('trendDomain', () => {
+  it('pads a varying series so the trend fills the axis instead of hugging zero', () => {
+    // 68–72kg weight: a zero-based axis would flatten this to a near-line.
+    const [lo, hi] = trendDomain([68, 70, 69, 72, 71])!
+    expect(lo).toBeCloseTo(67.5)
+    expect(hi).toBeCloseTo(72.5)
+    expect(lo).toBeGreaterThan(0)
+  })
+  it('pads a flat series around its value', () => {
+    expect(trendDomain([70, 70])).toEqual([66.5, 73.5])
+    expect(trendDomain([3])).toEqual([2, 4])
+  })
+  it('covers both series for dual-line metrics (bp)', () => {
+    const [lo, hi] = trendDomain([120, 118, undefined, 80, 79])!
+    expect(lo).toBeCloseTo(74)
+    expect(hi).toBeCloseTo(125)
+  })
+  it('quantizes bounds outward to 0.1 so ticks stay readable', () => {
+    expect(trendDomain([70.9, 72.5])).toEqual([70.7, 72.7])
+  })
+  it('returns undefined without finite values', () => {
+    expect(trendDomain([])).toBeUndefined()
+    expect(trendDomain([null, undefined])).toBeUndefined()
   })
 })
