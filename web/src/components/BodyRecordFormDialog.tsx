@@ -7,6 +7,7 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog'
+import { StarRating } from './StarRating'
 import { useCreateBodyMetric, useUpdateBodyMetric } from '../hooks/api/useBodyMetrics'
 import type { BodyMetric, BodyMetricInput } from '../types'
 
@@ -35,9 +36,12 @@ export function BodyRecordFormDialog({ open, editing, onClose }: BodyRecordFormD
   const [systolic, setSystolic] = useState(editing?.systolic != null ? String(editing.systolic) : '')
   const [diastolic, setDiastolic] = useState(editing?.diastolic != null ? String(editing.diastolic) : '')
   const [sleepHours, setSleepHours] = useState(editing?.sleep_hours != null ? String(editing.sleep_hours) : '')
+  const [bedtime, setBedtime] = useState(editing?.bedtime ? isoToLocalInput(editing.bedtime) : '')
+  const [wakeTime, setWakeTime] = useState(editing?.wake_time ? isoToLocalInput(editing.wake_time) : '')
+  const [sleepScore, setSleepScore] = useState<number | null>(editing?.sleep_score ?? null)
   const [steps, setSteps] = useState(editing?.steps != null ? String(editing.steps) : '')
-  const [energy, setEnergy] = useState(editing?.energy != null ? String(editing.energy) : '')
-  const [mood, setMood] = useState(editing?.mood != null ? String(editing.mood) : '')
+  const [energy, setEnergy] = useState<number | null>(editing?.energy ?? null)
+  const [mood, setMood] = useState<number | null>(editing?.mood ?? null)
   const [notes, setNotes] = useState(editing?.notes ?? '')
 
   const handleSave = useCallback(async () => {
@@ -51,9 +55,12 @@ export function BodyRecordFormDialog({ open, editing, onClose }: BodyRecordFormD
       systolic: systolic ? parseInt(systolic, 10) : null,
       diastolic: diastolic ? parseInt(diastolic, 10) : null,
       sleep_hours: sleepHours ? parseFloat(sleepHours) : null,
+      bedtime: bedtime ? new Date(bedtime).toISOString() : null,
+      wake_time: wakeTime ? new Date(wakeTime).toISOString() : null,
+      sleep_score: sleepScore,
       steps: steps ? parseInt(steps, 10) : null,
-      energy: energy ? parseInt(energy, 10) : null,
-      mood: mood ? parseInt(mood, 10) : null,
+      energy,
+      mood,
       notes,
     }
     if (editing) {
@@ -62,7 +69,25 @@ export function BodyRecordFormDialog({ open, editing, onClose }: BodyRecordFormD
       await createMetric.mutateAsync(data)
     }
     onClose()
-  }, [editing, recordedAt, weight, height, bodyFat, muscleMass, restingHr, systolic, diastolic, sleepHours, steps, energy, mood, notes, createMetric, updateMetric, onClose])
+  }, [editing, recordedAt, weight, height, bodyFat, muscleMass, restingHr, systolic, diastolic, sleepHours, bedtime, wakeTime, sleepScore, steps, energy, mood, notes, createMetric, updateMetric, onClose])
+
+  // Sleep detail block: filling both bedtime and wake time auto-fills the
+  // duration, so manual entry stays consistent with the imported data.
+  const onBedtimeChange = (v: string) => {
+    setBedtime(v)
+    autoFillSleepHours(v, wakeTime)
+  }
+  const onWakeTimeChange = (v: string) => {
+    setWakeTime(v)
+    autoFillSleepHours(bedtime, v)
+  }
+  const autoFillSleepHours = (bed: string, wake: string) => {
+    if (!bed || !wake) return
+    const start = new Date(bed).getTime()
+    const end = new Date(wake).getTime()
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return
+    setSleepHours(String(Math.round(((end - start) / 3600000) * 100) / 100))
+  }
 
   // num takes a label + state setter pair to keep the field grid DRY.
   const num = (label: string, val: string, set: (v: string) => void, opts: { step?: string; min?: string } = {}) => (
@@ -94,11 +119,31 @@ export function BodyRecordFormDialog({ open, editing, onClose }: BodyRecordFormD
             {num(t('fitness.sleepHours'), sleepHours, setSleepHours)}
             {num(t('fitness.bloodPressure') + ' (' + t('fitness.systolic') + ')', systolic, setSystolic, { step: '1' })}
             {num(t('fitness.bloodPressure') + ' (' + t('fitness.diastolic') + ')', diastolic, setDiastolic, { step: '1' })}
+            {num(t('fitness.steps'), steps, setSteps, { step: '1' })}
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {num(t('fitness.steps'), steps, setSteps, { step: '1' })}
-            {num(`${t('fitness.energy')} (1-5)`, energy, setEnergy, { step: '1', min: '1' })}
-            {num(`${t('fitness.mood')} (1-5)`, mood, setMood, { step: '1', min: '1' })}
+            <div className="space-y-1.5">
+              <Label>{t('fitness.bedtime')}</Label>
+              <Input type="datetime-local" value={bedtime} onChange={(e) => onBedtimeChange(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t('fitness.wakeTime')}</Label>
+              <Input type="datetime-local" value={wakeTime} onChange={(e) => onWakeTimeChange(e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t('fitness.sleepScore')}</Label>
+            <StarRating value={sleepScore} onChange={setSleepScore} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>{t('fitness.energy')}</Label>
+              <StarRating value={energy} onChange={setEnergy} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t('fitness.mood')}</Label>
+              <StarRating value={mood} onChange={setMood} />
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label>{t('fitness.notes')}</Label>

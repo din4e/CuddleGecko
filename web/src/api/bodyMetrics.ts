@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { BodyMetric, BodyMetricInput, BodyMetricSummary, PaginatedData } from '../types'
+import type { BodyMetric, BodyMetricImportRecord, BodyMetricImportResult, BodyMetricInput, BodyMetricSummary, PaginatedData } from '../types'
 
 export const bodyMetricsApi = {
   list: (
@@ -23,4 +23,8 @@ export const bodyMetricsApi = {
 
   delete: (id: number) =>
     request.delete<void>(`/body-metrics/${id}`).then(() => {}),
+
+  /** Bulk-import records from external platforms (Garmin Connect, …). */
+  import: (source: string, records: BodyMetricImportRecord[]) =>
+    request.post<BodyMetricImportResult>('/body-metrics/import', { source, records }).then((d) => ({ data: d })),
 }

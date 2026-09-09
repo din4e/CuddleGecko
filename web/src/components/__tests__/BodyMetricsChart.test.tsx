@@ -25,7 +25,7 @@ function metric(weight: number, day: number): BodyMetric {
     id: day, user_id: 1, workspace_id: 1,
     recorded_at: new Date(Date.UTC(2026, 8, day)).toISOString(),
     weight, height: null, body_fat: null, muscle_mass: null, resting_hr: null,
-    systolic: null, diastolic: null, sleep_hours: null, steps: null,
+    systolic: null, diastolic: null, sleep_hours: null, bedtime: null, wake_time: null, sleep_score: null, steps: null,
     energy: null, mood: null, notes: '',
     created_at: '', updated_at: '',
   }

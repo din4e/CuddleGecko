@@ -79,9 +79,12 @@ type BodyMetric struct {
 	Systolic    *int           `json:"systolic"`  // mmHg
 	Diastolic   *int           `json:"diastolic"` // mmHg
 	SleepHours  *float64       `json:"sleep_hours"`
+	Bedtime     *time.Time     `json:"bedtime"`     // lights-out (sleep start)
+	WakeTime    *time.Time     `json:"wake_time"`   // wake-up (sleep end)
+	SleepScore  *int           `json:"sleep_score"` // 1-10
 	Steps       *int           `json:"steps"`
-	Energy      *int           `json:"energy"` // 1-5
-	Mood        *int           `json:"mood"`   // 1-5
+	Energy      *int           `json:"energy"` // 1-10
+	Mood        *int           `json:"mood"`   // 1-10
 	Notes       string         `gorm:"size:1000" json:"notes"`
 	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`

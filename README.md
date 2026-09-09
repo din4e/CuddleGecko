@@ -229,6 +229,9 @@ All endpoints at `/api`:
 | PATCH | /todos/:id/toggle | Toggle todo status |
 | POST | /todos/:id/sync-event | Sync todo to event |
 | DELETE | /todos/:id | Delete todo |
+| GET/POST | /workouts | List/Create workouts |
+| GET | /workouts/body-metrics | List body records (sleep detail: `bedtime`/`wake_time`/`sleep_score`) |
+| POST | /workouts/body-metrics/import | Bulk-import body/sleep data (Garmin Connect, Apple Health, …) |
 | GET/POST | /transactions | List/Create transactions |
 | GET | /transactions/summary | Transaction summary |
 | GET | /transactions/monthly | Monthly income/expense aggregate (dashboard trend) |
@@ -247,6 +250,33 @@ All endpoints at `/api`:
 | POST | /ai/analyze/event/:eventId | Analyze event |
 | POST | /ai/analyze | Comprehensive analysis |
 | POST | /mcp | MCP server endpoint |
+
+### Body Data Import (`POST /api/workouts/body-metrics/import`)
+
+Imports sleep/body records from external platforms (Garmin Connect 导出、Apple 健康、WHOOP 等). Idempotent: a record whose `recorded_at` already exists is skipped, so re-running the same export is a no-op.
+
+```bash
+curl -X POST http://<host>/api/workouts/body-metrics/import \
+  -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+  -d '{
+    "source": "garmin",
+    "records": [
+      {
+        "date": "2026-09-08",                       // or "recorded_at": RFC3339
+        "bedtime": "2026-09-07T23:10:00+08:00",      // 入睡时间
+        "wake_time": "2026-09-08T07:20:00+08:00",    // 起床时间
+        "sleep_hours": 8.2,
+        "score_100": 86,                             // Garmin 0-100 睡眠评分 → 自动换算 1-10
+        "steps": 8500,
+        "resting_hr": 52,
+        "weight": 70.9
+      }
+    ]
+  }'
+# → {"code":0,"data":{"created":1,"skipped":0},"message":"ok"}
+```
+
+Accepted fields per record: `recorded_at` (RFC3339) or `date` (YYYY-MM-DD, local midnight), `bedtime`/`wake_time` (RFC3339), `sleep_hours`, `sleep_score` (1-10, clamped), `score_100` (0-100 → ÷10), `steps`, `resting_hr`, `systolic`, `diastolic`, `weight`. Max 1000 records per request. In-app equivalent: 健身 → 身体记录 → 导入数据 (paste the same JSON).
 
 ## MCP Server
 

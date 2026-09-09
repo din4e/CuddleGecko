@@ -25,6 +25,7 @@ function metric(partial: Partial<BodyMetric>): BodyMetric {
     systolic: null,
     diastolic: null,
     sleep_hours: null,
+    bedtime: null, wake_time: null, sleep_score: null,
     steps: null,
     energy: null,
     mood: null,
