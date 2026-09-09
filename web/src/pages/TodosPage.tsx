@@ -1166,7 +1166,7 @@ export default function TodosPage() {
       return order.map((p) => ({
         key: `p-${p}`,
         label: t(`todos.${p}`),
-        items: pendingTodos.filter((td) => (td.priority ?? 'normal') === p),
+        items: pendingTodos.filter((td) => (td.priority ?? 'none') === p),
       }))
     }
     if (groupBy === 'status') {

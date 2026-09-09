@@ -199,7 +199,7 @@ func TestTodoService_Create(t *testing.T) {
 	assert.Equal(t, uint(1), todo.UserID)
 	assert.Equal(t, uint(2), todo.WorkspaceID)
 	assert.Equal(t, "pending", todo.Status)
-	assert.Equal(t, "normal", todo.Priority)
+	assert.Equal(t, "none", todo.Priority)
 	repo.AssertExpectations(t)
 }
 

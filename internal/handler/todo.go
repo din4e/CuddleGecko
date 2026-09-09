@@ -931,6 +931,10 @@ func (h *TodoHandler) ReplaceTags(c *gin.Context) {
 	}
 
 	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, todoID, req.TagIDs); err != nil {
+		if errors.Is(err, service.ErrInvalidTodo) {
+			response.BadRequest(c, err.Error())
+			return
+		}
 		if err == service.ErrTodoNotFound {
 			response.NotFound(c, "todo not found")
 			return

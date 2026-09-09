@@ -153,7 +153,10 @@ func (s *TodoService) Create(ctx context.Context, userID, workspaceID uint, todo
 		todo.CompletedAt = &now
 	}
 	if todo.Priority == "" {
-		todo.Priority = "normal"
+		todo.Priority = "none"
+	}
+	if err := validateTodoPriority(todo.Priority); err != nil {
+		return nil, err
 	}
 	// A nested todo's parent must exist in the same workspace (defends against
 	// dangling / cross-workspace parent ids supplied on create).
@@ -179,6 +182,9 @@ func (s *TodoService) List(ctx context.Context, userID, workspaceID uint, q mode
 }
 
 func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Todo, clear TodoClear) (*model.Todo, error) {
+	if err := validateTodoPriority(updates.Priority); err != nil {
+		return nil, err
+	}
 	if err := validateTodoStatus(updates.Status); err != nil {
 		return nil, err
 	}
@@ -607,6 +613,9 @@ func (s *TodoService) ReplaceTags(ctx context.Context, userID, workspaceID, todo
 		tags[i].ID = id
 	}
 	if err := s.repo.ReplaceTags(ctx, todoID, tags); err != nil {
+		if errors.Is(err, model.ErrInvalidTagIDs) {
+			return fmt.Errorf("%w: %v", ErrInvalidTodo, err)
+		}
 		return err
 	}
 	s.notify(ctx, workspaceID, ChangeUpdated, todoID, nil)

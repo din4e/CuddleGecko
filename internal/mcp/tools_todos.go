@@ -41,7 +41,7 @@ func (s *MCPServer) registerTodoTools() {
 			"title":        map[string]interface{}{"type": "string", "description": "Todo title"},
 			"description":  map[string]interface{}{"type": "string", "description": "Todo description"},
 			"status":       map[string]interface{}{"type": "string", "description": "Status: pending, done or abandoned (default pending)"},
-			"priority":     map[string]interface{}{"type": "string", "description": "Priority: none, low, normal or high (default normal)"},
+			"priority":    map[string]interface{}{"type": "string", "description": "Priority: none, low, normal or high (default none)"},
 			"due_time":     map[string]interface{}{"type": "string", "description": "Due time (RFC3339)"},
 			"duration":     map[string]interface{}{"type": "integer", "description": "Estimated effort in minutes (0 = unset)"},
 			"amount":       map[string]interface{}{"type": "number", "description": "Associated amount"},

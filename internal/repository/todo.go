@@ -367,11 +367,34 @@ func (r *TodoRepo) Stats(ctx context.Context, workspaceID uint) (model.TodoStats
 // --- Tag associations ---
 
 func (r *TodoRepo) ReplaceTags(ctx context.Context, todoID uint, tags []model.Tag) error {
-	todo := model.Todo{ID: todoID}
-	if err := r.db.WithContext(ctx).Model(&todo).Association("Tags").Replace(tags); err != nil {
-		return fmt.Errorf("replace todo tags: %w", err)
-	}
-	return nil
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var todo model.Todo
+		if err := tx.Select("id", "workspace_id").First(&todo, todoID).Error; err != nil {
+			return err
+		}
+		ids := make([]uint, 0, len(tags))
+		seen := make(map[uint]bool, len(tags))
+		for _, tag := range tags {
+			if !seen[tag.ID] {
+				ids = append(ids, tag.ID)
+				seen[tag.ID] = true
+			}
+		}
+		valid := make([]model.Tag, 0, len(ids))
+		if len(ids) > 0 {
+			if err := tx.Where("workspace_id = ? AND id IN ?", todo.WorkspaceID, ids).Find(&valid).Error; err != nil {
+				return err
+			}
+			if len(valid) != len(ids) {
+				return model.ErrInvalidTagIDs
+			}
+		}
+		// Only change the association; never insert/update a tag from input IDs.
+		if err := tx.Model(&todo).Omit("Tags.*").Association("Tags").Replace(valid); err != nil {
+			return fmt.Errorf("replace todo tags: %w", err)
+		}
+		return nil
+	})
 }
 
 func (r *TodoRepo) GetTags(ctx context.Context, todoID uint) ([]model.Tag, error) {

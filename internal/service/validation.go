@@ -100,3 +100,10 @@ func validateTodoDuration(minutes int) error {
 func validTodoPriority(p string) bool {
 	return p == "high" || p == "normal" || p == "low" || p == "none"
 }
+
+func validateTodoPriority(priority string) error {
+	if priority != "" && !validTodoPriority(priority) {
+		return fmt.Errorf("%w: priority must be 'high', 'normal', 'low' or 'none'", ErrInvalidTodo)
+	}
+	return nil
+}
