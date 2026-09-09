@@ -124,3 +124,55 @@ func TestWorkoutService_CreateMetricDefaultsTime(t *testing.T) {
 
 // floatPtr is a tiny helper for pointer literals in tests.
 func floatPtr(v float64) *float64 { return &v }
+
+// ImportMetrics bulk-creates external records, dedupes on recorded_at and
+// clamps sleep scores to the 1-10 scale.
+func TestWorkoutService_ImportMetrics(t *testing.T) {
+	svc, _ := newWorkoutSvcTestDB(t)
+	ctx := context.Background()
+
+	day1, _ := time.Parse(time.RFC3339, "2026-09-07T07:20:00+08:00")
+	bed1, _ := time.Parse(time.RFC3339, "2026-09-06T23:10:00+08:00")
+	wake1, _ := time.Parse(time.RFC3339, "2026-09-07T07:20:00+08:00")
+	day2, _ := time.Parse(time.RFC3339, "2026-09-08T07:30:00+08:00")
+	highScore := 99 // Garmin-style 0-100 score mapped by the handler, clamped here
+
+	res, err := svc.ImportMetrics(ctx, 1, 1, "garmin", []BodyMetricImport{
+		{RecordedAt: day1, Bedtime: &bed1, WakeTime: &wake1, SleepHours: floatPtr(8.17), SleepScore: &highScore, Steps: intPtr(8500), RestingHR: intPtr(52)},
+		{RecordedAt: day2, SleepHours: floatPtr(6.5)},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 2, res.Created)
+	assert.Equal(t, 0, res.Skipped)
+
+	metrics, total, err := svc.ListMetrics(ctx, 1, 1, model.BodyMetricListQuery{Page: 1, PageSize: 50})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), total)
+	// Newest first: metrics[0] is day2 (no score), metrics[1] is the scored day1 row.
+	assert.Equal(t, 6.5, *metrics[0].SleepHours)
+	require.NotNil(t, metrics[1].SleepScore)
+	assert.Equal(t, 10, *metrics[1].SleepScore, "score clamped to 1-10")
+	assert.Equal(t, "Imported from garmin", metrics[1].Notes)
+	require.NotNil(t, metrics[1].Bedtime)
+	assert.True(t, metrics[1].Bedtime.Equal(bed1))
+
+	// Re-importing the same timestamps is a no-op.
+	res, err = svc.ImportMetrics(ctx, 1, 1, "garmin", []BodyMetricImport{
+		{RecordedAt: day1, SleepHours: floatPtr(1)},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 0, res.Created)
+	assert.Equal(t, 1, res.Skipped)
+
+	// A zero recorded_at is rejected before anything is written.
+	_, err = svc.ImportMetrics(ctx, 1, 1, "garmin", []BodyMetricImport{{SleepHours: floatPtr(7)}})
+	assert.Error(t, err)
+
+	// Oversized batches are rejected.
+	var big []BodyMetricImport
+	for i := 0; i < maxMetricImportRecords+1; i++ {
+		big = append(big, BodyMetricImport{RecordedAt: day1.Add(time.Duration(i) * time.Hour)})
+	}
+	_, err = svc.ImportMetrics(ctx, 1, 1, "garmin", big)
+	assert.Error(t, err)
+}

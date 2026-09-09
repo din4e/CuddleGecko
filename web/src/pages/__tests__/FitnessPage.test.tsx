@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import FitnessPage from '../FitnessPage'
@@ -20,6 +19,8 @@ vi.mock('react-i18next', () => ({
         'fitness.name': '名称',
         'fitness.allTypes': '全部类型',
         'fitness.allStatuses': '全部状态',
+        'fitness.tabLibrary': '库与模板',
+        'fitness.importPlans': '导入计划',
         'fitness.scheduledAt': '计划时间',
         'fitness.recordedAt': '记录时间',
         'fitness.statsCompleted': '累计完成',
@@ -161,7 +162,7 @@ describe('FitnessPage', () => {
     vi.mocked(fitnessGoalsApi.list).mockResolvedValue({ data: [] })
   })
 
-  it('renders the title and the seeded workout on the workouts tab', async () => {
+  it('renders the title and the seeded workout on the merged page', async () => {
     renderPage()
     expect(screen.getByText('健身')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByText('晨跑 5 公里')).toBeInTheDocument())
@@ -172,12 +173,11 @@ describe('FitnessPage', () => {
     await waitFor(() => expect(screen.getByText('配速 6 分 24 秒，状态不错。')).toBeInTheDocument())
   })
 
-  it('switches to the body records tab and shows the empty state', async () => {
-    const user = userEvent.setup()
+  it('shows workouts and body records on the same page without tab switching', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('晨跑 5 公里')).toBeInTheDocument())
-
-    await user.click(screen.getByText('身体记录'))
-    await waitFor(() => expect(screen.getByText('暂无身体记录')).toBeInTheDocument())
+    // Body section renders below the workouts section — no tab click needed.
+    expect(screen.getByText('暂无身体记录')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '身体记录' })).toBeInTheDocument()
   })
 })

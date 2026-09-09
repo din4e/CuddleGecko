@@ -3,7 +3,7 @@ import { bodyMetricsApi } from '../../api/bodyMetrics'
 import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
 import { invalidateScope } from '@/lib/querySync'
-import type { BodyMetric, BodyMetricInput, BodyMetricSummary, PaginatedData } from '../../types'
+import type { BodyMetric, BodyMetricImportRecord, BodyMetricInput, BodyMetricSummary, PaginatedData } from '../../types'
 
 const scope = 'body-metrics'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
@@ -45,6 +45,17 @@ export function useDeleteBodyMetric() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => bodyMetricsApi.delete(id),
+    onSuccess: () => invalidateScope(qc, scope),
+    onError: mutationErrorToast,
+  })
+}
+
+/** Bulk-import external body/sleep data; success toast reports created/skipped. */
+export function useImportBodyMetrics() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ source, records }: { source: string; records: BodyMetricImportRecord[] }) =>
+      bodyMetricsApi.import(source, records),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })

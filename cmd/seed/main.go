@@ -531,16 +531,36 @@ func seedBodyMetrics(db *gorm.DB, user model.User) {
 		n := time.Now()
 		return time.Date(n.Year(), n.Month(), n.Day(), hour, 0, 0, 0, time.Local).AddDate(0, 0, -daysAgo)
 	}
+	atMinute := func(daysAgo, hour, min int) *time.Time {
+		n := time.Now()
+		t := time.Date(n.Year(), n.Month(), n.Day(), hour, min, 0, 0, time.Local).AddDate(0, 0, -daysAgo)
+		return &t
+	}
 
 	records := []model.BodyMetric{
-		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(28, 9), Weight: fptr(72.5), Height: fptr(175), BodyFat: fptr(20.1), RestingHR: iptr(68), SleepHours: fptr(7), Energy: iptr(3), Mood: iptr(3)},
-		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(21, 9), Weight: fptr(72.1), Height: fptr(175), BodyFat: fptr(19.7), RestingHR: iptr(67), SleepHours: fptr(7.5), Steps: iptr(9000), Energy: iptr(4), Mood: iptr(4)},
-		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(14, 9), Weight: fptr(71.6), Height: fptr(175), BodyFat: fptr(19.2), MuscleMass: fptr(31.5), RestingHR: iptr(66), Systolic: iptr(118), Diastolic: iptr(78), SleepHours: fptr(6.5), Steps: iptr(11000), Energy: iptr(4), Mood: iptr(4)},
-		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(7, 9), Weight: fptr(71.2), Height: fptr(175), BodyFat: fptr(18.8), MuscleMass: fptr(31.8), RestingHR: iptr(65), Systolic: iptr(116), Diastolic: iptr(76), SleepHours: fptr(8), Steps: iptr(12000), Energy: iptr(5), Mood: iptr(4)},
-		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(1, 9), Weight: fptr(70.9), Height: fptr(175), BodyFat: fptr(18.5), MuscleMass: fptr(32.0), RestingHR: iptr(64), Systolic: iptr(115), Diastolic: iptr(75), SleepHours: fptr(7.5), Steps: iptr(8500), Energy: iptr(4), Mood: iptr(5)},
+		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(28, 9), Weight: fptr(72.5), Height: fptr(175), BodyFat: fptr(20.1), RestingHR: iptr(68), SleepHours: fptr(7), Energy: iptr(6), Mood: iptr(6)},
+		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(21, 9), Weight: fptr(72.1), Height: fptr(175), BodyFat: fptr(19.7), RestingHR: iptr(67), SleepHours: fptr(7.5), Steps: iptr(9000), Energy: iptr(7), Mood: iptr(7)},
+		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(14, 9), Weight: fptr(71.6), Height: fptr(175), BodyFat: fptr(19.2), MuscleMass: fptr(31.5), RestingHR: iptr(66), Systolic: iptr(118), Diastolic: iptr(78), SleepHours: fptr(6.5), Steps: iptr(11000), Energy: iptr(7), Mood: iptr(8)},
+		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(7, 9), Weight: fptr(71.2), Height: fptr(175), BodyFat: fptr(18.8), MuscleMass: fptr(31.8), RestingHR: iptr(65), Systolic: iptr(116), Diastolic: iptr(76), SleepHours: fptr(8), Steps: iptr(12000), Energy: iptr(9), Mood: iptr(8)},
+		{UserID: user.ID, WorkspaceID: wsID, RecordedAt: day(1, 9), Weight: fptr(70.9), Height: fptr(175), BodyFat: fptr(18.5), MuscleMass: fptr(32.0), RestingHR: iptr(64), Systolic: iptr(115), Diastolic: iptr(75), SleepHours: fptr(7.5), Steps: iptr(8500), Energy: iptr(8), Mood: iptr(9)},
 	}
+	// Sleep detail on the most recent records: bedtime the night before the
+	// recorded wake-up, plus a 1-10 quality score.
+	records[3].Bedtime = atMinute(8, 23, 5)
+	records[3].WakeTime = atMinute(7, 7, 20)
+	score7 := 9
+	records[3].SleepScore = &score7
+	records[4].Bedtime = atMinute(2, 23, 10)
+	records[4].WakeTime = atMinute(1, 7, 20)
+	score1 := 8
+	records[4].SleepScore = &score1
 	for i := range records {
 		db.FirstOrCreate(&records[i], model.BodyMetric{WorkspaceID: wsID, RecordedAt: records[i].RecordedAt})
+		// Keep the sleep detail fields fresh on re-seeds (FirstOrCreate skips
+		// existing rows).
+		db.Model(&records[i]).Updates(map[string]interface{}{
+			"bedtime": records[i].Bedtime, "wake_time": records[i].WakeTime, "sleep_score": records[i].SleepScore,
+		})
 	}
 	fmt.Printf("Created %d body metrics\n", len(records))
 }

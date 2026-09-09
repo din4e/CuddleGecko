@@ -266,6 +266,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.GET("/body-metrics", h.Workout.ListMetrics)
 			wsProtected.GET("/body-metrics/summary", h.Workout.BodySummary)
 			wsProtected.POST("/body-metrics", h.Workout.CreateMetric)
+			wsProtected.POST("/body-metrics/import", h.Workout.ImportMetrics)
 			wsProtected.PUT("/body-metrics/:id", h.Workout.UpdateMetric)
 			wsProtected.DELETE("/body-metrics/:id", h.Workout.DeleteMetric)
 

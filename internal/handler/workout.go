@@ -2,6 +2,8 @@ package handler
 
 import (
 	"errors"
+	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -97,6 +99,9 @@ type bodyMetricRequest struct {
 	Systolic   *int     `json:"systolic"`
 	Diastolic  *int     `json:"diastolic"`
 	SleepHours *float64 `json:"sleep_hours"`
+	Bedtime    string   `json:"bedtime"`
+	WakeTime   string   `json:"wake_time"`
+	SleepScore *int     `json:"sleep_score"`
 	Steps      *int     `json:"steps"`
 	Energy     *int     `json:"energy"`
 	Mood       *int     `json:"mood"`
@@ -114,6 +119,7 @@ func (r bodyMetricRequest) toModel(id uint) (*model.BodyMetric, error) {
 		Systolic:    r.Systolic,
 		Diastolic:   r.Diastolic,
 		SleepHours:  r.SleepHours,
+		SleepScore:  r.SleepScore,
 		Steps:       r.Steps,
 		Energy:      r.Energy,
 		Mood:        r.Mood,
@@ -125,6 +131,20 @@ func (r bodyMetricRequest) toModel(id uint) (*model.BodyMetric, error) {
 			return nil, errInvalidTime
 		}
 		m.RecordedAt = t
+	}
+	if r.Bedtime != "" {
+		t, err := time.Parse(time.RFC3339, r.Bedtime)
+		if err != nil {
+			return nil, errInvalidTime
+		}
+		m.Bedtime = &t
+	}
+	if r.WakeTime != "" {
+		t, err := time.Parse(time.RFC3339, r.WakeTime)
+		if err != nil {
+			return nil, errInvalidTime
+		}
+		m.WakeTime = &t
 	}
 	return m, nil
 }
@@ -704,6 +724,104 @@ func (h *WorkoutHandler) DeleteMetric(c *gin.Context) {
 		return
 	}
 	response.OK(c, nil)
+}
+
+// --- Body metric import (external platforms) ---
+
+type importBodyMetricRecord struct {
+	RecordedAt string   `json:"recorded_at"` // RFC3339; or "date": YYYY-MM-DD
+	Date       string   `json:"date"`        // YYYY-MM-DD alias, local midnight
+	Bedtime    string   `json:"bedtime"`     // RFC3339
+	WakeTime   string   `json:"wake_time"`   // RFC3339
+	SleepHours *float64 `json:"sleep_hours"`
+	SleepScore *int     `json:"sleep_score"` // 1-10
+	Score100   *int     `json:"score_100"`   // Garmin-style 0-100 score → /10
+	Steps      *int     `json:"steps"`
+	RestingHR  *int     `json:"resting_hr"`
+	Systolic   *int     `json:"systolic"`
+	Diastolic  *int     `json:"diastolic"`
+	Weight     *float64 `json:"weight"`
+}
+
+type importBodyMetricsRequest struct {
+	Source  string                   `json:"source"` // garmin | apple | whoop | …
+	Records []importBodyMetricRecord `json:"records"`
+}
+
+// ImportMetrics bulk-imports body/sleep data from external platforms
+// (Garmin Connect exports, Apple Health, …). Idempotent on recorded_at:
+// re-importing the same export skips already-stored records.
+func (h *WorkoutHandler) ImportMetrics(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+
+	var req importBodyMetricsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	records := make([]service.BodyMetricImport, 0, len(req.Records))
+	for i, r := range req.Records {
+		var imp service.BodyMetricImport
+
+		switch {
+		case r.RecordedAt != "":
+			t, err := time.Parse(time.RFC3339, r.RecordedAt)
+			if err != nil {
+				response.BadRequest(c, fmt.Sprintf("records[%d].recorded_at: invalid RFC3339 time", i))
+				return
+			}
+			imp.RecordedAt = t
+		case r.Date != "":
+			t, err := time.ParseInLocation("2006-01-02", r.Date, time.Local)
+			if err != nil {
+				response.BadRequest(c, fmt.Sprintf("records[%d].date: invalid date (want YYYY-MM-DD)", i))
+				return
+			}
+			imp.RecordedAt = t
+		default:
+			response.BadRequest(c, fmt.Sprintf("records[%d]: recorded_at or date is required", i))
+			return
+		}
+		if r.Bedtime != "" {
+			t, err := time.Parse(time.RFC3339, r.Bedtime)
+			if err != nil {
+				response.BadRequest(c, fmt.Sprintf("records[%d].bedtime: invalid RFC3339 time", i))
+				return
+			}
+			imp.Bedtime = &t
+		}
+		if r.WakeTime != "" {
+			t, err := time.Parse(time.RFC3339, r.WakeTime)
+			if err != nil {
+				response.BadRequest(c, fmt.Sprintf("records[%d].wake_time: invalid RFC3339 time", i))
+				return
+			}
+			imp.WakeTime = &t
+		}
+		imp.SleepHours = r.SleepHours
+		imp.SleepScore = r.SleepScore
+		// Garmin Connect scores sleep 0-100; map onto the 1-10 scale when the
+		// caller didn't supply a 1-10 score directly.
+		if imp.SleepScore == nil && r.Score100 != nil {
+			s10 := int(math.Round(float64(*r.Score100) / 10))
+			imp.SleepScore = &s10
+		}
+		imp.Steps = r.Steps
+		imp.RestingHR = r.RestingHR
+		imp.Systolic = r.Systolic
+		imp.Diastolic = r.Diastolic
+		imp.Weight = r.Weight
+		records = append(records, imp)
+	}
+
+	result, err := h.svc.ImportMetrics(c.Request.Context(), userID, workspaceID, req.Source, records)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.OK(c, result)
 }
 
 // parseRFC3339Query parses an optional RFC3339 query parameter. Returns

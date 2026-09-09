@@ -435,6 +435,9 @@ export interface BodyMetric {
   systolic: number | null
   diastolic: number | null
   sleep_hours: number | null
+  bedtime: string | null
+  wake_time: string | null
+  sleep_score: number | null
   steps: number | null
   energy: number | null
   mood: number | null
@@ -513,10 +516,36 @@ export interface BodyMetricInput {
   systolic?: number | null
   diastolic?: number | null
   sleep_hours?: number | null
+  bedtime?: string | null
+  wake_time?: string | null
+  sleep_score?: number | null
   steps?: number | null
   energy?: number | null
   mood?: number | null
   notes?: string
+}
+
+/** One normalized record posted to the body-metric import endpoint. */
+export interface BodyMetricImportRecord {
+  recorded_at?: string
+  /** YYYY-MM-DD alias for recorded_at (local midnight). */
+  date?: string
+  bedtime?: string
+  wake_time?: string
+  sleep_hours?: number | null
+  sleep_score?: number | null
+  /** Garmin-style 0-100 sleep score; converted to the 1-10 scale server-side. */
+  score_100?: number | null
+  steps?: number | null
+  resting_hr?: number | null
+  systolic?: number | null
+  diastolic?: number | null
+  weight?: number | null
+}
+
+export interface BodyMetricImportResult {
+  created: number
+  skipped: number
 }
 
 /** BMI from weight (kg) + height (cm); 0 when inputs are missing/non-positive. */

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -49,6 +50,7 @@ type BodyMetricRepository interface {
 	Update(ctx context.Context, m *model.BodyMetric) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 	Summary(ctx context.Context, workspaceID uint) (model.BodyMetricSummary, error)
+	ExistsByRecordedAt(ctx context.Context, workspaceID uint, recordedAt time.Time) (bool, error)
 }
 
 // WorkoutClear flags which nullable workout fields should be explicitly cleared
@@ -402,4 +404,92 @@ func (s *WorkoutService) DeleteMetric(ctx context.Context, userID, workspaceID, 
 
 func (s *WorkoutService) BodySummary(ctx context.Context, userID, workspaceID uint) (model.BodyMetricSummary, error) {
 	return s.bodyRepo.Summary(ctx, workspaceID)
+}
+
+// --- Body metric import (external platforms: Garmin Connect, Apple Health, …) ---
+
+// BodyMetricImport is one normalized record from an external platform. The
+// handler layer parses platform formats into this shape.
+type BodyMetricImport struct {
+	RecordedAt time.Time
+	Bedtime    *time.Time
+	WakeTime   *time.Time
+	SleepHours *float64
+	SleepScore *int // 1-10; values outside the range are clamped
+	Steps      *int
+	RestingHR  *int
+	Systolic   *int
+	Diastolic  *int
+	Weight     *float64
+}
+
+// BodyMetricImportResult reports the idempotent-import outcome.
+type BodyMetricImportResult struct {
+	Created int `json:"created"`
+	Skipped int `json:"skipped"`
+}
+
+// maxMetricImportRecords caps one import request; platform backfills are daily
+// rows, so 1000 ≈ 3 years of history.
+const maxMetricImportRecords = 1000
+
+// ImportMetrics bulk-creates external records, skipping any whose recorded_at
+// already exists (re-running the same export is a no-op). The source is noted
+// on each created record's Notes for provenance.
+func (s *WorkoutService) ImportMetrics(ctx context.Context, userID, workspaceID uint, source string, records []BodyMetricImport) (BodyMetricImportResult, error) {
+	var result BodyMetricImportResult
+	if len(records) > maxMetricImportRecords {
+		return result, fmt.Errorf("too many records: %d (max %d)", len(records), maxMetricImportRecords)
+	}
+	if source == "" {
+		source = "external"
+	}
+	for _, r := range records {
+		if r.RecordedAt.IsZero() {
+			return result, errors.New("recorded_at is required")
+		}
+		exists, err := s.bodyRepo.ExistsByRecordedAt(ctx, workspaceID, r.RecordedAt)
+		if err != nil {
+			return result, err
+		}
+		if exists {
+			result.Skipped++
+			continue
+		}
+		m := &model.BodyMetric{
+			UserID:      userID,
+			WorkspaceID: workspaceID,
+			RecordedAt:  r.RecordedAt,
+			Bedtime:     r.Bedtime,
+			WakeTime:    r.WakeTime,
+			SleepHours:  r.SleepHours,
+			SleepScore:  clampScore(r.SleepScore),
+			Steps:       r.Steps,
+			RestingHR:   r.RestingHR,
+			Systolic:    r.Systolic,
+			Diastolic:   r.Diastolic,
+			Weight:      r.Weight,
+			Notes:       "Imported from " + source,
+		}
+		if err := s.bodyRepo.Create(ctx, m); err != nil {
+			return result, err
+		}
+		result.Created++
+		notifyChange(ctx, s.notifier, workspaceID, ResourceBodyMetric, ChangeCreated, m.ID, m)
+	}
+	return result, nil
+}
+
+// clampScore forces a 1-10 score; nil passes through untouched.
+func clampScore(v *int) *int {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	if c < 1 {
+		c = 1
+	} else if c > 10 {
+		c = 10
+	}
+	return &c
 }

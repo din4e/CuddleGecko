@@ -618,11 +618,23 @@ func (r *BodyMetricRepo) List(ctx context.Context, workspaceID uint, q model.Bod
 
 func (r *BodyMetricRepo) Update(ctx context.Context, m *model.BodyMetric) error {
 	if err := r.db.WithContext(ctx).Model(&model.BodyMetric{ID: m.ID}).
-		Select("recorded_at", "weight", "height", "body_fat", "muscle_mass", "resting_hr", "systolic", "diastolic", "sleep_hours", "steps", "energy", "mood", "notes").
+		Select("recorded_at", "weight", "height", "body_fat", "muscle_mass", "resting_hr", "systolic", "diastolic", "sleep_hours", "bedtime", "wake_time", "sleep_score", "steps", "energy", "mood", "notes").
 		Updates(m).Error; err != nil {
 		return fmt.Errorf("update body metric: %w", err)
 	}
 	return nil
+}
+
+// ExistsByRecordedAt reports whether a record already exists at exactly this
+// timestamp — the dedupe key for idempotent platform imports.
+func (r *BodyMetricRepo) ExistsByRecordedAt(ctx context.Context, workspaceID uint, recordedAt time.Time) (bool, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&model.BodyMetric{}).
+		Where("workspace_id = ? AND recorded_at = ?", workspaceID, recordedAt).
+		Count(&count).Error; err != nil {
+		return false, fmt.Errorf("check body metric exists: %w", err)
+	}
+	return count > 0, nil
 }
 
 func (r *BodyMetricRepo) Delete(ctx context.Context, workspaceID, id uint) error {
