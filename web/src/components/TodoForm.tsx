@@ -10,7 +10,7 @@ import { DialogFooter } from './ui/dialog'
 import { Markdown } from './Markdown'
 import BuddyPicker from './BuddyPicker'
 import TodoParentPicker from './TodoParentPicker'
-import TodoLabelPicker from './TodoLabelPicker'
+import LabelPicker from './LabelPicker'
 import { useCreateTodo, useUpdateTodo, useReplaceTodoTags, useMoveTodo } from '../hooks/api/useTodos'
 import { descendantIds } from '../lib/buildTodoTree'
 import type { Todo, Contact, Tag, TodoStatus, TodoUpdateInput } from '../types'
@@ -243,10 +243,10 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
         )}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <Label>{t('todos.labels')}</Label>
-            <span className="text-xs text-muted-foreground">{t('todos.labelsMultiple')}</span>
+            <Label>{t('labels.title')}</Label>
+            <span className="text-xs text-muted-foreground">{t('labels.multiple')}</span>
           </div>
-          <TodoLabelPicker
+          <LabelPicker
             value={formTagIds}
             onChange={setFormTagIds}
             candidates={labelCandidates}

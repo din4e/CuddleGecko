@@ -11,6 +11,7 @@ import type {
   WorkoutPR,
   SetLog,
   SetLogInput,
+  Tag,
 } from '../types'
 
 function buildParams(params?: WorkoutListParams) {
@@ -91,4 +92,12 @@ export const workoutsApi = {
 
   deleteSet: (workoutId: number, exerciseId: number, setId: number) =>
     request.delete<void>(`/workouts/${workoutId}/exercises/${exerciseId}/sets/${setId}`).then(() => {}),
+
+  // --- Workspace labels ---
+
+  getTags: (id: number) =>
+    request.get<Tag[]>(`/workouts/${id}/tags`).then((data) => ({ data })),
+
+  replaceTags: (id: number, tagIds: number[]) =>
+    request.put<void>(`/workouts/${id}/tags`, { tag_ids: tagIds }).then(() => {}),
 }

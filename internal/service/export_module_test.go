@@ -86,7 +86,7 @@ func TestModule_HabitsCSVRoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	require.NoError(t, habitRepo.Create(ctx, &model.Habit{UserID: 1, WorkspaceID: 1, Name: "阅读", Emoji: "📚", Frequency: "daily"}))
-	habits, err := habitRepo.List(ctx, 1, false)
+	habits, err := habitRepo.List(ctx, 1, false, nil)
 	require.NoError(t, err)
 	_, err = logRepo.Toggle(ctx, 1, 1, habits[0].ID, "2026-08-01")
 	require.NoError(t, err)
@@ -100,7 +100,7 @@ func TestModule_HabitsCSVRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, ImportStats{Imported: 1}, stats)
 
-	imported, err := habitRepo.List(ctx, 2, true)
+	imported, err := habitRepo.List(ctx, 2, true, nil)
 	require.NoError(t, err)
 	require.Len(t, imported, 1)
 	assert.Equal(t, "阅读", imported[0].Name)
@@ -141,7 +141,7 @@ func TestModule_JSONRoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	require.NoError(t, habitRepo.Create(ctx, &model.Habit{UserID: 1, WorkspaceID: 1, Name: "跑步", Frequency: "daily"}))
-	habits, err := habitRepo.List(ctx, 1, false)
+	habits, err := habitRepo.List(ctx, 1, false, nil)
 	require.NoError(t, err)
 	_, err = logRepo.Toggle(ctx, 1, 1, habits[0].ID, "2026-08-10")
 	require.NoError(t, err)
@@ -158,7 +158,7 @@ func TestModule_JSONRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, ImportStats{Imported: 1}, stats)
 
-	imported, err := habitRepo.List(ctx, 2, true)
+	imported, err := habitRepo.List(ctx, 2, true, nil)
 	require.NoError(t, err)
 	require.Len(t, imported, 1)
 	logs, err := logRepo.ListAllByWorkspace(ctx, 2)

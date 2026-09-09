@@ -12,7 +12,7 @@ var ErrTransactionNotFound = errors.New("transaction not found")
 type TransactionRepository interface {
 	Create(ctx context.Context, tx *model.Transaction) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Transaction, error)
-	List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string) ([]model.Transaction, int64, error)
+	List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string, tagIDs []uint) ([]model.Transaction, int64, error)
 	ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Transaction, error)
 	Summary(ctx context.Context, workspaceID uint) (income float64, expense float64, err error)
 	Monthly(ctx context.Context, workspaceID uint, months int) ([]model.TransactionMonthly, error)
@@ -21,12 +21,13 @@ type TransactionRepository interface {
 }
 
 type TransactionService struct {
-	repo     TransactionRepository
-	notifier ChangeNotifier
+	repo        TransactionRepository
+	taggingRepo TaggingRepository
+	notifier    ChangeNotifier
 }
 
-func NewTransactionService(repo TransactionRepository, notifier ...ChangeNotifier) *TransactionService {
-	return &TransactionService{repo: repo, notifier: firstNotifier(notifier)}
+func NewTransactionService(repo TransactionRepository, taggingRepo TaggingRepository, notifier ...ChangeNotifier) *TransactionService {
+	return &TransactionService{repo: repo, taggingRepo: taggingRepo, notifier: firstNotifier(notifier)}
 }
 
 func (s *TransactionService) Create(ctx context.Context, userID, workspaceID uint, tx *model.Transaction) (*model.Transaction, error) {
@@ -43,11 +44,25 @@ func (s *TransactionService) Create(ctx context.Context, userID, workspaceID uin
 }
 
 func (s *TransactionService) GetByID(ctx context.Context, userID, workspaceID, id uint) (*model.Transaction, error) {
-	return s.repo.GetByID(ctx, workspaceID, id)
+	tx, err := s.repo.GetByID(ctx, workspaceID, id)
+	if err != nil {
+		return nil, err
+	}
+	s.populateTags(ctx, workspaceID, []*model.Transaction{tx})
+	return tx, nil
 }
 
-func (s *TransactionService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string) ([]model.Transaction, int64, error) {
-	return s.repo.List(ctx, workspaceID, page, pageSize, txType, contactID, search)
+func (s *TransactionService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string, tagIDs []uint) ([]model.Transaction, int64, error) {
+	txs, total, err := s.repo.List(ctx, workspaceID, page, pageSize, txType, contactID, search, tagIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	ptrs := make([]*model.Transaction, len(txs))
+	for i := range txs {
+		ptrs[i] = &txs[i]
+	}
+	s.populateTags(ctx, workspaceID, ptrs)
+	return txs, total, nil
 }
 
 func (s *TransactionService) Summary(ctx context.Context, userID, workspaceID uint) (income float64, expense float64, err error) {
@@ -94,6 +109,44 @@ func (s *TransactionService) Delete(ctx context.Context, userID, workspaceID, id
 	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}
+	// Clean up dangling tag associations.
+	_ = s.taggingRepo.RemoveAll(ctx, workspaceID, model.TagTargetTransaction, id)
 	notifyChange(ctx, s.notifier, workspaceID, ResourceTransaction, ChangeDeleted, id, nil)
 	return nil
+}
+
+func (s *TransactionService) ReplaceTags(ctx context.Context, userID, workspaceID, txID uint, tagIDs []uint) error {
+	if _, err := s.repo.GetByID(ctx, workspaceID, txID); err != nil {
+		return ErrTransactionNotFound
+	}
+	if err := s.taggingRepo.SetTags(ctx, workspaceID, model.TagTargetTransaction, txID, tagIDs); err != nil {
+		return err
+	}
+	notifyChange(ctx, s.notifier, workspaceID, ResourceTransaction, ChangeUpdated, txID, nil)
+	return nil
+}
+
+func (s *TransactionService) GetTags(ctx context.Context, userID, workspaceID, txID uint) ([]model.Tag, error) {
+	if _, err := s.repo.GetByID(ctx, workspaceID, txID); err != nil {
+		return nil, ErrTransactionNotFound
+	}
+	return s.taggingRepo.GetTags(ctx, workspaceID, model.TagTargetTransaction, txID)
+}
+
+// populateTags fills the virtual Tags field for a batch of transactions.
+func (s *TransactionService) populateTags(ctx context.Context, workspaceID uint, txs []*model.Transaction) {
+	if s.taggingRepo == nil || len(txs) == 0 {
+		return
+	}
+	ids := make([]uint, len(txs))
+	for i, t := range txs {
+		ids[i] = t.ID
+	}
+	tagMap, err := s.taggingRepo.GetTagsByTargets(ctx, workspaceID, model.TagTargetTransaction, ids)
+	if err != nil {
+		return
+	}
+	for _, t := range txs {
+		t.Tags = tagMap[t.ID]
+	}
 }

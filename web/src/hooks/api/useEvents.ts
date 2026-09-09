@@ -51,3 +51,11 @@ export function useDeleteEvent() {
     onError: mutationErrorToast,
   })
 }
+
+export function useReplaceEventTags() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => eventsApi.replaceTags(id, tagIds),
+    onSuccess: () => invalidateScope(qc, scope),
+  })
+}

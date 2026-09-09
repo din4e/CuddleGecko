@@ -17,6 +17,8 @@ type Event struct {
 	Location    string         `gorm:"size:200" json:"location"`
 	ContactIDs  []uint         `gorm:"type:longtext;serializer:json" json:"contact_ids"`
 	Color       string         `gorm:"size:20" json:"color"`
+	// Virtual (not DB) — populated from the polymorphic taggings table.
+	Tags        []Tag          `gorm:"-" json:"tags"`
 	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`

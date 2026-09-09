@@ -20,6 +20,9 @@ import {
 } from '../components/ui/dialog'
 import { TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, Heart } from 'lucide-react'
 import BuddyPicker from '../components/BuddyPicker'
+import LabelPicker from '../components/LabelPicker'
+import { mergeLabelCandidates } from '../lib/labels'
+import LabelChips from '../components/LabelChips'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
@@ -27,6 +30,7 @@ import { ListSkeleton } from '../components/ListSkeleton'
 import ListPageHeader from '../components/ListPageHeader'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
+import { useTagsList } from '../hooks/api/useTags'
 import type { Transaction } from '../types'
 import {
   useTransactionsList,
@@ -34,6 +38,7 @@ import {
   useCreateTransaction,
   useUpdateTransaction,
   useDeleteTransaction,
+  useReplaceTransactionTags,
 } from '../hooks/api/useTransactions'
 
 type TxType = '' | 'income' | 'expense'
@@ -46,6 +51,7 @@ interface TxFormData {
   date: string
   notes: string
   contact_ids: number[]
+  label_ids: number[]
 }
 
 const emptyForm: TxFormData = {
@@ -56,6 +62,7 @@ const emptyForm: TxFormData = {
   date: '',
   notes: '',
   contact_ids: [],
+  label_ids: [],
 }
 
 export default function FinancePage() {
@@ -91,6 +98,13 @@ export default function FinancePage() {
   const createTx = useCreateTransaction()
   const updateTx = useUpdateTransaction()
   const deleteTx = useDeleteTransaction()
+  const replaceTxTags = useReplaceTransactionTags()
+  const { data: tagsData } = useTagsList(1, 200)
+  const labelCandidates = useMemo(
+    () => mergeLabelCandidates(tagsData?.items, editing?.tags),
+    [tagsData, editing?.tags],
+  )
+  const [labelCreating, setLabelCreating] = useState(false)
 
   const transactions = data?.items ?? []
   const total = data?.total ?? 0
@@ -116,6 +130,7 @@ export default function FinancePage() {
       date: tx.date ? new Date(tx.date).toISOString().slice(0, 10) : '',
       notes: tx.notes || '',
       contact_ids: tx.contact_ids || [],
+      label_ids: (tx.tags ?? []).map((tg) => tg.id),
     })
     setDialogOpen(true)
   }
@@ -136,10 +151,17 @@ export default function FinancePage() {
       contact_ids: form.contact_ids,
     }
 
+    let txId = editing?.id
     if (editing) {
       await updateTx.mutateAsync({ id: editing.id, data: payload })
     } else {
-      await createTx.mutateAsync(payload)
+      const created = await createTx.mutateAsync(payload)
+      txId = created?.data?.id
+    }
+    // Labels go through the dedicated association endpoint; skip when unchanged.
+    const original = (editing?.tags ?? []).map((tg) => tg.id)
+    if (txId != null && (form.label_ids.length !== original.length || form.label_ids.some((id) => !original.includes(id)))) {
+      await replaceTxTags.mutateAsync({ id: txId, tagIds: form.label_ids })
     }
 
     setDialogOpen(false)
@@ -250,7 +272,12 @@ export default function FinancePage() {
                       {tx.type === 'income' ? <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" /> : <TrendingDown className="h-3.5 w-3.5" aria-hidden="true" />}
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">{tx.title}</TableCell>
+                  <TableCell className="font-medium">
+                    <div>
+                      {tx.title}
+                      <LabelChips tags={tx.tags} className="mt-1" />
+                    </div>
+                  </TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</TableCell>
                   <TableCell>
                     {tx.category ? <Badge variant="secondary" className="text-xs">{tx.category}</Badge> : '—'}
@@ -306,6 +333,7 @@ export default function FinancePage() {
                     {tx.contact_ids.map((cid) => buddyNameById.get(cid)).filter(Boolean).join(', ')}
                   </div>
                 )}
+                <LabelChips tags={tx.tags} />
                 <div className="flex gap-1 pt-1">
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(tx)} aria-label={t('finance.editTransaction')}>
                     <Pencil className="h-3.5 w-3.5" />
@@ -386,6 +414,18 @@ export default function FinancePage() {
               <Textarea id="tx-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </div>
             <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t('labels.title')}</Label>
+                <span className="text-xs text-muted-foreground">{t('labels.multiple')}</span>
+              </div>
+              <LabelPicker
+                value={form.label_ids}
+                onChange={(ids) => setForm({ ...form, label_ids: ids })}
+                candidates={labelCandidates}
+                onPendingChange={setLabelCreating}
+              />
+            </div>
+            <div className="space-y-2">
               <Label>{t('common.buddies')}</Label>
               <BuddyPicker
                 buddies={buddies}
@@ -399,7 +439,7 @@ export default function FinancePage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleSubmit} disabled={!form.title || !form.amount || !form.date || createTx.isPending || updateTx.isPending}>
+            <Button onClick={handleSubmit} disabled={!form.title || !form.amount || !form.date || labelCreating || createTx.isPending || updateTx.isPending}>
               {editing ? t('finance.title') : t('finance.newTransaction')}
             </Button>
           </DialogFooter>

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 	"time"
 
@@ -177,6 +178,7 @@ func (h *WorkoutHandler) List(c *gin.Context) {
 		Status:   c.Query("status"),
 		Type:     c.Query("type"),
 		Search:   c.Query("q"),
+		TagIDs:   parseTagIDs(c),
 		Sort:     c.DefaultQuery("sort", model.WorkoutSortScheduled),
 		Order:    c.DefaultQuery("order", "asc"),
 		Page:     page,
@@ -201,6 +203,49 @@ func (h *WorkoutHandler) List(c *gin.Context) {
 		return
 	}
 	response.OKPaginated(c, workouts, total, q.Page, q.PageSize)
+}
+
+func (h *WorkoutHandler) GetTags(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid workout id")
+		return
+	}
+
+	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, uint(id))
+	if err != nil {
+		response.NotFound(c, "workout not found")
+		return
+	}
+	response.OK(c, tags)
+}
+
+func (h *WorkoutHandler) ReplaceTags(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid workout id")
+		return
+	}
+
+	var req replaceTagsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
+		if errors.Is(err, model.ErrInvalidTagIDs) {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.NotFound(c, "workout not found")
+		return
+	}
+	response.OK(c, nil)
 }
 
 func (h *WorkoutHandler) Stats(c *gin.Context) {

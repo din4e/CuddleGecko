@@ -25,7 +25,7 @@ func newFitnessSvcTestDB(t *testing.T) (*FitnessService, *WorkoutService, *gorm.
 		&model.ExerciseLibraryItem{}, &model.WorkoutTemplate{}, &model.WorkoutTemplateItem{},
 		&model.WorkoutSetLog{}, &model.FitnessGoal{},
 	))
-	workoutSvc := NewWorkoutService(repository.NewWorkoutRepo(db), repository.NewWorkoutExerciseRepo(db), repository.NewBodyMetricRepo(db))
+	workoutSvc := NewWorkoutService(repository.NewWorkoutRepo(db), repository.NewWorkoutExerciseRepo(db), repository.NewBodyMetricRepo(db), repository.NewTaggingRepo(db))
 	svc := NewFitnessService(
 		repository.NewExerciseLibraryRepo(db),
 		repository.NewWorkoutTemplateRepo(db),

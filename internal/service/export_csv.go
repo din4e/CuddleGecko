@@ -91,7 +91,7 @@ func (s *ExportService) ExportRelationsCSV(ctx context.Context, workspaceID uint
 }
 
 func (s *ExportService) ExportRemindersCSV(ctx context.Context, workspaceID uint) (string, error) {
-	reminders, _, err := s.reminderRepo.List(ctx, workspaceID, "", nil, 1, 100000)
+	reminders, _, err := s.reminderRepo.List(ctx, workspaceID, "", nil, 1, 100000, nil)
 	if err != nil {
 		return "", fmt.Errorf("export reminders csv: %w", err)
 	}
@@ -206,7 +206,7 @@ func (s *ExportService) ExportHabitsCSV(ctx context.Context, workspaceID uint) (
 	if s.habitRepo == nil {
 		return "", fmt.Errorf("habit export not available")
 	}
-	habits, err := s.habitRepo.List(ctx, workspaceID, true)
+	habits, err := s.habitRepo.List(ctx, workspaceID, true, nil)
 	if err != nil {
 		return "", fmt.Errorf("export habits csv: %w", err)
 	}

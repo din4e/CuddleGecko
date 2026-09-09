@@ -18,32 +18,51 @@ func NewTaggingRepo(db *gorm.DB) *TaggingRepo {
 }
 
 // SetTags replaces the full set of tags attached to a target. Duplicates and
-// zero IDs are ignored.
+// zero IDs are ignored. Every remaining ID must reference a tag in the same
+// workspace — foreign or deleted IDs are rejected and nothing is written.
 func (r *TaggingRepo) SetTags(ctx context.Context, workspaceID uint, targetType string, targetID uint, tagIDs []uint) error {
-	tx := r.db.WithContext(ctx).Begin()
-	if err := tx.Where("workspace_id = ? AND target_type = ? AND target_id = ?", workspaceID, targetType, targetID).
-		Delete(&model.Tagging{}).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("clear taggings: %w", err)
-	}
-
-	seen := make(map[uint]bool, len(tagIDs))
-	for _, id := range tagIDs {
-		if id == 0 || seen[id] {
-			continue
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		seen := make(map[uint]bool, len(tagIDs))
+		ids := make([]uint, 0, len(tagIDs))
+		for _, id := range tagIDs {
+			if id == 0 || seen[id] {
+				continue
+			}
+			seen[id] = true
+			ids = append(ids, id)
 		}
-		seen[id] = true
-		if err := tx.Create(&model.Tagging{
-			WorkspaceID: workspaceID,
-			TagID:       id,
-			TargetType:  targetType,
-			TargetID:    targetID,
-		}).Error; err != nil {
-			tx.Rollback()
+		if len(ids) > 0 {
+			var count int64
+			if err := tx.Model(&model.Tag{}).
+				Where("workspace_id = ? AND id IN ?", workspaceID, ids).
+				Count(&count).Error; err != nil {
+				return fmt.Errorf("validate tag ids: %w", err)
+			}
+			if count != int64(len(ids)) {
+				return model.ErrInvalidTagIDs
+			}
+		}
+		if err := tx.Where("workspace_id = ? AND target_type = ? AND target_id = ?", workspaceID, targetType, targetID).
+			Delete(&model.Tagging{}).Error; err != nil {
+			return fmt.Errorf("clear taggings: %w", err)
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		rows := make([]model.Tagging, 0, len(ids))
+		for _, id := range ids {
+			rows = append(rows, model.Tagging{
+				WorkspaceID: workspaceID,
+				TagID:       id,
+				TargetType:  targetType,
+				TargetID:    targetID,
+			})
+		}
+		if err := tx.Create(&rows).Error; err != nil {
 			return fmt.Errorf("create tagging: %w", err)
 		}
-	}
-	return tx.Commit().Error
+		return nil
+	})
 }
 
 // GetTags returns the tags attached to a single target.

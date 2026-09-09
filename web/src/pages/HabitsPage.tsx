@@ -9,10 +9,14 @@ import {
 } from '../components/ui/dialog'
 import { Plus, Pencil, Trash2, Flame, CheckCircle2, Loader2, Trophy, TrendingUp } from 'lucide-react'
 import EmptyState from '../components/EmptyState'
+import LabelPicker from '../components/LabelPicker'
+import { mergeLabelCandidates } from '../lib/labels'
+import LabelChips from '../components/LabelChips'
 import { toast } from 'sonner'
 import type { Habit } from '../types'
+import { useTagsList } from '../hooks/api/useTags'
 import {
-  useHabitsList, useCreateHabit, useUpdateHabit, useDeleteHabit, useCheckinHabit,
+  useHabitsList, useCreateHabit, useUpdateHabit, useDeleteHabit, useCheckinHabit, useReplaceHabitTags,
 } from '../hooks/api/useHabits'
 
 const COLORS = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899']
@@ -36,6 +40,8 @@ export default function HabitsPage() {
   const updateHabit = useUpdateHabit()
   const deleteHabit = useDeleteHabit()
   const checkin = useCheckinHabit()
+  const replaceHabitTags = useReplaceHabitTags()
+  const { data: tagsData } = useTagsList(1, 200)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Habit | null>(null)
@@ -43,17 +49,29 @@ export default function HabitsPage() {
   const [formName, setFormName] = useState('')
   const [formEmoji, setFormEmoji] = useState('✅')
   const [formColor, setFormColor] = useState('')
+  const [formLabelIds, setFormLabelIds] = useState<number[]>([])
+  const [labelCreating, setLabelCreating] = useState(false)
+  const labelCandidates = useMemo(
+    () => mergeLabelCandidates(tagsData?.items, editing?.tags),
+    [tagsData, editing?.tags],
+  )
 
   const days = useMemo(() => lastNDates(35), [])
 
-  const openCreate = () => { setEditing(null); setFormName(''); setFormEmoji('✅'); setFormColor(''); setDialogOpen(true) }
-  const openEdit = (h: Habit) => { setEditing(h); setFormName(h.name); setFormEmoji(h.emoji || '✅'); setFormColor(h.color || ''); setDialogOpen(true) }
+  const openCreate = () => { setEditing(null); setFormName(''); setFormEmoji('✅'); setFormColor(''); setFormLabelIds([]); setDialogOpen(true) }
+  const openEdit = (h: Habit) => { setEditing(h); setFormName(h.name); setFormEmoji(h.emoji || '✅'); setFormColor(h.color || ''); setFormLabelIds((h.tags ?? []).map((tg) => tg.id)); setDialogOpen(true) }
 
   const handleSave = async () => {
     if (!formName.trim()) return
     const payload = { name: formName.trim(), emoji: formEmoji, color: formColor }
+    let habitId = editing?.id
     if (editing) await updateHabit.mutateAsync({ id: editing.id, data: payload })
-    else await createHabit.mutateAsync(payload)
+    else habitId = (await createHabit.mutateAsync(payload))?.data?.id
+    // Labels go through the dedicated association endpoint; skip when unchanged.
+    const original = (editing?.tags ?? []).map((tg) => tg.id)
+    if (habitId != null && (formLabelIds.length !== original.length || formLabelIds.some((id) => !original.includes(id)))) {
+      await replaceHabitTags.mutateAsync({ id: habitId, tagIds: formLabelIds })
+    }
     setDialogOpen(false)
   }
 
@@ -104,6 +122,7 @@ export default function HabitsPage() {
                         <span className="inline-flex items-center gap-0.5"><Trophy className="h-3 w-3" />{t('habits.best')}: <b className="text-foreground">{h.best}</b></span>
                         <span className="inline-flex items-center gap-0.5"><TrendingUp className="h-3 w-3" />{t('habits.rate30')}: <b className="text-foreground">{Math.round(h.rate_30 * 100)}%</b></span>
                       </div>
+                      <LabelChips tags={h.tags} className="mt-1" />
                     </div>
                     <div className="flex items-center gap-0.5">
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(h)}><Pencil className="h-3.5 w-3.5" /></Button>
@@ -158,6 +177,18 @@ export default function HabitsPage() {
                 </div>
               </div>
             </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label>{t('labels.title')}</Label>
+                <span className="text-xs text-muted-foreground">{t('labels.multiple')}</span>
+              </div>
+              <LabelPicker
+                value={formLabelIds}
+                onChange={setFormLabelIds}
+                candidates={labelCandidates}
+                onPendingChange={setLabelCreating}
+              />
+            </div>
             {editing && (
               <Button variant="outline" size="sm" onClick={async () => {
                 await updateHabit.mutateAsync({ id: editing.id, data: { archived: !editing.archived } })
@@ -169,7 +200,7 @@ export default function HabitsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
-            <Button onClick={handleSave} disabled={!formName.trim() || createHabit.isPending || updateHabit.isPending}>
+            <Button onClick={handleSave} disabled={!formName.trim() || labelCreating || createHabit.isPending || updateHabit.isPending}>
               {(createHabit.isPending || updateHabit.isPending) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               {t('common.create')}
             </Button>

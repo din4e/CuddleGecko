@@ -274,7 +274,7 @@ func (s *ContactService) CreateBirthdayReminder(ctx context.Context, userID, wor
 	}
 	remindAt := time.Date(occ.NextBirthday.Year(), occ.NextBirthday.Month(), occ.NextBirthday.Day(), 9, 0, 0, 0, now.Location())
 
-	if existing, _, err := s.reminderRepo.List(ctx, workspaceID, model.ReminderPending, &contactID, 1, 100); err == nil {
+	if existing, _, err := s.reminderRepo.List(ctx, workspaceID, model.ReminderPending, &contactID, 1, 100, nil); err == nil {
 		for _, r := range existing {
 			if sameLocalDate(r.RemindAt, remindAt) && strings.Contains(r.Title, "生日") {
 				return nil, ErrBirthdayReminderExists

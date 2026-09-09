@@ -54,25 +54,25 @@ func TestTransactionRepo_List_ContactIDFilter(t *testing.T) {
 	create("solo", []uint{5})       // contains contact 5
 
 	// Filter by contact 5 -> only the two transactions that include it.
-	txs, total, err := repo.List(ctx, ws, 1, 100, nil, ptrUint(5), "")
+	txs, total, err := repo.List(ctx, ws, 1, 100, nil, ptrUint(5), "", nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), total)
 	assert.Len(t, txs, 2)
 	assert.ElementsMatch(t, []string{"shared", "solo"}, []string{txs[0].Title, txs[1].Title})
 
 	// Filter by a contact nobody shares -> empty, no error.
-	txs, total, err = repo.List(ctx, ws, 1, 100, nil, ptrUint(999), "")
+	txs, total, err = repo.List(ctx, ws, 1, 100, nil, ptrUint(999), "", nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), total)
 	assert.Empty(t, txs)
 
 	// No contact filter -> all transactions in the workspace.
-	_, total, err = repo.List(ctx, ws, 1, 100, nil, nil, "")
+	_, total, err = repo.List(ctx, ws, 1, 100, nil, nil, "", nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(4), total)
 
 	// Title search is a case-insensitive substring match.
-	txs, total, err = repo.List(ctx, ws, 1, 100, nil, nil, "SOL")
+	txs, total, err = repo.List(ctx, ws, 1, 100, nil, nil, "SOL", nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), total, "search should match only 'solo'")
 	require.Len(t, txs, 1)

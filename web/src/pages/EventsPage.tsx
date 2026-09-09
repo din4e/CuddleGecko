@@ -19,6 +19,9 @@ import {
 } from '../components/ui/dialog'
 import { CalendarDays, Clock, MapPin, Plus, Pencil, Trash2, Heart, Sparkles, Loader2 } from 'lucide-react'
 import BuddyPicker from '../components/BuddyPicker'
+import LabelPicker from '../components/LabelPicker'
+import { mergeLabelCandidates } from '../lib/labels'
+import LabelChips from '../components/LabelChips'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
@@ -27,12 +30,14 @@ import ListPageHeader from '../components/ListPageHeader'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import { useModeStore } from '../stores/mode'
+import { useTagsList } from '../hooks/api/useTags'
 import type { Event } from '../types'
 import {
   useEventsList,
   useCreateEvent,
   useUpdateEvent,
   useDeleteEvent,
+  useReplaceEventTags,
 } from '../hooks/api/useEvents'
 
 type TimeFilter = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'upcoming' | 'past'
@@ -105,6 +110,7 @@ interface EventFormData {
   location: string
   color: string
   contact_ids: number[]
+  label_ids: number[]
 }
 
 const emptyForm: EventFormData = {
@@ -115,6 +121,7 @@ const emptyForm: EventFormData = {
   location: '',
   color: '',
   contact_ids: [],
+  label_ids: [],
 }
 
 export default function EventsPage() {
@@ -155,6 +162,13 @@ export default function EventsPage() {
   const createEvent = useCreateEvent()
   const updateEvent = useUpdateEvent()
   const deleteEvent = useDeleteEvent()
+  const replaceEventTags = useReplaceEventTags()
+  const { data: tagsData } = useTagsList(1, 200)
+  const labelCandidates = useMemo(
+    () => mergeLabelCandidates(tagsData?.items, editing?.tags),
+    [tagsData, editing?.tags],
+  )
+  const [labelCreating, setLabelCreating] = useState(false)
 
   const events = data?.items ?? []
   const total = data?.total ?? 0
@@ -209,6 +223,7 @@ export default function EventsPage() {
       location: e.location || '',
       color: e.color || '',
       contact_ids: e.contact_ids || [],
+      label_ids: (e.tags ?? []).map((tg) => tg.id),
     })
     setDialogOpen(true)
   }
@@ -228,10 +243,17 @@ export default function EventsPage() {
       contact_ids: form.contact_ids,
     }
 
+    let eventId = editing?.id
     if (editing) {
       await updateEvent.mutateAsync({ id: editing.id, data: payload })
     } else {
-      await createEvent.mutateAsync(payload)
+      const created = await createEvent.mutateAsync(payload)
+      eventId = created?.data?.id
+    }
+    // Labels go through the dedicated association endpoint; skip when unchanged.
+    const original = (editing?.tags ?? []).map((tg) => tg.id)
+    if (eventId != null && (form.label_ids.length !== original.length || form.label_ids.some((id) => !original.includes(id)))) {
+      await replaceEventTags.mutateAsync({ id: eventId, tagIds: form.label_ids })
     }
 
     setDialogOpen(false)
@@ -306,6 +328,7 @@ export default function EventsPage() {
                     <div>
                       <div className="font-medium">{e.title}</div>
                       {e.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{e.description}</div>}
+                      <LabelChips tags={e.tags} className="mt-1" />
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap">
@@ -372,6 +395,7 @@ export default function EventsPage() {
                     {e.contact_ids.map((cid) => buddyNameById.get(cid)).filter(Boolean).join(', ')}
                   </div>
                 )}
+                <LabelChips tags={e.tags} />
                 <div className="flex gap-1 pt-1">
                   {aiAvailable && (
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAnalyzeEvent(e.id)} disabled={analyzingId === e.id} title={t('ai.analyzeEvent')} aria-label={t('ai.analyzeEvent')}>
@@ -448,6 +472,18 @@ export default function EventsPage() {
               </div>
             </div>
             <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t('labels.title')}</Label>
+                <span className="text-xs text-muted-foreground">{t('labels.multiple')}</span>
+              </div>
+              <LabelPicker
+                value={form.label_ids}
+                onChange={(ids) => setForm({ ...form, label_ids: ids })}
+                candidates={labelCandidates}
+                onPendingChange={setLabelCreating}
+              />
+            </div>
+            <div className="space-y-2">
               <Label>{t('common.buddies')}</Label>
               <BuddyPicker
                 buddies={buddies}
@@ -461,7 +497,7 @@ export default function EventsPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleSubmit} disabled={!form.title || !form.start_time || createEvent.isPending || updateEvent.isPending}>
+            <Button onClick={handleSubmit} disabled={!form.title || !form.start_time || labelCreating || createEvent.isPending || updateEvent.isPending}>
               {editing ? t('events.editEvent') : t('events.newEvent')}
             </Button>
           </DialogFooter>

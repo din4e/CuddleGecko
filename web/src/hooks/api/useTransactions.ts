@@ -65,3 +65,11 @@ export function useDeleteTransaction() {
     onError: mutationErrorToast,
   })
 }
+
+export function useReplaceTransactionTags() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => transactionsApi.replaceTags(id, tagIds),
+    onSuccess: () => invalidateScope(qc, scope),
+  })
+}

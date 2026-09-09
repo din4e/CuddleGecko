@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { Transaction, TransactionSummary, TransactionMonthly, PaginatedData } from '../types'
+import type { Transaction, TransactionSummary, TransactionMonthly, PaginatedData, Tag } from '../types'
 
 export const transactionsApi = {
   list: (params?: { page?: number; page_size?: number; type?: string; contact_id?: number; q?: string }, signal?: AbortSignal) =>
@@ -19,4 +19,12 @@ export const transactionsApi = {
 
   delete: (id: number) =>
     request.delete<void>(`/transactions/${id}`).then(() => {}),
+
+  // --- Workspace labels ---
+
+  getTags: (id: number) =>
+    request.get<Tag[]>(`/transactions/${id}/tags`).then((data) => ({ data })),
+
+  replaceTags: (id: number, tagIds: number[]) =>
+    request.put<void>(`/transactions/${id}/tags`, { tag_ids: tagIds }).then(() => {}),
 }

@@ -72,14 +72,14 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 	contactSvc := service.NewContactService(contactRepo, taggingRepo, reminderRepo)
 	tagSvc := service.NewTagService(tagRepo)
 	interactionSvc := service.NewInteractionService(interactionRepo)
-	reminderSvc := service.NewReminderService(reminderRepo)
+	reminderSvc := service.NewReminderService(reminderRepo, taggingRepo)
 	relationSvc := service.NewRelationService(relationRepo, contactRepo, interactionRepo)
-	eventSvc := service.NewEventService(eventRepo)
+	eventSvc := service.NewEventService(eventRepo, taggingRepo)
 	hub := realtime.NewHub()
 	defer hub.Close()
 	todoSvc := service.NewTodoService(todoRepo, eventRepo, todoRepo, service.WithTodoNotifier(hub))
-	workoutSvc := service.NewWorkoutService(workoutRepo, workoutExerciseRepo, bodyMetricRepo)
-	transactionSvc := service.NewTransactionService(transactionRepo)
+	workoutSvc := service.NewWorkoutService(workoutRepo, workoutExerciseRepo, bodyMetricRepo, taggingRepo)
+	transactionSvc := service.NewTransactionService(transactionRepo, taggingRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, config.AIConfig{})
 	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo,
 		service.WithExportNotifier(hub), service.WithTransactionRepo(transactionRepo), service.WithEventRepo(eventRepo),

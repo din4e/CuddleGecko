@@ -131,7 +131,7 @@ func TestCreateBirthdayReminder_Errors(t *testing.T) {
 }
 
 func TestReminderServiceCreateRequiresRemindAt(t *testing.T) {
-	reminderSvc := NewReminderService(nil)
+	reminderSvc := NewReminderService(nil, nil)
 	_, err := reminderSvc.Create(context.Background(), 1, 1, 1, &model.Reminder{Title: "x"})
 	assert.ErrorIs(t, err, ErrInvalidReminder)
 }

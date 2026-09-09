@@ -31,7 +31,7 @@ func (s *MCPServer) registerEventTools() {
 			endBefore = &s
 		}
 
-		events, total, err := s.eventSvc.List(ctx, userID, workspaceID, page, pageSize, startAfter, endBefore, search)
+		events, total, err := s.eventSvc.List(ctx, userID, workspaceID, page, pageSize, startAfter, endBefore, search, nil)
 		if err != nil {
 			return nil, err
 		}

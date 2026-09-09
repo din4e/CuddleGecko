@@ -243,7 +243,7 @@ func (s *ExportService) ImportRemindersCSV(ctx context.Context, userID, workspac
 	if err != nil {
 		return ImportStats{}, err
 	}
-	existing, _, err := s.reminderRepo.List(ctx, workspaceID, "", nil, 1, 100000)
+	existing, _, err := s.reminderRepo.List(ctx, workspaceID, "", nil, 1, 100000, nil)
 	if err != nil {
 		return ImportStats{}, err
 	}
@@ -297,7 +297,7 @@ func (s *ExportService) ImportEventsCSV(ctx context.Context, userID, workspaceID
 	if err != nil {
 		return ImportStats{}, err
 	}
-	existing, _, err := s.eventRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "")
+	existing, _, err := s.eventRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "", nil)
 	if err != nil {
 		return ImportStats{}, err
 	}
@@ -487,7 +487,7 @@ func (s *ExportService) ImportHabitsCSV(ctx context.Context, userID, workspaceID
 	if err != nil || t == nil {
 		return ImportStats{}, err
 	}
-	existing, err := s.habitRepo.List(ctx, workspaceID, true)
+	existing, err := s.habitRepo.List(ctx, workspaceID, true, nil)
 	if err != nil {
 		return ImportStats{}, err
 	}

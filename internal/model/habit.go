@@ -28,4 +28,5 @@ type Habit struct {
 	Best      int      `gorm:"-" json:"best"`
 	Rate30    float64  `gorm:"-" json:"rate_30"`
 	Recent    []string `gorm:"-" json:"recent"` // checked-in dates (YYYY-MM-DD) for the heatmap window
+	Tags      []Tag    `gorm:"-" json:"tags"`   // from the polymorphic taggings table
 }
