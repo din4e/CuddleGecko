@@ -56,6 +56,24 @@ export function toBodyChartData(metrics: BodyMetric[], metric: BodyChartMetric):
     })
 }
 
+/**
+ * Y-axis domain [lo, hi] for a trend chart: data min/max padded by 12% of the
+ * range, so real variation isn't crushed against a zero-based axis (a 68–72kg
+ * weight series on a 0–72 axis renders as an almost-flat line). Flat data pads
+ * by max(5% of |value|, 1) so a single value still sits mid-chart. Bounds are
+ * quantized outward to 0.1 so axis ticks stay readable (no 70.70800…0001).
+ * Returns undefined when there is no finite value (caller keeps the axis
+ * default).
+ */
+export function trendDomain(values: Array<number | null | undefined>): [number, number] | undefined {
+  const nums = values.filter((v): v is number => v != null && Number.isFinite(v))
+  if (nums.length === 0) return undefined
+  const min = Math.min(...nums)
+  const max = Math.max(...nums)
+  const pad = min === max ? Math.max(Math.abs(min) * 0.05, 1) : (max - min) * 0.12
+  return [Math.floor((min - pad) * 10) / 10, Math.ceil((max + pad) * 10) / 10]
+}
+
 /** Range selector value → date_after ISO string (undefined = all time). */
 export function dateAfterForRange(range: '30d' | '90d' | '1y' | 'all'): string | undefined {
   if (range === 'all') return undefined
