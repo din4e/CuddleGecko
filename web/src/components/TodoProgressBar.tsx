@@ -7,7 +7,8 @@ import { cn } from '../lib/utils'
  *  Visual: a 3px bar (muted track + emerald fill). The pointer hit area is
  *  much taller (12px) so the thin bar is easy to grab.
  *  Interaction: press-drag (or single click) sets the percent in 5-steps and
- *  commits once on release; double-click clears it. While a todo has no
+ *  commits once on release; a clean no-movement double-click clears it (a
+ *  dblclick trailing a drag-adjust keeps the value). While a todo has no
  *  progress the bar is invisible until the row is hovered — then a faint
  *  empty track appears so it can be grabbed.
  *  percent=null means "not configured" (still rendered: it's the drag target).
@@ -30,6 +31,9 @@ export default function TodoProgressBar({
   // Local value during a drag; null = follow the prop (no drag in progress).
   const [dragValue, setDragValue] = useState<number | null>(null)
   const trackRef = useRef<HTMLSpanElement>(null)
+  // True when the latest interaction moved the pointer — a rapid drag-adjust
+  // pair also fires dblclick, and that must NOT wipe the just-set percent.
+  const draggedRef = useRef(false)
 
   // A committed change (new percent from the server/cache) ends any in-flight
   // drag — the bar snaps to the authoritative value.
@@ -65,6 +69,7 @@ export default function TodoProgressBar({
     } catch {
       // no active pointer — continue without capture
     }
+    draggedRef.current = false
     setDragging(true)
     setDragValue(pctFromEvent(e))
   }
@@ -72,7 +77,9 @@ export default function TodoProgressBar({
     if (!dragging) return
     e.stopPropagation()
     e.preventDefault()
-    setDragValue(pctFromEvent(e))
+    const v = pctFromEvent(e)
+    draggedRef.current = draggedRef.current || v !== dragValue
+    setDragValue(v)
   }
   const handlePointerUp = (e: ReactPointerEvent<HTMLSpanElement>) => {
     if (!dragging) return
@@ -101,8 +108,11 @@ export default function TodoProgressBar({
         e.preventDefault()
       }}
       onDoubleClick={(e) => {
-        if (!interactive || percent == null) return
+        // Only a clean no-movement double-click clears; the dblclick that
+        // trails a rapid drag-adjust would otherwise wipe the fresh percent.
+        if (!interactive || percent == null || draggedRef.current) return
         e.stopPropagation()
+        draggedRef.current = false
         onCommit?.(null)
       }}
       className={cn(
