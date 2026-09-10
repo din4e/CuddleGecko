@@ -15,6 +15,15 @@ import { cn } from '../lib/utils'
  */
 const STEP = 5
 
+// True while a pointer press is held on any progress bar. Draggable rows
+// consult this in their dragstart handler: a native HTML5 drag that begins on
+// the scrubber swallows the pointer stream (no pointerup ever reaches the
+// bar), so it must be canceled for the percent to commit.
+let barPressActive = false
+export function isBarPressActive(): boolean {
+  return barPressActive
+}
+
 export default function TodoProgressBar({
   percent,
   onCommit,
@@ -70,6 +79,7 @@ export default function TodoProgressBar({
       // no active pointer — continue without capture
     }
     draggedRef.current = false
+    barPressActive = true
     setDragging(true)
     setDragValue(pctFromEvent(e))
   }
@@ -87,6 +97,7 @@ export default function TodoProgressBar({
     const v = pctFromEvent(e)
     setDragValue(null)
     setDragging(false)
+    barPressActive = false
     onCommit?.(v)
   }
 
@@ -102,6 +113,14 @@ export default function TodoProgressBar({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      // Canceling pointerdown does NOT stop Chromium from arming the
+      // surrounding row's native HTML5 drag (dragstart fires anyway and then
+      // swallows the pointer stream — the scrub never commits). Preventing
+      // mousedown — the event that actually initiates the drag — does.
+      onMouseDown={(e) => {
+        if (!interactive) return
+        e.preventDefault()
+      }}
       onDragStart={(e) => {
         // Belt-and-suspenders: the bar must never become the source of a
         // row's HTML5 drag (some browsers re-evaluate draggable mid-press).

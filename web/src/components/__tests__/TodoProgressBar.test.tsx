@@ -70,4 +70,11 @@ it('a dblclick trailing a rapid drag-adjust keeps the value (no wipe)', () => {
     fireEvent.doubleClick(bar)
     expect(onCommit.mock.calls.map((c) => c[0])).toEqual([40, 75])
   })
+it('cancels mousedown so the draggable row never arms a native drag', () => {
+    const onCommit = vi.fn()
+    const { bar } = renderBar({ percent: 30, onCommit })
+    const down = new MouseEvent('mousedown', { bubbles: true, cancelable: true })
+    bar.dispatchEvent(down)
+    expect(down.defaultPrevented).toBe(true)
+  })
 })

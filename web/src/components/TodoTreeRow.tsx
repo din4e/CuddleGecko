@@ -10,7 +10,7 @@ import { subtreeProgressFromNode } from '../lib/todoProgress'
 import { cn } from '@/lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
 import TodoPriorityBadge from './TodoPriorityBadge'
-import TodoProgressBar from './TodoProgressBar'
+import TodoProgressBar, { isBarPressActive } from './TodoProgressBar'
 import { todoProgressPercent } from '../lib/todoProgress'
 import { useSetTodoProgress } from '../hooks/api/useTodos'
 import { AddChildInput } from './AddChildInput'
@@ -111,6 +111,18 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
     dragId, onDragIdChange, onLoadChildren,
   } = props
   const [dropZone, setDropZone] = useState<DropZone | null>(null)
+  // True while a pointer press is held on the row's progress bar: the row's
+  // draggable flag drops for the gesture, so the browser never arms a native
+  // HTML5 drag that would swallow the bar's pointerup (and its commit).
+  const [barGesture, setBarGesture] = useState(false)
+  // Safety reset: if the release lands outside the row (lost pointer capture),
+  // a window-level capture listener still restores draggability.
+  useEffect(() => {
+    if (!barGesture) return
+    const clear = () => setBarGesture(false)
+    window.addEventListener('pointerup', clear, true)
+    return () => window.removeEventListener('pointerup', clear, true)
+  }, [barGesture])
   const todo = node.todo
   // hideDone: settled (done/abandoned) nodes whose whole loaded subtree is
   // settled are marked hidden (children stay intact — progress and move
@@ -233,9 +245,23 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
         // Clicking anywhere on the row makes it the arrow-key navigation
         // target (title clicks still open the drawer via their own handler).
         onMouseDown={() => onSelect?.(todo.id)}
-        draggable={dragId === undefined ? false : true}
+        draggable={dragId !== undefined && !barGesture}
+        onPointerDownCapture={(e) => {
+          // Capture phase: the progress bar stops pointerdown propagation on
+          // its way up, so this must see the press BEFORE the bar does to drop
+          // the draggable flag for the scrub (see barGesture above).
+          setBarGesture(!!(e.target as HTMLElement).closest?.('[role="slider"]'))
+        }}
+        onPointerUpCapture={() => setBarGesture(false)}
         onDragStart={(e) => {
           if (dragId === undefined || !onDragIdChange) return
+          // A gesture that began on the progress scrubber must stay with the
+          // bar: letting the row's native drag run would swallow the pointer
+          // stream and the percent would never commit.
+          if (isBarPressActive()) {
+            e.preventDefault()
+            return
+          }
           e.stopPropagation()
           e.dataTransfer.effectAllowed = 'move'
           e.dataTransfer.setData('text/plain', String(todo.id))
