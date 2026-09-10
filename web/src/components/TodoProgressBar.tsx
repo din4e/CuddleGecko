@@ -141,12 +141,16 @@ export default function TodoProgressBar({
       )}
     >
       <span
-        className={`block h-[3px] w-full overflow-hidden rounded-full transition-opacity ${
-          show == null ? 'bg-muted opacity-0 group-hover/bar:opacity-100 group-hover:opacity-100' : 'bg-muted'
+        className={`block h-[3px] w-full overflow-hidden rounded-full ${
+          dragging
+            ? // scrub in flight: show the track instantly — the opacity
+              // transition would flash the bar in on the first press
+              'bg-muted opacity-100 transition-none'
+            : `transition-opacity ${show == null ? 'bg-muted opacity-0 group-hover/bar:opacity-100 group-hover:opacity-100' : 'bg-muted'}`
         }`}
       >
         <span
-          className={`block h-full rounded-full ${dragging ? 'bg-emerald-500' : 'bg-emerald-500/70'}`}
+          className={`block h-full rounded-full transition-colors duration-150 ${dragging ? 'bg-emerald-500' : 'bg-emerald-500/70'}`}
           style={{ width: `${show ?? 0}%` }}
         />
       </span>
