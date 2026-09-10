@@ -56,4 +56,18 @@ describe('TodoProgressBar', () => {
     fireEvent.doubleClick(bar)
     expect(onCommit).toHaveBeenCalledWith(null)
   })
+it('a dblclick trailing a rapid drag-adjust keeps the value (no wipe)', () => {
+    const onCommit = vi.fn()
+    const { bar } = renderBar({ percent: 20, onCommit })
+    // two quick drag-adjusts; the browser fires dblclick after the pair —
+    // that must not clear the percent that was just committed
+    fireEvent.pointerDown(bar, { pointerId: 1, clientX: 10 })
+    fireEvent.pointerMove(bar, { pointerId: 1, clientX: 40 })
+    fireEvent.pointerUp(bar, { pointerId: 1, clientX: 40 })
+    fireEvent.pointerDown(bar, { pointerId: 2, clientX: 45 })
+    fireEvent.pointerMove(bar, { pointerId: 2, clientX: 75 })
+    fireEvent.pointerUp(bar, { pointerId: 2, clientX: 75 })
+    fireEvent.doubleClick(bar)
+    expect(onCommit.mock.calls.map((c) => c[0])).toEqual([40, 75])
+  })
 })
