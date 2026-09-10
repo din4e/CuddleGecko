@@ -321,4 +321,28 @@ describe('TodoSubtaskList', () => {
     dragWithY('drop', rowGrand, 20)
     expect(onMove).not.toHaveBeenCalled()
   })
+
+// A press on a row's progress bar must not arm the row's native drag: the
+// drag would swallow the pointer stream and the percent would never commit.
+// The row drops its draggable flag for the gesture and cancels any dragstart
+// that still fires; releasing the bar restores draggability.
+it('progress-bar press suppresses row drag for the gesture and restores it on release', () => {
+  renderWithClient(<DndHarness todo={parent} childrenByParent={makeMap()} onToggle={vi.fn()} onEdit={vi.fn()} onMove={vi.fn()} />)
+  const row = rowOf('Child')
+  const slider = row.querySelector('[role="slider"]') as HTMLElement
+  mockRect(slider)
+
+  expect(row.draggable).toBe(true)
+  fireEvent.pointerDown(slider, { pointerId: 1, clientX: 20 })
+  expect(row.draggable).toBe(false)
+
+  // even if a dragstart slips through (state flip loses the race), the
+  // isBarPressActive guard cancels it
+  const ds = createEvent.dragStart(row, { dataTransfer: dt() })
+  fireEvent(row, ds)
+  expect(ds.defaultPrevented).toBe(true)
+
+  fireEvent.pointerUp(slider, { pointerId: 1, clientX: 60 })
+  expect(row.draggable).toBe(true)
+})
 })

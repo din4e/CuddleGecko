@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Ban, CheckCircle2, ChevronDown, ChevronRight, Circle, Plus, Timer, Trash2 } from 'lucide-react'
 import { Button } from './ui/button'
@@ -7,7 +7,7 @@ import { formatDueLabel } from '../lib/dueLabel'
 import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 import TodoPriorityBadge from './TodoPriorityBadge'
-import TodoProgressBar from './TodoProgressBar'
+import TodoProgressBar, { isBarPressActive } from './TodoProgressBar'
 import { todoProgressPercent } from '../lib/todoProgress'
 import { useSetTodoProgress } from '../hooks/api/useTodos'
 import { isSettledStatus, subtreeSettledFromMap } from '../lib/buildTodoTree'
@@ -91,6 +91,18 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
   // time, so a single section-level slot replaces per-row state).
   const [hover, setHover] = useState<{ id: number; zone: DropZone } | null>(null)
   const draggable = onMove != null && onDragIdChange != null
+  // True while a pointer press is held on a row's progress bar: the row's
+  // draggable flag drops for the gesture, so the browser never arms a native
+  // HTML5 drag that would swallow the bar's pointerup (and its commit).
+  const [barGesture, setBarGesture] = useState(false)
+  // Safety reset: if the release lands outside the row (lost pointer capture),
+  // a window-level capture listener still restores draggability.
+  useEffect(() => {
+    if (!barGesture) return
+    const clear = () => setBarGesture(false)
+    window.addEventListener('pointerup', clear, true)
+    return () => window.removeEventListener('pointerup', clear, true)
+  }, [barGesture])
   // Dropping into this section (any zone) makes the dragged todo a descendant
   // of `todo` — refuse when the drag comes from todo's own chain (cycle).
   const selfChain = new Set(ancestorIds).add(todo.id)
@@ -138,11 +150,26 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
         return (
         <div key={child.id}>
           <div
-            draggable={draggable}
-            // A drag gesture starting on a row must never arm the surrounding
-            // card's dnd-kit listeners (it would drag the whole card instead).
-            onPointerDown={draggable ? (e) => e.stopPropagation() : undefined}
+            draggable={draggable && !barGesture}
+            // Capture phase: the progress bar stops pointerdown propagation on
+            // its way up, so a bubble-phase handler here would never see a bar
+            // press and the row would stay draggable during the scrub. For
+            // non-bar presses the original stopPropagation is kept so the
+            // surrounding card's dnd-kit listeners never arm.
+            onPointerDownCapture={draggable ? (e) => {
+              const onBar = !!(e.target as HTMLElement).closest?.('[role="slider"]')
+              setBarGesture(onBar)
+              if (!onBar) e.stopPropagation()
+            } : undefined}
+            onPointerUpCapture={() => setBarGesture(false)}
             onDragStart={draggable ? (e) => {
+              // A gesture that began on the progress scrubber must stay with
+              // the bar — cancel the row's native drag so the pointer stream
+              // keeps flowing and the percent commits on release.
+              if (isBarPressActive()) {
+                e.preventDefault()
+                return
+              }
               e.stopPropagation()
               e.dataTransfer.effectAllowed = 'move'
               e.dataTransfer.setData('text/plain', String(child.id))
