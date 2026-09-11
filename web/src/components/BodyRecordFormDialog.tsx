@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2 } from 'lucide-react'
+import { Copy, Loader2 } from 'lucide-react'
 import { isoToLocalInput } from '../lib/utils'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -15,9 +15,12 @@ interface BodyRecordFormDialogProps {
   open: boolean
   editing: BodyMetric | null
   onClose: () => void
+  /** Latest record before today (falls back to the newest record) — the
+   *  "copy previous day" source for quick daily logging. */
+  copyFrom?: BodyMetric | null
 }
 
-export function BodyRecordFormDialog({ open, editing, onClose }: BodyRecordFormDialogProps) {
+export function BodyRecordFormDialog({ open, editing, onClose, copyFrom }: BodyRecordFormDialogProps) {
   const { t } = useTranslation()
   const createMetric = useCreateBodyMetric()
   const updateMetric = useUpdateBodyMetric()
@@ -89,6 +92,27 @@ export function BodyRecordFormDialog({ open, editing, onClose }: BodyRecordFormD
     setSleepHours(String(Math.round(((end - start) / 3600000) * 100) / 100))
   }
 
+  // One-click daily logging: prefill every measured value from the previous
+  // day's record (recorded_at stays "now"; notes are personal text, not a
+  // parameter, so they are not copied).
+  const copyPrevDay = () => {
+    if (!copyFrom) return
+    setWeight(copyFrom.weight != null ? String(copyFrom.weight) : '')
+    setHeight(copyFrom.height != null ? String(copyFrom.height) : '')
+    setBodyFat(copyFrom.body_fat != null ? String(copyFrom.body_fat) : '')
+    setMuscleMass(copyFrom.muscle_mass != null ? String(copyFrom.muscle_mass) : '')
+    setRestingHr(copyFrom.resting_hr != null ? String(copyFrom.resting_hr) : '')
+    setSystolic(copyFrom.systolic != null ? String(copyFrom.systolic) : '')
+    setDiastolic(copyFrom.diastolic != null ? String(copyFrom.diastolic) : '')
+    setSleepHours(copyFrom.sleep_hours != null ? String(copyFrom.sleep_hours) : '')
+    setBedtime(copyFrom.bedtime ? isoToLocalInput(copyFrom.bedtime) : '')
+    setWakeTime(copyFrom.wake_time ? isoToLocalInput(copyFrom.wake_time) : '')
+    setSleepScore(copyFrom.sleep_score ?? null)
+    setSteps(copyFrom.steps != null ? String(copyFrom.steps) : '')
+    setEnergy(copyFrom.energy ?? null)
+    setMood(copyFrom.mood ?? null)
+  }
+
   // num takes a label + state setter pair to keep the field grid DRY.
   const num = (label: string, val: string, set: (v: string) => void, opts: { step?: string; min?: string } = {}) => (
     <div className="space-y-1.5">
@@ -103,6 +127,11 @@ export function BodyRecordFormDialog({ open, editing, onClose }: BodyRecordFormD
         <DialogHeader>
           <DialogTitle>{editing ? t('fitness.editBodyRecord') : t('fitness.newBodyRecord')}</DialogTitle>
         </DialogHeader>
+        {!editing && copyFrom && (
+          <Button variant="outline" size="sm" className="w-full" onClick={copyPrevDay}>
+            <Copy className="h-4 w-4 mr-1" />{t('fitness.copyPrevDay')}
+          </Button>
+        )}
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label>{t('fitness.recordedAt')}</Label>

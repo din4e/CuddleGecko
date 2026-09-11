@@ -689,6 +689,7 @@ export default {
     completionRate: 'Completion rate',
     minutesShort: 'min',
     newBodyRecord: 'New Record',
+    copyPrevDay: 'Copy previous day',
     editBodyRecord: 'Edit Record',
     noBodyRecords: 'No body records yet',
     recordedAt: 'Recorded At',
