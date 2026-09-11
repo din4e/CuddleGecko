@@ -688,6 +688,7 @@ export default {
     completionRate: '完成率',
     minutesShort: '分钟',
     newBodyRecord: '新建记录',
+    copyPrevDay: '复制前一天参数',
     editBodyRecord: '编辑记录',
     noBodyRecords: '暂无身体记录',
     recordedAt: '记录时间',

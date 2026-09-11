@@ -107,6 +107,9 @@ export default function FitnessPage() {
   const openEditWorkout = (w: Workout) => { setEditingWorkout(w); setWorkoutDialogOpen(true) }
   const openNewMetric = () => { setEditingMetric(null); setBodyDialogOpen(true) }
   const openEditMetric = (m: BodyMetric) => { setEditingMetric(m); setBodyDialogOpen(true) }
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
+  // 「复制前一天」的来源：今天零点之前的最新一条；没有更早记录时回退最新一条。
+  const copyFromMetric = metrics.find((m) => new Date(m.recorded_at) < startOfToday) ?? metrics[0] ?? null
 
   const selectCls = 'h-9 rounded-md border bg-background px-2 text-sm'
 
@@ -293,7 +296,7 @@ export default function FitnessPage() {
           empty fields and Save produced a near-empty duplicate. Distinct
           fallbacks: the dialogs are siblings, a shared 'new' collided. */}
       <WorkoutFormDialog key={editingWorkout?.id ?? 'workout-new'} open={workoutDialogOpen} editing={editingWorkout} onClose={() => setWorkoutDialogOpen(false)} />
-      <BodyRecordFormDialog key={editingMetric?.id ?? 'metric-new'} open={bodyDialogOpen} editing={editingMetric} onClose={() => setBodyDialogOpen(false)} />
+      <BodyRecordFormDialog key={editingMetric?.id ?? 'metric-new'} open={bodyDialogOpen} editing={editingMetric} copyFrom={copyFromMetric} onClose={() => setBodyDialogOpen(false)} />
       {/* Mounted only while open so its todos/events/habits queries don't run
           on every fitness page visit. */}
       {importOpen && <ImportPlansDialog open onClose={() => setImportOpen(false)} />}
