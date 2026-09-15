@@ -239,7 +239,11 @@ function WhiteboardPageInner() {
           {list.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
         {current != null && (
-          <Button variant="outline" size="sm" onClick={() => setAddAt({ x: 200, y: 200 })}>
+          <Button variant="outline" size="sm" onClick={() => {
+            // stagger successive drops so new elements don't stack on one spot
+            const count = currentBoard?.nodes.length ?? 0
+            setAddAt({ x: 200 + (count % 4) * 100, y: 200 + Math.floor(count / 4) * 100 })
+          }}>
             <Plus className="mr-1 h-4 w-4" />{t('whiteboard.addNode')}
           </Button>
         )}
