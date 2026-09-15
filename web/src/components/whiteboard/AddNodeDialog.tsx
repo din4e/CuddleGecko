@@ -155,9 +155,7 @@ export function AddNodeDialog({ open, at, onClose, onAdd }: {
     name.trim().length > 0 &&
     (kind !== 'transaction' || (Number.isFinite(parseFloat(amount)) && parseFloat(amount) > 0))
 
-  const cls = 'h-8 rounded-md border bg-background px-2 text-xs'
-  const seg = (active: boolean) =>
-    `rounded-full px-2.5 py-1 text-xs ${active ? 'border-primary bg-primary/10 font-medium' : 'text-muted-foreground'}`
+  const selectCls = 'h-9 rounded-md border bg-background px-2 text-sm'
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -165,16 +163,19 @@ export function AddNodeDialog({ open, at, onClose, onAdd }: {
         <DialogHeader>
           <DialogTitle>{t('whiteboard.addNode')}</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1">
           {KINDS.map((k) => (
-            <button
+            <Button
               key={k}
               type="button"
+              variant={kind === k ? 'default' : 'outline'}
+              size="sm"
+              className="text-xs"
+              aria-pressed={kind === k}
               onClick={() => switchKind(k)}
-              className={`rounded-full border px-2.5 py-1 text-xs ${kind === k ? 'border-primary bg-primary/10 font-medium' : 'text-muted-foreground'}`}
             >
               {t(`whiteboard.kind_${k}`)}
-            </button>
+            </Button>
           ))}
         </div>
         {kind === 'note' ? (
@@ -188,11 +189,9 @@ export function AddNodeDialog({ open, at, onClose, onAdd }: {
           </div>
         ) : mode === 'new' ? (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex gap-1.5">
-                <button type="button" className={`border ${seg(false)}`} onClick={() => setMode('pick')}>{t('whiteboard.pickExisting')}</button>
-                <button type="button" className={`border ${seg(true)}`}>{t('whiteboard.createNew')}</button>
-              </div>
+            <div className="flex gap-1">
+              <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setMode('pick')}>{t('whiteboard.pickExisting')}</Button>
+              <Button type="button" variant="default" size="sm" className="text-xs" aria-pressed>{t('whiteboard.createNew')}</Button>
             </div>
             <Input
               placeholder={kind === 'contact' || kind === 'workout' ? t('whiteboard.newName') : t('whiteboard.newTitle')}
@@ -202,7 +201,7 @@ export function AddNodeDialog({ open, at, onClose, onAdd }: {
               autoFocus
             />
             {kind === 'event' && (
-              <Input type="datetime-local" className={cls} value={startAt} onChange={(e) => setStartAt(e.target.value)} aria-label={t('whiteboard.startAt')} />
+              <Input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} aria-label={t('whiteboard.startAt')} />
             )}
             {kind === 'transaction' && (
               <div className="flex gap-2">
@@ -210,16 +209,15 @@ export function AddNodeDialog({ open, at, onClose, onAdd }: {
                   type="number"
                   min="0.01"
                   step="0.01"
-                  className={cls}
                   placeholder={t('finance.amount')}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
-                <select className={cls} value={txType} onChange={(e) => setTxType(e.target.value as 'expense' | 'income')} aria-label={t('finance.type')}>
+                <select className={selectCls} value={txType} onChange={(e) => setTxType(e.target.value as 'expense' | 'income')} aria-label={t('finance.type')}>
                   <option value="expense">{t('finance.expense')}</option>
                   <option value="income">{t('finance.income')}</option>
                 </select>
-                <Input type="date" className={cls} value={txDate} onChange={(e) => setTxDate(e.target.value)} aria-label={t('finance.date')} />
+                <Input type="date" className={selectCls} value={txDate} onChange={(e) => setTxDate(e.target.value)} aria-label={t('finance.date')} />
               </div>
             )}
             <Button size="sm" onClick={createAndAdd} disabled={!newFormValid || adding}>
@@ -229,14 +227,14 @@ export function AddNodeDialog({ open, at, onClose, onAdd }: {
           </div>
         ) : (
           <>
-            <div className="flex gap-1.5">
-              <button type="button" className={`border ${seg(true)}`}>{t('whiteboard.pickExisting')}</button>
-              <button type="button" className={`border ${seg(false)}`} onClick={() => setMode('new')}>{t('whiteboard.createNew')}</button>
+            <div className="flex gap-1">
+              <Button type="button" variant="default" size="sm" className="text-xs" aria-pressed>{t('whiteboard.pickExisting')}</Button>
+              <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setMode('new')}>{t('whiteboard.createNew')}</Button>
             </div>
-            <Input className={cls} placeholder={t('common.search') || ''} value={q} onChange={(e) => setQ(e.target.value)} />
+            <Input type="search" placeholder={t('whiteboard.searchPlaceholder')} value={q} onChange={(e) => setQ(e.target.value)} />
             <div className="max-h-64 overflow-y-auto">
               {busy && <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>}
-              {!busy && items.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">{t('common.none') || '—'}</p>}
+              {!busy && items.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">{t('whiteboard.noMatches')}</p>}
               {items.map((it) => (
                 <button
                   key={it.id}

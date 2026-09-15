@@ -14,6 +14,7 @@ import { Input } from '../components/ui/input'
 import { Textarea } from '../components/ui/textarea'
 import { Label } from '../components/ui/label'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog'
 import { BoardNode, type BoardNodeData } from '../components/whiteboard/BoardNode'
 import { AddNodeDialog } from '../components/whiteboard/AddNodeDialog'
 import {
@@ -182,7 +183,7 @@ function NodeDetailPanel({ board, nodeId }: { board: WhiteboardDetail; nodeId: n
       </div>
       <div className="space-y-1.5">
         <Label className="text-xs">{t('whiteboard.titleLabel')}</Label>
-        <Input value={label} onChange={(e) => setLabel(e.target.value)} className="h-8 text-sm" />
+        <Input value={label} onChange={(e) => setLabel(e.target.value)} className="h-9 text-sm" />
       </div>
       <div className="space-y-1.5">
         <Label className="text-xs">{t('whiteboard.noteBody')}</Label>
@@ -209,6 +210,7 @@ function WhiteboardPageInner() {
   const [activeId, setActiveId] = useState<number | null>(null)
   const [selectedNode, setSelectedNode] = useState<number | null>(null)
   const [addAt, setAddAt] = useState<{ x: number; y: number } | null>(null)
+  const [newBoardOpen, setNewBoardOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
 
@@ -221,16 +223,33 @@ function WhiteboardPageInner() {
     if (!newName.trim()) return
     const res = await createBoard.mutateAsync(newName.trim())
     setNewName('')
+    setNewBoardOpen(false)
     setActiveId(res.data.id)
   }
 
+  const selectCls = 'h-9 rounded-md border bg-background px-2 text-sm'
+
   return (
     <div className="space-y-4">
-      <ListPageHeader title={t('whiteboard.title')} />
+      <ListPageHeader
+        title={t('whiteboard.title')}
+        actions={
+          <Button
+            disabled={current == null}
+            onClick={() => {
+              // stagger successive drops so new elements don't stack on one spot
+              const count = currentBoard?.nodes.length ?? 0
+              setAddAt({ x: 200 + (count % 4) * 100, y: 200 + Math.floor(count / 4) * 100 })
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />{t('whiteboard.addNode')}
+          </Button>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <select
-          className="h-9 min-w-44 rounded-md border bg-background px-2 text-sm"
+          className={`${selectCls} min-w-44`}
           value={current ?? ''}
           onChange={(e) => { setActiveId(Number(e.target.value)); setSelectedNode(null) }}
           aria-label={t('whiteboard.selectBoard')}
@@ -238,15 +257,6 @@ function WhiteboardPageInner() {
           {list.length === 0 && <option value="">{t('whiteboard.noBoards')}</option>}
           {list.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
-        {current != null && (
-          <Button variant="outline" size="sm" onClick={() => {
-            // stagger successive drops so new elements don't stack on one spot
-            const count = currentBoard?.nodes.length ?? 0
-            setAddAt({ x: 200 + (count % 4) * 100, y: 200 + Math.floor(count / 4) * 100 })
-          }}>
-            <Plus className="mr-1 h-4 w-4" />{t('whiteboard.addNode')}
-          </Button>
-        )}
         {currentBoard && (
           <Input
             className="h-9 w-44"
@@ -259,23 +269,14 @@ function WhiteboardPageInner() {
             aria-label={t('whiteboard.boardName')}
           />
         )}
+        <Button variant="outline" size="sm" onClick={() => setNewBoardOpen(true)}>
+          <Plus className="mr-1 h-4 w-4" />{t('whiteboard.createBoard')}
+        </Button>
         {current != null && (
           <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setConfirmDelete(current)}>
             <Trash2 className="mr-1 h-4 w-4" />{t('whiteboard.deleteBoard')}
           </Button>
         )}
-        <div className="ml-auto flex items-center gap-2">
-          <Input
-            className="h-9 w-44"
-            placeholder={t('whiteboard.newBoardName')}
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate() }}
-          />
-          <Button size="sm" onClick={handleCreate} disabled={!newName.trim() || createBoard.isPending}>
-            {createBoard.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          </Button>
-        </div>
       </div>
 
       {isLoading ? (
@@ -305,6 +306,29 @@ function WhiteboardPageInner() {
           onAdd={async (input: WhiteboardNodeInput) => { await createNode.mutateAsync(input) }}
         />
       )}
+
+      <Dialog open={newBoardOpen} onOpenChange={setNewBoardOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('whiteboard.createBoard')}</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            placeholder={t('whiteboard.newBoardName')}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate() }}
+            aria-label={t('whiteboard.boardName')}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewBoardOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleCreate} disabled={!newName.trim() || createBoard.isPending}>
+              {createBoard.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {t('common.create')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmDelete != null}
