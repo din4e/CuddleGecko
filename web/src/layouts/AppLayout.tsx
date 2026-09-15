@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '../components/ui/avatar'
-import {
+import { Presentation,
   Heart,
   Network,
   Dumbbell,
@@ -55,6 +55,7 @@ const navKeys = [
   { to: '/', label: 'nav.dashboard', icon: LayoutDashboard },
   { to: '/buddies', label: 'nav.contacts', icon: Heart },
   { to: '/graph', label: 'nav.network', icon: Network },
+  { to: '/whiteboard', label: 'nav.whiteboard', icon: Presentation },
   { to: '/events', label: 'nav.events', icon: Calendar },
   { to: '/todos', label: 'nav.todos', icon: ListChecks },
   { to: '/fitness', label: 'nav.fitness', icon: Dumbbell },

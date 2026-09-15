@@ -39,6 +39,7 @@ const HabitsPage = lazy(loadHabitsPage)
 const PomodoroPage = lazy(loadPomodoroPage)
 const CalendarPage = lazy(loadCalendarPage)
 const FitnessPage = lazy(() => import('./pages/FitnessPage'))
+const WhiteboardPage = lazy(() => import('./pages/WhiteboardPage'))
 const TerminalPage = lazy(loadTerminalPage)
 
 function PageLoader() {
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="events" element={<Suspense fallback={<PageLoader />}><EventsPage /></Suspense>} />
           <Route path="todos" element={<Suspense fallback={<PageLoader />}><TodosPage /></Suspense>} />
           <Route path="fitness" element={<Suspense fallback={<PageLoader />}><FitnessPage /></Suspense>} />
+          <Route path="whiteboard" element={<Suspense fallback={<PageLoader />}><WhiteboardPage /></Suspense>} />
           <Route path="habits" element={<Suspense fallback={<PageLoader />}><HabitsPage /></Suspense>} />
           <Route path="pomodoro" element={<Suspense fallback={<PageLoader />}><PomodoroPage /></Suspense>} />
           <Route path="calendar" element={<Suspense fallback={<PageLoader />}><CalendarPage /></Suspense>} />

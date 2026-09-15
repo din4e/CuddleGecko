@@ -88,7 +88,7 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, transactionSvc, aiSvc, workspaceSvc, nil, nil)
 
 	avatarDir := t.TempDir()
-	handlers := NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarDir, config.AIConfig{}, userSettingSvc, nil, nil)
+	handlers := NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, nil, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarDir, config.AIConfig{}, userSettingSvc, nil, nil)
 	handlers.WS = NewWSHandler(hub, jwtCfg, workspaceSvc, gin.TestMode, []string{})
 
 	r := gin.New()

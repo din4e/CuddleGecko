@@ -22,6 +22,7 @@ type Handlers struct {
 	Event       *EventHandler
 	Todo        *TodoHandler
 	Workout     *WorkoutHandler
+	Whiteboard  *WhiteboardHandler
 	Fitness     *FitnessHandler
 	Habit       *HabitHandler
 	Pomodoro    *PomodoroHandler
@@ -46,6 +47,7 @@ func NewHandlers(
 	eventSvc *service.EventService,
 	todoSvc *service.TodoService,
 	workoutSvc *service.WorkoutService,
+	whiteboardSvc *service.WhiteboardService,
 	fitnessSvc *service.FitnessService,
 	transactionSvc *service.TransactionService,
 	aiSvc *service.AIService,
@@ -70,6 +72,7 @@ func NewHandlers(
 		Event:       NewEventHandler(eventSvc),
 		Todo:        NewTodoHandler(todoSvc),
 		Workout:     NewWorkoutHandler(workoutSvc),
+		Whiteboard:  NewWhiteboardHandler(whiteboardSvc),
 		Fitness:     NewFitnessHandler(fitnessSvc),
 		Habit:       NewHabitHandler(habitSvc),
 		Pomodoro:    NewPomodoroHandler(pomodoroSvc),
@@ -269,6 +272,19 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.POST("/body-metrics/import", h.Workout.ImportMetrics)
 			wsProtected.PUT("/body-metrics/:id", h.Workout.UpdateMetric)
 			wsProtected.DELETE("/body-metrics/:id", h.Workout.DeleteMetric)
+
+			// Whiteboard (infinite canvas): boards, nodes, edges + expansion
+			wsProtected.GET("/whiteboards", h.Whiteboard.ListBoards)
+			wsProtected.POST("/whiteboards", h.Whiteboard.CreateBoard)
+			wsProtected.GET("/whiteboards/:id", h.Whiteboard.GetBoard)
+			wsProtected.PUT("/whiteboards/:id", h.Whiteboard.RenameBoard)
+			wsProtected.DELETE("/whiteboards/:id", h.Whiteboard.DeleteBoard)
+			wsProtected.POST("/whiteboards/:id/nodes", h.Whiteboard.CreateNode)
+			wsProtected.PUT("/whiteboards/:id/nodes/:nodeId", h.Whiteboard.UpdateNode)
+			wsProtected.DELETE("/whiteboards/:id/nodes/:nodeId", h.Whiteboard.DeleteNode)
+			wsProtected.GET("/whiteboards/:id/nodes/:nodeId/expand", h.Whiteboard.ExpandNode)
+			wsProtected.POST("/whiteboards/:id/edges", h.Whiteboard.CreateEdge)
+			wsProtected.DELETE("/whiteboards/:id/edges/:edgeId", h.Whiteboard.DeleteEdge)
 
 			// Fitness extras: per-set logs, PRs, exercise library, templates, goals
 			wsProtected.GET("/workouts/history", h.Workout.History)

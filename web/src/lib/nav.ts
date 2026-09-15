@@ -1,4 +1,4 @@
-import { Network, Calendar, ListChecks, Wallet, Bot, Tag, Bell, Dumbbell, Flame, Timer, CalendarDays } from 'lucide-react' 
+import { Presentation, Network, Calendar, ListChecks, Wallet, Bot, Tag, Bell, Dumbbell, Flame, Timer, CalendarDays } from 'lucide-react' 
 import type { LucideIcon } from 'lucide-react'
 
 export interface CustomizableNavItem {
@@ -10,6 +10,7 @@ export interface CustomizableNavItem {
 // Sidebar nav items the user can reorder / hide (dashboard, contacts, settings stay fixed).
 export const CUSTOMIZABLE_NAV: CustomizableNavItem[] = [
   { to: '/graph', label: 'nav.network', icon: Network },
+  { to: '/whiteboard', label: 'nav.whiteboard', icon: Presentation },
   { to: '/events', label: 'nav.events', icon: Calendar },
   { to: '/todos', label: 'nav.todos', icon: ListChecks },
   { to: '/fitness', label: 'nav.fitness', icon: Dumbbell },
