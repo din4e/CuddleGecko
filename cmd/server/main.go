@@ -56,6 +56,7 @@ func main() {
 	eventRepo := repository.NewEventRepo(db)
 	todoRepo := repository.NewTodoRepo(db)
 	workoutRepo := repository.NewWorkoutRepo(db)
+	whiteboardRepo := repository.NewWhiteboardRepo(db)
 	workoutExerciseRepo := repository.NewWorkoutExerciseRepo(db)
 	bodyMetricRepo := repository.NewBodyMetricRepo(db)
 	habitRepo := repository.NewHabitRepo(db)
@@ -86,6 +87,7 @@ func main() {
 	eventSvc := service.NewEventService(eventRepo, taggingRepo, hub)
 	todoActivityRepo := repository.NewTodoActivityRepo(db)
 	todoSvc := service.NewTodoService(todoRepo, eventRepo, todoRepo, service.WithTodoNotifier(hub), service.WithTodoHistory(todoActivityRepo, userRepo))
+		whiteboardSvc := service.NewWhiteboardService(whiteboardRepo, hub)
 	workoutSvc := service.NewWorkoutService(workoutRepo, workoutExerciseRepo, bodyMetricRepo, taggingRepo, hub)
 	exerciseLibraryRepo := repository.NewExerciseLibraryRepo(db)
 	workoutTemplateRepo := repository.NewWorkoutTemplateRepo(db)
@@ -120,7 +122,7 @@ func main() {
 	}
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, fitnessSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc, habitSvc, pomodoroSvc)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, whiteboardSvc, fitnessSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc, habitSvc, pomodoroSvc)
 	handlers.WS = handler.NewWSHandler(hub, &cfg.JWT, workspaceSvc, cfg.Server.Mode, cfg.CORS.AllowOrigins)
 
 	// Router

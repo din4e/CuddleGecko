@@ -15,14 +15,7 @@ import { cn } from '../lib/utils'
  */
 const STEP = 5
 
-// True while a pointer press is held on any progress bar. Draggable rows
-// consult this in their dragstart handler: a native HTML5 drag that begins on
-// the scrubber swallows the pointer stream (no pointerup ever reaches the
-// bar), so it must be canceled for the percent to commit.
-let barPressActive = false
-export function isBarPressActive(): boolean {
-  return barPressActive
-}
+import { setBarPressActive as setBarPress } from '../lib/barGesture'
 
 export default function TodoProgressBar({
   percent,
@@ -79,7 +72,7 @@ export default function TodoProgressBar({
       // no active pointer — continue without capture
     }
     draggedRef.current = false
-    barPressActive = true
+    setBarPress(true)
     setDragging(true)
     setDragValue(pctFromEvent(e))
   }
@@ -97,7 +90,7 @@ export default function TodoProgressBar({
     const v = pctFromEvent(e)
     setDragValue(null)
     setDragging(false)
-    barPressActive = false
+    setBarPress(false)
     onCommit?.(v)
   }
 

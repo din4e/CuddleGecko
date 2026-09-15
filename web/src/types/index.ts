@@ -662,3 +662,63 @@ export interface BodyMetricStat {
   prev: number | null
   trend: BodyMetricTrend
 }
+
+// ---------------- Whiteboard (infinite canvas) ----------------
+
+export type WhiteboardRefType = '' | 'note' | 'contact' | 'todo' | 'event' | 'workout' | 'transaction'
+
+export interface Whiteboard {
+  id: number
+  user_id: number
+  workspace_id: number
+  name: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WhiteboardNode {
+  id: number
+  whiteboard_id: number
+  ref_type: WhiteboardRefType
+  ref_id: number | null
+  label: string
+  note: string
+  x: number
+  y: number
+  color: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WhiteboardEdge {
+  id: number
+  whiteboard_id: number
+  from_node_id: number
+  to_node_id: number
+  label: string
+  created_at: string
+  updated_at: string
+}
+
+/** Board payload: the board plus everything the canvas renders. */
+export interface WhiteboardDetail extends Whiteboard {
+  nodes: WhiteboardNode[]
+  edges: WhiteboardEdge[]
+}
+
+export interface WhiteboardNodeInput {
+  ref_type?: WhiteboardRefType
+  ref_id?: number | null
+  label?: string
+  note?: string
+  x?: number
+  y?: number
+  color?: string
+}
+
+export interface WhiteboardRelated {
+  ref_type: WhiteboardRefType
+  ref_id: number
+  label: string
+  detail: string
+}
