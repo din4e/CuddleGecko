@@ -30,7 +30,8 @@ export default function TodoProgressBar({
   className?: string
 }) {
   const [dragging, setDragging] = useState(false)
-  // Local value during a drag; null = follow the prop (no drag in progress).
+  // Local value during a drag, and the just-committed value after release
+  // until the percent prop catches up; null = follow the prop.
   const [dragValue, setDragValue] = useState<number | null>(null)
   const trackRef = useRef<HTMLSpanElement>(null)
   // True when the latest interaction moved the pointer — a rapid drag-adjust
@@ -88,9 +89,16 @@ export default function TodoProgressBar({
     if (!dragging) return
     e.stopPropagation()
     const v = pctFromEvent(e)
-    setDragValue(null)
+    // Hold the committed value until the authoritative percent prop catches
+    // up (the optimistic cache patch reaches the bar only after the parent's
+    // rerender — in the detail drawer that hop includes a useEffect snapshot
+    // sync, a full extra paint). Clearing dragValue here would flash the OLD
+    // percent — or an empty bar when none was configured — for that window.
+    // The [percent] effect above clears the hold: on success, on rollback,
+    // and on external updates alike.
     setDragging(false)
     setBarPress(false)
+    setDragValue(v)
     onCommit?.(v)
   }
 
