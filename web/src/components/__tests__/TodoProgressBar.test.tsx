@@ -77,4 +77,23 @@ it('cancels mousedown so the draggable row never arms a native drag', () => {
     bar.dispatchEvent(down)
     expect(down.defaultPrevented).toBe(true)
   })
+  it('holds the committed percent on release until the prop catches up (no 0% flash)', () => {
+    // Regression: the detail drawer's bar used to drop to the stale prop on
+    // release — an empty bar ("0%") when no percent was configured — until
+    // the optimistic cache patch round-tripped back through the parent.
+    const onCommit = vi.fn()
+    const utils = render(<TodoProgressBar percent={null} onCommit={onCommit} />)
+    const bar = utils.container.querySelector('[role="slider"]') as HTMLElement
+    bar.getBoundingClientRect = () => ({ x: 0, y: 0, width: 100, height: 12, top: 0, left: 0, bottom: 12, right: 100, toJSON: () => ({}) } as DOMRect)
+    fireEvent.pointerDown(bar, { pointerId: 1, clientX: 60 })
+    fireEvent.pointerUp(bar, { pointerId: 1, clientX: 60 })
+    expect(onCommit).toHaveBeenCalledWith(60)
+    // before the prop updates, the bar still shows the just-committed 60
+    expect(bar.getAttribute('aria-valuenow')).toBe('60')
+    // once the authoritative percent lands, the hold clears and it follows
+    utils.rerender(<TodoProgressBar percent={60} onCommit={onCommit} />)
+    expect(bar.getAttribute('aria-valuenow')).toBe('60')
+    utils.rerender(<TodoProgressBar percent={30} onCommit={onCommit} />)
+    expect(bar.getAttribute('aria-valuenow')).toBe('30')
+  })
 })
