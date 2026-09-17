@@ -115,7 +115,7 @@ function BoardCanvas({ board, onNodeClick }: {
   const handleNodeClick: NodeMouseHandler = useCallback((_, node) => onNodeClick(Number(node.id)), [onNodeClick])
 
   return (
-    <div className="h-[calc(100vh-13rem)] min-h-[28rem] w-full overflow-hidden rounded-lg border bg-background">
+    <div className="h-[calc(100vh-11rem)] min-h-[26rem] w-full overflow-hidden rounded-lg border bg-background">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -176,7 +176,7 @@ function NodeDetailPanel({ board, nodeId }: { board: WhiteboardDetail; nodeId: n
   }
 
   return (
-    <div className="flex w-72 shrink-0 flex-col gap-3 rounded-lg border bg-card p-3">
+    <div className="flex w-72 shrink-0 flex-col gap-2 rounded-lg border bg-card p-3">
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('whiteboard.detail')}</p>
         <span className="text-[10px] text-muted-foreground">{t(`whiteboard.kind_${node.ref_type || 'note'}`)}</span>
@@ -230,7 +230,7 @@ function WhiteboardPageInner() {
   const selectCls = 'h-9 rounded-md border bg-background px-2 text-sm'
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <ListPageHeader
         title={t('whiteboard.title')}
         actions={
@@ -249,7 +249,7 @@ function WhiteboardPageInner() {
 
       <div className="flex flex-wrap items-center gap-2">
         <select
-          className={`${selectCls} min-w-44`}
+          className={`${selectCls} min-w-40`}
           value={current ?? ''}
           onChange={(e) => { setActiveId(Number(e.target.value)); setSelectedNode(null) }}
           aria-label={t('whiteboard.selectBoard')}
@@ -259,7 +259,7 @@ function WhiteboardPageInner() {
         </select>
         {currentBoard && (
           <Input
-            className="h-9 w-44"
+            className="h-9 w-40"
             defaultValue={currentBoard.name}
             key={`rename-${currentBoard.id}`}
             onBlur={(e) => {
@@ -284,7 +284,7 @@ function WhiteboardPageInner() {
       ) : current == null || !currentBoard ? (
         <EmptyState message={t('whiteboard.noBoards')} />
       ) : (
-        <div className="flex items-stretch gap-4">
+        <div className="flex items-stretch gap-3">
           <div className="min-w-0 flex-1">
             <BoardCanvas board={currentBoard} onNodeClick={setSelectedNode} />
           </div>
