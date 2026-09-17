@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Eye, EyeOff, Plus } from 'lucide-react'
+import { Eye, EyeOff, Plus, Trash2 } from 'lucide-react'
 import { isSettledStatus } from '../lib/buildTodoTree'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs'
@@ -30,6 +30,9 @@ interface TodoDetailDrawerProps {
    *  and "open this subtask in the drawer" (onOpenTodo). */
   onToggleSubtask?: (todo: Todo) => void
   onDeleteSubtask?: (todo: Todo) => void
+  /** Delete the todo being viewed — the page shows its shared confirm
+   *  dialog (same one the rows use), then closes the drawer on success. */
+  onDeleteTodo?: (todo: Todo) => void
   onStartPomodoro?: (todo: Todo) => void
   onOpenTodo?: (todo: Todo) => void
   /** Inline quick-add under any subtask row (page's create handler). */
@@ -177,7 +180,7 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
  *  modification history each one click away instead of stacked in a very long
  *  scroll. The form remounts per todo id so its state always matches the todo
  *  being viewed. */
-export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates, onContactsChange, onClose, onToggleSubtask, onDeleteSubtask, onStartPomodoro, onOpenTodo, onCreateChild, hideDone, subtaskDragId, onSubtaskDragIdChange, onMoveSubtask }: TodoDetailDrawerProps) {
+export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates, onContactsChange, onClose, onToggleSubtask, onDeleteSubtask, onDeleteTodo, onStartPomodoro, onOpenTodo, onCreateChild, hideDone, subtaskDragId, onSubtaskDragIdChange, onMoveSubtask }: TodoDetailDrawerProps) {
   const { t } = useTranslation()
   // Same drag-to-set control as the rows, wider and with a percent label.
   const setProgress = useSetTodoProgress()
@@ -202,6 +205,21 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
                 showLabel
                 className="w-28"
               />
+              {onDeleteTodo && (
+                <>
+                  <div className="flex-1" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => onDeleteTodo(todo)}
+                    aria-label={t('common.delete')}
+                    title={t('common.delete')}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </SheetHeader>
