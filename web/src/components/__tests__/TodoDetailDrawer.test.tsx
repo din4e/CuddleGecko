@@ -118,6 +118,24 @@ describe('TodoDetailDrawer', () => {
     expect(mocks.updateTodo).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }))
   })
 
+  it('deletes the viewed todo through the page handler (header trash)', async () => {
+    const user = userEvent.setup()
+    const onDeleteTodo = vi.fn()
+    renderWithClient(
+      <TodoDetailDrawer
+        todo={todo()}
+        open
+        contacts={[]}
+        tags={[]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+        onDeleteTodo={onDeleteTodo}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'common.delete' }))
+    expect(onDeleteTodo).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }))
+  })
+
   it('renders the subtask subtree and toggles a subtask', async () => {
     const user = userEvent.setup()
     const sub = { ...todo({ id: 8, title: 'Deep subtask', parent_id: 7 }) }

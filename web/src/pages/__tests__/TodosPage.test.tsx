@@ -99,6 +99,7 @@ import type { AxiosResponse } from 'axios'
 const mockedList = vi.mocked(todosApi.list)
 const mockedCreate = vi.mocked(todosApi.create)
 const mockedUpdate = vi.mocked(todosApi.update)
+const mockedDelete = vi.mocked(todosApi.delete)
 const mockedReplaceTags = vi.mocked(todosApi.replaceTags)
 const mockedStats = vi.mocked(todosApi.stats)
 const mockedTrash = vi.mocked(todosApi.listTrash)
@@ -556,6 +557,41 @@ describe('TodosPage', () => {
     await waitFor(() => {
       expect(screen.getByText('common.save')).toBeInTheDocument()
     }, { timeout: 2000 })
+  })
+
+  it('deletes the open todo from the drawer via the shared confirm dialog', async () => {
+    // Param-aware mock: children slices (parent_id queries) come back EMPTY —
+    // returning the root itself for them would model a cyclic todo (its own
+    // child), which TodoSubtaskList's render recursion can't stop walking.
+    mockedList.mockImplementation(async (params?: TodoListParams) =>
+      params?.parent_id != null
+        ? mockPage<Todo>([])
+        : mockPage<Todo>([
+          { id: 1, title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+        ]))
+    mockedDelete.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Buy milk')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByText('Buy milk'))
+    await waitFor(() => {
+      expect(screen.getByText('common.save')).toBeInTheDocument()
+    }, { timeout: 2000 })
+
+    // Header trash asks first (same dialog the rows use)…
+    await user.click(screen.getByRole('button', { name: 'common.delete' }))
+    expect(screen.getByText('确定删除此待办？')).toBeInTheDocument()
+    // …then the confirmed delete closes the drawer along with the todo.
+    await user.click(screen.getByText('common.confirm'))
+    await waitFor(() => {
+      expect(mockedDelete).toHaveBeenCalledWith(1)
+    })
+    await waitFor(() => {
+      expect(screen.queryByText('common.save')).not.toBeInTheDocument()
+    })
   })
 
   it('creates a todo via the quick-add bar on Enter', async () => {

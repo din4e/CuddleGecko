@@ -796,10 +796,16 @@ export default function TodosPage() {
     try {
       await deleteTodo.mutateAsync(id)
       setConfirmDelete(null)
+      // The drawer renders a stale snapshot once its todo is deleted — close
+      // it rather than keep showing a todo that no longer exists.
+      if (editing?.id === id) {
+        setDrawerOpen(false)
+        setEditing(null)
+      }
     } catch {
       // ignore
     }
-  }, [deleteTodo])
+  }, [deleteTodo, editing])
 
   const contactNameMap = useMemo(() => {
     const m = new Map<number, string>()
@@ -1929,6 +1935,7 @@ export default function TodosPage() {
             onClose={() => setDrawerOpen(false)}
             onToggleSubtask={handleToggleSub}
             onDeleteSubtask={setConfirmDelete}
+            onDeleteTodo={setConfirmDelete}
             onStartPomodoro={handleStartPomodoro}
             onOpenTodo={openEdit}
             onCreateChild={handleCreateChild}
