@@ -121,12 +121,18 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
     <div className="mt-0.5 space-y-0.5 border-l-2 border-border pl-2">
       {rows?.map((child, i) => {
         const grandChildren = childrenByParent.get(child.id)
+        // Cycle guard (defense in depth): the backend's move path rejects
+        // cycles, but corrupted or hand-imported data could still loop
+        // parent↔child. A child that already sits on this section's ancestor
+        // chain renders its row once — with a caret or recursion the walk
+        // would re-enter the cycle and never terminate.
+        const cyclical = selfChain.has(child.id)
         // The caret/fold follows the VISIBLE rows (a caret that expands to
         // nothing is a bug), but the progress chip keeps the TRUE counts.
         const visibleGrandChildren = hideDone && grandChildren
           ? grandChildren.filter((g) => !isSettledStatus(g.status) || !subtreeSettledFromMap(g, childrenByParent))
           : grandChildren
-        const hasChildren = !!visibleGrandChildren?.length
+        const hasChildren = !cyclical && !!visibleGrandChildren?.length
         const showsProgress = !!grandChildren?.length
         const childFolded = hasChildren && collapsed.has(collapseKey(collapseScope, child.id))
         const prevSiblingId = i > 0 ? rows[i - 1].id : null
@@ -317,8 +323,9 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
             )}
           </div>
           {/* Recurse: grandchildren render indented under their own parent row,
-              with the same controls as any other depth — unless folded. */}
-          {!childFolded && (
+              with the same controls as any other depth — unless folded, or the
+              child closes an ancestor cycle (guard above). */}
+          {!childFolded && !cyclical && (
             <div className="pl-4">
               <TodoSubtaskList
                 todo={child}
