@@ -95,6 +95,24 @@ describe('TodoSubtaskList', () => {
     expect(screen.getByText('Grandchild')).toBeInTheDocument()
   })
 
+  it('stops at a parent↔child cycle instead of recursing forever', () => {
+    // Corrupted/imported data can loop: child 2's children list the root
+    // itself. Without the ancestor-chain guard the render walk re-enters the
+    // cycle endlessly (freezes the tab; found as an OOM in a page test).
+    const cycMap = new Map<number, Todo[]>([
+      [1, [child]],
+      [2, [parent]],
+    ])
+    renderWithClient(
+      <TodoSubtaskList todo={parent} childrenByParent={cycMap}
+        onToggle={vi.fn()} onEdit={vi.fn()} />,
+    )
+    // Each row appears exactly once; the Parent row (which closes the cycle)
+    // gets no caret and never expands into another copy of the section.
+    expect(screen.getAllByText('Child').length).toBe(1)
+    expect(screen.getAllByText('Parent').length).toBe(1)
+  })
+
   it('toggles a subtask and opens edit via the title', () => {
     const onToggle = vi.fn()
     const onEdit = vi.fn()
