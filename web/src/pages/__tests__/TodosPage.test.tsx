@@ -552,10 +552,15 @@ describe('TodosPage', () => {
     })
 
     // Single click opens the right-side drawer (fires after the 200ms
-    // double-click disambiguation window).
+    // double-click disambiguation window) — the edit form's title input,
+    // prefilled with the todo's title (edits auto-save; no Save button).
+    // The page renders other inputs before the drawer (quick-add, filters),
+    // so locate the prefilled title input by value, not DOM order.
+    const titleInputWithValue = (v: string) =>
+      [...document.querySelectorAll('input')].some((i) => (i as HTMLInputElement).value === v)
     await user.click(screen.getByText('Buy milk'))
     await waitFor(() => {
-      expect(screen.getByText('common.save')).toBeInTheDocument()
+      expect(titleInputWithValue('Buy milk')).toBe(true)
     }, { timeout: 2000 })
   })
 
@@ -578,7 +583,11 @@ describe('TodosPage', () => {
 
     await user.click(screen.getByText('Buy milk'))
     await waitFor(() => {
-      expect(screen.getByText('common.save')).toBeInTheDocument()
+      // Auto-save drawer: no Save button — its open state is the prefilled
+      // title input.
+      expect(
+        [...document.querySelectorAll('input')].some((i) => (i as HTMLInputElement).value === 'Buy milk'),
+      ).toBe(true)
     }, { timeout: 2000 })
 
     // Header trash asks first (same dialog the rows use)…
@@ -590,7 +599,11 @@ describe('TodosPage', () => {
       expect(mockedDelete).toHaveBeenCalledWith(1)
     })
     await waitFor(() => {
-      expect(screen.queryByText('common.save')).not.toBeInTheDocument()
+      // The row text stays (the mock list still returns the todo), so the
+      // closed drawer is observed through its title input disappearing.
+      expect(
+        [...document.querySelectorAll('input')].some((i) => (i as HTMLInputElement).value === 'Buy milk'),
+      ).toBe(false)
     })
   })
 
