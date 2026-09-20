@@ -16,6 +16,7 @@ import { ListSkeleton } from '../components/ListSkeleton'
 import ListPageHeader from '../components/ListPageHeader'
 import LabelPicker from '../components/LabelPicker'
 import { mergeLabelCandidates } from '../lib/labels'
+import { isoToLocalInput } from '../lib/utils'
 import LabelChips from '../components/LabelChips'
 import { useTagsList } from '../hooks/api/useTags'
 import {
@@ -67,7 +68,7 @@ export default function RemindersPage() {
     setEditing(r)
     setFormTitle(r.title)
     setFormDesc(r.description || '')
-    setFormRemindAt(r.remind_at ? r.remind_at.slice(0, 16) : '')
+    setFormRemindAt(r.remind_at ? isoToLocalInput(r.remind_at) : '')
     setFormStatus(r.status)
     setFormLabelIds((r.tags ?? []).map((tg) => tg.id))
     setDialogOpen(true)
@@ -80,7 +81,9 @@ export default function RemindersPage() {
       data: {
         title: formTitle,
         description: formDesc,
-        remind_at: formRemindAt,
+        // datetime-local values are local wall time; convert to UTC ISO so the
+        // backend (which parses without a timezone) stores the intended instant.
+        remind_at: formRemindAt ? new Date(formRemindAt).toISOString() : undefined,
         status: formStatus,
       },
     })

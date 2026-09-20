@@ -22,6 +22,7 @@ import { TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, Heart } from 'l
 import BuddyPicker from '../components/BuddyPicker'
 import LabelPicker from '../components/LabelPicker'
 import { mergeLabelCandidates } from '../lib/labels'
+import { localDateInput } from '../lib/utils'
 import LabelChips from '../components/LabelChips'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import Pagination from '../components/Pagination'
@@ -116,7 +117,7 @@ export default function FinancePage() {
 
   const openCreate = () => {
     setEditing(null)
-    setForm({ ...emptyForm, date: new Date().toISOString().slice(0, 10) })
+    setForm({ ...emptyForm, date: localDateInput() })
     setDialogOpen(true)
   }
 
