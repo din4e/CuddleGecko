@@ -30,6 +30,7 @@ import EmojiPicker from '../components/EmojiPicker'
 import BuddyPicker from '../components/BuddyPicker'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { labelColors, presetLabelKeys, getNodeLabelColor } from '../lib/constants'
+import { isoToLocalInput } from '../lib/utils'
 import { nextBirthday, lunarFullText, lunarBirthdayToSolar } from '../lib/lunar'
 import { useCreateBirthdayReminder } from '../hooks/api/useContacts'
 
@@ -286,19 +287,24 @@ export default function ContactDetailPage() {
 
   // --- Interaction CRUD ---
   const openCreateInt = () => {
-    setIntForm({ type: 'meeting', title: '', content: '', occurred_at: new Date().toISOString().slice(0, 16) })
+    setIntForm({ type: 'meeting', title: '', content: '', occurred_at: isoToLocalInput(new Date().toISOString()) })
     setIntDialog({ open: true, editing: null })
   }
   const openEditInt = (i: Interaction) => {
-    setIntForm({ type: i.type, title: i.title, content: i.content || '', occurred_at: i.occurred_at ? new Date(i.occurred_at).toISOString().slice(0, 16) : '' })
+    setIntForm({ type: i.type, title: i.title, content: i.content || '', occurred_at: i.occurred_at ? isoToLocalInput(i.occurred_at) : '' })
     setIntDialog({ open: true, editing: i })
   }
   const handleSaveInt = async () => {
     const payload = { ...intForm, occurred_at: intForm.occurred_at ? new Date(intForm.occurred_at).toISOString() : undefined }
-    if (intDialog.editing) {
-      await interactionsApi.update(intDialog.editing.id, payload)
-    } else {
-      await interactionsApi.create(contactId, payload)
+    try {
+      if (intDialog.editing) {
+        await interactionsApi.update(intDialog.editing.id, payload)
+      } else {
+        await interactionsApi.create(contactId, payload)
+      }
+    } catch {
+      toast.error(t('contacts.interactionSaveFailed'))
+      return
     }
     setIntDialog({ open: false, editing: null })
     fetchInteractions()
@@ -310,19 +316,24 @@ export default function ContactDetailPage() {
 
   // --- Reminder CRUD ---
   const openCreateRem = () => {
-    setRemForm({ title: '', description: '', remind_at: new Date().toISOString().slice(0, 16) })
+    setRemForm({ title: '', description: '', remind_at: isoToLocalInput(new Date().toISOString()) })
     setRemDialog({ open: true, editing: null })
   }
   const openEditRem = (r: Reminder) => {
-    setRemForm({ title: r.title, description: r.description || '', remind_at: r.remind_at ? new Date(r.remind_at).toISOString().slice(0, 16) : '' })
+    setRemForm({ title: r.title, description: r.description || '', remind_at: r.remind_at ? isoToLocalInput(r.remind_at) : '' })
     setRemDialog({ open: true, editing: r })
   }
   const handleSaveRem = async () => {
     const payload = { ...remForm, remind_at: remForm.remind_at ? new Date(remForm.remind_at).toISOString() : undefined }
-    if (remDialog.editing) {
-      await remindersApi.update(remDialog.editing.id, payload)
-    } else {
-      await remindersApi.create(contactId, payload)
+    try {
+      if (remDialog.editing) {
+        await remindersApi.update(remDialog.editing.id, payload)
+      } else {
+        await remindersApi.create(contactId, payload)
+      }
+    } catch {
+      toast.error(t('contacts.reminderSaveFailed'))
+      return
     }
     setRemDialog({ open: false, editing: null })
     fetchReminders()
