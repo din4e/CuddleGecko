@@ -10,6 +10,7 @@ import { useTodosList, useCreateTodo } from '../../hooks/api/useTodos'
 import { useEventsList, useCreateEvent } from '../../hooks/api/useEvents'
 import { useWorkoutsList, useCreateWorkout } from '../../hooks/api/useWorkouts'
 import { useTransactionsList, useCreateTransaction } from '../../hooks/api/useTransactions'
+import { localDateInput } from '../../lib/utils'
 import type { WhiteboardNodeInput, WhiteboardRefType } from '../../types'
 
 type Kind = 'contact' | 'todo' | 'event' | 'workout' | 'transaction' | 'note'
@@ -44,7 +45,7 @@ export function AddNodeDialog({ open, at, onClose, onAdd }: {
   const [startAt, setStartAt] = useState(nowLocalInput)
   const [amount, setAmount] = useState('')
   const [txType, setTxType] = useState<'expense' | 'income'>('expense')
-  const [txDate, setTxDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [txDate, setTxDate] = useState(() => localDateInput())
   const [adding, setAdding] = useState(false)
 
   // Entity lists reuse the shared cached hooks — 100 items each is plenty for

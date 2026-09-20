@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { useContactsList } from '../hooks/api/useContacts'
 import { rootKey } from '../hooks/api/keys'
+import { isoToLocalInput } from '../lib/utils'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table'
@@ -218,8 +219,8 @@ export default function EventsPage() {
     setForm({
       title: e.title,
       description: e.description || '',
-      start_time: e.start_time ? new Date(e.start_time).toISOString().slice(0, 16) : '',
-      end_time: e.end_time ? new Date(e.end_time).toISOString().slice(0, 16) : '',
+      start_time: e.start_time ? isoToLocalInput(e.start_time) : '',
+      end_time: e.end_time ? isoToLocalInput(e.end_time) : '',
       location: e.location || '',
       color: e.color || '',
       contact_ids: e.contact_ids || [],

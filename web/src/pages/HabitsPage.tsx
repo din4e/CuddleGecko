@@ -15,6 +15,7 @@ import LabelChips from '../components/LabelChips'
 import { toast } from 'sonner'
 import type { Habit } from '../types'
 import { useTagsList } from '../hooks/api/useTags'
+import { localDateInput } from '../lib/utils'
 import {
   useHabitsList, useCreateHabit, useUpdateHabit, useDeleteHabit, useCheckinHabit, useReplaceHabitTags,
 } from '../hooks/api/useHabits'
@@ -27,7 +28,7 @@ function lastNDates(n: number): string[] {
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(t)
     d.setDate(d.getDate() - i)
-    out.push(d.toISOString().slice(0, 10))
+    out.push(localDateInput(d))
   }
   return out
 }
