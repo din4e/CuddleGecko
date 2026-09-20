@@ -182,6 +182,16 @@ func (h *ReminderHandler) Update(c *gin.Context) {
 		Description: req.Description,
 		Status:      model.ReminderStatus(req.Status),
 	}
+	// The service only applies RemindAt when non-zero; leave it zero when the
+	// request omits the field so the stored time survives a partial update.
+	if req.RemindAt != "" {
+		remindAt, err := parseFlexibleTime(req.RemindAt)
+		if err != nil {
+			response.BadRequest(c, "invalid remind_at: "+err.Error())
+			return
+		}
+		updates.RemindAt = remindAt
+	}
 
 	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), updates)
 	if err != nil {
