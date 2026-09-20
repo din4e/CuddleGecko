@@ -67,10 +67,17 @@ func (h *InteractionHandler) Create(c *gin.Context) {
 		return
 	}
 
+	occurredAt, err := parseFlexibleTime(req.OccurredAt)
+	if err != nil {
+		response.BadRequest(c, "invalid occurred_at: "+err.Error())
+		return
+	}
+
 	interaction := &model.Interaction{
-		Type:    req.Type,
-		Title:   req.Title,
-		Content: req.Content,
+		Type:       req.Type,
+		Title:      req.Title,
+		Content:    req.Content,
+		OccurredAt: occurredAt,
 	}
 
 	result, err := h.svc.Create(c.Request.Context(), userID, workspaceID, uint(contactID), interaction)
@@ -97,10 +104,20 @@ func (h *InteractionHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// The service only applies OccurredAt when non-zero; leave it zero when the
+	// request omits the field so the stored timestamp survives a partial update.
 	interaction := &model.Interaction{
 		Type:    req.Type,
 		Title:   req.Title,
 		Content: req.Content,
+	}
+	if req.OccurredAt != "" {
+		occurredAt, err := parseFlexibleTime(req.OccurredAt)
+		if err != nil {
+			response.BadRequest(c, "invalid occurred_at: "+err.Error())
+			return
+		}
+		interaction.OccurredAt = occurredAt
 	}
 
 	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), interaction)
