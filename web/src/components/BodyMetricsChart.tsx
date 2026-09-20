@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
-import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { toBodyChartData, trendDomain, type BodyChartMetric } from '../lib/fitness'
+import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceDot } from 'recharts'
+import { Dumbbell } from 'lucide-react'
+import { toBodyChartData, trendDomain, type BodyChartMetric, type BodyChartPoint } from '../lib/fitness'
 
 // metric → i18n label key (the 'a' series; bp renders systolic+diastolic).
 const LABEL_KEYS: Record<BodyChartMetric, { a: string; b?: string }> = {
@@ -17,6 +18,8 @@ const LABEL_KEYS: Record<BodyChartMetric, { a: string; b?: string }> = {
 
 const B_COLOR = '#3b82f6'
 const A_COLOR = '#f97316'
+// Training-day marker: green ring on the reading taken on a workout day.
+const TRAINED_COLOR = '#10b981'
 
 // Theme tokens adapt to dark mode automatically (no useIsDarkMode needed).
 const TOOLTIP_STYLE = {
@@ -35,14 +38,62 @@ function fmtTick(v: number): string {
   return String(Math.round(v * 100) / 100)
 }
 
-export function BodyMetricsChart({ metrics, metric = 'weight' }: { metrics: Parameters<typeof toBodyChartData>[0]; metric?: BodyChartMetric }) {
+interface TooltipEntry {
+  dataKey?: string | number
+  value?: number | string
+  color?: string
+  payload?: BodyChartPoint
+}
+
+/** Default tooltip plus the same-day workout names when the reading falls on a training day. */
+function ChartTooltip({ active, payload, label, labelKeys }: {
+  active?: boolean
+  payload?: TooltipEntry[]
+  label?: string | number
+  labelKeys: { a: string; b?: string }
+}) {
   const { t } = useTranslation()
-  const data = toBodyChartData(metrics, metric)
+  if (!active || !payload?.length) return null
+  const trained = payload[0]?.payload?.trained
+  return (
+    <div className="max-w-64 rounded-lg p-2 shadow-md" style={TOOLTIP_STYLE}>
+      <p style={TOOLTIP_LABEL}>{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="flex items-center gap-1.5" style={TOOLTIP_ITEM}>
+          {p.color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} aria-hidden />}
+          <span className="min-w-0 break-words">
+            {t(p.dataKey === 'b' ? (labelKeys.b ?? '') : labelKeys.a)}: {String(p.value)}
+          </span>
+        </p>
+      ))}
+      {trained?.length ? (
+        <p className="mt-1 flex items-start gap-1" style={{ ...TOOLTIP_ITEM, color: TRAINED_COLOR }}>
+          <Dumbbell className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+          <span className="min-w-0 break-words">{t('fitness.trainedOnDay')}: {trained.join(' · ')}</span>
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+export interface BodyMetricsChartProps {
+  metrics: Parameters<typeof toBodyChartData>[0]
+  metric?: BodyChartMetric
+  /** day key ("2026-08-14") → same-day workout names, drawn as chart markers */
+  trainedDays?: Map<string, string[]>
+  /** click on a training-day marker → jump to the workouts section */
+  onWorkoutDayClick?: (day: string) => void
+}
+
+export function BodyMetricsChart({ metrics, metric = 'weight', trainedDays, onWorkoutDayClick }: BodyMetricsChartProps) {
+  const { t } = useTranslation()
+  const data = toBodyChartData(metrics, metric, trainedDays)
   if (data.length === 0) return null
 
   const dual = metric === 'bp'
   const labels = LABEL_KEYS[metric]
   const domain = trendDomain(data.flatMap((d) => [d.a, dual ? d.b : undefined]))
+  const markerPoints = data.filter((d) => d.trained?.length && d.a != null)
 
   return (
     <div className="h-72 w-full">
@@ -64,7 +115,7 @@ export function BodyMetricsChart({ metrics, metric = 'weight' }: { metrics: Para
             tickFormatter={fmtTick}
             width={44}
           />
-          <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL} itemStyle={TOOLTIP_ITEM} />
+          <Tooltip content={<ChartTooltip labelKeys={labels} />} />
           <Legend />
           {!dual ? (
             <Area
@@ -102,6 +153,19 @@ export function BodyMetricsChart({ metrics, metric = 'weight' }: { metrics: Para
               />
             </>
           )}
+          {markerPoints.map((p, i) => (
+            <ReferenceDot
+              key={`${p.day}-${i}`}
+              x={p.date}
+              y={p.a as number}
+              r={5}
+              fill="var(--background)"
+              stroke={TRAINED_COLOR}
+              strokeWidth={2}
+              className={onWorkoutDayClick ? 'cursor-pointer' : undefined}
+              onClick={() => onWorkoutDayClick?.(p.day)}
+            />
+          ))}
         </ComposedChart>
       </ResponsiveContainer>
     </div>

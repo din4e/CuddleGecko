@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, Circle, ChevronDown, ChevronRight, Pencil, Trash2, Clock, Flame, MapPin, Dumbbell, NotebookPen } from 'lucide-react'
+import { CheckCircle2, Circle, ChevronDown, ChevronRight, Pencil, Trash2, Clock, Flame, MapPin, Dumbbell, NotebookPen, HeartPulse } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
@@ -8,7 +8,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { ExerciseList } from './ExerciseList'
 import LabelChips from './LabelChips'
 import { useToggleWorkout, useDeleteWorkout } from '../hooks/api/useWorkouts'
-import type { Workout } from '../types'
+import type { BodyMetric, Workout } from '../types'
 
 const typeColor: Record<string, string> = {
   strength: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
@@ -30,9 +30,15 @@ export interface WorkoutCardProps {
   workout: Workout
   onEdit: (w: Workout) => void
   formatDate: (dateStr: string | null) => string
+  /** same-day body record (newest of that local day), when one exists */
+  dayMetric?: BodyMetric | null
+  /** clicking the same-day body snapshot → jump to that body record */
+  onShowDayMetric?: (m: BodyMetric) => void
+  /** temporary ring while a cross-link jump targets this card */
+  highlighted?: boolean
 }
 
-export function WorkoutCard({ workout, onEdit, formatDate }: WorkoutCardProps) {
+export function WorkoutCard({ workout, onEdit, formatDate, dayMetric, onShowDayMetric, highlighted }: WorkoutCardProps) {
   const { t } = useTranslation()
   const toggleWorkout = useToggleWorkout()
   const deleteWorkout = useDeleteWorkout()
@@ -45,7 +51,7 @@ export function WorkoutCard({ workout, onEdit, formatDate }: WorkoutCardProps) {
   const progress = total > 0 ? Math.round((done / total) * 100) : 0
 
   return (
-    <Card className={completed ? 'opacity-70' : ''}>
+    <Card id={`workout-card-${workout.id}`} className={`${completed ? 'opacity-70 ' : ''}${highlighted ? 'ring-2 ring-primary' : ''}`}>
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <button
@@ -76,6 +82,24 @@ export function WorkoutCard({ workout, onEdit, formatDate }: WorkoutCardProps) {
               {workout.calories != null && <span className="inline-flex items-center gap-1"><Flame className="h-3 w-3" />{workout.calories} kcal</span>}
               {workout.location && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{workout.location}</span>}
             </div>
+
+            {dayMetric && (
+              <button
+                type="button"
+                onClick={() => onShowDayMetric?.(dayMetric)}
+                className="mt-1.5 inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md bg-muted/60 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label={t('fitness.showBodyRecord')}
+                title={t('fitness.showBodyRecord')}
+              >
+                <HeartPulse className="h-3 w-3 shrink-0 text-rose-500" aria-hidden />
+                <span className="font-medium">{t('fitness.sameDayBody')}</span>
+                {dayMetric.weight != null && <span>{t('fitness.weight')}: {dayMetric.weight}kg</span>}
+                {dayMetric.body_fat != null && <span>{t('fitness.bodyFat')}: {dayMetric.body_fat}%</span>}
+                {dayMetric.resting_hr != null && <span>{t('fitness.restingHr')}: {dayMetric.resting_hr}</span>}
+                {dayMetric.sleep_hours != null && <span>{t('fitness.sleepHours')}: {dayMetric.sleep_hours}</span>}
+                {dayMetric.energy != null && <span>{t('fitness.energy')}: {dayMetric.energy}</span>}
+              </button>
+            )}
             <LabelChips tags={workout.tags} className="mt-1.5" />
 
             {workout.notes.trim() !== '' && (

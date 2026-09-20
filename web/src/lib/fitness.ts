@@ -1,6 +1,6 @@
 // Pure mappers/utilities for the Fitness module (no React, no i18n) — unit-tested
 // in lib/__tests__/fitness.test.ts.
-import type { BodyMetric, FitnessGoal, WorkoutPR } from '../types'
+import type { BodyMetric, FitnessGoal, Workout, WorkoutPR } from '../types'
 
 /** Selectable chart metrics on the Body tab; 'bp' renders two lines. */
 export type BodyChartMetric =
@@ -31,28 +31,76 @@ function hasAny(m: BodyMetric, metric: BodyChartMetric): boolean {
   return m[metric] != null
 }
 
+// --- Same-day workout ↔ body-record correlation (local calendar days) ---
+// Workouts and body metrics have no foreign key; the day key joins them.
+
+/** Local calendar day "2026-08-14" of an ISO timestamp; null when absent/invalid. */
+export function localDayKey(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** A workout's day: scheduled date first, else completion, else creation. */
+export function workoutDayKey(w: Pick<Workout, 'scheduled_at' | 'completed_at' | 'created_at'>): string | null {
+  return localDayKey(w.scheduled_at) ?? localDayKey(w.completed_at) ?? localDayKey(w.created_at)
+}
+
+/** Newest body record per local day. Input is the API's newest-first list, so
+ *  the first record seen for a day wins; later duplicates are ignored. */
+export function metricByDay(metrics: BodyMetric[]): Map<string, BodyMetric> {
+  const map = new Map<string, BodyMetric>()
+  for (const m of metrics) {
+    const day = localDayKey(m.recorded_at)
+    if (day && !map.has(day)) map.set(day, m)
+  }
+  return map
+}
+
+/** Workouts grouped by their local day, preserving the input order. */
+export function workoutsByDay(workouts: Workout[]): Map<string, Workout[]> {
+  const map = new Map<string, Workout[]>()
+  for (const w of workouts) {
+    const day = workoutDayKey(w)
+    if (!day) continue
+    const list = map.get(day)
+    if (list) list.push(w)
+    else map.set(day, [w])
+  }
+  return map
+}
+
 export interface BodyChartPoint {
   date: string
+  /** local day key — joins the point to same-day workouts */
+  day: string
   /** primary series value (or systolic for bp) */
   a: number | null
   /** secondary series value (diastolic for bp, else absent) */
   b?: number | null
+  /** same-day workout names, rendered as training-day markers */
+  trained?: string[]
 }
 
 /**
  * Map newest-first body metric records into chronological chart points for the
  * selected metric. Records without a value for the metric are dropped so
- * connectNulls-style gaps don't appear.
+ * connectNulls-style gaps don't appear. When trainedDays (day key → workout
+ * names) is given, points carry the same-day names for chart markers.
  */
-export function toBodyChartData(metrics: BodyMetric[], metric: BodyChartMetric): BodyChartPoint[] {
+export function toBodyChartData(metrics: BodyMetric[], metric: BodyChartMetric, trainedDays?: Map<string, string[]>): BodyChartPoint[] {
   return [...metrics]
     .filter((m) => hasAny(m, metric))
     .reverse()
     .map((m) => {
       const d = new Date(m.recorded_at)
       const date = `${d.getMonth() + 1}/${d.getDate()}`
-      if (metric === 'bp') return { date, a: m.systolic, b: m.diastolic }
-      return { date, a: m[metric] }
+      const day = localDayKey(m.recorded_at) ?? ''
+      const trained = day ? trainedDays?.get(day) : undefined
+      const trainedProp = trained?.length ? { trained } : {}
+      if (metric === 'bp') return { date, day, a: m.systolic, b: m.diastolic, ...trainedProp }
+      return { date, day, a: m[metric], ...trainedProp }
     })
 }
 

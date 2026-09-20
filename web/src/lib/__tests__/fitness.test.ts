@@ -8,8 +8,12 @@ import {
   epley1rm,
   goalPercent,
   trendDomain,
+  localDayKey,
+  workoutDayKey,
+  metricByDay,
+  workoutsByDay,
 } from '../fitness'
-import type { BodyMetric, FitnessGoal, WorkoutPR } from '../../types'
+import type { BodyMetric, FitnessGoal, Workout, WorkoutPR } from '../../types'
 
 function metric(partial: Partial<BodyMetric>): BodyMetric {
   return {
@@ -36,27 +40,102 @@ function metric(partial: Partial<BodyMetric>): BodyMetric {
   }
 }
 
+/** ISO string for a local-canvas date/time, so day-key tests don't depend on
+ *  the machine's timezone (components → ISO → localDayKey round-trips to the
+ *  same calendar day for any offset within ±14h). */
+function localIso(y: number, mo: number, d: number, h = 9, mi = 30): string {
+  return new Date(y, mo - 1, d, h, mi).toISOString()
+}
+
 describe('toBodyChartData', () => {
   it('reverses newest-first records and maps the selected metric', () => {
     const rows = [
-      metric({ recorded_at: '2026-08-02T00:00:00Z', weight: 71 }),
-      metric({ recorded_at: '2026-08-01T00:00:00Z', weight: 70 }),
+      metric({ recorded_at: localIso(2026, 8, 2), weight: 71 }),
+      metric({ recorded_at: localIso(2026, 8, 1), weight: 70 }),
     ]
     expect(toBodyChartData(rows, 'weight')).toEqual([
-      { date: '8/1', a: 70 },
-      { date: '8/2', a: 71 },
+      { date: '8/1', day: '2026-08-01', a: 70 },
+      { date: '8/2', day: '2026-08-02', a: 71 },
     ])
   })
 
   it('bp maps systolic/diastolic into a/b', () => {
-    const rows = [metric({ systolic: 120, diastolic: 80 })]
-    expect(toBodyChartData(rows, 'bp')).toEqual([{ date: '8/1', a: 120, b: 80 }])
+    const rows = [metric({ recorded_at: localIso(2026, 8, 1), systolic: 120, diastolic: 80 })]
+    expect(toBodyChartData(rows, 'bp')).toEqual([{ date: '8/1', day: '2026-08-01', a: 120, b: 80 }])
   })
 
   it('drops records without a value for the metric', () => {
     const rows = [metric({ weight: 70 }), metric({ steps: 1000 })]
     expect(toBodyChartData(rows, 'steps')).toHaveLength(1)
     expect(toBodyChartData(rows, 'steps')[0].a).toBe(1000)
+  })
+
+  it('attaches same-day workout names as trained markers', () => {
+    const rows = [
+      metric({ recorded_at: localIso(2026, 8, 2), weight: 71 }),
+      metric({ recorded_at: localIso(2026, 8, 1), weight: 70 }),
+    ]
+    const trained = new Map([['2026-08-01', ['Morning Run', 'Yoga']]])
+    const points = toBodyChartData(rows, 'weight', trained)
+    expect(points[0].trained).toEqual(['Morning Run', 'Yoga'])
+    expect(points[1].trained).toBeUndefined()
+  })
+})
+
+describe('localDayKey', () => {
+  it('keys by the local calendar day', () => {
+    expect(localDayKey(localIso(2026, 8, 1, 23, 45))).toBe('2026-08-01')
+  })
+  it('returns null for absent or invalid timestamps', () => {
+    expect(localDayKey(null)).toBeNull()
+    expect(localDayKey(undefined)).toBeNull()
+    expect(localDayKey('')).toBeNull()
+    expect(localDayKey('not-a-date')).toBeNull()
+  })
+})
+
+describe('workoutDayKey', () => {
+  it('prefers scheduled_at, then completed_at, then created_at', () => {
+    const base = { scheduled_at: null, completed_at: null, created_at: localIso(2026, 1, 1) }
+    expect(workoutDayKey({ ...base, scheduled_at: localIso(2026, 8, 1) })).toBe('2026-08-01')
+    expect(workoutDayKey({ ...base, completed_at: localIso(2026, 8, 2) })).toBe('2026-08-02')
+    expect(workoutDayKey(base)).toBe('2026-01-01')
+    expect(workoutDayKey({ scheduled_at: null, completed_at: null, created_at: '' })).toBeNull()
+  })
+})
+
+describe('metricByDay', () => {
+  it('keeps the newest record per day from newest-first input', () => {
+    const rows = [
+      metric({ id: 2, recorded_at: localIso(2026, 8, 1, 20), weight: 70.5 }),
+      metric({ id: 1, recorded_at: localIso(2026, 8, 1, 8), weight: 70 }),
+      metric({ id: 0, recorded_at: localIso(2026, 7, 31, 9), weight: 69 }),
+    ]
+    const map = metricByDay(rows)
+    expect(map.size).toBe(2)
+    expect(map.get('2026-08-01')?.id).toBe(2)
+    expect(map.get('2026-07-31')?.id).toBe(0)
+  })
+})
+
+describe('workoutsByDay', () => {
+  const workout = (id: number, scheduled_at: string | null, completed_at: string | null = null): Pick<Workout, 'scheduled_at' | 'completed_at' | 'created_at'> & { id: number } =>
+    ({ id, scheduled_at, completed_at, created_at: localIso(2020, 1, 1) })
+
+  it('groups by day and preserves order within a day', () => {
+    const map = workoutsByDay([
+      workout(1, localIso(2026, 8, 1, 7)),
+      workout(2, localIso(2026, 8, 1, 19)),
+      workout(3, localIso(2026, 8, 3, 7)),
+    ] as Workout[])
+    expect(map.size).toBe(2)
+    expect(map.get('2026-08-01')?.map((w) => w.id)).toEqual([1, 2])
+    expect(map.get('2026-08-03')?.map((w) => w.id)).toEqual([3])
+  })
+
+  it('falls back to completed_at when scheduled_at is null', () => {
+    const map = workoutsByDay([workout(9, null, localIso(2026, 8, 5, 21))] as Workout[])
+    expect(map.get('2026-08-05')?.map((w) => w.id)).toEqual([9])
   })
 })
 

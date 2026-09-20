@@ -1,7 +1,7 @@
-import { useState, useDeferredValue } from 'react'
+import { useState, useDeferredValue, useEffect, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, TrendingUp, TrendingDown, Minus, Activity, Flame, Timer, CheckCircle2, Pencil, Trash2, Download, Flame as StreakFlame } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, Minus, Activity, Flame, Timer, CheckCircle2, Pencil, Trash2, Download, Dumbbell, Flame as StreakFlame } from 'lucide-react'
 import ListPageHeader from '../components/ListPageHeader'
 import EmptyState from '../components/EmptyState'
 import { ListSkeleton } from '../components/ListSkeleton'
@@ -22,7 +22,7 @@ import { ExerciseLibraryPanel, WorkoutTemplatesPanel } from '../components/Fitne
 import { useWorkoutsList, useWorkoutStats } from '../hooks/api/useWorkouts'
 import { useBodyMetricsList, useBodyMetricSummary, useDeleteBodyMetric } from '../hooks/api/useBodyMetrics'
 import { useWorkoutTemplates, useInstantiateTemplate } from '../hooks/api/useWorkoutTemplates'
-import { dateAfterForRange, BODY_CHART_METRICS, type BodyChartMetric } from '../lib/fitness'
+import { dateAfterForRange, localDayKey, metricByDay, workoutDayKey, workoutsByDay, BODY_CHART_METRICS, type BodyChartMetric } from '../lib/fitness'
 import { bmi } from '../types'
 import type { Workout, WorkoutType, WorkoutStatus, BodyMetric } from '../types'
 
@@ -79,7 +79,9 @@ export default function FitnessPage() {
     page_size: 100,
   })
   const { data: stats } = useWorkoutStats()
-  const workouts = workoutsPage?.items ?? []
+  // Memoized so the cross-link highlight effects key off identity, not a fresh
+  // `?? []` array per render (which would re-fire their scroll on every render).
+  const workouts = useMemo(() => workoutsPage?.items ?? [], [workoutsPage])
 
   // --- Body records state ---
   const [bodyDialogOpen, setBodyDialogOpen] = useState(false)
@@ -91,7 +93,58 @@ export default function FitnessPage() {
   const { data: bodyPage } = useBodyMetricsList(dateAfterForRange(chartRange))
   const { data: summary } = useBodyMetricSummary()
   const deleteMetric = useDeleteBodyMetric()
-  const metrics = bodyPage?.items ?? []
+  const metrics = useMemo(() => bodyPage?.items ?? [], [bodyPage])
+
+  // --- Workout ↔ body-record day correlation (local calendar days) ---
+  // Full all-time metric set feeds the workout-card snapshots; shares the
+  // 'all' cache entry with the chart query when chartRange is 'all'.
+  const { data: allBodyPage } = useBodyMetricsList()
+  const metricDay = useMemo(() => metricByDay(allBodyPage?.items ?? []), [allBodyPage])
+  // Completed workouts inside the chart window → markers + body-record chips.
+  const { data: trainedPage } = useWorkoutsList({
+    status: 'completed',
+    date_after: dateAfterForRange(chartRange),
+    page_size: 100000,
+  })
+  const trainedDayWorkouts = useMemo(() => workoutsByDay(trainedPage?.items ?? []), [trainedPage])
+  const trainedDayNames = useMemo(
+    () => new Map([...trainedDayWorkouts].map(([day, ws]) => [day, ws.map((w) => w.name)])),
+    [trainedDayWorkouts],
+  )
+
+  // Cross-link jumps: scroll the target row into view and ring it briefly.
+  // Filters/chart range reset first so the target is actually rendered.
+  const [highlightMetricId, setHighlightMetricId] = useState<number | null>(null)
+  const [highlightWorkoutId, setHighlightWorkoutId] = useState<number | null>(null)
+
+  const jumpToMetric = (m: BodyMetric) => {
+    if (!metrics.some((x) => x.id === m.id)) setChartRange('all')
+    setHighlightMetricId(m.id)
+  }
+  const jumpToWorkout = (w: Workout) => {
+    setQ('')
+    setTypeFilter('')
+    setStatusFilter('')
+    setHighlightWorkoutId(w.id)
+  }
+  // Re-run when the list lands (the jump may have just widened the range),
+  // and only start the un-highlight timer once the row is on screen.
+  useEffect(() => {
+    if (highlightMetricId == null) return
+    const el = document.getElementById(`body-metric-${highlightMetricId}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const timer = window.setTimeout(() => setHighlightMetricId(null), 2200)
+    return () => window.clearTimeout(timer)
+  }, [highlightMetricId, metrics])
+  useEffect(() => {
+    if (highlightWorkoutId == null) return
+    const el = document.getElementById(`workout-card-${highlightWorkoutId}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const timer = window.setTimeout(() => setHighlightWorkoutId(null), 2200)
+    return () => window.clearTimeout(timer)
+  }, [highlightWorkoutId, workouts])
 
   // --- Templates (create-from-template in the workouts section header) ---
   const { data: templates } = useWorkoutTemplates()
@@ -197,7 +250,15 @@ export default function FitnessPage() {
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {workouts.map((w) => (
-              <WorkoutCard key={w.id} workout={w} onEdit={openEditWorkout} formatDate={fmtDate} />
+              <WorkoutCard
+                key={w.id}
+                workout={w}
+                onEdit={openEditWorkout}
+                formatDate={fmtDate}
+                dayMetric={metricDay.get(workoutDayKey(w) ?? '') ?? null}
+                onShowDayMetric={jumpToMetric}
+                highlighted={highlightWorkoutId === w.id}
+              />
             ))}
           </div>
         )}
@@ -233,7 +294,17 @@ export default function FitnessPage() {
                 </select>
               </div>
             </div>
-            {metrics.length > 0 && <BodyMetricsChart metrics={metrics} metric={chartMetric} />}
+            {metrics.length > 0 && (
+              <BodyMetricsChart
+                metrics={metrics}
+                metric={chartMetric}
+                trainedDays={trainedDayNames}
+                onWorkoutDayClick={(day) => {
+                  const target = trainedDayWorkouts.get(day)?.[0]
+                  if (target) jumpToWorkout(target)
+                }}
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -241,43 +312,62 @@ export default function FitnessPage() {
           <EmptyState message={t('fitness.noBodyRecords')} />
         ) : (
           <div className="space-y-2">
-            {metrics.map((m) => (
-              <Card key={m.id}>
-                <CardContent className="flex items-center gap-3 p-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
-                      <span className="font-medium">{fmtDate(m.recorded_at)}</span>
-                      {m.weight != null && <span className="text-muted-foreground">{t('fitness.weight')}: {m.weight}kg</span>}
-                      {m.body_fat != null && <span className="text-muted-foreground">{t('fitness.bodyFat')}: {m.body_fat}%</span>}
-                      {m.systolic != null && m.diastolic != null && <span className="text-muted-foreground">{t('fitness.bloodPressure')}: {m.systolic}/{m.diastolic}</span>}
-                      {m.resting_hr != null && <span className="text-muted-foreground">{t('fitness.restingHr')}: {m.resting_hr}</span>}
-                      {m.sleep_hours != null && <span className="text-muted-foreground">{t('fitness.sleepHours')}: {m.sleep_hours}</span>}
-                      {m.bedtime && <span className="text-muted-foreground">{t('fitness.bedtime')} {fmtTime(m.bedtime)}</span>}
-                      {m.wake_time && <span className="text-muted-foreground">{t('fitness.wakeTime')} {fmtTime(m.wake_time)}</span>}
-                      {m.sleep_score != null && (
-                        <span className="inline-flex items-center gap-1 text-muted-foreground">
-                          {t('fitness.sleepScore')} <StarRating value={m.sleep_score} readOnly />
-                        </span>
-                      )}
-                      {m.steps != null && <span className="text-muted-foreground">{t('fitness.steps')}: {m.steps}</span>}
-                      {m.energy != null && (
-                        <span className="inline-flex items-center gap-1 text-muted-foreground">
-                          {t('fitness.energy')} <StarRating value={m.energy} readOnly />
-                        </span>
-                      )}
-                      {m.mood != null && (
-                        <span className="inline-flex items-center gap-1 text-muted-foreground">
-                          {t('fitness.mood')} <StarRating value={m.mood} readOnly />
-                        </span>
-                      )}
+            {metrics.map((m) => {
+              const dayWorkouts = trainedDayWorkouts.get(localDayKey(m.recorded_at) ?? '') ?? []
+              return (
+                <Card
+                  key={m.id}
+                  id={`body-metric-${m.id}`}
+                  className={highlightMetricId === m.id ? 'ring-2 ring-primary' : undefined}
+                >
+                  <CardContent className="flex items-center gap-3 p-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
+                        <span className="font-medium">{fmtDate(m.recorded_at)}</span>
+                        {m.weight != null && <span className="text-muted-foreground">{t('fitness.weight')}: {m.weight}kg</span>}
+                        {m.body_fat != null && <span className="text-muted-foreground">{t('fitness.bodyFat')}: {m.body_fat}%</span>}
+                        {m.systolic != null && m.diastolic != null && <span className="text-muted-foreground">{t('fitness.bloodPressure')}: {m.systolic}/{m.diastolic}</span>}
+                        {m.resting_hr != null && <span className="text-muted-foreground">{t('fitness.restingHr')}: {m.resting_hr}</span>}
+                        {m.sleep_hours != null && <span className="text-muted-foreground">{t('fitness.sleepHours')}: {m.sleep_hours}</span>}
+                        {m.bedtime && <span className="text-muted-foreground">{t('fitness.bedtime')} {fmtTime(m.bedtime)}</span>}
+                        {m.wake_time && <span className="text-muted-foreground">{t('fitness.wakeTime')} {fmtTime(m.wake_time)}</span>}
+                        {m.sleep_score != null && (
+                          <span className="inline-flex items-center gap-1 text-muted-foreground">
+                            {t('fitness.sleepScore')} <StarRating value={m.sleep_score} readOnly />
+                          </span>
+                        )}
+                        {m.steps != null && <span className="text-muted-foreground">{t('fitness.steps')}: {m.steps}</span>}
+                        {m.energy != null && (
+                          <span className="inline-flex items-center gap-1 text-muted-foreground">
+                            {t('fitness.energy')} <StarRating value={m.energy} readOnly />
+                          </span>
+                        )}
+                        {m.mood != null && (
+                          <span className="inline-flex items-center gap-1 text-muted-foreground">
+                            {t('fitness.mood')} <StarRating value={m.mood} readOnly />
+                          </span>
+                        )}
+                        {dayWorkouts.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => jumpToWorkout(dayWorkouts[0])}
+                            className="inline-flex max-w-full items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
+                            aria-label={t('fitness.showWorkouts')}
+                            title={t('fitness.showWorkouts')}
+                          >
+                            <Dumbbell className="h-3 w-3 shrink-0" aria-hidden />
+                            <span className="truncate">{dayWorkouts.map((w) => w.name).join(' · ')}</span>
+                          </button>
+                        )}
+                      </div>
+                      {m.notes && <p className="mt-0.5 truncate text-xs text-muted-foreground">{m.notes}</p>}
                     </div>
-                    {m.notes && <p className="mt-0.5 truncate text-xs text-muted-foreground">{m.notes}</p>}
-                  </div>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEditMetric(m)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground" onClick={() => setDeleteMetricId(m.id)}><Trash2 className="h-4 w-4" /></Button>
-                </CardContent>
-              </Card>
-            ))}
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEditMetric(m)}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground" onClick={() => setDeleteMetricId(m.id)}><Trash2 className="h-4 w-4" /></Button>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         )}
       </section>
