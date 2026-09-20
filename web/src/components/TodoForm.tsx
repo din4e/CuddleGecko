@@ -1,6 +1,6 @@
-import { useCallback, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, Eye, Hourglass, PenLine, Repeat, Loader2 } from 'lucide-react'
+import { Check, ChevronDown, Eye, Hourglass, PenLine, Repeat, Loader2 } from 'lucide-react'
 import { isoToLocalInput } from '../lib/utils'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -45,12 +45,80 @@ export interface TodoFormProps {
   /** Prefilled due time for create (local datetime-local string) — the
    *  calendar view's per-day quick create. Ignored when editing. */
   initialDueTime?: string
+  /** Edit-mode auto-save (detail drawer): every change is persisted shortly
+   *  after it's made, so there is no Save button. Ignored for create — a
+   *  todo that doesn't exist yet can't be patched. */
+  autoSave?: boolean
+}
+
+/** Raw editable state, initialized once from the todo being edited. Extracted
+ *  so the auto-save snapshot can be built from the same values that seed the
+ *  inputs — the initial form must compare equal to "what's on the server". */
+interface FormValues {
+  title: string
+  desc: string
+  status: TodoStatus
+  priority: 'none' | 'low' | 'normal' | 'high'
+  dueTime: string
+  startTime: string
+  duration: string
+  amount: string
+  amountType: '' | 'income' | 'expense'
+  contactIds: number[]
+  color: string
+  repeat: string
+  repeatInterval: number
+  tagIds: number[]
+  parentId: number | null
+}
+
+function initialFormValues(editing: Todo | null, initialDueTime?: string): FormValues {
+  return {
+    title: editing?.title ?? '',
+    desc: editing?.description ?? '',
+    status: editing?.status ?? 'pending',
+    priority: editing?.priority ?? 'none',
+    dueTime: editing?.due_time ? isoToLocalInput(editing.due_time) : initialDueTime ?? '',
+    startTime: editing?.start_time ? isoToLocalInput(editing.start_time) : '',
+    duration: editing?.duration ? String(editing.duration) : '',
+    amount: editing?.amount != null ? String(editing.amount) : '',
+    amountType: editing?.amount_type ?? '',
+    contactIds: editing?.contact_ids ?? [],
+    color: editing?.color ?? '',
+    repeat: editing?.repeat ?? '',
+    repeatInterval: editing?.repeat_interval && editing.repeat_interval > 0 ? editing.repeat_interval : 1,
+    tagIds: editing?.tags?.map((tg) => tg.id) ?? [],
+    parentId: editing?.parent_id ?? null,
+  }
+}
+
+/** Canonical serialization of the persisted form fields — two equal strings
+ *  mean "nothing to save". Order-insensitive lists (contacts, tags) are
+ *  sorted so a pure reorder of the picked chips isn't a change. */
+function snapshotOf(v: FormValues): string {
+  return JSON.stringify({
+    title: v.title.trim(),
+    description: v.desc,
+    status: v.status,
+    priority: v.priority,
+    due_time: v.dueTime,
+    start_time: v.startTime,
+    duration: v.duration,
+    amount: v.amount,
+    amount_type: v.amountType,
+    contact_ids: [...v.contactIds].sort((a, b) => a - b),
+    color: v.color,
+    repeat: v.repeat,
+    repeat_interval: v.repeatInterval,
+    parent_id: v.parentId,
+    tag_ids: [...v.tagIds].sort((a, b) => a - b),
+  })
 }
 
 /** Shared todo create/edit fields — hosted by TodoFormDialog (create modal)
  *  and TodoDetailDrawer (right slide-over). State initializes from `editing`
  *  once per mount; both shells remount via a key on the todo id. */
-export function TodoForm({ editing, contacts, tags, parentCandidates, onContactsChange, onClose, initialDueTime }: TodoFormProps) {
+export function TodoForm({ editing, contacts, tags, parentCandidates, onContactsChange, onClose, initialDueTime, autoSave }: TodoFormProps) {
   const { t } = useTranslation()
   const formId = useId()
   const createTodo = useCreateTodo()
@@ -58,22 +126,23 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   const replaceTags = useReplaceTodoTags()
   const moveTodo = useMoveTodo()
 
-  const [formTitle, setFormTitle] = useState(editing?.title ?? '')
-  const [formDesc, setFormDesc] = useState(editing?.description ?? '')
-  const [formStatus, setFormStatus] = useState<TodoStatus>(editing?.status ?? 'pending')
-  const [formPriority, setFormPriority] = useState<'none' | 'low' | 'normal' | 'high'>(editing?.priority ?? 'none')
-  const [formDueTime, setFormDueTime] = useState(editing?.due_time ? isoToLocalInput(editing.due_time) : initialDueTime ?? '')
-  const [formStartTime, setFormStartTime] = useState(editing?.start_time ? isoToLocalInput(editing.start_time) : '')
+  const [init] = useState(() => initialFormValues(editing, initialDueTime))
+  const [formTitle, setFormTitle] = useState(init.title)
+  const [formDesc, setFormDesc] = useState(init.desc)
+  const [formStatus, setFormStatus] = useState<TodoStatus>(init.status)
+  const [formPriority, setFormPriority] = useState<'none' | 'low' | 'normal' | 'high'>(init.priority)
+  const [formDueTime, setFormDueTime] = useState(init.dueTime)
+  const [formStartTime, setFormStartTime] = useState(init.startTime)
   // Estimated effort in minutes (TickTick 持续时长); '' = unset.
-  const [formDuration, setFormDuration] = useState(editing?.duration ? String(editing.duration) : '')
-  const [formAmount, setFormAmount] = useState(editing?.amount != null ? String(editing.amount) : '')
-  const [formAmountType, setFormAmountType] = useState<'' | 'income' | 'expense'>(editing?.amount_type ?? '')
-  const [formContactIds, setFormContactIds] = useState<number[]>(editing?.contact_ids ?? [])
-  const [formColor, setFormColor] = useState(editing?.color ?? '')
-  const [formRepeat, setFormRepeat] = useState<string>(editing?.repeat ?? '')
-  const [formRepeatInterval, setFormRepeatInterval] = useState<number>(editing?.repeat_interval && editing.repeat_interval > 0 ? editing.repeat_interval : 1)
-  const [formTagIds, setFormTagIds] = useState<number[]>(editing?.tags?.map((tg) => tg.id) ?? [])
-  const [formParentId, setFormParentId] = useState<number | null>(editing?.parent_id ?? null)
+  const [formDuration, setFormDuration] = useState(init.duration)
+  const [formAmount, setFormAmount] = useState(init.amount)
+  const [formAmountType, setFormAmountType] = useState<'' | 'income' | 'expense'>(init.amountType)
+  const [formContactIds, setFormContactIds] = useState<number[]>(init.contactIds)
+  const [formColor, setFormColor] = useState(init.color)
+  const [formRepeat, setFormRepeat] = useState<string>(init.repeat)
+  const [formRepeatInterval, setFormRepeatInterval] = useState<number>(init.repeatInterval)
+  const [formTagIds, setFormTagIds] = useState<number[]>(init.tagIds)
+  const [formParentId, setFormParentId] = useState<number | null>(init.parentId)
   const savingRef = useRef(false)
   const savedTodoId = useRef(editing?.id)
   const savedParentId = useRef(editing?.parent_id ?? null)
@@ -81,6 +150,30 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   const [saving, setSaving] = useState(false)
   const [labelCreating, setLabelCreating] = useState(false)
   const [saveError, setSaveError] = useState(false)
+  // Auto-save bookkeeping (drawer edit mode only).
+  const autoSaveOn = !!autoSave && editing != null
+  // True while an IME composition (Chinese pinyin etc.) is in progress —
+  // React defers onChange until compositionend, so state lags the visible
+  // text and saving mid-composition would persist a half-typed value.
+  const [composing, setComposing] = useState(false)
+  const [savedFlash, setSavedFlash] = useState(false)
+  // Snapshot of the form as of the last successful save; seeded with the
+  // pristine form so opening the drawer is never "dirty".
+  const savedSnapshotRef = useRef(snapshotOf(init))
+  // Latest form snapshot, recomputed every render (cheap JSON stringify) so
+  // the unmount flush can compare without stale closures.
+  const currentSnapshot = snapshotOf({
+    title: formTitle, desc: formDesc, status: formStatus, priority: formPriority,
+    dueTime: formDueTime, startTime: formStartTime, duration: formDuration, amount: formAmount,
+    amountType: formAmountType, contactIds: formContactIds, color: formColor, repeat: formRepeat,
+    repeatInterval: formRepeatInterval, tagIds: formTagIds, parentId: formParentId,
+  })
+  const currentSnapshotRef = useRef(currentSnapshot)
+  // Latest save fn for timers/unmount (they must not capture a stale closure).
+  const handleSaveRef = useRef<(opts?: { close?: boolean }) => Promise<void>>(async () => {})
+  // In-flight save promise — the unmount flush chains behind it so edits made
+  // while a save is running aren't dropped by the component going away.
+  const inFlightRef = useRef<Promise<void> | null>(null)
   const labelCandidates = useMemo(() => {
     const map = new Map((editing?.tags ?? []).map((tag) => [tag.id, tag]))
     for (const tag of tags) map.set(tag.id, tag)
@@ -103,79 +196,131 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
     [editing, parentCandidates],
   )
 
-  const handleSave = useCallback(async () => {
+  /** Persists the form. `close: false` (auto-save) keeps the form mounted —
+   *  only an explicit Save (create dialog / Enter) closes the shell. */
+  const handleSave = useCallback(async (opts?: { close?: boolean }) => {
+    const close = opts?.close ?? true
     if (!formTitle.trim() || savingRef.current || labelCreating) return
     savingRef.current = true
     setSaving(true)
     setSaveError(false)
-    try {
-      let todoId = savedTodoId.current
-      if (todoId != null) {
-        const data: TodoUpdateInput = {
-          title: formTitle.trim(),
-          description: formDesc,
-          status: formStatus,
-          priority: formPriority,
-          due_time: formDueTime ? new Date(formDueTime).toISOString() : null,
-          start_time: formStartTime ? new Date(formStartTime).toISOString() : null,
-          duration: formDuration ? parseInt(formDuration, 10) : 0,
-          amount: formAmount ? parseFloat(formAmount) : null,
-          amount_type: formAmountType,
-          contact_ids: formContactIds,
-          color: formColor,
-          repeat: formRepeat,
-          repeat_interval: formRepeatInterval,
+    const run = async () => {
+      try {
+        let todoId = savedTodoId.current
+        if (todoId != null) {
+          const data: TodoUpdateInput = {
+            title: formTitle.trim(),
+            description: formDesc,
+            status: formStatus,
+            priority: formPriority,
+            due_time: formDueTime ? new Date(formDueTime).toISOString() : null,
+            start_time: formStartTime ? new Date(formStartTime).toISOString() : null,
+            duration: formDuration ? parseInt(formDuration, 10) : 0,
+            amount: formAmount ? parseFloat(formAmount) : null,
+            amount_type: formAmountType,
+            contact_ids: formContactIds,
+            color: formColor,
+            repeat: formRepeat,
+            repeat_interval: formRepeatInterval,
+          }
+          // Clearing a populated nullable field removes it server-side.
+          // Progress is deliberately NOT sent here: the row-bar drag owns it
+          // (PATCH /progress), and an omitted field leaves the column untouched.
+          if (!formDueTime) data.clear_due_time = true
+          if (!formStartTime) data.clear_start_time = true
+          if (!formAmount) data.clear_amount = true
+          if (!formDuration) data.clear_duration = true
+          await updateTodo.mutateAsync({ id: todoId, data })
+        } else {
+          const payload: Partial<Todo> = {
+            title: formTitle.trim(),
+            description: formDesc,
+            status: formStatus === 'pending' ? undefined : formStatus,
+            priority: formPriority,
+            due_time: formDueTime ? new Date(formDueTime).toISOString() : undefined,
+            start_time: formStartTime ? new Date(formStartTime).toISOString() : undefined,
+            duration: formDuration ? parseInt(formDuration, 10) : undefined,
+            amount: formAmount ? parseFloat(formAmount) : undefined,
+            amount_type: formAmountType,
+            contact_ids: formContactIds,
+            color: formColor,
+            repeat: formRepeat || undefined,
+            repeat_interval: formRepeatInterval || undefined,
+            parent_id: formParentId ?? undefined,
+          }
+          const created = await createTodo.mutateAsync(payload)
+          todoId = created?.data?.id
+          savedTodoId.current = todoId
+          savedParentId.current = formParentId
         }
-        // Clearing a populated nullable field removes it server-side.
-        // Progress is deliberately NOT sent here: the row-bar drag owns it
-        // (PATCH /progress), and an omitted field leaves the column untouched.
-        if (!formDueTime) data.clear_due_time = true
-        if (!formStartTime) data.clear_start_time = true
-        if (!formAmount) data.clear_amount = true
-        if (!formDuration) data.clear_duration = true
-        await updateTodo.mutateAsync({ id: todoId, data })
-      } else {
-        const payload: Partial<Todo> = {
-          title: formTitle.trim(),
-          description: formDesc,
-          status: formStatus === 'pending' ? undefined : formStatus,
-          priority: formPriority,
-          due_time: formDueTime ? new Date(formDueTime).toISOString() : undefined,
-          start_time: formStartTime ? new Date(formStartTime).toISOString() : undefined,
-          duration: formDuration ? parseInt(formDuration, 10) : undefined,
-          amount: formAmount ? parseFloat(formAmount) : undefined,
-          amount_type: formAmountType,
-          contact_ids: formContactIds,
-          color: formColor,
-          repeat: formRepeat || undefined,
-          repeat_interval: formRepeatInterval || undefined,
-          parent_id: formParentId ?? undefined,
+        // Remember each successful step: a failed label/move request leaves the
+        // form open, and retrying a new task updates its saved id instead of
+        // creating a duplicate. Unchanged labels are never overwritten.
+        if (todoId != null && formParentId !== savedParentId.current) {
+          await moveTodo.mutateAsync({ id: todoId, parentId: formParentId, afterId: null })
+          savedParentId.current = formParentId
         }
-        const created = await createTodo.mutateAsync(payload)
-        todoId = created?.data?.id
-        savedTodoId.current = todoId
-        savedParentId.current = formParentId
+        const tagsChanged = formTagIds.length !== savedTagIds.current.length || formTagIds.some((id) => !savedTagIds.current.includes(id))
+        if (todoId != null && tagsChanged) {
+          await replaceTags.mutateAsync({ todoId, tagIds: formTagIds })
+          savedTagIds.current = [...formTagIds]
+        }
+        // Everything this closure captured is now on the server — snapshot
+        // THESE values, not the ref (which may already include edits made
+        // while the requests were in flight; those must stay dirty).
+        savedSnapshotRef.current = snapshotOf({
+          title: formTitle, desc: formDesc, status: formStatus, priority: formPriority,
+          dueTime: formDueTime, startTime: formStartTime, duration: formDuration, amount: formAmount,
+          amountType: formAmountType, contactIds: formContactIds, color: formColor, repeat: formRepeat,
+          repeatInterval: formRepeatInterval, tagIds: formTagIds, parentId: formParentId,
+        })
+        if (close) onClose()
+        else setSavedFlash(true)
+      } catch {
+        setSaveError(true)
+      } finally {
+        savingRef.current = false
+        setSaving(false)
       }
-      // Remember each successful step: a failed label/move request leaves the
-      // form open, and retrying a new task updates its saved id instead of
-      // creating a duplicate. Unchanged labels are never overwritten.
-      if (todoId != null && formParentId !== savedParentId.current) {
-        await moveTodo.mutateAsync({ id: todoId, parentId: formParentId, afterId: null })
-        savedParentId.current = formParentId
-      }
-      const tagsChanged = formTagIds.length !== savedTagIds.current.length || formTagIds.some((id) => !savedTagIds.current.includes(id))
-      if (todoId != null && tagsChanged) {
-        await replaceTags.mutateAsync({ todoId, tagIds: formTagIds })
-        savedTagIds.current = [...formTagIds]
-      }
-      onClose()
-    } catch {
-      setSaveError(true)
-    } finally {
-      savingRef.current = false
-      setSaving(false)
     }
+    const p = run()
+    inFlightRef.current = p
+    await p
   }, [labelCreating, formTitle, formDesc, formStatus, formPriority, formDueTime, formStartTime, formDuration, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
+
+  // Keep the "latest value" refs current after every render (effect order
+  // matters: this runs before the auto-save/flush effects below, so they and
+  // their cleanups always observe this render's values).
+  useEffect(() => {
+    currentSnapshotRef.current = currentSnapshot
+    handleSaveRef.current = handleSave
+  })
+
+  // Auto-save: whenever the form drifts from the last saved snapshot, persist
+  // it after a short debounce. IME composition, in-flight label creation and
+  // an empty title hold the timer off — each is a dep so saving resumes the
+  // moment the flag clears (including when a previous save finishes: `saving`).
+  useEffect(() => {
+    if (!autoSaveOn) return
+    if (currentSnapshot === savedSnapshotRef.current) return
+    if (!formTitle.trim() || labelCreating || composing || saving) return
+    const timer = setTimeout(() => { void handleSaveRef.current({ close: false }) }, 800)
+    return () => clearTimeout(timer)
+  }, [autoSaveOn, currentSnapshot, formTitle, labelCreating, composing, saving])
+
+  // Close/switch while edits are still pending: flush them so closing the
+  // drawer can't drop changes made inside the debounce window. Fire-and-
+  // forget — the mutation outruns the unmount; if a save is mid-flight, the
+  // flush chains behind it (savingRef would otherwise swallow it).
+  useEffect(() => {
+    if (!autoSaveOn) return
+    return () => {
+      if (currentSnapshotRef.current === savedSnapshotRef.current) return
+      const fire = () => { void handleSaveRef.current({ close: false }) }
+      if (savingRef.current && inFlightRef.current) void inFlightRef.current.then(fire, fire)
+      else if (!savingRef.current) fire()
+    }
+  }, [autoSaveOn])
 
   return (
     <>
@@ -191,13 +336,17 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             value={formTitle}
             onChange={(e) => setFormTitle(e.target.value)}
             // Fast create flow: focus the title on open, Enter submits.
+            // In the auto-save drawer Enter just flushes the pending save
+            // (immediately) instead of closing the slide-over.
             autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.nativeEvent.isComposing && formTitle.trim()) {
                 e.preventDefault()
-                void handleSave()
+                void handleSave({ close: !autoSaveOn })
               }
             }}
+            onCompositionStart={() => setComposing(true)}
+            onCompositionEnd={() => setComposing(false)}
             maxLength={200}
           />
         </div>
@@ -224,7 +373,14 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
               <Markdown content={formDesc} />
             </div>
           ) : (
-            <Textarea value={formDesc} onChange={(e) => setFormDesc(e.target.value)} rows={2} placeholder={t('todos.descMarkdownHint')} />
+            <Textarea
+              value={formDesc}
+              onChange={(e) => setFormDesc(e.target.value)}
+              onCompositionStart={() => setComposing(true)}
+              onCompositionEnd={() => setComposing(false)}
+              rows={2}
+              placeholder={t('todos.descMarkdownHint')}
+            />
           )}
         </div>
         {parentCandidates && (
@@ -449,14 +605,44 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
           )}
         </div>
       </div>
-      {saveError && <p role="alert" className="mt-2 text-xs text-destructive">{t('todos.saveRetry')}</p>}
-      <DialogFooter className="mt-3 border-t pt-3">
-        <Button variant="outline" onClick={onClose} disabled={saving || labelCreating}>{t('common.cancel')}</Button>
-        <Button onClick={handleSave} disabled={!formTitle.trim() || saving || labelCreating}>
-          {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-          {editing ? t('common.save') : t('common.create')}
-        </Button>
-      </DialogFooter>
+      {saveError && !autoSaveOn && <p role="alert" className="mt-2 text-xs text-destructive">{t('todos.saveRetry')}</p>}
+      {autoSaveOn ? (
+        /* No buttons in auto-save mode: closing the shell is the X on the
+           drawer, and everything else is already saving itself. */
+        <div className="mt-3 flex min-h-9 items-center gap-2 border-t pt-3 text-xs text-muted-foreground" role="status">
+          {saving ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              {t('todos.autoSaving')}
+            </>
+          ) : saveError ? (
+            <>
+              <span className="text-destructive" role="alert">{t('todos.autoSaveFailed')}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => void handleSave({ close: false })}
+              >
+                {t('todos.autoSaveRetry')}
+              </Button>
+            </>
+          ) : savedFlash ? (
+            <>
+              <Check className="h-3.5 w-3.5" />
+              {t('todos.autoSaved')}
+            </>
+          ) : null}
+        </div>
+      ) : (
+        <DialogFooter className="mt-3 border-t pt-3">
+          <Button variant="outline" onClick={onClose} disabled={saving || labelCreating}>{t('common.cancel')}</Button>
+          <Button onClick={() => void handleSave()} disabled={!formTitle.trim() || saving || labelCreating}>
+            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            {editing ? t('common.save') : t('common.create')}
+          </Button>
+        </DialogFooter>
+      )}
     </>
   )
 }

@@ -238,6 +238,7 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
                 parentCandidates={parentCandidates}
                 onContactsChange={onContactsChange}
                 onClose={onClose}
+                autoSave
               />
               <DrawerSubtasks
                 key={`subs-${todo.id}`}

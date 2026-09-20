@@ -99,10 +99,12 @@ describe('TodoDetailDrawer', () => {
     expect(screen.getAllByText('Drawer task').length).toBeGreaterThan(0)
     const titleInput = document.querySelector('input') as HTMLInputElement
     expect(titleInput.value).toBe('Drawer task')
-    expect(screen.getByText('common.save')).toBeInTheDocument()
+    // Auto-save mode: no manual Save/Cancel buttons.
+    expect(screen.queryByText('common.save')).not.toBeInTheDocument()
+    expect(screen.queryByText('common.cancel')).not.toBeInTheDocument()
   })
 
-  it('saves edits through the shared form', async () => {
+  it('saves a pristine todo only after something changes (debounced auto-save)', async () => {
     const user = userEvent.setup()
     renderWithClient(
       <TodoDetailDrawer
@@ -114,8 +116,44 @@ describe('TodoDetailDrawer', () => {
         onClose={vi.fn()}
       />,
     )
-    await user.click(screen.getByText('common.save'))
-    expect(mocks.updateTodo).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }))
+    // Untouched form is not dirty — nothing saves on its own.
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mocks.updateTodo).not.toHaveBeenCalled()
+    // Typing marks it dirty; the save lands after the debounce window.
+    const titleInput = document.querySelector('input') as HTMLInputElement
+    await user.type(titleInput, '!')
+    await waitFor(() => {
+      expect(mocks.updateTodo).toHaveBeenCalledTimes(1)
+    }, { timeout: 3000 })
+    expect(mocks.updateTodo).toHaveBeenCalledWith(expect.objectContaining({
+      id: 7,
+      data: expect.objectContaining({ title: 'Drawer task!' }),
+    }))
+    // The status footer confirms the round-trip.
+    expect(await screen.findByText('todos.autoSaved')).toBeInTheDocument()
+  })
+
+  it('flushes pending edits when the drawer closes', async () => {
+    const user = userEvent.setup()
+    const { unmount } = renderWithClient(
+      <TodoDetailDrawer
+        todo={todo()}
+        open
+        contacts={[]}
+        tags={[]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    // Close inside the debounce window — the unmount cleanup must still save.
+    const titleInput = document.querySelector('input') as HTMLInputElement
+    await user.type(titleInput, ' now')
+    unmount()
+    await waitFor(() => {
+      expect(mocks.updateTodo).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ title: 'Drawer task now' }),
+      }))
+    })
   })
 
   it('deletes the viewed todo through the page handler (header trash)', async () => {
