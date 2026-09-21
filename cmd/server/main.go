@@ -97,6 +97,7 @@ func main() {
 	habitSvc := service.NewHabitService(habitRepo, habitLogRepo, taggingRepo, hub)
 	pomodoroSvc := service.NewPomodoroService(pomodoroRepo, hub)
 	transactionSvc := service.NewTransactionService(transactionRepo, taggingRepo, hub)
+	searchSvc := service.NewSearchService(repository.NewSearchRepo(db))
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
 	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo,
 		service.WithExportNotifier(hub),
@@ -122,7 +123,7 @@ func main() {
 	}
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, whiteboardSvc, fitnessSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc, habitSvc, pomodoroSvc)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, whiteboardSvc, fitnessSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc, habitSvc, pomodoroSvc, searchSvc)
 	handlers.WS = handler.NewWSHandler(hub, &cfg.JWT, workspaceSvc, cfg.Server.Mode, cfg.CORS.AllowOrigins)
 
 	// Router

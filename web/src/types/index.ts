@@ -722,3 +722,35 @@ export interface WhiteboardRelated {
   label: string
   detail: string
 }
+
+/** Entity kinds covered by global search (the `type` of a SearchHit). */
+export type SearchEntityType =
+  | 'contact'
+  | 'interaction'
+  | 'reminder'
+  | 'event'
+  | 'todo'
+  | 'workout'
+  | 'transaction'
+  | 'habit'
+  | 'tag'
+  | 'body_metric'
+  | 'whiteboard'
+
+/** One global-search result row, unified across entity types. */
+export interface SearchHit {
+  type: SearchEntityType
+  id: number
+  title: string
+  subtitle?: string
+  snippet?: string
+  matched_fields?: string[]
+  contact_id?: number
+  updated_at: string
+}
+
+export interface SearchResults {
+  query: string
+  total: number
+  hits: SearchHit[]
+}

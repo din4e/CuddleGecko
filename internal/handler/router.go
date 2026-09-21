@@ -33,6 +33,7 @@ type Handlers struct {
 	UserSetting *UserSettingHandler
 	Version     *VersionHandler
 	WS          *WSHandler
+	Search      *SearchHandler
 	avatarDir   string
 }
 
@@ -58,6 +59,7 @@ func NewHandlers(
 	userSettingSvc *service.UserSettingService,
 	habitSvc *service.HabitService,
 	pomodoroSvc *service.PomodoroService,
+	searchSvc *service.SearchService,
 ) *Handlers {
 	return &Handlers{
 		Auth:        NewAuthHandler(authSvc, captchaSvc),
@@ -82,6 +84,7 @@ func NewHandlers(
 		Export:      NewExportHandler(exportSvc),
 		avatarDir:   uploadDir,
 		UserSetting: NewUserSettingHandler(userSettingSvc),
+		Search:      NewSearchHandler(searchSvc),
 	}
 }
 
@@ -153,6 +156,9 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 		wsProtected.Use(middleware.WorkspaceAuth(workspaceSvc))
 		{
 			wsProtected.POST("/upload/avatar", h.Upload.UploadAvatar)
+
+			// Global search across every workspace-scoped entity.
+			wsProtected.GET("/search", h.Search.Search)
 
 			// MCP endpoint. Rate-limited like the REST AI routes: tool calls can
 			// drive the same paid LLM endpoints, so an unthrottled client (or a
