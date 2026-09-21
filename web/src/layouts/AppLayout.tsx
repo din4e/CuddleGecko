@@ -43,6 +43,7 @@ import { Presentation,
 } from 'lucide-react'
 import { BrandWordmark } from '../components/BrandWordmark'
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher'
+import GlobalSearch from '../components/GlobalSearch'
 import { cn } from '@/lib/utils'
 import { useNavConfigStore } from '../stores/navConfig'
 import { useGraphSettings } from '../stores/graphSettings'
@@ -279,6 +280,8 @@ export default function AppLayout() {
           >
             <Menu className="h-4 w-4" />
           </Button>
+
+          <GlobalSearch />
 
           <div className="ml-auto flex items-center gap-1">
             <Button

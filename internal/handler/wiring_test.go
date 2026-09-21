@@ -85,10 +85,11 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 		service.WithExportNotifier(hub), service.WithTransactionRepo(transactionRepo), service.WithEventRepo(eventRepo),
 		service.WithWorkoutRepos(workoutRepo, workoutExerciseRepo, bodyMetricRepo))
 	userSettingSvc := service.NewUserSettingService(userSettingRepo)
+	searchSvc := service.NewSearchService(repository.NewSearchRepo(db))
 	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, transactionSvc, aiSvc, workspaceSvc, nil, nil)
 
 	avatarDir := t.TempDir()
-	handlers := NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, nil, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarDir, config.AIConfig{}, userSettingSvc, nil, nil)
+	handlers := NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, nil, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarDir, config.AIConfig{}, userSettingSvc, nil, nil, searchSvc)
 	handlers.WS = NewWSHandler(hub, jwtCfg, workspaceSvc, gin.TestMode, []string{})
 
 	r := gin.New()
@@ -110,6 +111,7 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 		{"POST", "/api/ai/chat"},               // rate-limited LLM group
 		{"POST", "/api/ai/analyze"},            // rate-limited LLM group
 		{"GET", "/api/captcha"},                // rate-limited public
+		{"GET", "/api/search"},                 // global search
 		{"GET", "/api/version"},                // public version/health probe
 		{"GET", "/api/ws"},                     // bare-group WS
 		{"GET", "/api/auth/me"},                // protected
