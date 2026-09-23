@@ -45,6 +45,7 @@ import { BrandWordmark } from '../components/BrandWordmark'
 import WorkspaceSwitcher from '../components/WorkspaceSwitcher'
 import GlobalSearch from '../components/GlobalSearch'
 import { cn } from '@/lib/utils'
+import { Toaster } from '@/components/ui/sonner'
 import { useNavConfigStore } from '../stores/navConfig'
 import { useGraphSettings } from '../stores/graphSettings'
 import { CUSTOMIZABLE_PATHS } from '../lib/nav'
@@ -347,6 +348,7 @@ export default function AppLayout() {
         </main>
       </div>
       </div>
+      <Toaster />
     </div>
   )
 }
