@@ -151,6 +151,14 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   const canUp = index > 0
   const canDown = index < siblings.length - 1
 
+  // The hover action strip overlays the row's right edge. The meta cluster
+  // (progress bar, due label, …) normally sits flush right and slides left by
+  // the strip's width while the strip is visible, so the interactive bar and
+  // the buttons never overlap. 16px per compact button + the strip's 2px inner
+  // padding each side; the pomodoro counter text can widen its button a bit.
+  const actionBtnCount = 6 + (onStartPomodoro ? 1 : 0) + (onTogglePin ? 1 : 0) + (onCreateChild ? 1 : 0)
+  const actionsWidth = actionBtnCount * 16 + 4 + (onStartPomodoro && todo.pomodoro_count ? 12 : 0)
+
   const { t } = useTranslation()
   // Row-bar drag writes only the percent via the dedicated endpoint.
   const setProgress = useSetTodoProgress()
@@ -295,7 +303,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
           dropZone === 'before' && 'border-t-2 border-primary',
           dropZone === 'after' && 'border-b-2 border-primary',
         )}
-        style={{ paddingLeft: depth * 18 + 4 }}
+        style={{ paddingLeft: depth * 18 + 4, '--actions-w': `${actionsWidth}px` } as React.CSSProperties}
       >
         {/* selection checkbox (bulk mode) */}
         {selectable && onSelectToggle && (
@@ -382,38 +390,46 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
           </>
         )}
 
-        {/* compact meta — same visual language as TodoCard's meta row */}
-        {todo.pinned && (
-          <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
-        )}
-        <TodoProgressBar percent={todoProgressPercent(todo)} onCommit={(pct) => setProgress.mutate({ id: todo.id, progress: pct })} />
-        {todo.due_time && (
-          <span className={cn(
-            'flex items-center gap-0.5 whitespace-nowrap text-[10px]',
-            dueOverdue ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground',
-          )}>
-            <Clock className="h-3 w-3" />
-            {formatDueLabel(todo.due_time, new Date(), t, { settled: todo.status !== 'pending' })}
-          </span>
-        )}
-        {subProgress.total > 0 && (
-          <span
-            className={cn(
-              'flex items-center gap-0.5 rounded px-1 text-[10px] tabular-nums',
-              subProgress.done === subProgress.total ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground',
-            )}
-            title={t('todos.subtaskProgress', { done: subProgress.done, total: subProgress.total })}
-          >
-            <ListTree className="h-3 w-3" />
-            {subProgress.done}/{subProgress.total}
-          </span>
-        )}
+        {/* compact meta — same visual language as TodoCard's meta row.
+            Cluster sits flush right while idle; on md+ it slides left by the
+            action strip's width whenever the strip is visible (row hover /
+            keyboard focus), keeping the draggable bar clear of the buttons.
+            Below md the strip is always visible, so the margin is permanent. */}
+        <div className="flex shrink-0 items-center gap-1 transition-[margin-right] duration-150 max-md:mr-[var(--actions-w,0px)] md:group-hover:mr-[var(--actions-w,0px)] md:group-focus-within:mr-[var(--actions-w,0px)]">
+          {todo.pinned && (
+            <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
+          )}
+          <TodoProgressBar percent={todoProgressPercent(todo)} onCommit={(pct) => setProgress.mutate({ id: todo.id, progress: pct })} />
+          {todo.due_time && (
+            <span className={cn(
+              'flex items-center gap-0.5 whitespace-nowrap text-[10px]',
+              dueOverdue ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground',
+            )}>
+              <Clock className="h-3 w-3" />
+              {formatDueLabel(todo.due_time, new Date(), t, { settled: todo.status !== 'pending' })}
+            </span>
+          )}
+          {subProgress.total > 0 && (
+            <span
+              className={cn(
+                'flex items-center gap-0.5 rounded px-1 text-[10px] tabular-nums',
+                subProgress.done === subProgress.total ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground',
+              )}
+              title={t('todos.subtaskProgress', { done: subProgress.done, total: subProgress.total })}
+            >
+              <ListTree className="h-3 w-3" />
+              {subProgress.done}/{subProgress.total}
+            </span>
+          )}
+        </div>
 
-        {/* hover actions — a floating overlay on the row's right edge so the
-            row's meta runs flush right with no reserved gap; they fade in
-            only when the pointer reaches this strip (touch/small screens keep
-            them always visible; focus-within covers keyboard). */}
-        <div className="absolute inset-y-0 right-0 flex items-center gap-0.5 rounded bg-background/90 px-0.5 opacity-100 transition-opacity md:opacity-0 md:hover:opacity-100 md:focus-within:opacity-100">
+        {/* hover actions — a floating overlay on the row's right edge; the
+            meta cluster slides left by the strip's width while it is visible,
+            so the bar and buttons never overlap. Shown on row hover / keyboard
+            focus on md+; touch and small screens keep them always visible.
+            pointer-events-none while hidden keeps the invisible strip from
+            swallowing clicks on the progress bar underneath it. */}
+        <div className="absolute inset-y-0 right-0 flex items-center gap-0 rounded bg-background/90 px-0.5 opacity-100 transition-opacity md:pointer-events-none md:opacity-0 md:group-hover:pointer-events-auto md:group-hover:opacity-100 md:group-focus-within:pointer-events-auto md:group-focus-within:opacity-100">
           {onStartPomodoro && (
             <RowBtn onClick={() => onStartPomodoro(todo)} title={t('todos.pomoStart')}>
               <Timer className="h-3.5 w-3.5" />
@@ -547,7 +563,7 @@ function RowBtn({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30',
+        'flex h-4 min-w-4 items-center justify-center rounded px-px text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30',
         className,
       )}
     >
