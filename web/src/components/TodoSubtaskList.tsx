@@ -117,6 +117,14 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
     ? rows?.find((c) => c.id === addingFor)
     : undefined
 
+  // The trailing action strip overlays each row's right edge. The meta
+  // cluster (progress bar, due label, …) normally sits flush right and slides
+  // left by the strip's width while the strip is visible, so the interactive
+  // bar and the buttons never overlap. 16px per compact button + the strip's
+  // 2px inner padding each side.
+  const stripBtns = (onStartPomodoro ? 1 : 0) + (onDelete ? 1 : 0) + (onCreateChild ? 1 : 0)
+  const actionsWidth = stripBtns * 16 + 4
+
   return (
     <div className="mt-0.5 space-y-0.5 border-l-2 border-border pl-2">
       {rows?.map((child, i) => {
@@ -212,6 +220,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
               hovered === 'before' && 'border-t-2 border-primary',
               hovered === 'after' && 'border-b-2 border-primary',
             )}
+            style={{ '--actions-w': `${actionsWidth}px` } as React.CSSProperties}
           >
             {/* fold caret — same affordance as the tree view, so a deep branch
                 can be tucked away at any depth */}
@@ -258,36 +267,45 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
             >
               <InlineMarkdown text={child.title} />
             </span>
-            <TodoProgressBar percent={todoProgressPercent(child)} onCommit={(pct) => setProgress.mutate({ id: child.id, progress: pct })} />
-            {child.due_time && (
-              <span
-                className={cn(
-                  'shrink-0 whitespace-nowrap text-[10px]',
-                  child.status === 'pending' && new Date(child.due_time) < new Date()
-                    ? 'text-destructive'
-                    : 'text-muted-foreground',
-                )}
-              >
-                {formatDueLabel(child.due_time, new Date(), t, { settled: child.status !== 'pending' })}
-              </span>
-            )}
-            {showsProgress && (
-              <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                {grandChildren!.filter((c) => c.status === 'done').length}/{grandChildren!.length}
-              </span>
-            )}
-            {/* Trailing actions float over the row's right edge — the row's
-                text runs flush to the right with no reserved gap, and the
-                buttons fade in only when the pointer reaches this strip on
-                md+ (touch/small screens keep them visible — touch has no
-                hover; focus-within keeps them reachable by keyboard). */}
+            {/* Meta cluster: flush right while idle; slides left by the
+                action strip's width while the strip is visible (row hover /
+                keyboard focus on md+) so the bar never sits under the
+                buttons. Below md the strip is always visible, so the margin
+                is permanent. */}
+            <div className="flex shrink-0 items-center gap-1.5 transition-[margin-right] duration-150 max-md:mr-[var(--actions-w,0px)] md:group-hover:mr-[var(--actions-w,0px)] md:group-focus-within:mr-[var(--actions-w,0px)]">
+              <TodoProgressBar percent={todoProgressPercent(child)} onCommit={(pct) => setProgress.mutate({ id: child.id, progress: pct })} />
+              {child.due_time && (
+                <span
+                  className={cn(
+                    'shrink-0 whitespace-nowrap text-[10px]',
+                    child.status === 'pending' && new Date(child.due_time) < new Date()
+                      ? 'text-destructive'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  {formatDueLabel(child.due_time, new Date(), t, { settled: child.status !== 'pending' })}
+                </span>
+              )}
+              {showsProgress && (
+                <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                  {grandChildren!.filter((c) => c.status === 'done').length}/{grandChildren!.length}
+                </span>
+              )}
+            </div>
+            {/* Trailing actions float over the row's right edge; the meta
+                cluster slides left by the strip's width while it is visible,
+                so the bar and labels never run underneath. Shown on row
+                hover / keyboard focus on md+; touch and small screens keep
+                them visible — touch has no hover. pointer-events-none while
+                hidden keeps the invisible strip from swallowing clicks on
+                the progress bar underneath it. */}
             {(onStartPomodoro || onDelete || onCreateChild) && (
-              <div className="absolute inset-y-0 right-0 flex items-center justify-end gap-0.5 rounded bg-background/90 px-0.5 opacity-100 transition-opacity md:opacity-0 md:hover:opacity-100 md:focus-within:opacity-100">
+              <div className="absolute inset-y-0 right-0 flex items-center justify-end gap-0 rounded bg-background/90 px-0.5 opacity-100 transition-opacity md:pointer-events-none md:opacity-0 md:group-hover:pointer-events-auto md:group-hover:opacity-100 md:group-focus-within:pointer-events-auto md:group-focus-within:opacity-100">
                 {onStartPomodoro && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-5 w-5 p-0 text-muted-foreground"
+                    className="h-4 w-4 p-0 text-muted-foreground"
                     onClick={() => onStartPomodoro(child)}
                     aria-label={t('todos.pomoStart')}
                     title={t('todos.pomoStart')}
@@ -299,7 +317,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                    className="h-4 w-4 p-0 text-muted-foreground hover:text-destructive"
                     onClick={() => onDelete(child)}
                     aria-label={t('common.delete')}
                     title={t('common.delete')}
@@ -311,7 +329,7 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-5 w-5 p-0"
+                    className="h-4 w-4 p-0"
                     onClick={() => setAddingFor(child.id)}
                     aria-label={t('todos.addChild')}
                     title={t('todos.addChild')}
