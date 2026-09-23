@@ -43,6 +43,40 @@ client.interceptors.request.use((config) => {
   return config
 })
 
+// Global undo hooks into every mutating request right before it dispatches
+// (after dedupe merges identical concurrent calls, so an op records once).
+// The observer lives in lib/undo/recorder.ts and is registered at startup.
+export type MutatingMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+export interface MutatingRequestObserver {
+  /**
+   * Called synchronously before the request goes out; returns a finisher that
+   * receives the unwrapped result on success (null/undefined = not recording).
+   */
+  onDispatch(method: MutatingMethod, url: string, data: unknown, params?: unknown): ((result: unknown) => void) | null | undefined
+}
+
+let mutatingObserver: MutatingRequestObserver | null = null
+
+export function setMutatingRequestObserver(observer: MutatingRequestObserver | null): void {
+  mutatingObserver = observer
+}
+
+function dispatchObserved<T>(
+  method: MutatingMethod,
+  url: string,
+  data: unknown,
+  params: unknown,
+  factory: () => Promise<T>,
+): Promise<T> {
+  const finish = mutatingObserver?.onDispatch(method, url, data, params)
+  if (!finish) return factory()
+  return factory().then((value) => {
+    finish(value)
+    return value
+  })
+}
+
 async function unwrap<T>(response: Promise<AxiosResponse<ApiResponse<T>>>): Promise<T> {
   const res = await response
   return res.data.data
@@ -68,13 +102,17 @@ export const request = {
   get: <T>(url: string, config?: AxiosRequestConfig) =>
     dedupe(requestKey('GET', url, config), () => unwrap(client.get<ApiResponse<T>>(url, config))),
   post: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
-    dedupe(requestKey('POST', url, { ...config, data }), () => unwrap(client.post<ApiResponse<T>>(url, data, config))),
+    dedupe(requestKey('POST', url, { ...config, data }), () =>
+      dispatchObserved('POST', url, data, config?.params, () => unwrap(client.post<ApiResponse<T>>(url, data, config)))),
   put: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
-    dedupe(requestKey('PUT', url, { ...config, data }), () => unwrap(client.put<ApiResponse<T>>(url, data, config))),
+    dedupe(requestKey('PUT', url, { ...config, data }), () =>
+      dispatchObserved('PUT', url, data, config?.params, () => unwrap(client.put<ApiResponse<T>>(url, data, config)))),
   patch: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
-    dedupe(requestKey('PATCH', url, { ...config, data }), () => unwrap(client.patch<ApiResponse<T>>(url, data, config))),
+    dedupe(requestKey('PATCH', url, { ...config, data }), () =>
+      dispatchObserved('PATCH', url, data, config?.params, () => unwrap(client.patch<ApiResponse<T>>(url, data, config)))),
   delete: <T>(url: string, config?: AxiosRequestConfig) =>
-    dedupe(requestKey('DELETE', url, config), () => unwrap(client.delete<ApiResponse<T>>(url, config))),
+    dedupe(requestKey('DELETE', url, config), () =>
+      dispatchObserved('DELETE', url, undefined, config?.params, () => unwrap(client.delete<ApiResponse<T>>(url, config)))),
 }
 
 // Single-flight token refresh: when the access token expires, several queries

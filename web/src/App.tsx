@@ -23,6 +23,7 @@ import {
   loadTerminalPage,
   loadTodosPage,
 } from './lib/pageLoaders'
+import { useUndoHotkey } from './lib/undo/useUndoHotkey'
 
 const DashboardPage = lazy(loadDashboardPage)
 const ContactsPage = lazy(loadContactsPage)
@@ -54,6 +55,7 @@ function PageLoader() {
 
 export default function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth)
+  useUndoHotkey()
 
   useEffect(() => {
     checkAuth()

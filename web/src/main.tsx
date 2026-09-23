@@ -8,7 +8,10 @@ import './i18n'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useWorkspaceStore } from './stores/workspace'
+import { useAuthStore } from './stores/auth'
 import { setupBrandFaviconSync } from './lib/brandIcon'
+import { installUndoRecorder, noteMutationStart, noteMutationSettled } from './lib/undo/recorder'
+import { useUndoStore } from './lib/undo/undoStore'
 
 const theme = localStorage.getItem('theme')
 if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -23,6 +26,10 @@ const queryClient = new QueryClient({
   // (silent-save bug class found in the form dialogs). Hooks whose call sites
   // show specific messages opt out via meta: { localErrorHandling: true }.
   mutationCache: new MutationCache({
+    // Undo snapshots: cache-level onMutate runs BEFORE each mutation's own
+    // onMutate (optimistic updates), so this is the one pre-edit vantage point.
+    onMutate: (variables, mutation) => noteMutationStart(mutation, variables),
+    onSettled: (_data, _error, _variables, _context, mutation) => noteMutationSettled(mutation),
     onError: (_error, _variables, _context, mutation) => {
       if (mutation.options.meta?.localErrorHandling) return
       toast.error(i18n.t('common.error'))
@@ -41,12 +48,22 @@ const queryClient = new QueryClient({
   },
 })
 
+installUndoRecorder(queryClient)
+
 let lastWorkspaceId = useWorkspaceStore.getState().currentWorkspace?.id
 useWorkspaceStore.subscribe((state) => {
   const nextId = state.currentWorkspace?.id
   if (nextId !== lastWorkspaceId) {
     lastWorkspaceId = nextId
     queryClient.clear()
+    useUndoStore.getState().clear()
+  }
+})
+
+// Undo history is session state tied to what it describes — drop it on logout.
+useAuthStore.subscribe((state, prev) => {
+  if (!state.accessToken && prev.accessToken) {
+    useUndoStore.getState().clear()
   }
 })
 
