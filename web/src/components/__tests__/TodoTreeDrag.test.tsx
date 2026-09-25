@@ -27,16 +27,15 @@ const base = (id: number, title: string, parent_id: number | null = null): Todo 
 const todos = [base(1, 'Root A'), base(2, 'Child A1', 1), base(3, 'Grandchild', 2), base(4, 'Root B')]
 const nodes: TodoNode[] = buildTodoTree(todos)
 
+// Card body stub: the drag tests only need the title text to target rows.
+const renderCardStub = (todo: Todo) => <div>{todo.title}</div>
+
 const handlers = {
   // All nodes expanded so the nested rows are visible for drop targeting.
   expanded: new Set<number>(todos.map((t) => t.id)),
   onToggleExpand: vi.fn(),
-  onToggle: vi.fn(),
-  onRename: vi.fn(),
-  onEdit: vi.fn(),
-  onDelete: vi.fn(),
   onMove: vi.fn(),
-  formatDate: () => '',
+  renderCard: renderCardStub,
 }
 
 function renderTree(expanded?: Set<number>) {

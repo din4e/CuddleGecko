@@ -1,21 +1,12 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  ArrowLeft, ArrowRight, Ban, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
-  Circle, Clock, ListTree, Loader2, Pencil, Plus, Star, Timer, Trash2,
-} from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, ChevronUp, Loader2 } from 'lucide-react'
 import type { Todo } from '../types'
 import type { TodoNode } from '../lib/buildTodoTree'
-import { subtreeProgressFromNode } from '../lib/todoProgress'
-import { cn } from '@/lib/utils'
-import { formatDueLabel } from '../lib/dueLabel'
-import TodoPriorityBadge from './TodoPriorityBadge'
-import TodoProgressBar from './TodoProgressBar'
+import { subtreeProgressFromNode, type SubtreeProgress } from '../lib/todoProgress'
+import type { TodoCardAction } from './TodoCard'
 import { isBarPressActive } from '../lib/barGesture'
-import { todoProgressPercent } from '../lib/todoProgress'
-import { useSetTodoProgress } from '../hooks/api/useTodos'
-import { AddChildInput } from './AddChildInput'
-import { InlineMarkdown } from './InlineMarkdown'
+import { cn } from '@/lib/utils'
 
 /** afterId targets: a sibling id to place after, null for the top of the
  *  sibling group, or 'last' to append at the end (the backend resolves it, so
@@ -23,23 +14,20 @@ import { InlineMarkdown } from './InlineMarkdown'
  *  loaded parents would otherwise nest at the wrong position). */
 export type MoveAfterId = number | null | 'last'
 
+/** Tree-specific context the row injects into its card body: the tree-only
+ *  move actions (appended to the card's toolbar) and the subtree progress
+ *  computed from the row's own (lazily loaded) children. */
+export interface TreeCardExtras {
+  extraActions?: TodoCardAction[]
+  subtaskProgress?: SubtreeProgress
+}
+
 export interface TodoTreeHandlers {
   expanded: Set<number>
   onToggleExpand: (id: number) => void
-  onToggle: (id: number) => void
-  onRename: (id: number, title: string) => void
-  onEdit: (todo: Todo) => void
-  onDelete: (todo: Todo) => void
   onMove: (id: number, parentId: number | null, afterId: MoveAfterId) => void
-  /** Inline quick-add: the row's "+" reveals a shared input (type + Enter
-   *  creates the child directly). Not wired → no "+" is rendered. */
-  onCreateChild?: (todo: Todo, title: string) => void
-  onStartPomodoro?: (todo: Todo) => void
-  onTogglePin?: (todo: Todo) => void
-  formatDate: (d: string | null) => string
-  selectable?: boolean
-  selectedIds?: Set<number>
-  onSelectToggle?: (id: number) => void
+  /** Renders the row body as the same full card the flat views use. */
+  renderCard: (todo: Todo, extras: TreeCardExtras) => ReactNode
   /** Arrow-key navigation target: the row with this id carries the selection
    *  highlight (the page moves it on ↑/↓ and folds around it on ←/→). */
   selectedId?: number | null
@@ -69,7 +57,10 @@ interface RowProps extends TodoTreeHandlers {
 }
 
 /** TodoTree renders roots and recurses; each row knows its sibling group so it
- *  can compute indent/outdent/up/down move targets. */
+ *  can compute indent/outdent/up/down move targets. Rows render the same full
+ *  TodoCard the timeline/grouped views use (via renderCard); this component
+ *  owns the tree mechanics around it — depth indent, fold caret, tri-zone
+ *  drag reparenting and outliner keyboard moves. */
 export default function TodoTree({
   nodes,
   ...handlers
@@ -99,17 +90,15 @@ export default function TodoTree({
 
 // Memoized so an incidental TodosPage re-render (dialog open, search typing,
 // selection-mode toggle, …) doesn't re-render every visible row. Effective as
-// long as the shared props (handlers, formatDate, expanded/selectedIds Sets,
+// long as the shared props (handlers, renderCard, expanded/selectedIds Sets,
 // the tree nodes) keep stable identity — TodosPage wraps those in useCallback /
-// useMemo / state. Data-changing props (expanded, selectedIds, nodes) still
-// re-render rows, which is correct.
+// useMemo / state. Data-changing props (expanded, nodes) still re-render rows,
+// which is correct.
 const TreeRow = memo(function TreeRow(props: RowProps) {
   const { node, siblings, index, parentId, grandparentId, depth, ancestorIds } = props
   const {
-    expanded, onToggleExpand, onToggle, onRename, onEdit, onDelete, onMove, onCreateChild, formatDate,
-    selectable, selectedIds, onSelectToggle, onStartPomodoro, onTogglePin,
-    selectedId, onSelect,
-    dragId, onDragIdChange, onLoadChildren,
+    expanded, onToggleExpand, onMove, renderCard, selectedId, onSelect,
+    dragId, dragSubtreeSize, onDragIdChange, onLoadChildren,
   } = props
   const [dropZone, setDropZone] = useState<DropZone | null>(null)
   // True while a pointer press is held on the row's progress bar: the row's
@@ -151,50 +140,25 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   const canUp = index > 0
   const canDown = index < siblings.length - 1
 
-  // The hover action strip overlays the row's right edge. The meta cluster
-  // (progress bar, due label, …) normally sits flush right and slides left by
-  // the strip's width while the strip is visible, so the interactive bar and
-  // the buttons never overlap. 16px per compact button + the strip's 2px inner
-  // padding each side; the pomodoro counter text can widen its button a bit.
-  const actionBtnCount = 6 + (onStartPomodoro ? 1 : 0) + (onTogglePin ? 1 : 0) + (onCreateChild ? 1 : 0)
-  const actionsWidth = actionBtnCount * 16 + 4 + (onStartPomodoro && todo.pomodoro_count ? 12 : 0)
-
   const { t } = useTranslation()
-  // Row-bar drag writes only the percent via the dedicated endpoint.
-  const setProgress = useSetTodoProgress()
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(todo.title)
-  // Single click on the title opens the detail drawer; double-click renames.
-  // The delayed click lets a second click cancel it before the drawer opens.
-  const titleClickTimer = useRef<number | null>(null)
-  const cancelPendingTitleClick = () => {
-    if (titleClickTimer.current != null) {
-      window.clearTimeout(titleClickTimer.current)
-      titleClickTimer.current = null
-    }
-  }
-  useEffect(() => () => {
-    if (titleClickTimer.current != null) window.clearTimeout(titleClickTimer.current)
-  }, [])
-  const startEdit = () => {
-    setDraft(todo.title)
-    setEditing(true)
-  }
-  // Inline child quick-add (TickTick-style): "+" reveals the shared input
-  // under the row; Enter creates the child and the input stays open for the
-  // next one.
-  const [addingChild, setAddingChild] = useState(false)
-  const commit = () => {
-    const v = draft.trim()
-    if (v && v !== todo.title) onRename(todo.id, v)
-    setEditing(false)
-  }
+  // Cross-subtask roll-up over ALL descendants from the row's own subtree —
+  // the flat views' children map stays empty in tree mode (children load
+  // through the lazy tree instead), so the card chip needs this injection.
+  const subProgress = subtreeProgressFromNode(node)
+  // Tree-only moves ride in the card's toolbar (and its small-screen kebab
+  // menu) next to the standard actions, exactly like every other card.
+  const moveActions: TodoCardAction[] = [
+    { key: 'outdent', label: t('todos.outdent'), onClick: () => onMove(todo.id, grandparentId, parentId), disabled: !canOutdent, children: <ArrowLeft className="h-3 w-3" /> },
+    { key: 'indent', label: t('todos.indent'), onClick: () => onMove(todo.id, prevSibling!.todo.id, null), disabled: !canIndent, children: <ArrowRight className="h-3 w-3" /> },
+    { key: 'up', label: t('todos.moveUp'), onClick: () => onMove(todo.id, parentId, index >= 2 ? siblings[index - 2].todo.id : null), disabled: !canUp, children: <ChevronUp className="h-3 w-3" /> },
+    { key: 'down', label: t('todos.moveDown'), onClick: () => onMove(todo.id, parentId, nextSibling ? nextSibling.todo.id : null), disabled: !canDown, children: <ChevronDown className="h-3 w-3" /> },
+  ]
 
   // Outliner keyboard: Tab indents under the previous sibling, Shift+Tab
   // outdents to the grandparent. Hijacked only from the row's own navigation
-  // surfaces (the row container and the title span) — intercepting Tab from
-  // the controls inside (action buttons, rename input) would trap keyboard
-  // users in the row, since no Tab press would ever move focus out.
+  // surfaces (the row container) — intercepting Tab from the controls inside
+  // (card toolbar, rename input) would trap keyboard users in the row, since
+  // no Tab press would ever move focus out.
   const handleRowKey = (e: React.KeyboardEvent) => {
     if (e.key !== 'Tab') return
     if (
@@ -211,11 +175,6 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
       onMove(todo.id, prevSibling!.todo.id, null)
     }
   }
-
-  const dueOverdue = todo.status === 'pending' && todo.due_time && new Date(todo.due_time) < new Date()
-  // Cross-subtask roll-up: completion over ALL descendants, not just this
-  // todo's own checklist items.
-  const subProgress = subtreeProgressFromNode(node)
 
   // Tri-zone drop target: top band = previous sibling, middle band = child
   // (reparenting — the whole dragged subtree follows, the backend only
@@ -252,7 +211,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
         data-nav-todo={todo.id}
         onKeyDown={handleRowKey}
         // Clicking anywhere on the row makes it the arrow-key navigation
-        // target (title clicks still open the drawer via their own handler).
+        // target (card clicks still report through the card's own handler).
         onMouseDown={() => onSelect?.(todo.id)}
         draggable={dragId !== undefined && !barGesture}
         onPointerDownCapture={(e) => {
@@ -296,201 +255,41 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
           onDragIdChange?.(null)
         }}
         className={cn(
-          'group relative flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+          'relative rounded-md',
           isDragged && 'opacity-40',
-          isSelected && 'bg-accent/60',
+          isSelected && 'ring-2 ring-ring',
           dropZone === 'child' && 'ring-2 ring-primary/70 bg-primary/5',
           dropZone === 'before' && 'border-t-2 border-primary',
           dropZone === 'after' && 'border-b-2 border-primary',
         )}
-        style={{ paddingLeft: depth * 18 + 4, '--actions-w': `${actionsWidth}px` } as React.CSSProperties}
+        style={{ marginLeft: depth * 18 }}
       >
-        {/* selection checkbox (bulk mode) */}
-        {selectable && onSelectToggle && (
-          <input
-            type="checkbox"
-            checked={selectedIds?.has(todo.id) ?? false}
-            onChange={() => onSelectToggle(todo.id)}
-            aria-label={t('todos.select')}
-            className="h-3.5 w-3.5"
-          />
-        )}
-
-        {/* expand / collapse caret */}
-        <button
-          type="button"
-          className="p-0.5 text-muted-foreground disabled:opacity-0"
-          disabled={!hasChildren}
-          onClick={() => hasChildren && onToggleExpand(todo.id)}
-          aria-label={hasChildren ? (isOpen ? t('todos.collapse') : t('todos.expand')) : undefined}
-        >
-          {hasChildren ? (
-            isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
-          ) : (
-            <span className="inline-block w-4" />
-          )}
-        </button>
-
-        {/* toggle done */}
-        <button type="button" className="p-0.5" onClick={() => onToggle(todo.id)} aria-label={todo.status === 'pending' ? t('todos.markDone') : t('todos.markPending')}>
-          {todo.status === 'done' ? (
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-          ) : todo.status === 'abandoned' ? (
-            <Ban className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <Circle className="h-4 w-4 text-muted-foreground" />
-          )}
-        </button>
-
-        {/* title (double-click to rename) */}
-        {editing ? (
-          <input
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commit()
-              if (e.key === 'Escape') setEditing(false)
-            }}
-            className="min-w-0 flex-1 rounded-sm bg-transparent px-1 outline-none ring-1 ring-primary"
-          />
-        ) : (
-          // span 而非 button:标题内可渲染 Markdown 链接,锚点按规范不能
-          // 嵌套在 button(交互内容)里;键盘 Enter/Space 直接开抽屉。
-          <>
-            <TodoPriorityBadge priority={todo.priority} />
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                cancelPendingTitleClick()
-                titleClickTimer.current = window.setTimeout(() => {
-                  titleClickTimer.current = null
-                  onEdit(todo)
-                }, 200)
-              }}
-              onDoubleClick={() => {
-                cancelPendingTitleClick()
-                startEdit()
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  onEdit(todo)
-                }
-              }}
-              className={cn(
-                'min-w-0 flex-1 truncate text-left text-sm font-medium',
-                todo.status !== 'pending' && 'text-muted-foreground line-through',
-              )}
-            >
-              <InlineMarkdown text={todo.title} />
-            </span>
-          </>
-        )}
-
-        {/* compact meta — same visual language as TodoCard's meta row.
-            Cluster sits flush right while idle; on md+ it slides left by the
-            action strip's width whenever the strip is visible (row hover /
-            keyboard focus), keeping the draggable bar clear of the buttons.
-            Below md the strip is always visible, so the margin is permanent. */}
-        <div className="flex shrink-0 items-center gap-1 transition-[margin-right] duration-150 max-md:mr-[var(--actions-w,0px)] md:group-hover:mr-[var(--actions-w,0px)] md:group-focus-within:mr-[var(--actions-w,0px)]">
-          {todo.pinned && (
-            <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label={t('todos.pinned')} />
-          )}
-          <TodoProgressBar percent={todoProgressPercent(todo)} onCommit={(pct) => setProgress.mutate({ id: todo.id, progress: pct })} />
-          {todo.due_time && (
-            <span className={cn(
-              'flex items-center gap-0.5 whitespace-nowrap text-[10px]',
-              dueOverdue ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground',
-            )}>
-              <Clock className="h-3 w-3" />
-              {formatDueLabel(todo.due_time, new Date(), t, { settled: todo.status !== 'pending' })}
-            </span>
-          )}
-          {subProgress.total > 0 && (
-            <span
-              className={cn(
-                'flex items-center gap-0.5 rounded px-1 text-[10px] tabular-nums',
-                subProgress.done === subProgress.total ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground',
-              )}
-              title={t('todos.subtaskProgress', { done: subProgress.done, total: subProgress.total })}
-            >
-              <ListTree className="h-3 w-3" />
-              {subProgress.done}/{subProgress.total}
-            </span>
-          )}
-        </div>
-
-        {/* hover actions — a floating overlay on the row's right edge; the
-            meta cluster slides left by the strip's width while it is visible,
-            so the bar and buttons never overlap. Shown on row hover / keyboard
-            focus on md+; touch and small screens keep them always visible.
-            pointer-events-none while hidden keeps the invisible strip from
-            swallowing clicks on the progress bar underneath it. */}
-        <div className="absolute inset-y-0 right-0 flex items-center gap-0 rounded bg-background/90 px-0.5 opacity-100 transition-opacity md:pointer-events-none md:opacity-0 md:group-hover:pointer-events-auto md:group-hover:opacity-100 md:group-focus-within:pointer-events-auto md:group-focus-within:opacity-100">
-          {onStartPomodoro && (
-            <RowBtn onClick={() => onStartPomodoro(todo)} title={t('todos.pomoStart')}>
-              <Timer className="h-3.5 w-3.5" />
-              {!!todo.pomodoro_count && (
-                <span className="text-[10px] tabular-nums">{todo.pomodoro_count}</span>
-              )}
-            </RowBtn>
-          )}
-          {onTogglePin && (
-            <RowBtn
-              onClick={() => onTogglePin(todo)}
-              title={t('todos.pinAria')}
-              className={todo.pinned ? 'text-amber-500' : undefined}
-            >
-              <Star className={cn('h-3.5 w-3.5', todo.pinned && 'fill-current')} />
-            </RowBtn>
-          )}
-          {onCreateChild && (
-            <RowBtn onClick={() => setAddingChild((v) => !v)} title={t('todos.addChild')}>
-              <Plus className="h-3.5 w-3.5" />
-            </RowBtn>
-          )}
-          <RowBtn disabled={!canOutdent} onClick={() => onMove(todo.id, grandparentId, parentId)} title={t('todos.outdent')}>
-            <ArrowLeft className="h-3.5 w-3.5" />
-          </RowBtn>
-          <RowBtn disabled={!canIndent} onClick={() => onMove(todo.id, prevSibling!.todo.id, null)} title={t('todos.indent')}>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </RowBtn>
-          <RowBtn
-            disabled={!canUp}
-            onClick={() => onMove(todo.id, parentId, index >= 2 ? siblings[index - 2].todo.id : null)}
-            title={t('todos.moveUp')}
+        <div className="flex items-start gap-0.5">
+          {/* expand / collapse caret */}
+          <button
+            type="button"
+            className="mt-1.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-0"
+            disabled={!hasChildren}
+            onClick={() => hasChildren && onToggleExpand(todo.id)}
+            aria-label={hasChildren ? (isOpen ? t('todos.collapse') : t('todos.expand')) : undefined}
           >
-            <ChevronUp className="h-3.5 w-3.5" />
-          </RowBtn>
-          <RowBtn disabled={!canDown} onClick={() => onMove(todo.id, parentId, nextSibling ? nextSibling.todo.id : null)} title={t('todos.moveDown')}>
-            <ChevronDown className="h-3.5 w-3.5" />
-          </RowBtn>
-          <RowBtn onClick={() => onEdit(todo)} title={t('common.edit')}>
-            <Pencil className="h-3.5 w-3.5" />
-          </RowBtn>
-          <RowBtn onClick={() => onDelete(todo)} title={t('common.delete')} className="text-destructive">
-            <Trash2 className="h-3.5 w-3.5" />
-          </RowBtn>
+            {hasChildren ? (
+              isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+            ) : (
+              <span className="inline-block w-4" />
+            )}
+          </button>
+          {/* The row body is the same full card the timeline/grouped views
+              render — the tree only contributes the mechanics around it. */}
+          <div className="min-w-0 flex-1">
+            {renderCard(node.todo, { extraActions: moveActions, subtaskProgress: subProgress })}
+          </div>
         </div>
       </div>
 
-      {addingChild && (
-        <div style={{ paddingLeft: depth * 18 + 24 }} className="py-0.5">
-          <AddChildInput
-            placeholder={t('todos.addSubtaskPlaceholder')}
-            onCommit={(v) => onCreateChild!(todo, v)}
-            onDismiss={() => setAddingChild(false)}
-            className="text-sm"
-          />
-        </div>
-      )}
-
       {isOpen && node.childrenLoading && (
         <div
-          style={{ paddingLeft: depth * 18 + 24 }}
+          style={{ marginLeft: depth * 18 + 40 }}
           className="flex items-center gap-1 py-0.5 text-xs text-muted-foreground"
         >
           <Loader2 className="h-3 w-3 animate-spin" />
@@ -499,7 +298,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
       )}
 
       {isOpen && !node.childrenLoading && node.childrenHasMore && onLoadChildren && (
-        <div style={{ paddingLeft: depth * 18 + 24 }} className="py-0.5">
+        <div style={{ marginLeft: depth * 18 + 40 }} className="py-0.5">
           <button
             type="button"
             onClick={() => onLoadChildren(todo.id)}
@@ -523,20 +322,11 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
             ancestorIds={new Set(ancestorIds).add(todo.id)}
             expanded={expanded}
             onToggleExpand={onToggleExpand}
-            onToggle={onToggle}
-            onRename={onRename}
-            onEdit={onEdit}
-            onDelete={onDelete}
             onMove={onMove}
-            onCreateChild={onCreateChild}
-            onStartPomodoro={onStartPomodoro}
-            onTogglePin={onTogglePin}
+            renderCard={renderCard}
             dragId={dragId}
+            dragSubtreeSize={dragSubtreeSize}
             onDragIdChange={onDragIdChange}
-            formatDate={formatDate}
-            selectable={selectable}
-            selectedIds={selectedIds}
-            onSelectToggle={onSelectToggle}
             selectedId={selectedId}
             onSelect={onSelect}
             onLoadChildren={onLoadChildren}
@@ -545,29 +335,3 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
     </div>
   )
 })
-
-function RowBtn({
-  children, onClick, disabled, title, className,
-}: {
-  children: React.ReactNode
-  onClick: () => void
-  disabled?: boolean
-  title: string
-  className?: string
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        'flex h-4 min-w-4 items-center justify-center rounded px-px text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30',
-        className,
-      )}
-    >
-      {children}
-    </button>
-  )
-}
