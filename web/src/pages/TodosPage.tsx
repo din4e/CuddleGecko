@@ -27,7 +27,7 @@ import {
 import { toast } from 'sonner'
 import type { Todo, TodoSort, TodoListParams, TodoUpdateInput, TodoBulkAction, TodoPriority } from '../types'
 import EmptyState from '../components/EmptyState'
-import TodoCard from '../components/TodoCard'
+import TodoCard, { type TodoCardAction } from '../components/TodoCard'
 import TodoSubtaskList from '../components/TodoSubtaskList'
 import TodoSortableGroups from '../components/TodoSortableGroups'
 import LoadMoreBar from '../components/LoadMoreBar'
@@ -175,25 +175,26 @@ interface CardRowCtx {
 // Memoized card wrapper: builds the card's subtask element HERE rather than in
 // the page render — a fresh element prop (or an inline closure) on every page
 // render would defeat TodoCard's own memo and re-render every visible card.
+// bare = render the card without this wrapper's nav/selection shell; the tree
+// view wraps cards in its own row (indent, caret, drag zones) and owns those.
 const TodoCardRow = memo(function TodoCardRow({
   ctx, todo, compact = false, selectable = false, selected = false,
+  bare = false, extraActions, subtaskProgress,
 }: {
   ctx: CardRowCtx
   todo: Todo
   compact?: boolean
   selectable?: boolean
   selected?: boolean
+  bare?: boolean
+  extraActions?: TodoCardAction[]
+  /** Tree rows compute progress from their own (lazy) subtree, not the flat
+   *  children map — overrides ctx when provided. */
+  subtaskProgress?: SubtreeProgress
 }) {
   // Flat views only: the tree renders rows (TodoTree), not cards.
   const flat = ctx.view !== 'tree'
-  return (
-    <div
-      data-nav-todo={todo.id}
-      // Clicking anywhere on the card makes it the arrow-key navigation
-      // target (title clicks still open the drawer via their own handler).
-      onMouseDown={() => ctx.onSelect(todo)}
-      className={ctx.navEnabled && ctx.selectedTodoId === todo.id ? 'rounded-md ring-2 ring-ring' : undefined}
-    >
+  const card = (
       <TodoCard
       todo={todo}
       compact={compact}
@@ -210,12 +211,15 @@ const TodoCardRow = memo(function TodoCardRow({
       onDuplicate={ctx.onDuplicate}
       onDelete={ctx.onDelete}
       formatDate={ctx.formatDate}
-      parentTitle={todo.parent_id ? ctx.todoTitleById.get(todo.parent_id) : undefined}
-      subtaskProgress={ctx.subtaskProgress.get(todo.id)}
+      // Flat views show a "↳ parent" breadcrumb on subtask cards; the tree
+      // nests rows visually under the parent card, so it would be redundant.
+      parentTitle={ctx.view === 'tree' ? undefined : todo.parent_id ? ctx.todoTitleById.get(todo.parent_id) : undefined}
+      subtaskProgress={subtaskProgress ?? ctx.subtaskProgress.get(todo.id)}
       collapseScope={ctx.view}
       onCreateChild={ctx.onCreateChild}
       onStartPomodoro={ctx.onStartPomodoro}
       onPostpone={ctx.onPostpone}
+      extraActions={extraActions}
       // Subtask drag & drop: rows carry the tree's tri-zone semantics, and a
       // drop on the card body nests under this todo. Shares the tree's drag
       // state, so drags interoperate across cards (one view renders at a time).
@@ -241,6 +245,17 @@ const TodoCardRow = memo(function TodoCardRow({
         />
       ) : undefined}
       />
+  )
+  if (bare) return card
+  return (
+    <div
+      data-nav-todo={todo.id}
+      // Clicking anywhere on the card makes it the arrow-key navigation
+      // target (title clicks still open the drawer via their own handler).
+      onMouseDown={() => ctx.onSelect(todo)}
+      className={ctx.navEnabled && ctx.selectedTodoId === todo.id ? 'rounded-md ring-2 ring-ring' : undefined}
+    >
+      {card}
     </div>
   )
 })
@@ -1316,6 +1331,25 @@ export default function TodosPage() {
     [cardCtx, selectionMode, selectedIds],
   )
 
+  // Tree rows render the same full card (timeline styling) inside their own
+  // wrapper; TreeRow supplies the tree-only move actions and the node-derived
+  // subtree progress through the extras argument.
+  const renderTreeCard = useCallback(
+    (todo: Todo, extras: { extraActions?: TodoCardAction[]; subtaskProgress?: SubtreeProgress }) => (
+      <TodoCardRow
+        key={todo.id}
+        ctx={cardCtx}
+        todo={todo}
+        bare
+        extraActions={extras.extraActions}
+        subtaskProgress={extras.subtaskProgress}
+        selectable={selectionMode}
+        selected={selectedIds.has(todo.id)}
+      />
+    ),
+    [cardCtx, selectionMode, selectedIds],
+  )
+
   // Manual-order list: O(1) position lookup for the up/down move buttons
   // (indexOf inside renderCard made every reorder O(n²)).
   const pendingIndexById = useMemo(
@@ -1766,19 +1800,10 @@ export default function TodosPage() {
               expanded={expanded}
               onToggleExpand={toggleExpand}
               dragId={treeDragId}
+              dragSubtreeSize={dragSubtreeSize}
               onDragIdChange={setTreeDragId}
-              onToggle={handleToggle}
-              onRename={handleRename}
-              onEdit={openEdit}
-              onDelete={setConfirmDelete}
               onMove={handleTreeMove}
-              onCreateChild={handleCreateChild}
-              onStartPomodoro={handleStartPomodoro}
-              onTogglePin={handleTogglePin}
-              formatDate={formatDate}
-              selectable={selectionMode}
-              selectedIds={selectedIds}
-              onSelectToggle={toggleSelect}
+              renderCard={renderTreeCard}
               selectedId={selectedTodoId}
               onSelect={selectTodoId}
               onLoadChildren={handleLoadChildren}
@@ -1878,7 +1903,7 @@ export default function TodosPage() {
             addColumn={addColumn}
             removeColumn={removeColumn}
             onColumnsReorder={handleKanbanColumnsReorder}
-            renderCard={(todo) => renderTodoCard(todo, true)}
+            renderCard={(todo) => renderTodoCard(todo)}
             onCardDropColumn={handleKanbanDrop}
             onReorder={handleKanbanReorder}
             onNest={handleNest}

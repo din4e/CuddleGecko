@@ -2,15 +2,15 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-// TodoCard/TodoTreeRow call useSetTodoProgress (row-bar drag) — they need a
-// QueryClient in tests.
+// The tree rows themselves carry no data hooks anymore (the card body comes
+// from renderCard) — the client wrapper stays for parity with the page.
 const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
 function renderWithClient(ui: React.ReactElement) {
   return render(<QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>)
 }
 import userEvent from '@testing-library/user-event'
 import TodoTree from '../TodoTreeRow'
-import type { TodoTreeHandlers } from '../TodoTreeRow'
+import type { TodoTreeHandlers, TreeCardExtras } from '../TodoTreeRow'
 import type { Todo } from '../../types'
 import type { TodoNode } from '../../lib/buildTodoTree'
 
@@ -27,16 +27,26 @@ function makeTodo(id: number, overrides: Partial<Todo> = {}): Todo {
 
 const node = (todo: Todo, children: TodoNode[] = []): TodoNode => ({ todo, children })
 
+// Card body stub: the real card is TodoCard (covered by the page tests); here
+// it only needs to surface the title and render the tree's injected move
+// actions so the row's sibling/depth math stays observable.
+const renderCardStub = (todo: Todo, extras: TreeCardExtras) => (
+  <div>
+    <span>{todo.title}</span>
+    {(extras.extraActions ?? []).map((a) => (
+      <button key={a.key} type="button" onClick={a.onClick} disabled={a.disabled} aria-label={a.label}>
+        {a.label}
+      </button>
+    ))}
+  </div>
+)
+
 function handlers(overrides: Partial<TodoTreeHandlers> = {}): TodoTreeHandlers {
   return {
     expanded: new Set<number>(),
     onToggleExpand: vi.fn(),
-    onToggle: vi.fn(),
-    onRename: vi.fn(),
-    onEdit: vi.fn(),
-    onDelete: vi.fn(),
     onMove: vi.fn(),
-    formatDate: () => '',
+    renderCard: renderCardStub,
     ...overrides,
   }
 }
@@ -49,18 +59,22 @@ describe('TodoTree', () => {
     expect(screen.getByText('todo-2')).toBeInTheDocument()
   })
 
-  it('renders markdown titles inline (bold) while plain titles stay plain', () => {
-    const tree = [node(makeTodo(1, { title: '**bold** task' })), node(makeTodo(2))]
-    renderWithClient(<TodoTree nodes={tree} {...handlers()} />)
-    expect(screen.getByText('bold').tagName).toBe('STRONG')
-    expect(screen.getByText('todo-2')).toBeInTheDocument()
-  })
-
-  it('opens the drawer from the keyboard on the title (Enter)', () => {
-    const onEdit = vi.fn()
-    renderWithClient(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onEdit })} />)
-    fireEvent.keyDown(screen.getByText('todo-1'), { key: 'Enter' })
-    expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }))
+  it('passes the node-derived subtree progress into the card', () => {
+    const seen: Array<TreeCardExtras['subtaskProgress']> = []
+    const tree = [node(makeTodo(1), [node(makeTodo(2, { status: 'done' }))])]
+    renderWithClient(
+      <TodoTree
+        nodes={tree}
+        {...handlers({
+          expanded: new Set([1]),
+          renderCard: (todo, extras) => {
+            if (todo.id === 1) seen.push(extras.subtaskProgress)
+            return renderCardStub(todo, extras)
+          },
+        })}
+      />,
+    )
+    expect(seen[0]).toEqual({ done: 1, total: 1 })
   })
 
   it('toggles expand via the caret', async () => {
@@ -98,14 +112,6 @@ describe('TodoTree', () => {
     )
     await user.click(screen.getByRole('button', { name: 'todos.loadMoreChildren' }))
     expect(onLoadChildren).toHaveBeenCalledWith(1)
-  })
-
-  it('toggles done via the circle button', async () => {
-    const user = userEvent.setup()
-    const onToggle = vi.fn()
-    renderWithClient(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onToggle })} />)
-    await user.click(screen.getByRole('button', { name: 'todos.markDone' }))
-    expect(onToggle).toHaveBeenCalledWith(1)
   })
 
   it('indent nests under the previous sibling', async () => {
@@ -146,37 +152,19 @@ describe('TodoTree', () => {
     expect(onMove).toHaveBeenCalledWith(1, null, 2)
   })
 
-  it('add-child becomes an inline input that creates children on Enter', async () => {
-    const user = userEvent.setup()
-    const onCreateChild = vi.fn()
-    renderWithClient(<TodoTree nodes={[node(makeTodo(1))]} {...handlers({ onCreateChild })} />)
-    await user.click(screen.getByRole('button', { name: 'todos.addChild' }))
-    const input = screen.getByPlaceholderText('todos.addSubtaskPlaceholder')
-    await user.type(input, '快速子任务{Enter}')
-    expect(onCreateChild).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), '快速子任务')
-    // Input stays open with a cleared draft for rapid entry.
-    expect(screen.getByPlaceholderText('todos.addSubtaskPlaceholder')).toHaveValue('')
-  })
-
-  it('renders a selection checkbox in bulk mode', async () => {
-    const user = userEvent.setup()
-    const onSelectToggle = vi.fn()
-    renderWithClient(
-      <TodoTree
-        nodes={[node(makeTodo(1))]}
-        {...handlers({ onSelectToggle })}
-        selectable
-        selectedIds={new Set()}
-      />,
-    )
-    await user.click(screen.getByRole('checkbox', { name: 'todos.select' }))
-    expect(onSelectToggle).toHaveBeenCalledWith(1)
+  it('disables the first row\u2019s up/outdent moves', () => {
+    renderWithClient(<TodoTree nodes={[node(makeTodo(1)), node(makeTodo(2))]} {...handlers()} />)
+    const upBtns = screen.getAllByRole('button', { name: 'todos.moveUp' })
+    const outdentBtns = screen.getAllByRole('button', { name: 'todos.outdent' })
+    expect(upBtns[0]).toBeDisabled()
+    expect(outdentBtns[0]).toBeDisabled()
+    expect(upBtns[1]).toBeEnabled()
   })
 
   it('Tab indents the row under its previous sibling', () => {
     const onMove = vi.fn()
     renderWithClient(<TodoTree nodes={[node(makeTodo(1)), node(makeTodo(2))]} {...handlers({ onMove })} />)
-    // keydown bubbles from the title span to the row's onKeyDown.
+    // keydown bubbles from the card body to the row's onKeyDown.
     fireEvent.keyDown(screen.getByText('todo-2'), { key: 'Tab' })
     expect(onMove).toHaveBeenCalledWith(2, 1, null)
   })

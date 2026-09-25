@@ -26,6 +26,19 @@ import { InlineMarkdown } from './InlineMarkdown'
 const repeatLabelOf = (t: (k: string) => string, r?: string) =>
   r ? t(`todos.repeat${r.charAt(0).toUpperCase()}${r.slice(1)}`) : ''
 
+/** One entry in the card's hover toolbar / kebab menu. Views can append
+ *  their own actions (e.g. the tree's indent/outdent/up/down moves) through
+ *  TodoCard's extraActions prop. */
+export interface TodoCardAction {
+  key: string
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  children: ReactNode
+  btnClass?: string
+  destructive?: boolean
+}
+
 export interface TodoCardProps {
   todo: Todo
   compact?: boolean
@@ -52,8 +65,11 @@ export interface TodoCardProps {
    *  card — rows inside the subtask section carry their own right-side "+". */
   onCreateChild?: (parent: Todo, title: string) => void
   /** Which surface's fold state the section chip toggles (see
-   *  todoCollapse) — each page keeps its own folds. */
+   * todoCollapse) — each page keeps its own folds. */
   collapseScope?: string
+  /** View-specific toolbar actions spliced in before edit/delete (the tree
+   *  appends its indent/outdent/up/down moves this way). */
+  extraActions?: TodoCardAction[]
   /** Nested subtask renderer (flat views); rendered inside the card body.
    *  On compact (kanban) cards it exists too but stays collapsed until the
    *  progress chip is clicked — drag overlays mount fresh, so they never
@@ -94,6 +110,7 @@ const TodoCard = memo(function TodoCard({
   subtaskDragId,
   onNestSubtask,
   collapseScope = 'page',
+  extraActions,
 }: TodoCardProps) {
   const { t } = useTranslation()
   const [editingTitle, setEditingTitle] = useState(false)
@@ -152,14 +169,7 @@ const TodoCard = memo(function TodoCard({
   // Toolbar actions, rendered twice from one list: the md+ hover strip and the
   // small-screen kebab menu (the 8-button strip would cover the card's
   // title/meta on a phone-width card).
-  const actions: {
-    key: string
-    label: string
-    onClick: () => void
-    children: ReactNode
-    btnClass?: string
-    destructive?: boolean
-  }[] = [
+  const actions: TodoCardAction[] = [
     ...(onStartPomodoro ? [{
       key: 'pomo',
       label: t('todos.pomoStart'),
@@ -203,6 +213,7 @@ const TodoCard = memo(function TodoCard({
       onClick: () => onDuplicate(todo),
       children: <Copy className="h-3 w-3" />,
     },
+    ...(extraActions ?? []),
     {
       key: 'edit',
       label: t('todos.editTodo'),
@@ -492,6 +503,7 @@ const TodoCard = memo(function TodoCard({
             size="sm"
             className={a.btnClass ?? (a.destructive ? 'h-5 w-5 p-0 text-destructive' : 'h-5 w-5 p-0')}
             onClick={a.onClick}
+            disabled={a.disabled}
             aria-label={a.label}
             title={a.label}
           >
@@ -521,6 +533,7 @@ const TodoCard = memo(function TodoCard({
               <DropdownMenuItem
                 key={a.key}
                 onClick={a.onClick}
+                disabled={a.disabled}
                 className={a.destructive ? 'text-destructive focus:text-destructive' : undefined}
               >
                 <span className="mr-1.5 inline-flex w-3.5 items-center justify-center">{a.children}</span>
