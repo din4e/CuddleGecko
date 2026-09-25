@@ -3,6 +3,7 @@ import { Play, Pause, RotateCcw, SkipForward, Timer } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { PomodoroPhase } from '../stores/pomodoro'
 import { formatPomodoroTime } from '../stores/pomodoro'
+import { playBeep } from '@/lib/beep'
 import { Button } from './ui/button'
 import { cn } from '@/lib/utils'
 
@@ -31,24 +32,7 @@ export function PomodoroTimer({ phase, secondsLeft, running, focusTodoTitle, onS
   const prevPhase = useRef(phase)
   useEffect(() => {
     if (phase === 'break' && prevPhase.current === 'work') {
-      try {
-        const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-        const ctx = new Ctx()
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        osc.frequency.value = 880
-        gain.gain.setValueAtTime(0.25, ctx.currentTime)
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
-        osc.start()
-        osc.stop(ctx.currentTime + 0.5)
-        // Browsers cap concurrent AudioContexts (~6 in Chrome) — one leaked per
-        // completed session eventually makes new AudioContext() throw forever.
-        osc.onended = () => { ctx.close().catch(() => {}) }
-      } catch {
-        // AudioContext unavailable — ignore.
-      }
+      playBeep(880, 0.5)
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         new Notification(t('todos.pomoDone'), { body: focusTodoTitle ?? '' })
       }

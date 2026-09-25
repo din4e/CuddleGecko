@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 import { useGraphSettings } from '../stores/graphSettings'
 import { settingsApi, type CaptchaConfig } from '../api/settings'
 import { refreshAccessToken } from '../api/client'
-import { CUSTOMIZABLE_NAV } from '../lib/nav'
+import { CUSTOMIZABLE_NAV, CUSTOMIZABLE_PATHS } from '../lib/nav'
 import { useNavConfigStore } from '../stores/navConfig'
 import type { AIProvider, AIProviderPreset } from '../types'
 
@@ -164,10 +164,20 @@ export default function SettingsPage() {
     }
   }, [])
 
+  // Normalize the stored order to cover every customizable path: a nav item
+  // introduced after the user last saved (e.g. /countdowns) is absent from the
+  // stored config, so append the missing ones — otherwise their drag indices
+  // (into orderedNavItems) don't line up with navOrder and reordering saves a
+  // list that still omits them.
+  const fullOrder = [
+    ...navOrder.filter((p) => CUSTOMIZABLE_PATHS.has(p)),
+    ...CUSTOMIZABLE_NAV.filter((n) => !navOrder.includes(n.to)).map((n) => n.to),
+  ]
+
   const orderedNavItems = [...CUSTOMIZABLE_NAV].sort((a, b) => {
-    const ia = navOrder.indexOf(a.to)
-    const ib = navOrder.indexOf(b.to)
-    return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib)
+    const ia = fullOrder.indexOf(a.to)
+    const ib = fullOrder.indexOf(b.to)
+    return ia - ib
   })
 
   const persistNav = async (cfg: { order: string[]; hidden: string[] }) => {
@@ -184,7 +194,7 @@ export default function SettingsPage() {
       setDragIndex(null)
       return
     }
-    const next = [...navOrder]
+    const next = [...fullOrder]
     const [moved] = next.splice(dragIndex, 1)
     next.splice(targetIdx, 0, moved)
     setDragIndex(null)
@@ -193,7 +203,7 @@ export default function SettingsPage() {
 
   const toggleNavVisible = async (to: string) => {
     const hidden = navHidden.includes(to) ? navHidden.filter((x) => x !== to) : [...navHidden, to]
-    await persistNav({ order: navOrder, hidden })
+    await persistNav({ order: fullOrder, hidden })
   }
 
   // Auto-check once on mount (deferred a tick to satisfy set-state-in-effect).

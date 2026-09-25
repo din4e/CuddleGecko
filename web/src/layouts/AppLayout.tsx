@@ -8,6 +8,7 @@ import { startTodoWsSync } from '../lib/wsSync'
 import { applyDataChanged } from '../lib/querySync'
 import { refreshAccessToken } from '../api/client'
 import { PomodoroBar } from './PomodoroBar'
+import { CountdownBar } from '../components/CountdownBar'
 import { Button } from '../components/ui/button'
 import BrandIcon from '../components/BrandIcon'
 import {
@@ -36,6 +37,7 @@ import { Presentation,
   Flame,
   Timer,
   CalendarDays,
+  Hourglass,
   PanelLeftClose,
   PanelLeft,
   Bot,
@@ -63,6 +65,7 @@ const navKeys = [
   { to: '/fitness', label: 'nav.fitness', icon: Dumbbell },
   { to: '/habits', label: 'nav.habits', icon: Flame },
   { to: '/pomodoro', label: 'nav.pomodoro', icon: Timer },
+  { to: '/countdowns', label: 'nav.countdowns', icon: Hourglass },
   { to: '/calendar', label: 'nav.calendar', icon: CalendarDays },
   { to: '/finance', label: 'nav.finance', icon: Wallet },
   { to: '/ai', label: 'nav.ai', icon: Bot },
@@ -342,6 +345,7 @@ export default function AppLayout() {
         {/* Content */}
         <main className="flex-1 overflow-hidden min-h-0">
           <div className="h-full overflow-auto p-3 sm:p-4 lg:p-5 2xl:p-6 border-0">
+            <CountdownBar />
             <PomodoroBar />
             <Outlet />
           </div>
