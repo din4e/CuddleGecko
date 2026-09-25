@@ -73,7 +73,7 @@ web/src/api/           # one module per domain; Axios client unwraps {code,data,
 web/src/hooks/api/     # TanStack Query hooks — THE way to fetch (30s staleTime, cached across pages)
 web/src/stores/        # Zustand: auth, workspace, pomodoro, navConfig, mode (HTTP adapter singleton)
 web/src/components/    # dialogs, pickers, cards, TodoTreeRow, terminal/ (xterm + sanitized formatters)
-web/src/lib/           # utils (cn, isoToLocalInput), ics (RFC5545 folding), quickAdd, wsSync
+web/src/lib/           # utils (cn, isoToLocalInput), ics (RFC5545 folding), quickAdd, wsSync, undo (global Ctrl+Z)
 web/src/i18n/          # react-i18next, en/zh locales — ALL UI strings through t()
 web/src/layouts/       # AppLayout + PomodoroBar (isolated so store ticks don't re-render the app)
 web/src/pages/         # route-level views
@@ -87,6 +87,10 @@ web/src/pages/         # route-level views
 - Optimistic updates: `getQueriesData` + per-key `setQueryData` (the `setQueriesData` updater takes ONE arg — a second `query` param is undefined; regression tests in hooks/api/__tests__/).
 - Terminal: user text MUST pass `sanitize()` (components/terminal/formatters.ts) before xterm.
 - Dark mode via `useIsDarkMode()` hook, not per-frame classList reads.
+- **Global undo (Ctrl/Cmd+Z)**: every mutating request through `request.*` records an inverse (`lib/undo/`); pre-state snapshots come from `MutationCache.onMutate`, which fires BEFORE each mutation's own optimistic `onMutate` — the one pre-edit vantage point. Recording is suppressed while an undo runs; the stack clears on logout/workspace switch. Not undoable by design: auth, AI chat, import/export, settings, workspaces, pomodoro counters, empty-trash.
+- **Todo rows are ONE card**: timeline/grouped/kanban/tree all render the same full `TodoCard` (no compact mode in the board). The tree view wraps cards in its own row (depth indent, caret, tri-zone drag reparenting, Tab/Shift+Tab indent/outdent) and injects the tree-only move buttons through `TodoCard`'s `extraActions` slot via the page's `renderCard(todo, extras)`; tree rows pass their own subtree progress (the flat children map is empty in tree view).
+- Subtask rows keep meta flush right and slide it left by the hover action strip's width (`--actions-w` CSS var, 16px per button) so the draggable progress bar never sits under the buttons; hidden strips are `pointer-events-none` (opacity-0 still intercepts pointers otherwise).
+- Toasts render through the single `<Toaster />` mounted in `AppLayout` — the global MutationCache error net and undo feedback both rely on it.
 
 **SSE wire format**: AI stream tokens are JSON envelopes (`data: {"c":"…"}` / `{"error":"…"}`), never raw text (newline-in-token framing). Out-of-tree clients must parse the envelope.
 
