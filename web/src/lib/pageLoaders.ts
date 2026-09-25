@@ -11,6 +11,7 @@ export const loadTodosPage = () => import('@/pages/TodosPage')
 export const loadHabitsPage = () => import('@/pages/HabitsPage')
 export const loadPomodoroPage = () => import('@/pages/PomodoroPage')
 export const loadCalendarPage = () => import('@/pages/CalendarPage')
+export const loadCountdownPage = () => import('@/pages/CountdownPage')
 export const loadFinancePage = () => import('@/pages/FinancePage')
 export const loadTagsPage = () => import('@/pages/TagsPage')
 export const loadRemindersPage = () => import('@/pages/RemindersPage')
@@ -30,6 +31,7 @@ const routeLoaders: Record<string, () => Promise<unknown>> = {
   '/habits': loadHabitsPage,
   '/pomodoro': loadPomodoroPage,
   '/calendar': loadCalendarPage,
+  '/countdowns': loadCountdownPage,
   '/finance': loadFinancePage,
   '/tags': loadTagsPage,
   '/reminders': loadRemindersPage,

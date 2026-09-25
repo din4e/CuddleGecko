@@ -9,6 +9,7 @@ import RegisterPage from './pages/RegisterPage'
 import {
   loadAIChatPage,
   loadCalendarPage,
+  loadCountdownPage,
   loadContactDetailPage,
   loadContactsPage,
   loadDashboardPage,
@@ -39,6 +40,7 @@ const TodosPage = lazy(loadTodosPage)
 const HabitsPage = lazy(loadHabitsPage)
 const PomodoroPage = lazy(loadPomodoroPage)
 const CalendarPage = lazy(loadCalendarPage)
+const CountdownPage = lazy(loadCountdownPage)
 const FitnessPage = lazy(() => import('./pages/FitnessPage'))
 const WhiteboardPage = lazy(() => import('./pages/WhiteboardPage'))
 const TerminalPage = lazy(loadTerminalPage)
@@ -84,6 +86,7 @@ export default function App() {
           <Route path="habits" element={<Suspense fallback={<PageLoader />}><HabitsPage /></Suspense>} />
           <Route path="pomodoro" element={<Suspense fallback={<PageLoader />}><PomodoroPage /></Suspense>} />
           <Route path="calendar" element={<Suspense fallback={<PageLoader />}><CalendarPage /></Suspense>} />
+          <Route path="countdowns" element={<Suspense fallback={<PageLoader />}><CountdownPage /></Suspense>} />
           <Route path="finance" element={<Suspense fallback={<PageLoader />}><FinancePage /></Suspense>} />
           <Route path="tags" element={<Suspense fallback={<PageLoader />}><TagsPage /></Suspense>} />
           <Route path="reminders" element={<Suspense fallback={<PageLoader />}><RemindersPage /></Suspense>} />
