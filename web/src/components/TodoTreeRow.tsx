@@ -205,7 +205,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
   }
 
   return (
-    <div>
+    <div className="space-y-1">
       <div
         tabIndex={0}
         data-nav-todo={todo.id}
@@ -264,7 +264,7 @@ const TreeRow = memo(function TreeRow(props: RowProps) {
         )}
         style={{ marginLeft: depth * 18 }}
       >
-        <div className="flex items-start gap-0.5">
+        <div className="flex items-start gap-1">
           {/* expand / collapse caret */}
           <button
             type="button"

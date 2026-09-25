@@ -1781,7 +1781,7 @@ export default function TodosPage() {
               {t('todos.collapseAll')}
             </Button>
           </div>
-          <div className="rounded-md border p-1">
+          <div className="space-y-1 rounded-md border p-1">
             {treeDragId != null && (
               <div
                 onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
