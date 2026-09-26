@@ -54,15 +54,20 @@ describe('toBodyChartData', () => {
       metric({ recorded_at: localIso(2026, 8, 2), weight: 71 }),
       metric({ recorded_at: localIso(2026, 8, 1), weight: 70 }),
     ]
-    expect(toBodyChartData(rows, 'weight')).toEqual([
-      { date: '8/1', day: '2026-08-01', a: 70 },
-      { date: '8/2', day: '2026-08-02', a: 71 },
+    const points = toBodyChartData(rows, 'weight')
+    expect(points.map((p) => [p.date, p.day, p.a])).toEqual([
+      ['8/1', '2026-08-01', 70],
+      ['8/2', '2026-08-02', 71],
     ])
+    // numeric axis values keep time gaps proportional
+    expect(points[1].x - points[0].x).toBeGreaterThan(0)
   })
 
   it('bp maps systolic/diastolic into a/b', () => {
     const rows = [metric({ recorded_at: localIso(2026, 8, 1), systolic: 120, diastolic: 80 })]
-    expect(toBodyChartData(rows, 'bp')).toEqual([{ date: '8/1', day: '2026-08-01', a: 120, b: 80 }])
+    const points = toBodyChartData(rows, 'bp')
+    expect(points[0]).toMatchObject({ date: '8/1', day: '2026-08-01', a: 120, b: 80 })
+    expect(points[0].x).toBe(new Date(rows[0].recorded_at).getTime())
   })
 
   it('drops records without a value for the metric', () => {

@@ -97,6 +97,14 @@ export function BodyMetricsChart({ metrics, metric = 'weight', trainedDays, onWo
   const labels = LABEL_KEYS[metric]
   const domain = trendDomain(data.flatMap((d) => [d.a, dual ? d.b : undefined]))
   const markerPoints = data.filter((d) => d.trained?.length && d.a != null)
+  // Tick labels keep the span-aware format (year+month beyond a year), but the
+  // axis itself is numeric epoch-ms so data gaps occupy proportional space —
+  // a category axis squeezed an 8-month hole into one point's width.
+  const spansYears = data.length > 1 && data[data.length - 1].x - data[0].x > 366 * 24 * 60 * 60 * 1000
+  const fmtX = (v: number) => {
+    const d = new Date(v)
+    return spansYears ? `${d.getFullYear()}/${d.getMonth() + 1}` : `${d.getMonth() + 1}/${d.getDate()}`
+  }
 
   return (
     <div className="h-72 w-full">
@@ -109,7 +117,17 @@ export function BodyMetricsChart({ metrics, metric = 'weight', trainedDays, onWo
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="currentColor" className="text-muted-foreground" minTickGap={24} />
+          <XAxis
+            dataKey="x"
+            type="number"
+            domain={['dataMin', 'dataMax']}
+            tick={{ fontSize: 12 }}
+            stroke="currentColor"
+            className="text-muted-foreground"
+            tickFormatter={fmtX}
+            minTickGap={24}
+            allowDecimals={false}
+          />
           <YAxis
             tick={{ fontSize: 12 }}
             stroke="currentColor"
@@ -159,7 +177,7 @@ export function BodyMetricsChart({ metrics, metric = 'weight', trainedDays, onWo
           {markerPoints.map((p, i) => (
             <ReferenceDot
               key={`${p.day}-${i}`}
-              x={p.date}
+              x={p.x}
               y={p.a as number}
               r={5}
               fill="var(--background)"
