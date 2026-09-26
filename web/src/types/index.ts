@@ -641,9 +641,13 @@ export interface FitnessGoal {
   id: number
   type: FitnessGoalType
   target_value: number
+  /** weight_target only: weight when the goal was opened; target vs start
+   *  decides the direction (lose/gain) and the progress math. */
+  start_value: number | null
   deadline: string | null
   status: FitnessGoalStatus
-  current_value: number
+  /** null when there is no data yet (e.g. no weight recorded). */
+  current_value: number | null
   created_at: string
   updated_at: string
 }

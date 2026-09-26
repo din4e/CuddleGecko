@@ -160,8 +160,34 @@ export function epley1rm(weight: number, reps: number): number {
   return weight * (1 + reps / 30)
 }
 
-/** Goal completion percent, clamped to 0–100; non-positive targets yield 0. */
+/**
+ * Goal direction for weight targets, derived from the baseline: a target below
+ * the starting weight is a cut (lose), above it a bulk (gain). Null for weekly
+ * goals or before a baseline exists.
+ */
+export function weightGoalDirection(goal: Pick<FitnessGoal, 'type' | 'start_value' | 'target_value'>): 'lose' | 'gain' | null {
+  if (goal.type !== 'weight_target' || goal.start_value == null) return null
+  return goal.target_value < goal.start_value ? 'lose' : 'gain'
+}
+
+/**
+ * Goal completion percent, clamped to 0–100.
+ *
+ * weekly_workouts: current/target (count up to the target).
+ * weight_target: fraction of the start→target distance covered, so a cut at
+ * its starting weight is 0% (not current/target, which reads 76kg against a
+ * 72kg target as "done") and overshooting either way saturates instead of
+ * flipping. Falls back to 0 without a baseline or a current value.
+ */
 export function goalPercent(goal: FitnessGoal): number {
   if (goal.target_value <= 0) return 0
+  if (goal.type === 'weight_target') {
+    if (goal.start_value == null || goal.current_value == null) return 0
+    const span = goal.target_value - goal.start_value
+    if (Math.abs(span) < 1e-9) return goal.current_value === goal.target_value ? 100 : 0
+    const pct = Math.round(((goal.current_value - goal.start_value) / span) * 100)
+    return Math.min(100, Math.max(0, pct))
+  }
+  if (goal.current_value == null) return 0
   return Math.min(100, Math.max(0, Math.round((goal.current_value / goal.target_value) * 100)))
 }

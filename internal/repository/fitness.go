@@ -409,13 +409,24 @@ func (r *FitnessGoalRepo) Create(ctx context.Context, g *model.FitnessGoal) erro
 func (r *FitnessGoalRepo) Update(ctx context.Context, g *model.FitnessGoal) error {
 	if err := r.db.WithContext(ctx).Model(&model.FitnessGoal{}).Where("id = ?", g.ID).
 		Updates(map[string]interface{}{
-			"type":          g.Type,
-			"target_value":  g.TargetValue,
-			"deadline":      g.Deadline,
-			"status":        g.Status,
-			"notes":         g.Notes,
+			"type":         g.Type,
+			"target_value": g.TargetValue,
+			"start_value":  g.StartValue,
+			"deadline":     g.Deadline,
+			"status":       g.Status,
+			"notes":        g.Notes,
 		}).Error; err != nil {
 		return fmt.Errorf("update fitness goal: %w", err)
+	}
+	return nil
+}
+
+// SetStartValue persists a goal's weight baseline (create snapshot / legacy
+// backfill) without touching any other column.
+func (r *FitnessGoalRepo) SetStartValue(ctx context.Context, id uint, v float64) error {
+	if err := r.db.WithContext(ctx).Model(&model.FitnessGoal{}).Where("id = ?", id).
+		Update("start_value", v).Error; err != nil {
+		return fmt.Errorf("set fitness goal start value: %w", err)
 	}
 	return nil
 }

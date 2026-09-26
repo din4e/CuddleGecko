@@ -93,6 +93,10 @@ type FitnessGoal struct {
 	WorkspaceID uint           `gorm:"index;not null;default:0" json:"workspace_id"`
 	Type        string         `gorm:"size:30;not null" json:"type"` // weekly_workouts|weight_target
 	TargetValue float64        `gorm:"not null" json:"target_value"`
+	// StartValue is the weight baseline a weight_target goal was opened at;
+	// target vs start decides the direction (lose/gain) and thus the progress
+	// math. Server-set on create (latest weight), never client-writable.
+	StartValue  *float64       `json:"start_value"`
 	Deadline    *time.Time     `json:"deadline"`
 	Status      string         `gorm:"size:20;not null;default:'active'" json:"status"` // active|done
 	Notes       string         `gorm:"size:500" json:"notes"`

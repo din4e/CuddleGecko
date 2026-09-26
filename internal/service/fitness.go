@@ -56,6 +56,7 @@ type FitnessGoalRepository interface {
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.FitnessGoal, error)
 	Create(ctx context.Context, g *model.FitnessGoal) error
 	Update(ctx context.Context, g *model.FitnessGoal) error
+	SetStartValue(ctx context.Context, id uint, v float64) error
 	Delete(ctx context.Context, workspaceID, id uint) error
 }
 
@@ -372,6 +373,16 @@ func (s *FitnessService) CreateGoal(ctx context.Context, userID, workspaceID uin
 	}
 	g.UserID = userID
 	g.WorkspaceID = workspaceID
+	if g.Type == model.FitnessGoalWeightTarget {
+		// Snapshot the current weight as the baseline: target vs start decides
+		// whether the goal is lose or gain, and the progress math needs a start.
+		if body, err := s.bodyRepo.Summary(ctx, workspaceID); err != nil {
+			return nil, err
+		} else if body.LatestWeight != nil {
+			w := *body.LatestWeight
+			g.StartValue = &w
+		}
+	}
 	if err := s.goalRepo.Create(ctx, g); err != nil {
 		return nil, err
 	}
@@ -394,6 +405,8 @@ func (s *FitnessService) UpdateGoal(ctx context.Context, userID, workspaceID, id
 	g.ID = existing.ID
 	g.UserID = existing.UserID
 	g.WorkspaceID = existing.WorkspaceID
+	// The baseline is set at create time; edits must not move it.
+	g.StartValue = existing.StartValue
 	if err := s.goalRepo.Update(ctx, g); err != nil {
 		return nil, err
 	}
@@ -423,7 +436,9 @@ func (s *FitnessService) DeleteGoal(ctx context.Context, userID, workspaceID, id
 
 // fillGoalProgress computes each goal's current value: weekly_workouts uses
 // this week's completed count from the stats aggregate; weight_target uses the
-// latest recorded weight.
+// latest recorded weight. Weight goals opened before the start-value baseline
+// existed (or before any weight was recorded) get their baseline backfilled
+// once, on first read, from the latest weight.
 func (s *FitnessService) fillGoalProgress(ctx context.Context, workspaceID uint, goals []model.FitnessGoalWithProgress) error {
 	var stats *model.WorkoutStats
 	var body *model.BodyMetricSummary
@@ -450,6 +465,13 @@ func (s *FitnessService) fillGoalProgress(ctx context.Context, workspaceID uint,
 			if body.LatestWeight != nil {
 				w := *body.LatestWeight
 				goals[i].CurrentValue = &w
+				if goals[i].StartValue == nil {
+					start := w
+					goals[i].StartValue = &start
+					if err := s.goalRepo.SetStartValue(ctx, goals[i].ID, start); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	}

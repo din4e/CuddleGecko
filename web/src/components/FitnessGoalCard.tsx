@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Pencil, Trash2, Loader2, Target } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Target, TrendingDown, TrendingUp } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog'
 import { useFitnessGoals, useFitnessGoalMutations } from '../hooks/api/useFitnessGoals'
-import { goalPercent } from '../lib/fitness'
+import { useBodyMetricSummary } from '../hooks/api/useBodyMetrics'
+import { goalPercent, weightGoalDirection } from '../lib/fitness'
 import { isoToLocalInput } from '../lib/utils'
 import type { FitnessGoal, FitnessGoalType } from '../types'
 
@@ -39,15 +40,28 @@ export function FitnessGoalCard() {
           <ul className="space-y-3">
             {goals.map((g) => {
               const pct = goalPercent(g)
+              const dir = weightGoalDirection(g)
               return (
                 <li key={g.id} className="space-y-1">
                   <div className="flex items-center gap-2 text-sm">
                     <span className="flex-1 truncate">
                       {t(g.type === 'weekly_workouts' ? 'fitness.goalWeeklyWorkouts' : 'fitness.goalWeightTarget')}
+                      {dir && (
+                        <span
+                          className={`ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium ${
+                            dir === 'lose' ? 'text-sky-600 dark:text-sky-400' : 'text-orange-600 dark:text-orange-400'
+                          }`}
+                        >
+                          {dir === 'lose' ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+                          {t(dir === 'lose' ? 'fitness.goalDirectionLose' : 'fitness.goalDirectionGain')}
+                        </span>
+                      )}
                       {g.deadline && <span className="ml-2 text-xs text-muted-foreground">{new Date(g.deadline).toLocaleDateString()}</span>}
                     </span>
                     <span className="text-xs tabular-nums text-muted-foreground">
-                      {g.type === 'weight_target' ? `${g.current_value}/${g.target_value}kg` : `${g.current_value}/${g.target_value}`} · {pct}%
+                      {g.type === 'weight_target'
+                        ? `${g.current_value ?? '—'} → ${g.target_value}kg`
+                        : `${g.current_value ?? 0}/${g.target_value}`} · {pct}%
                     </span>
                     {g.status === 'active' && pct >= 100 ? (
                       <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => update.mutate({ id: g.id, data: { status: 'done' } })}>
@@ -113,6 +127,11 @@ function GoalDialog({
   const [type, setType] = useState<FitnessGoalType>(editing?.type ?? 'weekly_workouts')
   const [target, setTarget] = useState(editing?.target_value != null ? String(editing.target_value) : '')
   const [deadline, setDeadline] = useState(editing?.deadline ? isoToLocalInput(editing.deadline) : '')
+  const { data: bodySummary } = useBodyMetricSummary()
+  const latestWeight = bodySummary?.latest_weight ?? null
+  const targetNum = parseFloat(target)
+  const showDirectionHint =
+    type === 'weight_target' && latestWeight != null && Number.isFinite(targetNum) && targetNum > 0 && targetNum !== latestWeight
 
   const cls = 'h-9 w-full rounded-md border bg-background px-2 text-sm'
 
@@ -133,6 +152,17 @@ function GoalDialog({
           <div className="space-y-1.5">
             <Label>{type === 'weight_target' ? t('fitness.goalTargetWeight') : t('fitness.goalTargetCount')} *</Label>
             <Input type="number" min={0} step="0.1" value={target} onChange={(e) => setTarget(e.target.value)} />
+            {type === 'weight_target' && (
+              <p className="text-xs text-muted-foreground">
+                {showDirectionHint
+                  ? t('fitness.goalDirectionHint', {
+                      current: latestWeight,
+                      target: targetNum,
+                      direction: t(targetNum < latestWeight! ? 'fitness.goalDirectionLose' : 'fitness.goalDirectionGain'),
+                    })
+                  : t('fitness.goalNoWeightHint')}
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>{t('fitness.goalDeadline')}</Label>

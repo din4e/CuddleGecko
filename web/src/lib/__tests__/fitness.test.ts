@@ -7,6 +7,7 @@ import {
   prFor,
   epley1rm,
   goalPercent,
+  weightGoalDirection,
   trendDomain,
   localDayKey,
   workoutDayKey,
@@ -189,23 +190,61 @@ describe('epley1rm', () => {
 })
 
 describe('goalPercent', () => {
-  const goal = (target: number, current: number): FitnessGoal => ({
+  const goal = (target: number, current: number | null): FitnessGoal => ({
     id: 1,
     type: 'weekly_workouts',
     target_value: target,
+    start_value: null,
     deadline: null,
     status: 'active',
     current_value: current,
     created_at: '',
     updated_at: '',
   })
-  it('computes and clamps percent', () => {
+  const weightGoal = (start: number | null, target: number, current: number | null): FitnessGoal => ({
+    ...goal(target, current),
+    type: 'weight_target',
+    start_value: start,
+  })
+  it('computes and clamps percent for count goals', () => {
     expect(goalPercent(goal(4, 2))).toBe(50)
     expect(goalPercent(goal(4, 9))).toBe(100)
     expect(goalPercent(goal(4, -1))).toBe(0)
+    expect(goalPercent(goal(4, null))).toBe(0)
   })
   it('returns 0 for non-positive target', () => {
     expect(goalPercent(goal(0, 3))).toBe(0)
+  })
+  it('measures weight cuts by distance covered, not current/target', () => {
+    // 76kg start, 72kg target: 76/72 would read 105% — the bug this replaces.
+    expect(goalPercent(weightGoal(76, 72, 76))).toBe(0)
+    expect(goalPercent(weightGoal(76, 72, 74))).toBe(50)
+    expect(goalPercent(weightGoal(76, 72, 72))).toBe(100)
+    expect(goalPercent(weightGoal(76, 72, 71))).toBe(100)
+    expect(goalPercent(weightGoal(76, 72, 80))).toBe(0)
+  })
+  it('measures weight gains symmetrically', () => {
+    expect(goalPercent(weightGoal(60, 65, 60))).toBe(0)
+    expect(goalPercent(weightGoal(60, 65, 62.5))).toBe(50)
+    expect(goalPercent(weightGoal(60, 65, 65))).toBe(100)
+    expect(goalPercent(weightGoal(60, 65, 58))).toBe(0)
+  })
+  it('handles missing baseline/current and a maintain target', () => {
+    expect(goalPercent(weightGoal(null, 72, 76))).toBe(0)
+    expect(goalPercent(weightGoal(76, 72, null))).toBe(0)
+    expect(goalPercent(weightGoal(72, 72, 72))).toBe(100)
+    expect(goalPercent(weightGoal(72, 72, 73))).toBe(0)
+  })
+})
+
+describe('weightGoalDirection', () => {
+  it('derives direction from the baseline', () => {
+    expect(weightGoalDirection({ type: 'weight_target', start_value: 76, target_value: 72 })).toBe('lose')
+    expect(weightGoalDirection({ type: 'weight_target', start_value: 60, target_value: 65 })).toBe('gain')
+  })
+  it('returns null for weekly goals or without a baseline', () => {
+    expect(weightGoalDirection({ type: 'weekly_workouts', start_value: null, target_value: 3 })).toBeNull()
+    expect(weightGoalDirection({ type: 'weight_target', start_value: null, target_value: 72 })).toBeNull()
   })
 })
 

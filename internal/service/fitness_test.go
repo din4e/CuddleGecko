@@ -126,7 +126,7 @@ func TestFitnessService_SetLogsAndPRs(t *testing.T) {
 
 // Goal validation + computed progress (weekly count and latest weight).
 func TestFitnessService_Goals(t *testing.T) {
-	svc, workoutSvc, _ := newFitnessSvcTestDB(t)
+	svc, workoutSvc, db := newFitnessSvcTestDB(t)
 	ctx := context.Background()
 
 	_, err := svc.CreateGoal(ctx, 1, 1, &model.FitnessGoal{Type: "bogus", TargetValue: 3})
@@ -153,6 +153,37 @@ func TestFitnessService_Goals(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, wGoal.CurrentValue)
 	assert.InDelta(t, 70.5, *wGoal.CurrentValue, 0.0001)
+	require.NotNil(t, wGoal.StartValue, "weight goal snapshots the latest weight as baseline")
+	assert.InDelta(t, 70.5, *wGoal.StartValue, 0.0001)
+
+	// Editing a goal must not move the baseline.
+	edited, err := svc.UpdateGoal(ctx, 1, 1, wGoal.ID, &model.FitnessGoal{Type: model.FitnessGoalWeightTarget, TargetValue: 66})
+	require.NoError(t, err)
+	require.NotNil(t, edited.StartValue)
+	assert.InDelta(t, 70.5, *edited.StartValue, 0.0001)
+
+	// Goals predating the baseline column self-heal on read: the latest
+	// weight at first read becomes their start value.
+	_, err = workoutSvc.CreateMetric(ctx, 1, 1, &model.BodyMetric{Weight: floatPtr(69.9)})
+	require.NoError(t, err)
+	legacyRepo := repository.NewFitnessGoalRepo(db)
+	legacy := &model.FitnessGoal{UserID: 1, WorkspaceID: 1, Type: model.FitnessGoalWeightTarget, TargetValue: 65}
+	require.NoError(t, legacyRepo.Create(ctx, legacy))
+	goals, err = svc.ListGoals(ctx, 1, 1)
+	require.NoError(t, err)
+	var legacyOut *model.FitnessGoalWithProgress
+	for i := range goals {
+		if goals[i].ID == legacy.ID {
+			legacyOut = &goals[i]
+		}
+	}
+	require.NotNil(t, legacyOut)
+	require.NotNil(t, legacyOut.StartValue, "legacy goal backfilled from latest weight")
+	assert.InDelta(t, 69.9, *legacyOut.StartValue, 0.0001)
+	stored, err := legacyRepo.GetByID(ctx, 1, legacy.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored.StartValue, "backfill persisted, not just in the response")
+	assert.InDelta(t, 69.9, *stored.StartValue, 0.0001)
 }
 
 // History buckets completed workouts per ISO week and Stats reports the streak.
