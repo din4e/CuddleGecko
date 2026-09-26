@@ -106,6 +106,22 @@ describe('toBodyChartData', () => {
     ]
     expect(toBodyChartData(rows, 'weight').map((p) => p.date)).toEqual(['3/5', '8/2'])
   })
+
+  it('collapses same-day records into one averaged point', () => {
+    const rows = [
+      metric({ id: 3, recorded_at: localIso(2026, 9, 17, 21), weight: 76.8 }),
+      metric({ id: 2, recorded_at: localIso(2026, 9, 17, 12), weight: 77.4 }),
+      metric({ id: 1, recorded_at: localIso(2026, 9, 17, 8), weight: 76.8 }),
+      metric({ id: 0, recorded_at: localIso(2026, 9, 16, 8), weight: 77 }),
+    ]
+    const points = toBodyChartData(rows, 'weight')
+    expect(points).toHaveLength(2)
+    const day17 = points.find((p) => p.day === '2026-09-17')!
+    expect(day17.a).toBe(77) // (76.8 + 77.4 + 76.8) / 3 = 76.999… → 77
+    // placed at the mean timestamp of that day's readings
+    const mean = (new Date(localIso(2026, 9, 17, 8)).getTime() + new Date(localIso(2026, 9, 17, 12)).getTime() + new Date(localIso(2026, 9, 17, 21)).getTime()) / 3
+    expect(day17.x).toBe(mean)
+  })
 })
 
 describe('localDayKey', () => {
