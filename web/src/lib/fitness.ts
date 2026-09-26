@@ -88,20 +88,25 @@ export interface BodyChartPoint {
  * selected metric. Records without a value for the metric are dropped so
  * connectNulls-style gaps don't appear. When trainedDays (day key → workout
  * names) is given, points carry the same-day names for chart markers.
+ *
+ * X labels adapt to the span: day-of-year "8/14" for windows under a year
+ * (unambiguous within the window), and year+month "2023/8" beyond it — a
+ * seven-year weight history rendered as bare "8/14" ticks is unreadable and
+ * year-blind. The exact day stays on each point (`day`) for tooltips.
  */
 export function toBodyChartData(metrics: BodyMetric[], metric: BodyChartMetric, trainedDays?: Map<string, string[]>): BodyChartPoint[] {
-  return [...metrics]
-    .filter((m) => hasAny(m, metric))
-    .reverse()
-    .map((m) => {
-      const d = new Date(m.recorded_at)
-      const date = `${d.getMonth() + 1}/${d.getDate()}`
-      const day = localDayKey(m.recorded_at) ?? ''
-      const trained = day ? trainedDays?.get(day) : undefined
-      const trainedProp = trained?.length ? { trained } : {}
-      if (metric === 'bp') return { date, day, a: m.systolic, b: m.diastolic, ...trainedProp }
-      return { date, day, a: m[metric], ...trainedProp }
-    })
+  const rows = [...metrics].filter((m) => hasAny(m, metric)).reverse()
+  const times = rows.map((m) => new Date(m.recorded_at).getTime()).filter((t) => !Number.isNaN(t))
+  const spansYears = times.length > 1 && times[times.length - 1] - times[0] > 366 * 24 * 60 * 60 * 1000
+  return rows.map((m) => {
+    const d = new Date(m.recorded_at)
+    const date = spansYears ? `${d.getFullYear()}/${d.getMonth() + 1}` : `${d.getMonth() + 1}/${d.getDate()}`
+    const day = localDayKey(m.recorded_at) ?? ''
+    const trained = day ? trainedDays?.get(day) : undefined
+    const trainedProp = trained?.length ? { trained } : {}
+    if (metric === 'bp') return { date, day, a: m.systolic, b: m.diastolic, ...trainedProp }
+    return { date, day, a: m[metric], ...trainedProp }
+  })
 }
 
 /**

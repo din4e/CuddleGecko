@@ -81,6 +81,26 @@ describe('toBodyChartData', () => {
     expect(points[0].trained).toEqual(['Morning Run', 'Yoga'])
     expect(points[1].trained).toBeUndefined()
   })
+
+  it('labels multi-year spans by year+month so 7 years of ticks stay readable', () => {
+    const rows = [
+      metric({ recorded_at: localIso(2026, 8, 2), weight: 71 }),
+      metric({ recorded_at: localIso(2023, 3, 5), weight: 70 }),
+      metric({ recorded_at: localIso(2019, 1, 20), weight: 69 }),
+    ]
+    const points = toBodyChartData(rows, 'weight')
+    expect(points.map((p) => p.date)).toEqual(['2019/1', '2023/3', '2026/8'])
+    // exact days survive for the tooltip
+    expect(points.map((p) => p.day)).toEqual(['2019-01-20', '2023-03-05', '2026-08-02'])
+  })
+
+  it('keeps day-of-year labels within a one-year span', () => {
+    const rows = [
+      metric({ recorded_at: localIso(2026, 8, 2), weight: 71 }),
+      metric({ recorded_at: localIso(2026, 3, 5), weight: 70 }),
+    ]
+    expect(toBodyChartData(rows, 'weight').map((p) => p.date)).toEqual(['3/5', '8/2'])
+  })
 })
 
 describe('localDayKey', () => {

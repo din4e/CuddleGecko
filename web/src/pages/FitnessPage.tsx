@@ -90,7 +90,11 @@ export default function FitnessPage() {
   const [deleteMetricId, setDeleteMetricId] = useState<number | null>(null)
   const [chartMetric, setChartMetric] = useState<BodyChartMetric>('weight')
   const [chartRange, setChartRange] = useState<'30d' | '90d' | '1y' | 'all'>('all')
-  const { data: bodyPage } = useBodyMetricsList(dateAfterForRange(chartRange))
+  // Memoized on the range: dateAfterForRange calls Date.now(), so an inline
+  // call would mint a fresh millisecond ISO every render — a new React Query
+  // key each frame, refetch storm, and the data never lands.
+  const chartDateAfter = useMemo(() => dateAfterForRange(chartRange), [chartRange])
+  const { data: bodyPage } = useBodyMetricsList(chartDateAfter)
   const { data: summary } = useBodyMetricSummary()
   const deleteMetric = useDeleteBodyMetric()
   const metrics = useMemo(() => bodyPage?.items ?? [], [bodyPage])
@@ -103,7 +107,7 @@ export default function FitnessPage() {
   // Completed workouts inside the chart window → markers + body-record chips.
   const { data: trainedPage } = useWorkoutsList({
     status: 'completed',
-    date_after: dateAfterForRange(chartRange),
+    date_after: chartDateAfter,
     page_size: 100000,
   })
   const trainedDayWorkouts = useMemo(() => workoutsByDay(trainedPage?.items ?? []), [trainedPage])
