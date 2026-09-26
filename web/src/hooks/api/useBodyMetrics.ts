@@ -8,11 +8,11 @@ import type { BodyMetric, BodyMetricImportRecord, BodyMetricInput, BodyMetricSum
 const scope = 'body-metrics'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
 
-export function useBodyMetricsList(dateAfter?: string) {
+export function useBodyMetricsList(dateAfter?: string, page = 1, pageSize = 100000) {
   return useQuery<PaginatedData<BodyMetric>>({
-    queryKey: [...allKey(), 'list', dateAfter ?? 'all'] as const,
+    queryKey: [...allKey(), 'list', dateAfter ?? 'all', page, pageSize] as const,
     queryFn: ({ signal }) =>
-      bodyMetricsApi.list({ page_size: 100000, ...(dateAfter ? { date_after: dateAfter } : {}) }, signal).then((r) => r.data),
+      bodyMetricsApi.list({ page, page_size: pageSize, ...(dateAfter ? { date_after: dateAfter } : {}) }, signal).then((r) => r.data),
   })
 }
 
