@@ -72,6 +72,9 @@ export function workoutsByDay(workouts: Workout[]): Map<string, Workout[]> {
 }
 
 export interface BodyChartPoint {
+  /** axis value: epoch ms — a number axis keeps gaps proportional to real time */
+  x: number
+  /** human label, unused for axis ticks since the switch to a numeric axis */
   date: string
   /** local day key — joins the point to same-day workouts */
   day: string
@@ -104,8 +107,8 @@ export function toBodyChartData(metrics: BodyMetric[], metric: BodyChartMetric, 
     const day = localDayKey(m.recorded_at) ?? ''
     const trained = day ? trainedDays?.get(day) : undefined
     const trainedProp = trained?.length ? { trained } : {}
-    if (metric === 'bp') return { date, day, a: m.systolic, b: m.diastolic, ...trainedProp }
-    return { date, day, a: m[metric], ...trainedProp }
+    if (metric === 'bp') return { x: d.getTime(), date, day, a: m.systolic, b: m.diastolic, ...trainedProp }
+    return { x: d.getTime(), date, day, a: m[metric], ...trainedProp }
   })
 }
 
