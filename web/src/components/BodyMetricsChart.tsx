@@ -54,10 +54,13 @@ function ChartTooltip({ active, payload, label, labelKeys }: {
 }) {
   const { t } = useTranslation()
   if (!active || !payload?.length) return null
-  const trained = payload[0]?.payload?.trained
+  const first = payload[0]?.payload
+  const trained = first?.trained
+  // Multi-year charts label ticks by year+month; the exact day rides on the point.
+  const title = first?.day ?? String(label ?? '')
   return (
     <div className="max-w-64 rounded-lg p-2 shadow-md" style={TOOLTIP_STYLE}>
-      <p style={TOOLTIP_LABEL}>{label}</p>
+      <p style={TOOLTIP_LABEL}>{title}</p>
       {payload.map((p, i) => (
         <p key={i} className="flex items-center gap-1.5" style={TOOLTIP_ITEM}>
           {p.color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} aria-hidden />}
