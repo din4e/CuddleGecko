@@ -1,7 +1,7 @@
 import { useState, useDeferredValue, useEffect, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, TrendingUp, TrendingDown, Minus, Activity, Flame, Timer, CheckCircle2, Pencil, Trash2, Download, Dumbbell, Flame as StreakFlame } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, Minus, Activity, Flame, Timer, CheckCircle2, Pencil, Trash2, Download, Dumbbell, Flame as StreakFlame, ChevronLeft, ChevronRight } from 'lucide-react'
 import ListPageHeader from '../components/ListPageHeader'
 import EmptyState from '../components/EmptyState'
 import { ListSkeleton } from '../components/ListSkeleton'
@@ -94,15 +94,31 @@ export default function FitnessPage() {
   // call would mint a fresh millisecond ISO every render — a new React Query
   // key each frame, refetch storm, and the data never lands.
   const chartDateAfter = useMemo(() => dateAfterForRange(chartRange), [chartRange])
-  const { data: bodyPage } = useBodyMetricsList(chartDateAfter)
+  // One all-time query feeds the chart (range-filtered client-side, so range
+  // switches are instant), the day-correlation map, and the paginated rows.
+  const { data: allBodyPage } = useBodyMetricsList()
+  const rangeMetrics = useMemo(() => {
+    const all = allBodyPage?.items ?? []
+    if (!chartDateAfter) return all
+    const after = new Date(chartDateAfter).getTime()
+    return all.filter((m) => new Date(m.recorded_at).getTime() >= after)
+  }, [allBodyPage, chartDateAfter])
   const { data: summary } = useBodyMetricSummary()
   const deleteMetric = useDeleteBodyMetric()
-  const metrics = useMemo(() => bodyPage?.items ?? [], [bodyPage])
+  const [bodyPageNum, setBodyPageNum] = useState(1)
+  const BODY_PAGE_SIZE = 30
+  const totalMetricPages = Math.max(1, Math.ceil(rangeMetrics.length / BODY_PAGE_SIZE))
+  // Derived (not state) so a shrunk last page after a delete clamps itself:
+  // the requested page number stays but every read uses the safe value.
+  const bodyPage = Math.min(bodyPageNum, totalMetricPages)
+  const metrics = useMemo(
+    () => rangeMetrics.slice((bodyPage - 1) * BODY_PAGE_SIZE, bodyPage * BODY_PAGE_SIZE),
+    [rangeMetrics, bodyPage],
+  )
 
   // --- Workout ↔ body-record day correlation (local calendar days) ---
-  // Full all-time metric set feeds the workout-card snapshots; shares the
-  // 'all' cache entry with the chart query when chartRange is 'all'.
-  const { data: allBodyPage } = useBodyMetricsList()
+  // Full all-time metric set feeds the workout-card snapshots AND the chart's
+  // range filtering above.
   const metricDay = useMemo(() => metricByDay(allBodyPage?.items ?? []), [allBodyPage])
   // Completed workouts inside the chart window → markers + body-record chips.
   const { data: trainedPage } = useWorkoutsList({
@@ -122,7 +138,10 @@ export default function FitnessPage() {
   const [highlightWorkoutId, setHighlightWorkoutId] = useState<number | null>(null)
 
   const jumpToMetric = (m: BodyMetric) => {
-    if (!metrics.some((x) => x.id === m.id)) setChartRange('all')
+    if (!rangeMetrics.some((x) => x.id === m.id)) setChartRange('all')
+    // Land the row's page (rows paginate server-side; the all-time set is sorted newest-first).
+    const idx = (allBodyPage?.items ?? []).findIndex((x) => x.id === m.id)
+    if (idx >= 0) setBodyPageNum(Math.floor(idx / BODY_PAGE_SIZE) + 1)
     setHighlightMetricId(m.id)
   }
   const jumpToWorkout = (w: Workout) => {
@@ -290,7 +309,7 @@ export default function FitnessPage() {
                     <option key={m} value={m}>{t(METRIC_LABEL_KEYS[m])}</option>
                   ))}
                 </select>
-                <select className={selectCls} value={chartRange} onChange={(e) => setChartRange(e.target.value as typeof chartRange)} aria-label={t('fitness.dateRange')}>
+                <select className={selectCls} value={chartRange} onChange={(e) => { setChartRange(e.target.value as typeof chartRange); setBodyPageNum(1) }} aria-label={t('fitness.dateRange')}>
                   <option value="30d">{t('fitness.range30d')}</option>
                   <option value="90d">{t('fitness.range90d')}</option>
                   <option value="1y">{t('fitness.range1y')}</option>
@@ -298,9 +317,9 @@ export default function FitnessPage() {
                 </select>
               </div>
             </div>
-            {metrics.length > 0 && (
+            {rangeMetrics.length > 0 && (
               <BodyMetricsChart
-                metrics={metrics}
+                metrics={rangeMetrics}
                 metric={chartMetric}
                 trainedDays={trainedDayNames}
                 onWorkoutDayClick={(day) => {
@@ -372,6 +391,20 @@ export default function FitnessPage() {
                 </Card>
               )
             })}
+          </div>
+        )}
+
+        {rangeMetrics.length > BODY_PAGE_SIZE && (
+          <div className="flex items-center justify-center gap-3 pt-1 text-sm text-muted-foreground">
+            <Button variant="outline" size="sm" disabled={bodyPage <= 1} onClick={() => setBodyPageNum(Math.max(1, bodyPage - 1))}>
+              <ChevronLeft className="h-4 w-4" />{t('common.prevPage')}
+            </Button>
+            <span className="tabular-nums">
+              {t('common.pageOf', { page: bodyPage, total: totalMetricPages })} · {t('fitness.recordsCount', { count: rangeMetrics.length })}
+            </span>
+            <Button variant="outline" size="sm" disabled={bodyPage >= totalMetricPages} onClick={() => setBodyPageNum(Math.min(totalMetricPages, bodyPage + 1))}>
+              {t('common.nextPage')}<ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         )}
       </section>
