@@ -300,7 +300,7 @@ export default function FitnessPage() {
         </div>
 
         <Card>
-          <CardContent className="space-y-2 p-4">
+          <CardContent className="space-y-2 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-medium">{t('fitness.metricTrend')}</p>
               <div className="flex items-center gap-2">
@@ -334,64 +334,66 @@ export default function FitnessPage() {
         {metrics.length === 0 ? (
           <EmptyState message={t('fitness.noBodyRecords')} />
         ) : (
-          <div className="space-y-2">
-            {metrics.map((m) => {
-              const dayWorkouts = trainedDayWorkouts.get(localDayKey(m.recorded_at) ?? '') ?? []
-              return (
-                <Card
-                  key={m.id}
-                  id={`body-metric-${m.id}`}
-                  className={highlightMetricId === m.id ? 'ring-2 ring-primary' : undefined}
-                >
-                  <CardContent className="flex items-center gap-3 p-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
-                        <span className="font-medium">{fmtDate(m.recorded_at)}</span>
-                        {m.weight != null && <span className="text-muted-foreground">{t('fitness.weight')}: {m.weight}kg</span>}
-                        {m.body_fat != null && <span className="text-muted-foreground">{t('fitness.bodyFat')}: {m.body_fat}%</span>}
-                        {m.systolic != null && m.diastolic != null && <span className="text-muted-foreground">{t('fitness.bloodPressure')}: {m.systolic}/{m.diastolic}</span>}
-                        {m.resting_hr != null && <span className="text-muted-foreground">{t('fitness.restingHr')}: {m.resting_hr}</span>}
-                        {m.sleep_hours != null && <span className="text-muted-foreground">{t('fitness.sleepHours')}: {m.sleep_hours}</span>}
-                        {m.bedtime && <span className="text-muted-foreground">{t('fitness.bedtime')} {fmtTime(m.bedtime)}</span>}
-                        {m.wake_time && <span className="text-muted-foreground">{t('fitness.wakeTime')} {fmtTime(m.wake_time)}</span>}
-                        {m.sleep_score != null && (
-                          <span className="inline-flex items-center gap-1 text-muted-foreground">
-                            {t('fitness.sleepScore')} <StarRating value={m.sleep_score} readOnly />
-                          </span>
-                        )}
-                        {m.steps != null && <span className="text-muted-foreground">{t('fitness.steps')}: {m.steps}</span>}
-                        {m.energy != null && (
-                          <span className="inline-flex items-center gap-1 text-muted-foreground">
-                            {t('fitness.energy')} <StarRating value={m.energy} readOnly />
-                          </span>
-                        )}
-                        {m.mood != null && (
-                          <span className="inline-flex items-center gap-1 text-muted-foreground">
-                            {t('fitness.mood')} <StarRating value={m.mood} readOnly />
-                          </span>
-                        )}
-                        {dayWorkouts.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => jumpToWorkout(dayWorkouts[0])}
-                            className="inline-flex max-w-full items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
-                            aria-label={t('fitness.showWorkouts')}
-                            title={t('fitness.showWorkouts')}
-                          >
-                            <Dumbbell className="h-3 w-3 shrink-0" aria-hidden />
-                            <span className="truncate">{dayWorkouts.map((w) => w.name).join(' · ')}</span>
-                          </button>
-                        )}
+          <Card>
+            <CardContent className="p-2">
+              <div className="divide-y">
+                {metrics.map((m) => {
+                  const dayWorkouts = trainedDayWorkouts.get(localDayKey(m.recorded_at) ?? '') ?? []
+                  return (
+                    <div
+                      key={m.id}
+                      id={`body-metric-${m.id}`}
+                      className={`flex items-center gap-2 rounded-md px-2 py-1.5 first:pt-0.5 last:pb-0.5 ${highlightMetricId === m.id ? 'bg-muted ring-1 ring-primary' : ''}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-sm">
+                          <span className="font-medium">{fmtDate(m.recorded_at)}</span>
+                          {m.weight != null && <span className="text-muted-foreground">{t('fitness.weight')}: {m.weight}kg</span>}
+                          {m.body_fat != null && <span className="text-muted-foreground">{t('fitness.bodyFat')}: {m.body_fat}%</span>}
+                          {m.systolic != null && m.diastolic != null && <span className="text-muted-foreground">{t('fitness.bloodPressure')}: {m.systolic}/{m.diastolic}</span>}
+                          {m.resting_hr != null && <span className="text-muted-foreground">{t('fitness.restingHr')}: {m.resting_hr}</span>}
+                          {m.sleep_hours != null && <span className="text-muted-foreground">{t('fitness.sleepHours')}: {m.sleep_hours}</span>}
+                          {m.bedtime && <span className="text-muted-foreground">{t('fitness.bedtime')} {fmtTime(m.bedtime)}</span>}
+                          {m.wake_time && <span className="text-muted-foreground">{t('fitness.wakeTime')} {fmtTime(m.wake_time)}</span>}
+                          {m.sleep_score != null && (
+                            <span className="inline-flex items-center gap-1 text-muted-foreground">
+                              {t('fitness.sleepScore')} <StarRating value={m.sleep_score} readOnly />
+                            </span>
+                          )}
+                          {m.steps != null && <span className="text-muted-foreground">{t('fitness.steps')}: {m.steps}</span>}
+                          {m.energy != null && (
+                            <span className="inline-flex items-center gap-1 text-muted-foreground">
+                              {t('fitness.energy')} <StarRating value={m.energy} readOnly />
+                            </span>
+                          )}
+                          {m.mood != null && (
+                            <span className="inline-flex items-center gap-1 text-muted-foreground">
+                              {t('fitness.mood')} <StarRating value={m.mood} readOnly />
+                            </span>
+                          )}
+                          {dayWorkouts.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => jumpToWorkout(dayWorkouts[0])}
+                              className="inline-flex max-w-full items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
+                              aria-label={t('fitness.showWorkouts')}
+                              title={t('fitness.showWorkouts')}
+                            >
+                              <Dumbbell className="h-3 w-3 shrink-0" aria-hidden />
+                              <span className="truncate">{dayWorkouts.map((w) => w.name).join(' · ')}</span>
+                            </button>
+                          )}
+                        </div>
+                        {m.notes && <p className="mt-0.5 truncate text-xs text-muted-foreground">{m.notes}</p>}
                       </div>
-                      {m.notes && <p className="mt-0.5 truncate text-xs text-muted-foreground">{m.notes}</p>}
+                      <Button variant="ghost" size="sm" className="h-7 w-7 shrink-0 p-0" onClick={() => openEditMetric(m)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 shrink-0 p-0 text-muted-foreground" onClick={() => setDeleteMetricId(m.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEditMetric(m)}><Pencil className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground" onClick={() => setDeleteMetricId(m.id)}><Trash2 className="h-4 w-4" /></Button>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {rangeMetrics.length > BODY_PAGE_SIZE && (
