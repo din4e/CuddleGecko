@@ -88,9 +88,11 @@ export interface BodyChartPoint {
 
 /**
  * Map newest-first body metric records into chronological chart points for the
- * selected metric. Records without a value for the metric are dropped so
- * connectNulls-style gaps don't appear. When trainedDays (day key → workout
- * names) is given, points carry the same-day names for chart markers.
+ * selected metric, collapsing same-day records into ONE averaged point — a day
+ * with three weigh-ins plots as their mean, not a vertical smudge of dots.
+ * Records without a value for the metric are dropped. When trainedDays
+ * (day key → workout names) is given, points carry the same-day names for
+ * chart markers.
  *
  * X labels adapt to the span: day-of-year "8/14" for windows under a year
  * (unambiguous within the window), and year+month "2023/8" beyond it — a
@@ -101,15 +103,38 @@ export function toBodyChartData(metrics: BodyMetric[], metric: BodyChartMetric, 
   const rows = [...metrics].filter((m) => hasAny(m, metric)).reverse()
   const times = rows.map((m) => new Date(m.recorded_at).getTime()).filter((t) => !Number.isNaN(t))
   const spansYears = times.length > 1 && times[times.length - 1] - times[0] > 366 * 24 * 60 * 60 * 1000
-  return rows.map((m) => {
-    const d = new Date(m.recorded_at)
-    const date = spansYears ? `${d.getFullYear()}/${d.getMonth() + 1}` : `${d.getMonth() + 1}/${d.getDate()}`
-    const day = localDayKey(m.recorded_at) ?? ''
-    const trained = day ? trainedDays?.get(day) : undefined
-    const trainedProp = trained?.length ? { trained } : {}
-    if (metric === 'bp') return { x: d.getTime(), date, day, a: m.systolic, b: m.diastolic, ...trainedProp }
-    return { x: d.getTime(), date, day, a: m[metric], ...trainedProp }
-  })
+
+  const byDay = new Map<string, { xs: number[]; as: number[]; bs: number[]; trained: string[] }>()
+  for (const m of rows) {
+    const day = localDayKey(m.recorded_at)
+    if (!day) continue
+    let g = byDay.get(day)
+    if (!g) { g = { xs: [], as: [], bs: [], trained: [] }; byDay.set(day, g) }
+    g.xs.push(new Date(m.recorded_at).getTime())
+    if (metric === 'bp') {
+      if (m.systolic != null) g.as.push(m.systolic)
+      if (m.diastolic != null) g.bs.push(m.diastolic)
+    } else if (m[metric] != null) {
+      g.as.push(m[metric] as number)
+    }
+    const tr = trainedDays?.get(day)
+    if (tr?.length) g.trained.push(...tr)
+  }
+
+  const avg = (xs: number[]): number | null =>
+    xs.length ? Math.round((xs.reduce((s, v) => s + v, 0) / xs.length) * 100) / 100 : null
+
+  return [...byDay.entries()]
+    .sort(([, a], [, b]) => a.xs[0] - b.xs[0])
+    .map(([day, g]) => {
+      const x = avg(g.xs) as number
+      const d = new Date(x)
+      const date = spansYears ? `${d.getFullYear()}/${d.getMonth() + 1}` : `${d.getMonth() + 1}/${d.getDate()}`
+      const trained = g.trained.length ? { trained: [...new Set(g.trained)] } : {}
+      const a = avg(g.as)
+      if (metric === 'bp') return { x, date, day, a, b: avg(g.bs), ...trained }
+      return { x, date, day, a, ...trained }
+    })
 }
 
 /**
