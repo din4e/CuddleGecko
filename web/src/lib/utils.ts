@@ -17,3 +17,15 @@ export function isoToLocalInput(iso: string): string {
   if (Number.isNaN(d.getTime())) return ''
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 }
+
+/**
+ * formatMoney renders CNY amounts the finance-web way: >=1万 collapses to a
+ * compact `x.x万`, smaller values keep zh-CN thousand separators. Sub-万
+ * values round to integers (finance-web behavior). Callers prefix ¥.
+ */
+export function formatMoney(v: number): string {
+  if (Math.abs(v) >= 10000) {
+    return (v / 10000).toFixed(1).replace(/\.0$/, '') + '万'
+  }
+  return Math.round(v).toLocaleString('zh-CN')
+}

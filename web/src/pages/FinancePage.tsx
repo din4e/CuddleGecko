@@ -11,6 +11,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '.
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -25,12 +26,16 @@ import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
 import { ListSkeleton } from '../components/ListSkeleton'
 import ListPageHeader from '../components/ListPageHeader'
+import AnnualView from '../components/AnnualView'
+import FinanceChart from '../components/FinanceChart'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
+import { formatMoney } from '../lib/utils'
 import type { Transaction } from '../types'
 import {
   useTransactionsList,
   useTransactionsSummary,
+  useTransactionsYearly,
   useCreateTransaction,
   useUpdateTransaction,
   useDeleteTransaction,
@@ -73,6 +78,7 @@ export default function FinancePage() {
   // Debounce the search: input stays responsive on `q`, list query refires only
   // once typing settles (matches the FitnessPage pattern).
   const deferredQ = useDeferredValue(q)
+  const [year, setYear] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
@@ -81,13 +87,23 @@ export default function FinancePage() {
   const [page, setPage] = useState(1)
   const pageSize = 50
 
+  // Year selector drives every query on the page: summary cards, annual view,
+  // chart-independent list below. Literal YYYY-MM-DD strings (no Date math, no
+  // timezone round-trips) — the backend parses them as UTC, matching the Jan-1
+  // storage of imported annual-plan rows.
+  const { data: yearlyData } = useTransactionsYearly()
+  const yearOptions = useMemo(() => (yearlyData ?? []).map((r) => r.year).reverse(), [yearlyData])
+  const range = year ? { from: `${year}-01-01`, to: `${year}-12-31` } : undefined
+
   const { data, isPending } = useTransactionsList({
     page,
     page_size: pageSize,
     type: typeFilter || undefined,
     q: deferredQ || undefined,
+    from: range?.from,
+    to: range?.to,
   })
-  const { data: summary } = useTransactionsSummary()
+  const { data: summary } = useTransactionsSummary(range)
   const createTx = useCreateTransaction()
   const updateTx = useUpdateTransaction()
   const deleteTx = useDeleteTransaction()
@@ -97,6 +113,11 @@ export default function FinancePage() {
 
   const changeTypeFilter = (ty: TxType) => {
     setTypeFilter(ty)
+    setPage(1)
+  }
+
+  const changeYear = (y: string) => {
+    setYear(y)
     setPage(1)
   }
 
@@ -151,8 +172,6 @@ export default function FinancePage() {
     setDeleteTarget(null)
   }
 
-  const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-
   return (
     <div className="space-y-6">
       <ListPageHeader
@@ -175,7 +194,7 @@ export default function FinancePage() {
               <TrendingUp className="h-8 w-8 text-green-500 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-xs text-muted-foreground">{t('finance.totalIncome')}</p>
-                <p className="text-xl font-bold text-green-600 tabular-nums">{fmt(summary.income)}</p>
+                <p className="text-xl font-bold text-green-600 tabular-nums">¥{formatMoney(summary.income)}</p>
               </div>
             </CardContent>
           </Card>
@@ -184,7 +203,7 @@ export default function FinancePage() {
               <TrendingDown className="h-8 w-8 text-red-500 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-xs text-muted-foreground">{t('finance.totalExpense')}</p>
-                <p className="text-xl font-bold text-red-600 tabular-nums">{fmt(summary.expense)}</p>
+                <p className="text-xl font-bold text-red-600 tabular-nums">¥{formatMoney(summary.expense)}</p>
               </div>
             </CardContent>
           </Card>
@@ -194,7 +213,7 @@ export default function FinancePage() {
               <div>
                 <p className="text-xs text-muted-foreground">{t('finance.balance')}</p>
                 <p className={`text-xl font-bold tabular-nums ${summary.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {fmt(summary.balance)}
+                  ¥{formatMoney(summary.balance)}
                 </p>
               </div>
             </CardContent>
@@ -202,7 +221,22 @@ export default function FinancePage() {
         </div>
       )}
 
+      <AnnualView from={range?.from} to={range?.to} />
+
+      <FinanceChart />
+
       <div className="flex flex-wrap items-center gap-2">
+        <Select value={year} onValueChange={(v) => changeYear(String(v))}>
+          <SelectTrigger className="h-9 w-28 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">{t('finance.all')}</SelectItem>
+            {yearOptions.map((y) => (
+              <SelectItem key={y} value={y}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {(['', 'income', 'expense'] as TxType[]).map((ty) => (
           <Button
             key={ty}
@@ -262,7 +296,7 @@ export default function FinancePage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <span className={`font-semibold tabular-nums ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                      {tx.type === 'income' ? '+' : '-'}{fmt(tx.amount)}
+                      {tx.type === 'income' ? '+' : '-'}¥{formatMoney(tx.amount)}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
@@ -291,7 +325,7 @@ export default function FinancePage() {
                     <span className="font-medium">{tx.title}</span>
                   </div>
                   <span className={`font-semibold text-sm ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                    {tx.type === 'income' ? '+' : '-'}{fmt(tx.amount)}
+                    {tx.type === 'income' ? '+' : '-'}¥{formatMoney(tx.amount)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
