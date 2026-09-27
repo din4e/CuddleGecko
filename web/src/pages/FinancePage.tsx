@@ -32,6 +32,9 @@ import { ListSkeleton } from '../components/ListSkeleton'
 import ListPageHeader from '../components/ListPageHeader'
 import AnnualView from '../components/AnnualView'
 import FinanceChart from '../components/FinanceChart'
+import NetWorthTrendCard from '../components/NetWorthTrendCard'
+import SnapshotAccountsCard from '../components/SnapshotAccountsCard'
+import MortgageCard from '../components/MortgageCard'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import { useTagsList } from '../hooks/api/useTags'
@@ -244,9 +247,15 @@ export default function FinancePage() {
         </div>
       )}
 
+      <NetWorthTrendCard />
+
       <AnnualView from={range?.from} to={range?.to} />
 
       <FinanceChart />
+
+      <SnapshotAccountsCard />
+
+      <MortgageCard />
 
       <div className="flex flex-wrap items-center gap-2">
         <Select value={year} onValueChange={(v) => changeYear(String(v))}>

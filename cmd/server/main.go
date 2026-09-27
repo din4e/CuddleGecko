@@ -63,6 +63,7 @@ func main() {
 	habitLogRepo := repository.NewHabitLogRepo(db)
 	pomodoroRepo := repository.NewPomodoroRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
+	financeSnapshotRepo := repository.NewFinanceSnapshotRepo(db)
 	aiRepo := repository.NewAIRepo(db)
 	workspaceRepo := repository.NewWorkspaceRepo(db)
 	settingRepo := repository.NewSettingRepo(db)
@@ -87,7 +88,7 @@ func main() {
 	eventSvc := service.NewEventService(eventRepo, taggingRepo, hub)
 	todoActivityRepo := repository.NewTodoActivityRepo(db)
 	todoSvc := service.NewTodoService(todoRepo, eventRepo, todoRepo, service.WithTodoNotifier(hub), service.WithTodoHistory(todoActivityRepo, userRepo))
-		whiteboardSvc := service.NewWhiteboardService(whiteboardRepo, hub)
+	whiteboardSvc := service.NewWhiteboardService(whiteboardRepo, hub)
 	workoutSvc := service.NewWorkoutService(workoutRepo, workoutExerciseRepo, bodyMetricRepo, taggingRepo, hub)
 	exerciseLibraryRepo := repository.NewExerciseLibraryRepo(db)
 	workoutTemplateRepo := repository.NewWorkoutTemplateRepo(db)
@@ -97,6 +98,7 @@ func main() {
 	habitSvc := service.NewHabitService(habitRepo, habitLogRepo, taggingRepo, hub)
 	pomodoroSvc := service.NewPomodoroService(pomodoroRepo, hub)
 	transactionSvc := service.NewTransactionService(transactionRepo, taggingRepo, hub)
+	financeSvc := service.NewFinanceSnapshotService(financeSnapshotRepo)
 	searchSvc := service.NewSearchService(repository.NewSearchRepo(db))
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, cfg.AI)
 	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo,
@@ -123,7 +125,7 @@ func main() {
 	}
 
 	// Handlers
-	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, whiteboardSvc, fitnessSvc, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc, habitSvc, pomodoroSvc, searchSvc)
+	handlers := handler.NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, whiteboardSvc, fitnessSvc, transactionSvc, financeSvc, aiSvc, workspaceSvc, exportSvc, avatarAbs, cfg.AI, userSettingSvc, habitSvc, pomodoroSvc, searchSvc)
 	handlers.WS = handler.NewWSHandler(hub, &cfg.JWT, workspaceSvc, cfg.Server.Mode, cfg.CORS.AllowOrigins)
 
 	// Router
