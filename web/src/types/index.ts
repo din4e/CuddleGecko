@@ -148,6 +148,18 @@ export interface TransactionMonthly {
   expense: number
 }
 
+export interface TransactionYearly {
+  year: string // "YYYY"
+  income: number
+  expense: number
+}
+
+export interface TransactionCategoryTotal {
+  category: string // "" = uncategorized
+  income: number
+  expense: number
+}
+
 export interface AIProvider {
   id: number
   user_id: number
