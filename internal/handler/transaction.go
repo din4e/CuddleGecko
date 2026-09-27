@@ -40,6 +40,36 @@ type updateTransactionRequest struct {
 	Notes      string  `json:"notes"`
 }
 
+// parseDateRange reads the optional ?from=&to= query params (YYYY-MM-DD,
+// parsed as UTC to match the Jan-1 storage convention of imported annual rows)
+// and returns half-open [from, to) bounds; nil = unbounded. `to` is the
+// inclusive END DATE advanced one day so records stored later on the last day
+// (different UTC instants) are still captured.
+func parseDateRange(c *gin.Context) (from, to *time.Time, err error) {
+	parse := func(name string) (*time.Time, error) {
+		v := c.Query(name)
+		if v == "" {
+			return nil, nil
+		}
+		t, err := time.Parse("2006-01-02", v)
+		if err != nil {
+			return nil, err
+		}
+		return &t, nil
+	}
+	if from, err = parse("from"); err != nil {
+		return nil, nil, err
+	}
+	if to, err = parse("to"); err != nil {
+		return nil, nil, err
+	}
+	if to != nil {
+		dayAfter := to.AddDate(0, 0, 1)
+		to = &dayAfter
+	}
+	return from, to, nil
+}
+
 func (h *TransactionHandler) List(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
@@ -58,7 +88,13 @@ func (h *TransactionHandler) List(c *gin.Context) {
 
 	search := c.Query("q")
 
-	txs, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, txType, contactID, search)
+	from, to, err := parseDateRange(c)
+	if err != nil {
+		response.BadRequest(c, "invalid from/to date format (expected YYYY-MM-DD)")
+		return
+	}
+
+	txs, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, txType, contactID, search, from, to)
 	if err != nil {
 		response.InternalError(c, "failed to list transactions")
 		return
@@ -67,29 +103,17 @@ func (h *TransactionHandler) List(c *gin.Context) {
 	response.OKPaginated(c, txs, total, page, pageSize)
 }
 
-func (h *TransactionHandler) MonthlyTrend(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	workspaceID := middleware.GetWorkspaceID(c)
-	months, _ := strconv.Atoi(c.DefaultQuery("months", "6"))
-	if months < 1 {
-		months = 1
-	} else if months > 24 {
-		months = 24
-	}
-
-	trend, err := h.svc.Monthly(c.Request.Context(), userID, workspaceID, months)
-	if err != nil {
-		response.InternalError(c, "failed to get transaction trend")
-		return
-	}
-
-	response.OK(c, trend)
-}
-
 func (h *TransactionHandler) Summary(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	income, expense, err := h.svc.Summary(c.Request.Context(), userID, workspaceID)
+
+	from, to, err := parseDateRange(c)
+	if err != nil {
+		response.BadRequest(c, "invalid from/to date format (expected YYYY-MM-DD)")
+		return
+	}
+
+	income, expense, err := h.svc.Summary(c.Request.Context(), userID, workspaceID, from, to)
 	if err != nil {
 		response.InternalError(c, "failed to get summary")
 		return
@@ -105,6 +129,37 @@ func (h *TransactionHandler) Monthly(c *gin.Context) {
 	rows, err := h.svc.Monthly(c.Request.Context(), userID, workspaceID, months)
 	if err != nil {
 		response.InternalError(c, "failed to get monthly summary")
+		return
+	}
+
+	response.OK(c, rows)
+}
+
+func (h *TransactionHandler) Yearly(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	rows, err := h.svc.Yearly(c.Request.Context(), userID, workspaceID)
+	if err != nil {
+		response.InternalError(c, "failed to get yearly summary")
+		return
+	}
+
+	response.OK(c, rows)
+}
+
+func (h *TransactionHandler) Categories(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+
+	from, to, err := parseDateRange(c)
+	if err != nil {
+		response.BadRequest(c, "invalid from/to date format (expected YYYY-MM-DD)")
+		return
+	}
+
+	rows, err := h.svc.CategoryTotals(c.Request.Context(), userID, workspaceID, from, to)
+	if err != nil {
+		response.InternalError(c, "failed to get category totals")
 		return
 	}
 

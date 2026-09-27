@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/din4e/cuddlegecko/internal/model"
 	"github.com/din4e/cuddlegecko/internal/mcp"
+	"github.com/din4e/cuddlegecko/internal/model"
 	"github.com/din4e/cuddlegecko/internal/realtime"
 	"github.com/din4e/cuddlegecko/internal/repository"
 	"github.com/din4e/cuddlegecko/internal/service"
@@ -92,8 +92,8 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 
 	r := gin.New()
 	cfg := &config.Config{
-		Server:  config.ServerConfig{Mode: gin.TestMode, AvatarDir: avatarDir},
-		CORS:    config.CORSConfig{},
+		Server: config.ServerConfig{Mode: gin.TestMode, AvatarDir: avatarDir},
+		CORS:   config.CORSConfig{},
 	}
 	RegisterRoutes(r, handlers, cfg, workspaceSvc, mcpServer)
 
@@ -103,15 +103,17 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 	for _, route := range []struct {
 		method, path string
 	}{
-		{"GET", "/api/transactions/monthly"},   // iter 12 endpoint
-		{"GET", "/api/todos/trash"},            // cascade trash
-		{"PATCH", "/api/todos/1/move"},         // tree move
-		{"POST", "/api/ai/chat"},               // rate-limited LLM group
-		{"POST", "/api/ai/analyze"},            // rate-limited LLM group
-		{"GET", "/api/captcha"},                // rate-limited public
-		{"GET", "/api/version"},                // public version/health probe
-		{"GET", "/api/ws"},                     // bare-group WS
-		{"GET", "/api/auth/me"},                // protected
+		{"GET", "/api/transactions/monthly"},    // iter 12 endpoint
+		{"GET", "/api/transactions/yearly"},     // finance annual view
+		{"GET", "/api/transactions/categories"}, // finance category breakdown
+		{"GET", "/api/todos/trash"},             // cascade trash
+		{"PATCH", "/api/todos/1/move"},          // tree move
+		{"POST", "/api/ai/chat"},                // rate-limited LLM group
+		{"POST", "/api/ai/analyze"},             // rate-limited LLM group
+		{"GET", "/api/captcha"},                 // rate-limited public
+		{"GET", "/api/version"},                 // public version/health probe
+		{"GET", "/api/ws"},                      // bare-group WS
+		{"GET", "/api/auth/me"},                 // protected
 	} {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(route.method, route.path, nil)
