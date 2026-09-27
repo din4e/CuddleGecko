@@ -359,7 +359,7 @@ export default function FinancePage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? t('finance.title') : t('finance.newTransaction')}</DialogTitle>
+            <DialogTitle>{editing ? t('finance.editTransaction') : t('finance.newTransaction')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -431,10 +431,10 @@ export default function FinancePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSubmit} disabled={!form.title || !form.amount || !form.date || createTx.isPending || updateTx.isPending}>
-              {editing ? t('finance.title') : t('finance.newTransaction')}
+              {editing ? t('common.save') : t('finance.newTransaction')}
             </Button>
           </DialogFooter>
         </DialogContent>
