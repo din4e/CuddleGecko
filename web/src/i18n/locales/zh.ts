@@ -270,6 +270,7 @@ export default {
     annualView: '年度收支',
     total: '合计',
     uncategorized: '未分类',
+    truncatedItems: '记录较多，仅显示前 {{count}} 条，各年合计仅含已显示部分',
     chartTitle: '收支趋势',
     yearly: '年度',
     monthly: '月度',

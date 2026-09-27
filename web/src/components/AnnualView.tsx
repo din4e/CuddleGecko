@@ -1,6 +1,7 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent } from './ui/card'
-import { useTransactionsCategoryTotals, useTransactionsList } from '../hooks/api/useTransactions'
+import { useTransactionsList } from '../hooks/api/useTransactions'
 import { formatMoney } from '../lib/utils'
 import type { Transaction } from '../types'
 
@@ -30,75 +31,117 @@ function TxRow({ tx }: { tx: Transaction }) {
   )
 }
 
+interface YearSection {
+  year: string
+  incomes: Transaction[]
+  expenses: Transaction[]
+  catTotals: { category: string; net: number }[]
+  net: number
+}
+
 /**
- * AnnualView renders one period's transactions the finance-web AnnualCard way:
- * income/expense item lists with category chips, per-category subtotals, and a
- * grand 合计 bar. Items come from the plain list endpoint (capped at the
- * handler's page-size max of 100 — current data is a handful of rows per
- * year); subtotals and the total come from the server-side category aggregate,
- * so they stay exact regardless of the item cap.
+ * AnnualView renders the period's annual-plan transactions the finance-web
+ * AnnualCard way, grouped by year: each year gets its own block with
+ * income/expense item lists, per-category subtotals and a 合计 bar. Grouping
+ * matters in the 全部 view — the same yearly recurring items (工资/租金/…)
+ * exist once per year, and listing them flat made three years of rows look
+ * like triple-counted duplicates.
+ *
+ * Items come from the list endpoint capped at the handler's page-size max of
+ * 100; when the window has more rows than that, per-year blocks render from
+ * the fetched page and a truncation hint is shown.
  */
 export function AnnualView({ from, to }: { from?: string; to?: string }) {
   const { t } = useTranslation()
   const { data, isPending } = useTransactionsList({ page: 1, page_size: 100, from, to })
-  const { data: categories } = useTransactionsCategoryTotals({ from, to })
+
+  const sections = useMemo<YearSection[]>(() => {
+    const items = data?.items ?? []
+    const byYear = new Map<string, YearSection>()
+    for (const tx of items) {
+      const year = tx.date.slice(0, 4)
+      let s = byYear.get(year)
+      if (!s) {
+        s = { year, incomes: [], expenses: [], catTotals: [], net: 0 }
+        byYear.set(year, s)
+      }
+      if (tx.type === 'income') {
+        s.incomes.push(tx)
+        s.net += tx.amount
+      } else {
+        s.expenses.push(tx)
+        s.net -= tx.amount
+      }
+    }
+    for (const s of byYear.values()) {
+      const cats = new Map<string, number>()
+      for (const tx of s.incomes) cats.set(tx.category, (cats.get(tx.category) ?? 0) + tx.amount)
+      for (const tx of s.expenses) cats.set(tx.category, (cats.get(tx.category) ?? 0) - tx.amount)
+      s.catTotals = [...cats.entries()]
+        .map(([category, net]) => ({ category, net }))
+        .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
+    }
+    return [...byYear.values()].sort((a, b) => b.year.localeCompare(a.year))
+  }, [data])
 
   if (isPending) return null
+  if (sections.length === 0) return null
 
-  const items = data?.items ?? []
-  const catTotals = categories ?? []
-  const incomes = items.filter((tx) => tx.type === 'income')
-  const expenses = items.filter((tx) => tx.type !== 'income')
-
-  const totalIncome = catTotals.reduce((s, c) => s + c.income, 0)
-  const totalExpense = catTotals.reduce((s, c) => s + c.expense, 0)
-  const net = totalIncome - totalExpense
-
-  if (items.length === 0) return null
-
-  const periodLabel = from ? from.slice(0, 4) : t('finance.all')
+  const truncated = (data?.total ?? 0) > (data?.items?.length ?? 0)
 
   return (
     <Card className="shadow-sm">
-      <CardContent className="pt-4 space-y-3">
+      <CardContent className="pt-4 space-y-4">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">{t('finance.annualView')}</p>
-          <span className="text-xs text-muted-foreground tabular-nums">{periodLabel}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{from ? from.slice(0, 4) : t('finance.all')}</span>
         </div>
 
-        <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-          <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">{t('finance.income')}</p>
-            {incomes.map((tx) => <TxRow key={tx.id} tx={tx} />)}
-          </div>
-          <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">{t('finance.expense')}</p>
-            {expenses.map((tx) => <TxRow key={tx.id} tx={tx} />)}
-          </div>
-        </div>
+        {sections.map((s) => (
+          <div key={s.year} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-muted-foreground tabular-nums">{s.year}</p>
+              <span className={`text-xs font-semibold tabular-nums ${s.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {s.net >= 0 ? '+' : '-'}¥{formatMoney(Math.abs(s.net))}
+              </span>
+            </div>
 
-        {catTotals.length > 1 && (
-          <div className="flex flex-wrap gap-2">
-            {catTotals.map((c) => {
-              const catNet = c.income - c.expense
-              return (
-                <span key={c.category || '_'} className="rounded-md bg-muted px-2 py-1 text-xs">
-                  {c.category || t('finance.uncategorized')}
-                  <span className={`ml-1.5 font-semibold tabular-nums ${catNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    ¥{formatMoney(catNet)}
+            <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+              <div>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">{t('finance.income')}</p>
+                {s.incomes.map((tx) => <TxRow key={tx.id} tx={tx} />)}
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">{t('finance.expense')}</p>
+                {s.expenses.map((tx) => <TxRow key={tx.id} tx={tx} />)}
+              </div>
+            </div>
+
+            {s.catTotals.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {s.catTotals.map((c) => (
+                  <span key={c.category || '_'} className="rounded-md bg-muted px-2 py-1 text-xs">
+                    {c.category || t('finance.uncategorized')}
+                    <span className={`ml-1.5 font-semibold tabular-nums ${c.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      ¥{formatMoney(c.net)}
+                    </span>
                   </span>
-                </span>
-              )
-            })}
-          </div>
-        )}
+                ))}
+              </div>
+            )}
 
-        <div className="flex items-center justify-between rounded-lg bg-muted px-3 py-2">
-          <span className="text-sm font-medium">{t('finance.total')}</span>
-          <span className={`text-sm font-bold tabular-nums ${net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {net >= 0 ? '+' : '-'}¥{formatMoney(Math.abs(net))}
-          </span>
-        </div>
+            <div className="flex items-center justify-between rounded-lg bg-muted px-3 py-2">
+              <span className="text-sm font-medium">{t('finance.total')}</span>
+              <span className={`text-sm font-bold tabular-nums ${s.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {s.net >= 0 ? '+' : '-'}¥{formatMoney(Math.abs(s.net))}
+              </span>
+            </div>
+          </div>
+        ))}
+
+        {truncated && (
+          <p className="text-xs text-muted-foreground">{t('finance.truncatedItems', { count: data?.items?.length ?? 0 })}</p>
+        )}
       </CardContent>
     </Card>
   )
