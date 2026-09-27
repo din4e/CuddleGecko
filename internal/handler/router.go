@@ -27,6 +27,7 @@ type Handlers struct {
 	Habit       *HabitHandler
 	Pomodoro    *PomodoroHandler
 	Transaction *TransactionHandler
+	Finance     *FinanceSnapshotHandler
 	AI          *AIHandler
 	Workspace   *WorkspaceHandler
 	Export      *ExportHandler
@@ -51,6 +52,7 @@ func NewHandlers(
 	whiteboardSvc *service.WhiteboardService,
 	fitnessSvc *service.FitnessService,
 	transactionSvc *service.TransactionService,
+	financeSvc *service.FinanceSnapshotService,
 	aiSvc *service.AIService,
 	workspaceSvc *service.WorkspaceService,
 	exportSvc *service.ExportService,
@@ -79,6 +81,7 @@ func NewHandlers(
 		Habit:       NewHabitHandler(habitSvc),
 		Pomodoro:    NewPomodoroHandler(pomodoroSvc),
 		Transaction: NewTransactionHandler(transactionSvc),
+		Finance:     NewFinanceSnapshotHandler(financeSvc),
 		AI:          NewAIHandler(aiSvc, aiCfg),
 		Workspace:   NewWorkspaceHandler(workspaceSvc),
 		Export:      NewExportHandler(exportSvc),
@@ -324,6 +327,13 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.POST("/transactions", h.Transaction.Create)
 			wsProtected.PUT("/transactions/:id", h.Transaction.Update)
 			wsProtected.DELETE("/transactions/:id", h.Transaction.Delete)
+
+			// finance-web snapshot data: net-worth trend, per-date account
+			// detail, mortgage trend, and the idempotent bundle import.
+			wsProtected.GET("/finance/snapshots", h.Finance.ListSnapshots)
+			wsProtected.GET("/finance/snapshots/accounts", h.Finance.ListAccounts)
+			wsProtected.GET("/finance/mortgage", h.Finance.ListMortgages)
+			wsProtected.POST("/finance/import", h.Finance.Import)
 			wsProtected.GET("/transactions/:id/tags", h.Transaction.GetTags)
 			wsProtected.PUT("/transactions/:id/tags", h.Transaction.ReplaceTags)
 

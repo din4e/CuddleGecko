@@ -60,6 +60,7 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 	workoutExerciseRepo := repository.NewWorkoutExerciseRepo(db)
 	bodyMetricRepo := repository.NewBodyMetricRepo(db)
 	transactionRepo := repository.NewTransactionRepo(db)
+	financeSnapshotRepo := repository.NewFinanceSnapshotRepo(db)
 	aiRepo := repository.NewAIRepo(db)
 	workspaceRepo := repository.NewWorkspaceRepo(db)
 	settingRepo := repository.NewSettingRepo(db)
@@ -80,6 +81,7 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 	todoSvc := service.NewTodoService(todoRepo, eventRepo, todoRepo, service.WithTodoNotifier(hub))
 	workoutSvc := service.NewWorkoutService(workoutRepo, workoutExerciseRepo, bodyMetricRepo, taggingRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo, taggingRepo)
+	financeSvc := service.NewFinanceSnapshotService(financeSnapshotRepo)
 	aiSvc := service.NewAIService(aiRepo, contactRepo, eventRepo, interactionRepo, transactionRepo, relationRepo, config.AIConfig{})
 	exportSvc := service.NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo,
 		service.WithExportNotifier(hub), service.WithTransactionRepo(transactionRepo), service.WithEventRepo(eventRepo),
@@ -89,7 +91,7 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 	mcpServer := mcp.NewServer(contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, transactionSvc, aiSvc, workspaceSvc, nil, nil)
 
 	avatarDir := t.TempDir()
-	handlers := NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, nil, transactionSvc, aiSvc, workspaceSvc, exportSvc, avatarDir, config.AIConfig{}, userSettingSvc, nil, nil, searchSvc)
+	handlers := NewHandlers(authSvc, captchaSvc, contactSvc, tagSvc, interactionSvc, reminderSvc, relationSvc, eventSvc, todoSvc, workoutSvc, nil, nil, transactionSvc, financeSvc, aiSvc, workspaceSvc, exportSvc, avatarDir, config.AIConfig{}, userSettingSvc, nil, nil, searchSvc)
 	handlers.WS = NewWSHandler(hub, jwtCfg, workspaceSvc, gin.TestMode, []string{})
 
 	r := gin.New()
@@ -107,6 +109,8 @@ func TestFullWiring_RoutesRegisterAndServe(t *testing.T) {
 	}{
 		{"GET", "/api/transactions/monthly"},    // iter 12 endpoint
 		{"GET", "/api/transactions/yearly"},     // finance annual view
+		{"GET", "/api/finance/snapshots"},       // net-worth trend
+		{"POST", "/api/finance/import"},         // finance-web bundle import
 		{"GET", "/api/transactions/categories"}, // finance category breakdown
 		{"GET", "/api/todos/trash"},             // cascade trash
 		{"PATCH", "/api/todos/1/move"},          // tree move
