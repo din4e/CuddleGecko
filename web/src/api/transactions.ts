@@ -1,15 +1,30 @@
 import { request } from './client'
-import type { Transaction, TransactionSummary, TransactionMonthly, PaginatedData, Tag } from '../types'
+import type {
+  Transaction,
+  TransactionSummary,
+  TransactionMonthly,
+  TransactionYearly,
+  TransactionCategoryTotal,
+  PaginatedData,
+  Tag,
+} from '../types'
 
 export const transactionsApi = {
-  list: (params?: { page?: number; page_size?: number; type?: string; contact_id?: number; q?: string }, signal?: AbortSignal) =>
-    request.get<PaginatedData<Transaction>>('/transactions', { params, signal }).then((data) => ({ data })),
+  list: (
+    params?: { page?: number; page_size?: number; type?: string; contact_id?: number; q?: string; from?: string; to?: string },
+    signal?: AbortSignal,
+  ) => request.get<PaginatedData<Transaction>>('/transactions', { params, signal }).then((data) => ({ data })),
 
-  summary: () =>
-    request.get<TransactionSummary>('/transactions/summary').then((data) => ({ data })),
+  summary: (params?: { from?: string; to?: string }) =>
+    request.get<TransactionSummary>('/transactions/summary', { params }).then((data) => ({ data })),
 
   monthly: (months = 6) =>
     request.get<TransactionMonthly[]>('/transactions/monthly', { params: { months } }).then((data) => ({ data })),
+
+  yearly: () => request.get<TransactionYearly[]>('/transactions/yearly').then((data) => ({ data })),
+
+  categories: (params?: { from?: string; to?: string }) =>
+    request.get<TransactionCategoryTotal[]>('/transactions/categories', { params }).then((data) => ({ data })),
 
   create: (data: Partial<Transaction>) =>
     request.post<Transaction>('/transactions', data).then((d) => ({ data: d })),

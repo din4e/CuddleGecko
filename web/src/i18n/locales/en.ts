@@ -265,6 +265,14 @@ export default {
   finance: {
     title: 'Finance',
     newTransaction: 'New Record',
+    editTransaction: 'Edit Record',
+    deleteTransaction: 'Delete Record',
+    annualView: 'Annual Summary',
+    total: 'Total',
+    uncategorized: 'Uncategorized',
+    chartTitle: 'Income & Expense Trend',
+    yearly: 'Yearly',
+    monthly: 'Monthly',
     deleteConfirm: 'Delete this record?',
     noTransactions: 'No records yet',
     searchPlaceholder: 'Search records...',
@@ -283,8 +291,6 @@ export default {
     totalIncome: 'Total Income',
     totalExpense: 'Total Expense',
     balance: 'Balance',
-    deleteTransaction: 'Delete Record',
-    editTransaction: 'Edit Record',
   },
   // Workspace-wide labels shared by every entry type (todos, events,
   // transactions, workouts, habits, reminders, buddies).

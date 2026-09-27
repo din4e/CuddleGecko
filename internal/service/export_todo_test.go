@@ -349,7 +349,7 @@ func TestExport_TransactionsJSONRoundTrip(t *testing.T) {
 	require.Contains(t, jsonStr, "Salary", "transactions present in JSON export")
 
 	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
-	txs, _, err := txRepo.List(ctx, 2, 1, 100, nil, nil, "", nil)
+	txs, _, err := txRepo.List(ctx, 2, 1, 100, nil, nil, "", nil, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, txs, 1)
 	assert.Equal(t, "Salary", txs[0].Title)
@@ -469,7 +469,7 @@ func TestExport_TransactionsCSVImport(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, ImportStats{Imported: 2, Skipped: 2}, n, "two valid rows (blank-title and bad-amount skipped)")
 
-	txs, _, err := txRepo.List(ctx, 1, 1, 100, nil, nil, "", nil)
+	txs, _, err := txRepo.List(ctx, 1, 1, 100, nil, nil, "", nil, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, txs, 2)
 	byTitle := make(map[string]model.Transaction, len(txs))

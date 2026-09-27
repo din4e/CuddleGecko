@@ -406,7 +406,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 	// only included when a transaction repo is wired in.
 	var transactions []model.Transaction
 	if s.txRepo != nil {
-		transactions, _, err = s.txRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "", nil)
+		transactions, _, err = s.txRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "", nil, nil, nil)
 		if err != nil {
 			return "", fmt.Errorf("export transactions: %w", err)
 		}
@@ -1361,7 +1361,7 @@ func (s *ExportService) ExportTransactionsCSV(ctx context.Context, workspaceID u
 	if s.txRepo == nil {
 		return "", fmt.Errorf("transaction export not available")
 	}
-	txs, _, err := s.txRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "", nil)
+	txs, _, err := s.txRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "", nil, nil, nil)
 	if err != nil {
 		return "", fmt.Errorf("export transactions csv: %w", err)
 	}
@@ -1433,7 +1433,7 @@ func (s *ExportService) ImportTransactionsCSV(ctx context.Context, userID, works
 	if err != nil {
 		return ImportStats{}, err
 	}
-	existing, _, err := s.txRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "", nil)
+	existing, _, err := s.txRepo.List(ctx, workspaceID, 1, 100000, nil, nil, "", nil, nil, nil)
 	if err != nil {
 		return ImportStats{}, err
 	}

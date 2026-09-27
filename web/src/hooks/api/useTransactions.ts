@@ -3,12 +3,24 @@ import { transactionsApi } from '../../api/transactions'
 import { mutationErrorToast } from '../../lib/toast'
 import { rootKey } from './keys'
 import { invalidateScope } from '@/lib/querySync'
-import type { Transaction, TransactionSummary, TransactionMonthly, PaginatedData } from '../../types'
+import type {
+  Transaction,
+  TransactionSummary,
+  TransactionMonthly,
+  TransactionYearly,
+  TransactionCategoryTotal,
+  PaginatedData,
+} from '../../types'
 
 const scope = 'transactions'
 const allKey = () => [scope, ...rootKey(scope).slice(1)] as const
 
-interface ListParams {
+interface DateRange {
+  from?: string
+  to?: string
+}
+
+interface ListParams extends DateRange {
   page?: number
   page_size?: number
   type?: string
@@ -17,18 +29,19 @@ interface ListParams {
 }
 
 export function useTransactionsList(params: ListParams) {
-  const { page = 1, page_size = 50, type, contact_id, q } = params
+  const { page = 1, page_size = 50, type, contact_id, q, from, to } = params
   return useQuery<PaginatedData<Transaction>>({
-    queryKey: [...allKey(), 'list', { page, page_size, type, contact_id, q }] as const,
-    queryFn: ({ signal }) => transactionsApi.list({ page, page_size, type, contact_id, q }, signal).then((r) => r.data),
+    queryKey: [...allKey(), 'list', { page, page_size, type, contact_id, q, from, to }] as const,
+    queryFn: ({ signal }) => transactionsApi.list({ page, page_size, type, contact_id, q, from, to }, signal).then((r) => r.data),
     placeholderData: (prev) => prev,
   })
 }
 
-export function useTransactionsSummary() {
+export function useTransactionsSummary(params?: DateRange) {
+  const { from, to } = params ?? {}
   return useQuery<TransactionSummary>({
-    queryKey: [...allKey(), 'summary'] as const,
-    queryFn: () => transactionsApi.summary().then((r) => r.data),
+    queryKey: [...allKey(), 'summary', { from, to }] as const,
+    queryFn: () => transactionsApi.summary({ from, to }).then((r) => r.data),
   })
 }
 
@@ -36,6 +49,21 @@ export function useTransactionsMonthly(months = 6) {
   return useQuery<TransactionMonthly[]>({
     queryKey: [...allKey(), 'monthly', months] as const,
     queryFn: () => transactionsApi.monthly(months).then((r) => r.data),
+  })
+}
+
+export function useTransactionsYearly() {
+  return useQuery<TransactionYearly[]>({
+    queryKey: [...allKey(), 'yearly'] as const,
+    queryFn: () => transactionsApi.yearly().then((r) => r.data),
+  })
+}
+
+export function useTransactionsCategoryTotals(params?: DateRange) {
+  const { from, to } = params ?? {}
+  return useQuery<TransactionCategoryTotal[]>({
+    queryKey: [...allKey(), 'categories', { from, to }] as const,
+    queryFn: () => transactionsApi.categories({ from, to }).then((r) => r.data),
   })
 }
 

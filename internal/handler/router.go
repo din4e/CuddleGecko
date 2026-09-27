@@ -319,6 +319,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.GET("/transactions", h.Transaction.List)
 			wsProtected.GET("/transactions/summary", h.Transaction.Summary)
 			wsProtected.GET("/transactions/monthly", h.Transaction.Monthly)
+			wsProtected.GET("/transactions/yearly", h.Transaction.Yearly)
+			wsProtected.GET("/transactions/categories", h.Transaction.Categories)
 			wsProtected.POST("/transactions", h.Transaction.Create)
 			wsProtected.PUT("/transactions/:id", h.Transaction.Update)
 			wsProtected.DELETE("/transactions/:id", h.Transaction.Delete)

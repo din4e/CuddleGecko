@@ -27,3 +27,15 @@ export function localDateInput(d: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
+
+/**
+ * formatMoney renders CNY amounts the finance-web way: >=1万 collapses to a
+ * compact `x.x万`, smaller values keep zh-CN thousand separators. Sub-万
+ * values round to integers (finance-web behavior). Callers prefix ¥.
+ */
+export function formatMoney(v: number): string {
+  if (Math.abs(v) >= 10000) {
+    return (v / 10000).toFixed(1).replace(/\.0$/, '') + '万'
+  }
+  return Math.round(v).toLocaleString('zh-CN')
+}

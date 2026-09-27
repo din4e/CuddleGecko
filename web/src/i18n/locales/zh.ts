@@ -265,6 +265,14 @@ export default {
   finance: {
     title: '资金管理',
     newTransaction: '新建记录',
+    editTransaction: '编辑记录',
+    deleteTransaction: '删除记录',
+    annualView: '年度收支',
+    total: '合计',
+    uncategorized: '未分类',
+    chartTitle: '收支趋势',
+    yearly: '年度',
+    monthly: '月度',
     deleteConfirm: '确定删除此记录？',
     noTransactions: '暂无记录',
     searchPlaceholder: '搜索记录...',
@@ -283,8 +291,6 @@ export default {
     totalIncome: '总收入',
     totalExpense: '总支出',
     balance: '余额',
-    deleteTransaction: '删除记录',
-    editTransaction: '编辑记录',
   },
   // 全工作区共享的标签，适用于所有条目（待办、日程、交易、训练、习惯、提醒、伙伴）。
   labels: {
