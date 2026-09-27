@@ -179,6 +179,34 @@ export interface TransactionCategoryTotal {
   expense: number
 }
 
+// finance-web snapshot data (pushed via /api/finance/import)
+
+export interface FinanceSnapshot {
+  date: string
+  assets: number
+  debt: number
+  net_worth: number
+}
+
+export interface FinanceSnapshotAccount {
+  date: string
+  name: string
+  amount: number
+  debt: number
+  // finance-web GetSummary semantics: for credit cards this is already
+  // rewritten to −欠款; for long-term liabilities it is −剩余本金.
+  available: number
+  type: string // 流通 / 非流通 / 锁住 / 信用卡 / 长期负债
+  note: string
+}
+
+export interface FinanceMortgage {
+  date: string
+  remaining: number
+  monthly: number
+  note: string
+}
+
 export interface AIProvider {
   id: number
   user_id: number
