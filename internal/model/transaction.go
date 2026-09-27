@@ -32,3 +32,19 @@ type TransactionMonthly struct {
 	Income  float64 `json:"income"`
 	Expense float64 `json:"expense"`
 }
+
+// TransactionYearly is one year's income/expense totals (keyed "YYYY"), served
+// by the finance page's yearly aggregate (year selector + yearly chart bars).
+type TransactionYearly struct {
+	Year    string  `json:"year"`
+	Income  float64 `json:"income"`
+	Expense float64 `json:"expense"`
+}
+
+// TransactionCategoryTotal is one category's income/expense totals ("" =
+// uncategorized), served by the finance page's category breakdown.
+type TransactionCategoryTotal struct {
+	Category string  `json:"category"`
+	Income   float64 `json:"income"`
+	Expense  float64 `json:"expense"`
+}

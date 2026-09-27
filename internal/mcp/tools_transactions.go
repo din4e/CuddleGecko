@@ -31,7 +31,7 @@ func (s *MCPServer) registerTransactionTools() {
 			contactID = &u
 		}
 
-		txs, total, err := s.transactionSvc.List(ctx, userID, workspaceID, page, pageSize, txType, contactID, search, nil)
+		txs, total, err := s.transactionSvc.List(ctx, userID, workspaceID, page, pageSize, txType, contactID, search, nil, nil, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -47,7 +47,7 @@ func (s *MCPServer) registerTransactionTools() {
 		"type": "object",
 		"properties": map[string]interface{}{},
 	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		income, expense, err := s.transactionSvc.Summary(ctx, userID, workspaceID)
+		income, expense, err := s.transactionSvc.Summary(ctx, userID, workspaceID, nil, nil)
 		if err != nil {
 			return nil, err
 		}

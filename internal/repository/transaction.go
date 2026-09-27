@@ -35,7 +35,19 @@ func (r *TransactionRepo) GetByID(ctx context.Context, workspaceID, id uint) (*m
 	return &tx, nil
 }
 
-func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string, tagIDs []uint) ([]model.Transaction, int64, error) {
+// applyDateRange adds the optional half-open [from, to) bounds to a query;
+// nil bounds leave the query unfiltered (all-time), matching the pre-range API.
+func applyDateRange(query *gorm.DB, from, to *time.Time) *gorm.DB {
+	if from != nil {
+		query = query.Where("date >= ?", *from)
+	}
+	if to != nil {
+		query = query.Where("date < ?", *to)
+	}
+	return query
+}
+
+func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string, tagIDs []uint, from, to *time.Time) ([]model.Transaction, int64, error) {
 	var txs []model.Transaction
 	var total int64
 
@@ -66,6 +78,8 @@ func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, page
 			workspaceID, model.TagTargetTransaction, tagIDs,
 		)
 	}
+
+	query = applyDateRange(query, from, to)
 
 	if err := query.Model(&model.Transaction{}).Count(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("count transactions: %w", err)
@@ -109,17 +123,17 @@ func (r *TransactionRepo) ListByContactIDs(ctx context.Context, workspaceID uint
 	return txs, nil
 }
 
-func (r *TransactionRepo) Summary(ctx context.Context, workspaceID uint) (income float64, expense float64, err error) {
+func (r *TransactionRepo) Summary(ctx context.Context, workspaceID uint, from, to *time.Time) (income float64, expense float64, err error) {
 	var result []struct {
 		Type  string
 		Total float64
 	}
 
-	err = r.db.WithContext(ctx).Model(&model.Transaction{}).
+	query := r.db.WithContext(ctx).Model(&model.Transaction{}).
 		Select("type, SUM(amount) as total").
-		Where("workspace_id = ?", workspaceID).
-		Group("type").
-		Find(&result).Error
+		Where("workspace_id = ?", workspaceID)
+	query = applyDateRange(query, from, to)
+	err = query.Group("type").Find(&result).Error
 	if err != nil {
 		return 0, 0, fmt.Errorf("transaction summary: %w", err)
 	}
@@ -157,13 +171,55 @@ func (r *TransactionRepo) Monthly(ctx context.Context, workspaceID uint, months 
 	var rows []model.TransactionMonthly
 	if err := r.db.WithContext(ctx).Model(&model.Transaction{}).
 		Where("workspace_id = ? AND date >= ?", workspaceID, start).
-		Select(monthExpr+" AS month, "+
-			"SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, "+
+		Select(monthExpr + " AS month, " +
+			"SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, " +
 			"SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense").
 		Group("month").
 		Order("month ASC").
 		Scan(&rows).Error; err != nil {
 		return nil, fmt.Errorf("transaction monthly: %w", err)
+	}
+	return rows, nil
+}
+
+// Yearly returns per-year income/expense totals for every year with data via a
+// single GROUP BY. Like Monthly, the year bucket reads the stored date text
+// (substr, not strftime) so a transaction stays in the year the user entered.
+func (r *TransactionRepo) Yearly(ctx context.Context, workspaceID uint) ([]model.TransactionYearly, error) {
+	yearExpr := "substr(date, 1, 4)"
+	if r.db.Dialector.Name() == "mysql" {
+		yearExpr = "DATE_FORMAT(date, '%Y')"
+	}
+
+	var rows []model.TransactionYearly
+	if err := r.db.WithContext(ctx).Model(&model.Transaction{}).
+		Where("workspace_id = ?", workspaceID).
+		Select(yearExpr + " AS year, " +
+			"SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, " +
+			"SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense").
+		Group("year").
+		Order("year ASC").
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("transaction yearly: %w", err)
+	}
+	return rows, nil
+}
+
+// CategoryTotals returns per-category income/expense totals ("" = uncategorized)
+// via a single GROUP BY, optionally bounded to the half-open [from, to) range.
+func (r *TransactionRepo) CategoryTotals(ctx context.Context, workspaceID uint, from, to *time.Time) ([]model.TransactionCategoryTotal, error) {
+	query := r.db.WithContext(ctx).Model(&model.Transaction{}).
+		Where("workspace_id = ?", workspaceID)
+	query = applyDateRange(query, from, to)
+	var rows []model.TransactionCategoryTotal
+	if err := query.
+		Select("category, " +
+			"SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, " +
+			"SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense").
+		Group("category").
+		Order("SUM(amount) DESC").
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("transaction category totals: %w", err)
 	}
 	return rows, nil
 }
