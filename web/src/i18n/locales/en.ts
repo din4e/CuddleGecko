@@ -270,6 +270,7 @@ export default {
     annualView: 'Annual Summary',
     total: 'Total',
     uncategorized: 'Uncategorized',
+    truncatedItems: 'Many records; showing first {{count}} — yearly totals cover shown rows only',
     chartTitle: 'Income & Expense Trend',
     yearly: 'Yearly',
     monthly: 'Monthly',
