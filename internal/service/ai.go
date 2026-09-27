@@ -574,7 +574,7 @@ func (s *AIService) buildSystemPromptUncached(ctx context.Context, userID, works
 		sb.WriteString("\n")
 	}
 
-	income, expense, err := s.transactionRepo.Summary(ctx, workspaceID)
+	income, expense, err := s.transactionRepo.Summary(ctx, workspaceID, nil, nil)
 	if err != nil {
 		log.Printf("ai: system prompt: tx summary (ws %d): %v", workspaceID, err)
 	}
@@ -794,7 +794,7 @@ func (s *AIService) buildEventAnalysis(ctx context.Context, userID, workspaceID 
 }
 
 func (s *AIService) buildFinancialAnalysis(ctx context.Context, userID, workspaceID uint, sb *strings.Builder) {
-	income, expense, err := s.transactionRepo.Summary(ctx, workspaceID)
+	income, expense, err := s.transactionRepo.Summary(ctx, workspaceID, nil, nil)
 	if err != nil {
 		return
 	}
@@ -804,7 +804,7 @@ func (s *AIService) buildFinancialAnalysis(ctx context.Context, userID, workspac
 	sb.WriteString(fmt.Sprintf("- Total Expense: %.2f\n", expense))
 	sb.WriteString(fmt.Sprintf("- Balance: %.2f\n\n", income-expense))
 
-	txs, _, err := s.transactionRepo.List(ctx, workspaceID, 1, 30, nil, nil, "")
+	txs, _, err := s.transactionRepo.List(ctx, workspaceID, 1, 30, nil, nil, "", nil, nil)
 	if err == nil && len(txs) > 0 {
 		sb.WriteString("### Recent Transactions\n")
 		for _, tx := range txs {
