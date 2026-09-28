@@ -35,10 +35,12 @@ import FinanceChart from '../components/FinanceChart'
 import NetWorthTrendCard from '../components/NetWorthTrendCard'
 import SnapshotAccountsCard from '../components/SnapshotAccountsCard'
 import MortgageCard from '../components/MortgageCard'
+import MonthlyOverviewCard from '../components/MonthlyOverviewCard'
+import MonthDetailView from '../components/MonthDetailView'
 import { useViewMode } from '../hooks/useViewMode'
 import ViewToggle from '../components/ViewToggle'
 import { useTagsList } from '../hooks/api/useTags'
-import { formatMoney } from '../lib/utils'
+import { formatMoney, lastDayOfMonth } from '../lib/utils'
 import type { Transaction } from '../types'
 import {
   useTransactionsList,
@@ -74,8 +76,12 @@ const emptyForm: TxFormData = {
   label_ids: [],
 }
 
+// Fixed '01'..'12' list — the month Select's values match the "MM" slice the
+// monthly aggregate keys on, so no number↔string conversion at selection time.
+const MONTH_OPTIONS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
+
 export default function FinancePage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   // Buddies come from the shared React-Query cache (30s staleTime) instead of a
   // raw per-mount fetch — navigating between pages no longer re-pulls the list.
   const qc = useQueryClient()
@@ -90,6 +96,7 @@ export default function FinancePage() {
   // once typing settles (matches the FitnessPage pattern).
   const deferredQ = useDeferredValue(q)
   const [year, setYear] = useState('')
+  const [month, setMonth] = useState('') // '01'..'12'; '' = all months (needs a year)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
@@ -98,13 +105,18 @@ export default function FinancePage() {
   const [page, setPage] = useState(1)
   const pageSize = 50
 
-  // Year selector drives every query on the page: summary cards, annual view,
-  // chart-independent list below. Literal YYYY-MM-DD strings (no Date math, no
-  // timezone round-trips) — the backend parses them as UTC, matching the Jan-1
-  // storage of imported annual-plan rows.
+  // Year + month selectors drive every query on the page: summary cards,
+  // monthly/annual views, list below. Literal YYYY-MM-DD strings (no Date math,
+  // no timezone round-trips) — the backend parses them as UTC, matching the
+  // Jan-1 storage of imported annual-plan rows. Wire `to` is inclusive, so a
+  // month span ends on the month's last day.
   const { data: yearlyData } = useTransactionsYearly()
   const yearOptions = useMemo(() => (yearlyData ?? []).map((r) => r.year).reverse(), [yearlyData])
-  const range = year ? { from: `${year}-01-01`, to: `${year}-12-31` } : undefined
+  const range = year
+    ? month
+      ? { from: `${year}-${month}-01`, to: lastDayOfMonth(year, month) }
+      : { from: `${year}-01-01`, to: `${year}-12-31` }
+    : undefined
 
   const { data, isPending } = useTransactionsList({
     page,
@@ -136,6 +148,12 @@ export default function FinancePage() {
 
   const changeYear = (y: string) => {
     setYear(y)
+    setMonth('') // a month picked under another year must never survive the switch
+    setPage(1)
+  }
+
+  const changeMonth = (m: string) => {
+    setMonth(m)
     setPage(1)
   }
 
@@ -249,7 +267,13 @@ export default function FinancePage() {
 
       <NetWorthTrendCard />
 
-      <AnnualView from={range?.from} to={range?.to} />
+      {year && !month && <MonthlyOverviewCard year={year} onSelectMonth={changeMonth} />}
+
+      {year && month ? (
+        <MonthDetailView year={year} month={month} summary={summary} onBack={() => changeMonth('')} />
+      ) : (
+        <AnnualView from={range?.from} to={range?.to} />
+      )}
 
       <FinanceChart />
 
@@ -266,6 +290,19 @@ export default function FinancePage() {
             <SelectItem value="">{t('finance.all')}</SelectItem>
             {yearOptions.map((y) => (
               <SelectItem key={y} value={y}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={month} onValueChange={(v) => changeMonth(String(v))} disabled={!year}>
+          <SelectTrigger className="h-9 w-28 text-sm" aria-label={t('finance.allMonths')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">{t('finance.allMonths')}</SelectItem>
+            {MONTH_OPTIONS.map((m) => (
+              <SelectItem key={m} value={m}>
+                {new Date(2020, Number(m) - 1, 1).toLocaleDateString(i18n.language, { month: 'long' })}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>

@@ -48,7 +48,18 @@ export function useTransactionsSummary(params?: DateRange) {
 export function useTransactionsMonthly(months = 6) {
   return useQuery<TransactionMonthly[]>({
     queryKey: [...allKey(), 'monthly', months] as const,
-    queryFn: () => transactionsApi.monthly(months).then((r) => r.data),
+    queryFn: () => transactionsApi.monthly({ months }).then((r) => r.data),
+  })
+}
+
+// Range-mode monthly aggregate (finance page's monthly overview card). Distinct
+// 'monthlyRange' subkey so it never collides with the numeric-keyed rolling
+// hook; both live under the invalidated 'transactions' scope.
+export function useTransactionsMonthlyRange(params: DateRange) {
+  const { from, to } = params
+  return useQuery<TransactionMonthly[]>({
+    queryKey: [...allKey(), 'monthlyRange', { from, to }] as const,
+    queryFn: () => transactionsApi.monthly({ from, to }).then((r) => r.data),
   })
 }
 
