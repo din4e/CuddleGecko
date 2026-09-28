@@ -16,7 +16,7 @@ type TransactionRepository interface {
 	List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string, tagIDs []uint, from, to *time.Time) ([]model.Transaction, int64, error)
 	ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Transaction, error)
 	Summary(ctx context.Context, workspaceID uint, from, to *time.Time) (income float64, expense float64, err error)
-	Monthly(ctx context.Context, workspaceID uint, months int) ([]model.TransactionMonthly, error)
+	Monthly(ctx context.Context, workspaceID uint, months int, from, to *time.Time) ([]model.TransactionMonthly, error)
 	Yearly(ctx context.Context, workspaceID uint) ([]model.TransactionYearly, error)
 	CategoryTotals(ctx context.Context, workspaceID uint, from, to *time.Time) ([]model.TransactionCategoryTotal, error)
 	Update(ctx context.Context, tx *model.Transaction) error
@@ -72,8 +72,8 @@ func (s *TransactionService) Summary(ctx context.Context, userID, workspaceID ui
 	return s.repo.Summary(ctx, workspaceID, from, to)
 }
 
-func (s *TransactionService) Monthly(ctx context.Context, userID, workspaceID uint, months int) ([]model.TransactionMonthly, error) {
-	return s.repo.Monthly(ctx, workspaceID, months)
+func (s *TransactionService) Monthly(ctx context.Context, userID, workspaceID uint, months int, from, to *time.Time) ([]model.TransactionMonthly, error) {
+	return s.repo.Monthly(ctx, workspaceID, months, from, to)
 }
 
 func (s *TransactionService) Yearly(ctx context.Context, userID, workspaceID uint) ([]model.TransactionYearly, error) {

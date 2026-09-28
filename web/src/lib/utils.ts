@@ -39,3 +39,19 @@ export function formatMoney(v: number): string {
   }
   return Math.round(v).toLocaleString('zh-CN')
 }
+
+/**
+ * lastDayOfMonth returns the LAST calendar day ("YYYY-MM-DD") of the given
+ * "YYYY" year and "01".."12" month via a plain day-count table — no Date math,
+ * no timezone round-trips. The backend treats a wire `to` as an inclusive end
+ * date (advanced one day internally), so month spans must send the last day,
+ * not first-of-next-month.
+ */
+export function lastDayOfMonth(year: string, month: string): string {
+  const days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  const y = Number(year)
+  const m = Number(month)
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0
+  const last = m === 2 && leap ? 29 : days[m - 1]
+  return `${year}-${month}-${String(last).padStart(2, '0')}`
+}

@@ -169,7 +169,14 @@ func (h *TransactionHandler) Monthly(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
 	months, _ := strconv.Atoi(c.DefaultQuery("months", "6"))
-	rows, err := h.svc.Monthly(c.Request.Context(), userID, workspaceID, months)
+	// Optional from/to switch the aggregate from the rolling `months` window
+	// (dashboard) to an explicit range (finance page's year selector).
+	from, to, err := parseDateRange(c)
+	if err != nil {
+		response.BadRequest(c, "invalid from/to date format (expected YYYY-MM-DD)")
+		return
+	}
+	rows, err := h.svc.Monthly(c.Request.Context(), userID, workspaceID, months, from, to)
 	if err != nil {
 		response.InternalError(c, "failed to get monthly summary")
 		return

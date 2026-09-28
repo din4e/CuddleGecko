@@ -18,8 +18,10 @@ export const transactionsApi = {
   summary: (params?: { from?: string; to?: string }) =>
     request.get<TransactionSummary>('/transactions/summary', { params }).then((data) => ({ data })),
 
-  monthly: (months = 6) =>
-    request.get<TransactionMonthly[]>('/transactions/monthly', { params: { months } }).then((data) => ({ data })),
+  // months = rolling-window mode (dashboard); from/to = explicit-range mode
+  // (finance page's year selector). Both optional; from/to wins when present.
+  monthly: (params?: { months?: number; from?: string; to?: string }) =>
+    request.get<TransactionMonthly[]>('/transactions/monthly', { params }).then((data) => ({ data })),
 
   yearly: () => request.get<TransactionYearly[]>('/transactions/yearly').then((data) => ({ data })),
 
