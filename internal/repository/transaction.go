@@ -148,15 +148,27 @@ func (r *TransactionRepo) Summary(ctx context.Context, workspaceID uint, from, t
 	return
 }
 
-// Monthly returns per-month income/expense totals for the last `months` months
-// (including the current month) via a single GROUP BY, so the dashboard trend
-// chart and month tiles don't need to fetch every transaction.
-func (r *TransactionRepo) Monthly(ctx context.Context, workspaceID uint, months int) ([]model.TransactionMonthly, error) {
+// Monthly returns per-month income/expense totals via a single GROUP BY, so
+// the dashboard trend chart and month tiles don't need to fetch every
+// transaction. Two modes: with from/to (half-open [from, to), nil bound =
+// unbounded) it aggregates the whole range — the finance page's year selector
+// uses this; with both nil it falls back to the last `months` months
+// (including the current month) for the rolling dashboard window.
+func (r *TransactionRepo) Monthly(ctx context.Context, workspaceID uint, months int, from, to *time.Time) ([]model.TransactionMonthly, error) {
 	if months < 1 {
 		months = 6
 	}
-	now := time.Now()
-	start := time.Date(now.Year(), now.Month()-time.Month(months-1), 1, 0, 0, 0, 0, now.Location())
+
+	query := r.db.WithContext(ctx).Model(&model.Transaction{}).
+		Where("workspace_id = ?", workspaceID)
+
+	if from != nil || to != nil {
+		query = applyDateRange(query, from, to)
+	} else {
+		now := time.Now()
+		start := time.Date(now.Year(), now.Month()-time.Month(months-1), 1, 0, 0, 0, 0, now.Location())
+		query = query.Where("date >= ?", start)
+	}
 
 	// Month truncation differs by driver: SQLite substr vs MySQL DATE_FORMAT.
 	// NB: strftime('%Y-%m', date) would CONVERT the stored timestamp to UTC
@@ -169,8 +181,7 @@ func (r *TransactionRepo) Monthly(ctx context.Context, workspaceID uint, months 
 	}
 
 	var rows []model.TransactionMonthly
-	if err := r.db.WithContext(ctx).Model(&model.Transaction{}).
-		Where("workspace_id = ? AND date >= ?", workspaceID, start).
+	if err := query.
 		Select(monthExpr + " AS month, " +
 			"SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, " +
 			"SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense").
