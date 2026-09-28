@@ -4,32 +4,7 @@ import { Card, CardContent } from './ui/card'
 import { useTransactionsList } from '../hooks/api/useTransactions'
 import { formatMoney } from '../lib/utils'
 import type { Transaction } from '../types'
-
-// Category chip colors, mirroring finance-web's AnnualCard: 我的 → brand green
-// family, 爸妈 → amber family (money-from-parents), unknown → muted. Matches
-// the income-circle palette already used across the finance page.
-const categoryChipClass: Record<string, string> = {
-  我的: 'bg-green-100 text-green-600 dark:bg-green-950',
-  爸妈: 'bg-amber-100 text-amber-600 dark:bg-amber-950',
-}
-
-function chipClass(category: string): string {
-  return categoryChipClass[category] ?? 'bg-muted text-muted-foreground'
-}
-
-function TxRow({ tx }: { tx: Transaction }) {
-  return (
-    <div className="flex items-center gap-2 py-1.5" title={tx.category ? `${tx.category} · ¥${formatMoney(tx.amount)}` : `¥${formatMoney(tx.amount)}`}>
-      {tx.category && (
-        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] leading-none ${chipClass(tx.category)}`}>{tx.category}</span>
-      )}
-      <span className="min-w-0 flex-1 truncate text-sm">{tx.title}</span>
-      <span className={`shrink-0 text-sm font-semibold tabular-nums ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-        {tx.type === 'income' ? '+' : '-'}¥{formatMoney(tx.amount)}
-      </span>
-    </div>
-  )
-}
+import { TxRow } from './TransactionRow'
 
 interface YearSection {
   year: string
@@ -47,9 +22,10 @@ interface YearSection {
  * exist once per year, and listing them flat made three years of rows look
  * like triple-counted duplicates.
  *
- * Items come from the list endpoint capped at the handler's page-size max of
- * 100; when the window has more rows than that, per-year blocks render from
- * the fetched page and a truncation hint is shown.
+ * Items come from the list endpoint capped at this view's own page_size of
+ * 100 (the repo's real max is far higher); when the window has more rows than
+ * that, per-year blocks render from the fetched page and a truncation hint is
+ * shown.
  */
 export function AnnualView({ from, to }: { from?: string; to?: string }) {
   const { t } = useTranslation()

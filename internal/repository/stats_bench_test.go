@@ -106,7 +106,7 @@ func BenchmarkTransactionMonthly(b *testing.B) {
 	ctx := context.Background()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := repo.Monthly(ctx, 1, 6); err != nil {
+		if _, err := repo.Monthly(ctx, 1, 6, nil, nil); err != nil {
 			b.Fatal(err)
 		}
 	}

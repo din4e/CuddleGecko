@@ -103,7 +103,7 @@ func TestTransactionRepo_Monthly(t *testing.T) {
 	mk(200, "income", time.Date(twoAgo.Year(), twoAgo.Month(), 10, 12, 0, 0, 0, now.Location()))
 	mk(999, "income", now.AddDate(0, -10, 0)) // outside the 6-month window
 
-	rows, err := repo.Monthly(ctx, ws, 6)
+	rows, err := repo.Monthly(ctx, ws, 6, nil, nil)
 	require.NoError(t, err)
 
 	byMonth := make(map[string]model.TransactionMonthly, len(rows))
@@ -124,6 +124,45 @@ func TestTransactionRepo_Monthly(t *testing.T) {
 	// The 10-month-old transaction is outside the 6-month window.
 	_, present := byMonth[now.AddDate(0, -10, 0).Format("2006-01")]
 	assert.False(t, present, "out-of-window month must be excluded")
+}
+
+// TestTransactionRepo_Monthly_Range verifies the ranged mode behind the finance
+// page's year selector: with from/to (half-open [from, to)) the aggregate
+// covers the explicit range and ignores `months`, with boundary-day rows
+// included on `from` and excluded once past `to`.
+func TestTransactionRepo_Monthly_Range(t *testing.T) {
+	db := newTransactionTestDB(t)
+	repo := NewTransactionRepo(db)
+	ctx := context.Background()
+	const ws uint = 1
+
+	mk := func(amount float64, txType string, when time.Time) {
+		require.NoError(t, repo.Create(ctx, &model.Transaction{
+			UserID: 1, WorkspaceID: ws, Title: "t", Amount: amount, Type: txType, Date: when,
+		}))
+	}
+
+	mk(100, "income", time.Date(2025, 12, 31, 12, 0, 0, 0, time.UTC)) // before `from`
+	mk(700, "income", time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC))
+	mk(90, "expense", time.Date(2026, 2, 15, 12, 0, 0, 0, time.UTC))
+	mk(300, "income", time.Date(2026, 12, 31, 23, 0, 0, 0, time.UTC)) // last day of range
+	mk(999, "expense", time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC))   // on exclusive `to`
+
+	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	// months is ignored in ranged mode — same rows with 1 or 6.
+	for _, months := range []int{1, 6} {
+		rows, err := repo.Monthly(ctx, ws, months, &from, &to)
+		require.NoError(t, err)
+		require.Len(t, rows, 2, "months=%d: one bucket per month with data in 2026", months)
+		assert.Equal(t, "2026-02", rows[0].Month)
+		assert.InDelta(t, 700.0, rows[0].Income, 0.0001)
+		assert.InDelta(t, 90.0, rows[0].Expense, 0.0001)
+		assert.Equal(t, "2026-12", rows[1].Month)
+		assert.InDelta(t, 300.0, rows[1].Income, 0.0001)
+		assert.InDelta(t, 0.0, rows[1].Expense, 0.0001)
+	}
 }
 
 // TestTransactionRepo_Yearly verifies the per-year income/expense aggregate
