@@ -58,6 +58,8 @@ Thumbs.db
 
 # --- Tooling / agent local state ---
 .omc/
+# Local deployment notes with credentials — never commit
+CLAUDE.local.md
 
 # --- Logs & temp ---
 *.log
