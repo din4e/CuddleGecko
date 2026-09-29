@@ -13,10 +13,10 @@ export interface SubtreeProgress {
   total: number
 }
 
-/** Display percent for a todo: a done task is always 100; otherwise the
- *  manually configured value. null = nothing to show (no bar). */
-export function todoProgressPercent(todo: Pick<Todo, 'progress' | 'status'>): number | null {
-  if (todo.status === 'done') return todo.progress != null ? 100 : null
+/** Display percent for a todo: the manually configured value. Closing a task
+ *  (done / abandoned) keeps the percent it had — status never rewrites it.
+ *  null = nothing to show (no bar). */
+export function todoProgressPercent(todo: Pick<Todo, 'progress'>): number | null {
   return todo.progress ?? null
 }
 
