@@ -400,6 +400,8 @@ export default {
     collapseAll: 'Collapse all',
     expanding: 'Expanding…',
     loadMore: 'Load more',
+    loadAll: 'Load all',
+    loadAllFailed: 'Failed to load all todos, please retry',
     loadedCount: '{{loaded}} / {{total}} loaded',
     loadingChildren: 'Loading subtasks…',
     loadMoreChildren: 'Load more subtasks',

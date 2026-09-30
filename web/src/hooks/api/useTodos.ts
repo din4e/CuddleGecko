@@ -44,6 +44,18 @@ export function useTodosInfinite(params: TodoListParams = {}, options?: { enable
   })
 }
 
+/** One-click "load all": drains an infinite query's remaining pages
+ *  sequentially (fetchNextPage fetches exactly one page per call). Each await
+ *  resolves with the result as of the page that just landed, so hasNextPage
+ *  stays accurate across iterations; rejects on the first failed page — the
+ *  caller toasts and the load-more bar remains for a retry. */
+export async function fetchAllTodoPages(query: ReturnType<typeof useTodosInfinite>): Promise<void> {
+  let current = query
+  while (current.hasNextPage) {
+    current = await current.fetchNextPage()
+  }
+}
+
 /** Per-parent children slice consumed by the lazy tree. */
 export interface TodoChildrenState {
   items: Todo[]
