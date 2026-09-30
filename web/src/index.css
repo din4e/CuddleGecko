@@ -176,11 +176,19 @@
 .animate-cg-card-in { animation: cg-card-in 0.45s ease-out both; }
 .animate-cg-bob { animation: cg-gecko-bob 3.6s ease-in-out infinite; }
 
+/* —— Pomodoro running glow（运行中的呼吸光晕；prefers-reduced-motion 下关闭）—— */
+@keyframes pomo-breathe {
+  0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+}
+.animate-pomo-breathe { animation: pomo-breathe 4s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   .animate-cg-blob,
   .animate-cg-blob-slow,
   .animate-cg-card-in,
-  .animate-cg-bob {
+  .animate-cg-bob,
+  .animate-pomo-breathe {
     animation: none;
   }
 }
