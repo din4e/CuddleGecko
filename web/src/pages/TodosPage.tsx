@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../components/ui/dialog'
-import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical, Eye, EyeOff, Tags, Inbox, CalendarDays, CalendarClock, Flag } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical, Eye, EyeOff, Tags, Inbox, CalendarDays, CalendarClock, Flag, ChevronsDown } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -416,8 +416,8 @@ export default function TodosPage() {
   // vanishing once "Today" lands. Treat that window as loading so the
   // skeleton shows instead of mismatched content.
   const listStale = (view === 'tree' ? rootQuery : flatQuery).isPlaceholderData
-  // One-click "load all" for the load-more bar: drain every remaining page of
-  // the active view's query (flat list or tree roots).
+  // One-click "load all" for the toolbar's square icon button: drain every
+  // remaining page of the active view's query (flat list or tree roots).
   const handleLoadAll = useCallback(async () => {
     try {
       await fetchAllTodoPages(view === 'tree' ? rootQuery : flatQuery)
@@ -1634,7 +1634,7 @@ export default function TodosPage() {
           </select>
         )}
         {/* Inbox-first toggle: pin the 收集箱 (undated) group to the top of
-            the grouped/timeline views. Only meaningful for date grouping. */}
+           the grouped/timeline views. Only meaningful for date grouping. */}
         {(view === 'timeline' || (view === 'grouped' && groupBy === 'date')) && (
           <Button
             variant={inboxFirst ? 'secondary' : 'outline'}
@@ -1646,6 +1646,26 @@ export default function TodosPage() {
             aria-pressed={inboxFirst}
           >
             <Inbox className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        {/* One-click "load all" — the same square-icon style as its toolbar
+           neighbours; hidden once everything is loaded (same rule as the
+           load-more bar). Not in the calendar (own queries) or trash. */}
+        {view !== 'calendar' && smartList !== 'trash' && todos.length < total && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => void handleLoadAll()}
+            disabled={(view === 'tree' ? rootQuery : flatQuery).isFetching}
+            title={t('todos.loadAll')}
+            aria-label={t('todos.loadAll')}
+          >
+            {(view === 'tree' ? rootQuery : flatQuery).isFetching ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ChevronsDown className="h-3.5 w-3.5" />
+            )}
           </Button>
         )}
       </div>
@@ -1930,7 +1950,6 @@ export default function TodosPage() {
           total={total}
           loading={rootQuery.isFetching}
           onMore={() => void rootQuery.fetchNextPage()}
-          onAll={() => void handleLoadAll()}
         />
       ) : smartList !== 'trash' && view !== 'calendar' ? (
         <LoadMoreBar
@@ -1938,7 +1957,6 @@ export default function TodosPage() {
           total={total}
           loading={flatQuery.isFetching}
           onMore={() => void flatQuery.fetchNextPage()}
-          onAll={() => void handleLoadAll()}
         />
       ) : null}
 
