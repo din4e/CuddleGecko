@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import ListPageHeader from '../components/ListPageHeader'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
-import { Play, Pause, RotateCcw, Coffee, Brain, Timer } from 'lucide-react'
+import { Play, Pause, RotateCcw, Coffee, Brain, Timer, CheckCircle2, Clock, Flame } from 'lucide-react'
 import { toast } from 'sonner'
 import { usePomodoroSummary, useRecordPomodoro } from '../hooks/api/usePomodoros'
 import { useTodosList } from '../hooks/api/useTodos'
@@ -105,30 +106,32 @@ export default function PomodoroPage() {
   const circ = 2 * Math.PI * radius
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-semibold tracking-tight">{t('pomo.title')}</h1>
-        <div className="flex gap-2">
-          <Button variant={mode === 'focus' ? 'default' : 'outline'} size="sm" onClick={() => selectMode('focus')}>
-            <Brain className="h-4 w-4 mr-1" />{t('pomo.focus')}
-          </Button>
-          <Button variant={mode === 'break' ? 'default' : 'outline'} size="sm" onClick={() => selectMode('break')}>
-            <Coffee className="h-4 w-4 mr-1" />{t('pomo.break')}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <ListPageHeader
+        title={t('pomo.title')}
+        actions={
+          <>
+            <Button variant={mode === 'focus' ? 'default' : 'outline'} size="sm" onClick={() => selectMode('focus')}>
+              <Brain className="mr-1.5 h-4 w-4" />{t('pomo.focus')}
+            </Button>
+            <Button variant={mode === 'break' ? 'default' : 'outline'} size="sm" onClick={() => selectMode('break')}>
+              <Coffee className="mr-1.5 h-4 w-4" />{t('pomo.break')}
+            </Button>
+          </>
+        }
+      />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <StatCard label={t('pomo.todayCount')} value={summary?.today_count ?? 0} />
-        <StatCard label={t('pomo.todayMin')} value={Math.round((summary?.today_seconds ?? 0) / 60)} />
-        <StatCard label={t('pomo.totalCount')} value={summary?.total_count ?? 0} />
-        <StatCard label={t('pomo.totalMin')} value={Math.round((summary?.total_seconds ?? 0) / 60)} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard icon={<CheckCircle2 className="h-4 w-4 text-green-500" />} label={t('pomo.todayCount')} value={summary?.today_count ?? 0} />
+        <StatCard icon={<Timer className="h-4 w-4 text-red-500" />} label={t('pomo.todayMin')} value={Math.round((summary?.today_seconds ?? 0) / 60)} />
+        <StatCard icon={<Flame className="h-4 w-4 text-orange-500" />} label={t('pomo.totalCount')} value={summary?.total_count ?? 0} />
+        <StatCard icon={<Clock className="h-4 w-4 text-blue-500" />} label={t('pomo.totalMin')} value={Math.round((summary?.total_seconds ?? 0) / 60)} />
       </div>
 
       <Card className="shadow-sm">
-        <CardContent className="flex flex-col items-center gap-5 p-6 sm:p-8">
-          <div className="relative">
+        <CardContent className="flex flex-col items-center gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-center lg:gap-12">
+          <div className="relative shrink-0">
             <svg width="220" height="220" className="-rotate-90">
               <circle cx="110" cy="110" r={radius} fill="none" stroke="currentColor" className="text-muted/30" strokeWidth="12" />
               <circle
@@ -145,48 +148,53 @@ export default function PomodoroPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button size="lg" onClick={() => setRunning((r) => !r)} disabled={secondsLeft === 0}>
-              {running ? <><Pause className="h-5 w-5 mr-1" />{t('pomo.pause')}</> : <><Play className="h-5 w-5 mr-1" />{t('pomo.start')}</>}
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => resetTimer()}>
-              <RotateCcw className="h-5 w-5 mr-1" />{t('pomo.reset')}
-            </Button>
-          </div>
+          <div className="flex w-full max-w-sm flex-col gap-5">
+            <div className="flex items-center justify-center gap-2">
+              <Button size="lg" onClick={() => setRunning((r) => !r)} disabled={secondsLeft === 0}>
+                {running ? <><Pause className="h-5 w-5 mr-1" />{t('pomo.pause')}</> : <><Play className="h-5 w-5 mr-1" />{t('pomo.start')}</>}
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => resetTimer()}>
+                <RotateCcw className="h-5 w-5 mr-1" />{t('pomo.reset')}
+              </Button>
+            </div>
 
-          <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-            <label className="flex items-center gap-2 text-sm">
-              {t('pomo.focusMin')}
-              <Input type="number" min={1} max={120} value={workMin} onChange={(e) => persistWork(Number(e.target.value) || 25)} className="h-8 w-20" />
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              {t('pomo.breakMin')}
-              <Input type="number" min={1} max={60} value={breakMin} onChange={(e) => persistBreak(Number(e.target.value) || 5)} className="h-8 w-20" />
-            </label>
-          </div>
+            <div className="grid grid-cols-2 gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                {t('pomo.focusMin')}
+                <Input type="number" min={1} max={120} value={workMin} onChange={(e) => persistWork(Number(e.target.value) || 25)} className="h-8 w-20" />
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                {t('pomo.breakMin')}
+                <Input type="number" min={1} max={60} value={breakMin} onChange={(e) => persistBreak(Number(e.target.value) || 5)} className="h-8 w-20" />
+              </label>
+            </div>
 
-          {mode === 'focus' && todos.length > 0 && (
-            <label className="flex items-center gap-2 text-sm w-full max-w-sm">
-              {t('pomo.linkTodo')}
-              <select value={todoId} onChange={(e) => setTodoId(e.target.value ? Number(e.target.value) : '')}
-                className="flex-1 h-9 rounded-md border border-border bg-transparent px-2 text-sm">
-                <option value="">{t('pomo.noLink')}</option>
-                {todos.map((td) => (<option key={td.id} value={td.id}>{td.title}</option>))}
-              </select>
-            </label>
-          )}
+            {mode === 'focus' && todos.length > 0 && (
+              <label className="flex items-center gap-2 text-sm">
+                {t('pomo.linkTodo')}
+                <select value={todoId} onChange={(e) => setTodoId(e.target.value ? Number(e.target.value) : '')}
+                  className="flex-1 h-9 rounded-md border border-border bg-transparent px-2 text-sm">
+                  <option value="">{t('pomo.noLink')}</option>
+                  {todos.map((td) => (<option key={td.id} value={td.id}>{td.title}</option>))}
+                </select>
+              </label>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
   )
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
   return (
     <Card>
-      <CardContent className="p-3 text-center">
-        <div className="text-2xl font-bold">{value}</div>
-        <div className="text-xs text-muted-foreground">{label}</div>
+      <CardContent className="p-3">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {icon}
+          <span>{label}</span>
+        </div>
+        <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
       </CardContent>
     </Card>
   )
