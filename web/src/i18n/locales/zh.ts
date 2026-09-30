@@ -399,6 +399,8 @@ export default {
     collapseAll: '折叠全部',
     expanding: '展开中…',
     loadMore: '加载更多',
+    loadAll: '加载全部',
+    loadAllFailed: '加载全部失败，请重试',
     loadedCount: '已加载 {{loaded}} / {{total}}',
     loadingChildren: '子任务加载中…',
     loadMoreChildren: '加载更多子任务',

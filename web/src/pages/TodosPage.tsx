@@ -43,6 +43,7 @@ import { usePomodoroStore } from '../stores/pomodoro'
 import { useTodoCollapseStore, collapseKey } from '../stores/todoCollapse'
 import {
   useTodosInfinite,
+  fetchAllTodoPages,
   useTodoChildrenMap,
   useCreateTodo,
   useUpdateTodo,
@@ -415,6 +416,15 @@ export default function TodosPage() {
   // vanishing once "Today" lands. Treat that window as loading so the
   // skeleton shows instead of mismatched content.
   const listStale = (view === 'tree' ? rootQuery : flatQuery).isPlaceholderData
+  // One-click "load all" for the load-more bar: drain every remaining page of
+  // the active view's query (flat list or tree roots).
+  const handleLoadAll = useCallback(async () => {
+    try {
+      await fetchAllTodoPages(view === 'tree' ? rootQuery : flatQuery)
+    } catch {
+      toast.error(t('todos.loadAllFailed'))
+    }
+  }, [view, rootQuery, flatQuery, t])
 
   // One-click visibility filter. Meaningless on the settled-only lists
   // (Completed / Abandoned / Done today / Done this week — everything there is
@@ -1920,6 +1930,7 @@ export default function TodosPage() {
           total={total}
           loading={rootQuery.isFetching}
           onMore={() => void rootQuery.fetchNextPage()}
+          onAll={() => void handleLoadAll()}
         />
       ) : smartList !== 'trash' && view !== 'calendar' ? (
         <LoadMoreBar
@@ -1927,6 +1938,7 @@ export default function TodosPage() {
           total={total}
           loading={flatQuery.isFetching}
           onMore={() => void flatQuery.fetchNextPage()}
+          onAll={() => void handleLoadAll()}
         />
       ) : null}
 
