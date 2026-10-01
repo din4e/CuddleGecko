@@ -420,6 +420,68 @@ func TestTodoService_Update_RejectsInvalidStatus(t *testing.T) {
 	repo.AssertNotCalled(t, "GetByID", mock.Anything, mock.Anything, mock.Anything)
 }
 
+func TestTodoService_Create_ImportanceUrgencyDefaultNone(t *testing.T) {
+	repo := new(mockTodoRepo)
+	eventRepo := new(mockEventRepoForSync)
+	svc := NewTodoService(repo, eventRepo, repo)
+
+	repo.On("Create", mock.Anything, mock.Anything).Return(nil)
+
+	todo, err := svc.Create(context.Background(), 1, 1, &model.Todo{Title: "t"})
+	assert.NoError(t, err)
+	assert.Equal(t, "none", todo.Importance)
+	assert.Equal(t, "none", todo.Urgency)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoService_Create_RejectsInvalidImportance(t *testing.T) {
+	repo := new(mockTodoRepo)
+	eventRepo := new(mockEventRepoForSync)
+	svc := NewTodoService(repo, eventRepo, repo)
+
+	_, err := svc.Create(context.Background(), 1, 1, &model.Todo{Title: "t", Importance: "very"})
+	assert.ErrorIs(t, err, ErrInvalidTodo)
+	repo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+}
+
+func TestTodoService_Create_RejectsInvalidUrgency(t *testing.T) {
+	repo := new(mockTodoRepo)
+	eventRepo := new(mockEventRepoForSync)
+	svc := NewTodoService(repo, eventRepo, repo)
+
+	_, err := svc.Create(context.Background(), 1, 1, &model.Todo{Title: "t", Urgency: "asap"})
+	assert.ErrorIs(t, err, ErrInvalidTodo)
+	repo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+}
+
+func TestTodoService_Update_RejectsInvalidUrgency(t *testing.T) {
+	repo := new(mockTodoRepo)
+	eventRepo := new(mockEventRepoForSync)
+	svc := NewTodoService(repo, eventRepo, repo)
+
+	_, err := svc.Update(context.Background(), 1, 1, 1, &model.Todo{Urgency: "soon"}, TodoClear{})
+	assert.ErrorIs(t, err, ErrInvalidTodo)
+	repo.AssertNotCalled(t, "GetByID", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestTodoService_Update_AppliesImportanceAndUrgency(t *testing.T) {
+	repo := new(mockTodoRepo)
+	eventRepo := new(mockEventRepoForSync)
+	svc := NewTodoService(repo, eventRepo, repo)
+
+	existing := &model.Todo{ID: 1, Title: "task", Status: "pending", Importance: "none", Urgency: "high"}
+	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	repo.On("Update", mock.Anything, mock.MatchedBy(func(td *model.Todo) bool {
+		return td.Importance == "high" && td.Urgency == "high"
+	})).Return(nil)
+
+	updated, err := svc.Update(context.Background(), 1, 1, 1, &model.Todo{Importance: "high"}, TodoClear{})
+	assert.NoError(t, err)
+	assert.Equal(t, "high", updated.Importance)
+	assert.Equal(t, "high", updated.Urgency, "empty update payload leaves urgency untouched")
+	repo.AssertExpectations(t)
+}
+
 func TestTodoService_Update_StatusSyncsCompletionTime(t *testing.T) {
 	repo := new(mockTodoRepo)
 	eventRepo := new(mockEventRepoForSync)

@@ -26,6 +26,8 @@ type createTodoRequest struct {
 	Description string   `json:"description"`
 	Status      string   `json:"status"`
 	Priority    string   `json:"priority"`
+	Importance  string   `json:"importance"`
+	Urgency     string   `json:"urgency"`
 	DueTime     string   `json:"due_time"`
 	StartTime   string   `json:"start_time"`
 	Duration    int      `json:"duration"`
@@ -44,6 +46,8 @@ type updateTodoRequest struct {
 	Description  string   `json:"description"`
 	Status       string   `json:"status"`
 	Priority     string   `json:"priority"`
+	Importance   string   `json:"importance"`
+	Urgency      string   `json:"urgency"`
 	DueTime      string   `json:"due_time"`
 	ClearDueTime bool     `json:"clear_due_time"`
 	StartTime    string   `json:"start_time"`
@@ -82,9 +86,11 @@ func (h *TodoHandler) List(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
 
 	q := model.TodoListQuery{
-		Status:   c.Query("status"),
-		Priority: c.Query("priority"),
-		Search:   c.Query("q"),
+		Status:     c.Query("status"),
+		Priority:   c.Query("priority"),
+		Importance: c.Query("importance"),
+		Urgency:    c.Query("urgency"),
+		Search:     c.Query("q"),
 		Sort:     c.DefaultQuery("sort", model.TodoSortDueDate),
 		Order:    c.DefaultQuery("order", "asc"),
 		Page:     page,
@@ -371,6 +377,8 @@ func (h *TodoHandler) Create(c *gin.Context) {
 		Description: req.Description,
 		Status:      req.Status,
 		Priority:    req.Priority,
+		Importance:  req.Importance,
+		Urgency:     req.Urgency,
 		Duration:    req.Duration,
 		Amount:      req.Amount,
 		AmountType:  req.AmountType,
@@ -433,6 +441,8 @@ func (h *TodoHandler) Update(c *gin.Context) {
 		Description: req.Description,
 		Status:      req.Status,
 		Priority:    req.Priority,
+		Importance:  req.Importance,
+		Urgency:     req.Urgency,
 		Duration:    req.Duration,
 		Amount:      req.Amount,
 		AmountType:  req.AmountType,

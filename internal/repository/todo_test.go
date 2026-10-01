@@ -277,7 +277,7 @@ func TestTodoRepo_Duplicate(t *testing.T) {
 	tag := &model.Tag{UserID: 1, WorkspaceID: 1, Name: "work"}
 	require.NoError(t, db.Create(tag).Error)
 
-	src := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "original", Status: "done", Priority: "high", Color: "#ff0000"}
+	src := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "original", Status: "done", Priority: "high", Importance: "normal", Urgency: "high", Color: "#ff0000"}
 	require.NoError(t, repo.Create(ctx, src))
 	require.NoError(t, repo.ReplaceTags(ctx, src.ID, []model.Tag{*tag}))
 	require.NoError(t, repo.CreateItem(ctx, &model.TodoItem{TodoID: src.ID, Content: "a", Done: false}))
@@ -288,6 +288,8 @@ func TestTodoRepo_Duplicate(t *testing.T) {
 	assert.Equal(t, "original", clone.Title)
 	assert.Equal(t, "pending", clone.Status, "completion resets on duplicate")
 	assert.Equal(t, "high", clone.Priority)
+	assert.Equal(t, "normal", clone.Importance)
+	assert.Equal(t, "high", clone.Urgency)
 	assert.Equal(t, "#ff0000", clone.Color)
 	assert.Equal(t, 2, clone.ItemTotal)
 	assert.Equal(t, 1, clone.ItemDone, "done state of copied items is preserved")
