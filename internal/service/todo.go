@@ -174,7 +174,11 @@ func (s *TodoService) Create(ctx context.Context, userID, workspaceID uint, todo
 }
 
 func (s *TodoService) GetByID(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error) {
-	return s.repo.GetByID(ctx, workspaceID, id)
+	todo, err := s.repo.GetByID(ctx, workspaceID, id)
+	if err != nil {
+		return nil, ErrTodoNotFound
+	}
+	return todo, nil
 }
 
 func (s *TodoService) List(ctx context.Context, userID, workspaceID uint, q model.TodoListQuery) ([]model.Todo, int64, error) {

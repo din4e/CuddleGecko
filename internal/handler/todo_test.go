@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"gorm.io/gorm"
 )
 
 func init() {
@@ -210,6 +211,7 @@ func setupTodoRouter(todoSvc *service.TodoService) *gin.Engine {
 	})
 	{
 		api.GET("/todos", h.List)
+		api.GET("/todos/:id", h.Get)
 		api.GET("/todos/stats", h.Stats)
 		api.GET("/todos/trash", h.ListTrash)
 		api.POST("/todos", h.Create)
@@ -444,6 +446,55 @@ func TestTodoHandler_BulkAction_InvalidAction(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestTodoHandler_Get(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	repo.On("GetByID", mock.Anything, uint(1), uint(7)).Return(&model.Todo{ID: 7, Title: "parent task"}, nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos/7", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "parent task")
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_Get_NotFound(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	// The repo surfaces gorm.ErrRecordNotFound from First(); the service maps
+	// any lookup error to ErrTodoNotFound.
+	repo.On("GetByID", mock.Anything, uint(1), uint(99)).Return(nil, gorm.ErrRecordNotFound)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos/99", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	repo.AssertExpectations(t)
+}
+
+func TestTodoHandler_Get_InvalidID(t *testing.T) {
+	repo := new(mockTodoSvcRepo)
+	eventRepo := new(mockTodoEventRepo)
+	svc := service.NewTodoService(repo, eventRepo, repo)
+	router := setupTodoRouter(svc)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/todos/not-a-number", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	repo.AssertNotCalled(t, "GetByID", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestTodoHandler_Stats(t *testing.T) {

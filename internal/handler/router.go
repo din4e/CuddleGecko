@@ -212,6 +212,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, cfg *config.Config, workspaceSvc
 			wsProtected.PUT("/events/:id/tags", h.Event.ReplaceTags)
 
 			wsProtected.GET("/todos", h.Todo.List)
+			wsProtected.GET("/todos/:id", h.Todo.Get)
 			wsProtected.GET("/todos/stats", h.Todo.Stats)
 			wsProtected.GET("/todos/trash", h.Todo.ListTrash)
 			wsProtected.POST("/todos", h.Todo.Create)
