@@ -14,6 +14,10 @@ type Todo struct {
 	Description string         `gorm:"type:longtext" json:"description"`
 	Status      string         `gorm:"size:20;not null;default:'pending';index:idx_todo_ws_status_due" json:"status"`   // pending / done / abandoned
 	Priority    string     `gorm:"size:20;not null;default:'none'" json:"priority"`                               // none / low / normal / high
+	// Eisenhower-matrix axes, sharing priority's four-tier vocabulary
+	// (中 = normal). Quadrant side: normal/high counts as important/urgent.
+	Importance  string     `gorm:"size:20;not null;default:'none'" json:"importance"`
+	Urgency     string     `gorm:"size:20;not null;default:'none'" json:"urgency"`
 	Pinned       bool           `gorm:"not null;default:false" json:"pinned"`
 	DueTime     *time.Time     `gorm:"index:idx_todo_ws_status_due" json:"due_time"`
 	StartTime   *time.Time     `json:"start_time"`
@@ -108,8 +112,10 @@ func TruncateActivityValue(s string) string {
 // It powers the TickTick-style smart lists (Today / Next 7 days / Overdue),
 // search box, and sort menu.
 type TodoListQuery struct {
-	Status    string     // "pending" | "done" | "abandoned" | "" (all)
-	Priority  string     // "low" | "normal" | "high" | "" (all)
+	Status     string     // "pending" | "done" | "abandoned" | "" (all)
+	Priority   string     // "low" | "normal" | "high" | "" (all)
+	Importance string     // Eisenhower importance tier | "" (all)
+	Urgency    string     // Eisenhower urgency tier | "" (all)
 	Search    string     // case-insensitive substring match on title OR description
 	DueBefore *time.Time // include todos due at or before this time
 	DueAfter  *time.Time // include todos due at or after this time

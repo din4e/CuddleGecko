@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../components/ui/dialog'
-import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical, Eye, EyeOff, Tags, Inbox, CalendarDays, CalendarClock, Flag, ChevronsDown } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, Loader2, ListChecks, AlignJustify, Columns, Search, ArrowDownUp, X, ChevronUp, ChevronDown, Keyboard, CheckSquare, Download, ListTree, ListPlus, MoreVertical, Eye, EyeOff, Tags, Inbox, CalendarDays, CalendarClock, Flag, ChevronsDown, LayoutGrid } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +25,7 @@ import {
   DropdownMenuCheckboxItem,
 } from '../components/ui/dropdown-menu'
 import { toast } from 'sonner'
-import type { Todo, TodoSort, TodoListParams, TodoUpdateInput, TodoBulkAction, TodoPriority } from '../types'
+import type { Todo, TodoSort, TodoListParams, TodoUpdateInput, TodoBulkAction, TodoPriority, TodoQuadrant } from '../types'
 import EmptyState from '../components/EmptyState'
 import TodoCard, { type TodoCardAction } from '../components/TodoCard'
 import TodoSubtaskList from '../components/TodoSubtaskList'
@@ -33,6 +33,7 @@ import TodoSortableGroups from '../components/TodoSortableGroups'
 import LoadMoreBar from '../components/LoadMoreBar'
 import { InlineMarkdown } from '../components/InlineMarkdown'
 import { matchesColumn } from '../lib/kanban'
+import { quadrantOf, quadrantOverrides, QUADRANT_ORDER } from '../lib/eisenhower'
 import { useKanbanColumns } from '../hooks/api/useKanbanColumns'
 import type { KanbanColumn } from '../api/settings'
 import TodoTree from '../components/TodoTreeRow'
@@ -63,7 +64,7 @@ import {
   useReplaceTodoTags,
 } from '../hooks/api/useTodos'
 
-type TodoView = 'timeline' | 'grouped' | 'kanban' | 'tree' | 'calendar'
+type TodoView = 'timeline' | 'grouped' | 'kanban' | 'tree' | 'calendar' | 'matrix'
 
 // How the grouped view buckets tasks. 'date' is the classic TickTick 今天/明天/
 // 本周 board; the others re-bucket the same list by priority, status or tag —
@@ -498,6 +499,7 @@ export default function TodosPage() {
         case '3': setView('kanban'); break
         case '4': setView('tree'); break
         case '5': setView('calendar'); break
+        case '6': setView('matrix'); break
         case 'h': case 'H':
           setHideCompleted((v) => !v); break
         case '?': setShortcutsOpen(true); break
@@ -659,6 +661,8 @@ export default function TodosPage() {
     title: todo.title,
     description: todo.description,
     priority: todo.priority,
+    importance: todo.importance,
+    urgency: todo.urgency,
     status: todo.status,
     due_time: todo.due_time,
     amount: todo.amount,
@@ -1283,12 +1287,36 @@ export default function TodosPage() {
     return arr
   }, [displayTodos, isTopLevel, inboxFirst, t])
 
+  // --- Matrix (Eisenhower) view ---
+  // Buckets the pending top-level todos by the importance/urgency axes
+  // (中/高 count as important/urgent — see lib/eisenhower). Dropping a card
+  // into another quadrant flips only the axis on the wrong side, so a 高
+  // importance survives a move that only changes urgency.
+  const matrixQuadrants = useMemo(() => {
+    const buckets: Record<TodoQuadrant, Todo[]> = { q1: [], q2: [], q3: [], q4: [] }
+    for (const todo of pendingTodos) buckets[quadrantOf(todo)].push(todo)
+    const meta: Record<TodoQuadrant, { label: string; hint: string; accent: string }> = {
+      q1: { label: t('todos.matrixQ1'), hint: t('todos.matrixQ1Hint'), accent: 'text-red-600 dark:text-red-400' },
+      q2: { label: t('todos.matrixQ2'), hint: t('todos.matrixQ2Hint'), accent: 'text-violet-600 dark:text-violet-400' },
+      q3: { label: t('todos.matrixQ3'), hint: t('todos.matrixQ3Hint'), accent: 'text-amber-600 dark:text-amber-400' },
+      q4: { label: t('todos.matrixQ4'), hint: t('todos.matrixQ4Hint'), accent: 'text-muted-foreground' },
+    }
+    return QUADRANT_ORDER.map((key) => ({ key, ...meta[key], items: buckets[key] }))
+  }, [pendingTodos, t])
+
+  const handleMatrixDrop = useCallback((todo: Todo, key: string) => {
+    const overrides = quadrantOverrides(todo, key as TodoQuadrant)
+    if (Object.keys(overrides).length === 0) return
+    updateTodo.mutate({ id: todo.id, data: fullUpdateData(todo, overrides) })
+  }, [updateTodo, fullUpdateData])
+
   const viewButtons: { key: TodoView; icon: typeof ListChecks; label: string }[] = [
     { key: 'timeline', icon: AlignJustify, label: t('todos.viewTimeline') },
     { key: 'grouped', icon: ListChecks, label: t('todos.viewGrouped') },
     { key: 'kanban', icon: Columns, label: t('todos.viewKanban') },
     { key: 'tree', icon: ListTree, label: t('todos.viewTree') },
     { key: 'calendar', icon: CalendarDays, label: t('todos.viewCalendar') },
+    { key: 'matrix', icon: LayoutGrid, label: t('todos.viewMatrix') },
   ]
 
   // The card-rendering context (see CardRowCtx): rebuilt only when real data
@@ -1750,7 +1778,7 @@ export default function TodosPage() {
         </div>
       ) : view !== 'calendar' && displayTodos.length === 0 ? (
         <EmptyState message={t('todos.noTodos')} />
-      ) : sort === 'manual' && view !== 'kanban' && view !== 'tree' && view !== 'calendar' ? (
+      ) : sort === 'manual' && view !== 'kanban' && view !== 'tree' && view !== 'calendar' && view !== 'matrix' ? (
         /* Manual-order flat list: drag to reorder (the up/down buttons remain
            for precise/keyboard moves). */
         <div className="space-y-3">
@@ -1907,6 +1935,49 @@ export default function TodosPage() {
             </div>
           )}
         </div>
+      ) : view === 'matrix' ? (
+        /* Matrix View — Eisenhower's four quadrants (importance × urgency).
+           Dragging a card into another quadrant re-classifies it: only the
+           axis on the wrong side flips (无/低 ↔ 中/高), so a 高 on the kept
+           axis survives the move. */
+        <div className="space-y-3">
+          <TodoSortableGroups
+            className="grid gap-3 lg:grid-cols-2"
+            groups={matrixQuadrants.map((q) => ({
+              key: q.key,
+              label: (
+                <div className="flex items-baseline justify-between gap-2 border-b pb-1">
+                  <h3 className={`text-xs font-semibold uppercase tracking-wide ${q.accent}`}>
+                    {q.label} <span className="font-normal text-muted-foreground">({q.items.length})</span>
+                  </h3>
+                  <span className="text-[10px] text-muted-foreground">{q.hint}</span>
+                </div>
+              ),
+              items: q.items,
+            }))}
+            itemAreaClass="space-y-1 min-h-6"
+            renderCard={renderTodoCard}
+            renderOverlayCard={(todo) => renderTodoCard(todo, true)}
+            onGroupDrop={handleMatrixDrop}
+            onNest={handleNest}
+          />
+          {doneTodos.length > 0 && (smartList === 'all' || settledOnlyList) && (
+            <div>
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.completed')} ({doneTodos.length})</h3>
+              <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {doneTodos.map((todo) => renderTodoCard(todo))}
+              </div>
+            </div>
+          )}
+          {abandonedTodos.length > 0 && (smartList === 'all' || smartList === 'abandoned') && (
+            <div>
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t('todos.abandoned')} ({abandonedTodos.length})</h3>
+              <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {abandonedTodos.map((todo) => renderTodoCard(todo))}
+              </div>
+            </div>
+          )}
+        </div>
       ) : view === 'calendar' ? (
         /* Calendar View — TickTick's month grid: chips per due day, drag a
            chip onto another day to reschedule (time of day preserved), drop it
@@ -2048,6 +2119,7 @@ export default function TodosPage() {
               ['3', t('todos.viewKanban')],
               ['4', t('todos.viewTree')],
               ['5', t('todos.viewCalendar')],
+              ['6', t('todos.viewMatrix')],
               ['H', t('todos.toggleCompleted')],
               ['↑ ↓', t('todos.navSwitch')],
               ['← →', t('todos.navFold')],

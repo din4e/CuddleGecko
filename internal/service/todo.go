@@ -158,6 +158,18 @@ func (s *TodoService) Create(ctx context.Context, userID, workspaceID uint, todo
 	if err := validateTodoPriority(todo.Priority); err != nil {
 		return nil, err
 	}
+	if todo.Importance == "" {
+		todo.Importance = "none"
+	}
+	if err := validateTodoImportance(todo.Importance); err != nil {
+		return nil, err
+	}
+	if todo.Urgency == "" {
+		todo.Urgency = "none"
+	}
+	if err := validateTodoUrgency(todo.Urgency); err != nil {
+		return nil, err
+	}
 	// A nested todo's parent must exist in the same workspace (defends against
 	// dangling / cross-workspace parent ids supplied on create).
 	if todo.ParentID != nil {
@@ -189,6 +201,12 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 	if err := validateTodoPriority(updates.Priority); err != nil {
 		return nil, err
 	}
+	if err := validateTodoImportance(updates.Importance); err != nil {
+		return nil, err
+	}
+	if err := validateTodoUrgency(updates.Urgency); err != nil {
+		return nil, err
+	}
 	if err := validateTodoStatus(updates.Status); err != nil {
 		return nil, err
 	}
@@ -218,6 +236,12 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 	}
 	if updates.Priority != "" {
 		todo.Priority = updates.Priority
+	}
+	if updates.Importance != "" {
+		todo.Importance = updates.Importance
+	}
+	if updates.Urgency != "" {
+		todo.Urgency = updates.Urgency
 	}
 	if clear.DueTime {
 		todo.DueTime = nil

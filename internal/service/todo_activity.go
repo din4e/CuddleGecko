@@ -124,6 +124,12 @@ func diffTodoUpdates(before, after *model.Todo) []model.TodoActivity {
 	if before.Priority != after.Priority {
 		add("priority", before.Priority, after.Priority)
 	}
+	if before.Importance != after.Importance {
+		add("importance", before.Importance, after.Importance)
+	}
+	if before.Urgency != after.Urgency {
+		add("urgency", before.Urgency, after.Urgency)
+	}
 	if before.Repeat != after.Repeat {
 		add("repeat", before.Repeat, after.Repeat)
 	}

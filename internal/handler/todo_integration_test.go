@@ -96,6 +96,51 @@ func TestTodoHTTP_CreateListToggle(t *testing.T) {
 	assert.Equal(t, "done", decodeTodo(t, env.Data).Status)
 }
 
+// TestTodoHTTP_ImportanceUrgency covers the Eisenhower-axis fields end to
+// end: create defaults, update application, list filtering and validation.
+func TestTodoHTTP_ImportanceUrgency(t *testing.T) {
+	router := setupTodoIntegrationRouter(t)
+
+	// Create without the axes -> defaults to none/none.
+	env, code := doReq(t, router, "POST", "/api/todos", map[string]interface{}{"title": "unclassified"})
+	require.Equal(t, http.StatusCreated, code)
+	plain := decodeTodo(t, env.Data)
+	assert.Equal(t, "none", plain.Importance)
+	assert.Equal(t, "none", plain.Urgency)
+
+	// Create classified into quadrant 1 (重要且紧急).
+	env, code = doReq(t, router, "POST", "/api/todos", map[string]interface{}{
+		"title": "quarterly report", "importance": "high", "urgency": "normal",
+	})
+	require.Equal(t, http.StatusCreated, code)
+	classified := decodeTodo(t, env.Data)
+	assert.Equal(t, "high", classified.Importance)
+	assert.Equal(t, "normal", classified.Urgency)
+
+	// Update moves it to quadrant 2 by clearing urgency.
+	env, code = doReq(t, router, "PUT", fmt.Sprintf("/api/todos/%d", classified.ID), map[string]interface{}{
+		"title": "quarterly report", "urgency": "none",
+	})
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "none", decodeTodo(t, env.Data).Urgency)
+	assert.Equal(t, "high", decodeTodo(t, env.Data).Importance, "omitted axis stays unchanged")
+
+	// Axis filters narrow the list.
+	env, code = doReq(t, router, "GET", "/api/todos?importance=high", nil)
+	require.Equal(t, http.StatusOK, code)
+	var page struct {
+		Items []model.Todo `json:"items"`
+		Total int64        `json:"total"`
+	}
+	require.NoError(t, json.Unmarshal(env.Data, &page))
+	require.Equal(t, int64(1), page.Total)
+	assert.Equal(t, classified.ID, page.Items[0].ID)
+
+	// Invalid tier is a 400, not a 500.
+	_, code = doReq(t, router, "POST", "/api/todos", map[string]interface{}{"title": "bad", "importance": "very"})
+	assert.Equal(t, http.StatusBadRequest, code)
+}
+
 func TestTodoHTTP_Subitems(t *testing.T) {
 	router := setupTodoIntegrationRouter(t)
 	env, _ := doReq(t, router, "POST", "/api/todos", map[string]interface{}{"title": "parent"})

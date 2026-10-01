@@ -153,6 +153,8 @@ function todoPayload(pre: Entity): Entity {
     description: pre.description ?? '',
     status: pre.status ?? 'pending',
     priority: pre.priority ?? 'normal',
+    importance: pre.importance ?? 'none',
+    urgency: pre.urgency ?? 'none',
     due_time: pre.due_time ?? '',
     clear_due_time: pre.due_time == null,
     start_time: pre.start_time ?? '',

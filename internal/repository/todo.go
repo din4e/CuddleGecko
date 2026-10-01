@@ -53,6 +53,12 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQ
 	if q.Priority != "" {
 		query = query.Where("priority = ?", q.Priority)
 	}
+	if q.Importance != "" {
+		query = query.Where("importance = ?", q.Importance)
+	}
+	if q.Urgency != "" {
+		query = query.Where("urgency = ?", q.Urgency)
+	}
 	if q.Search != "" {
 		// LIKE matching is case-insensitive under MySQL's default collation;
 		// wrap with LOWER so SQLite-backed tests also match case-insensitively.
@@ -163,7 +169,7 @@ func todoOrderClause(sort, order string) string {
 
 func (r *TodoRepo) Update(ctx context.Context, todo *model.Todo) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{ID: todo.ID}).
-		Select("title", "description", "status", "priority", "due_time", "start_time", "duration", "amount", "amount_type", "progress", "contact_ids", "color", "repeat", "repeat_interval", "completed_at", "status_before_cascade").
+		Select("title", "description", "status", "priority", "importance", "urgency", "due_time", "start_time", "duration", "amount", "amount_type", "progress", "contact_ids", "color", "repeat", "repeat_interval", "completed_at", "status_before_cascade").
 		Updates(todo).Error; err != nil {
 		return fmt.Errorf("update todo: %w", err)
 	}
@@ -646,6 +652,8 @@ func (r *TodoRepo) Duplicate(ctx context.Context, userID, workspaceID, id uint) 
 		Description: src.Description,
 		Status:      "pending",
 		Priority:    src.Priority,
+		Importance:  src.Importance,
+		Urgency:     src.Urgency,
 		DueTime:     src.DueTime,
 		Amount:      src.Amount,
 		AmountType:  src.AmountType,

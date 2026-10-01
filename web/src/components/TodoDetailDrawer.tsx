@@ -10,7 +10,7 @@ import TodoSubtaskList from './TodoSubtaskList'
 import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 import { TodoHistory } from './TodoHistory'
-import TodoPriorityBadge from './TodoPriorityBadge'
+import TodoPriorityBadge, { TodoAxisBadges } from './TodoPriorityBadge'
 import TodoProgressBar from './TodoProgressBar'
 import { todoProgressPercent } from '../lib/todoProgress'
 import { useSetTodoProgress } from '../hooks/api/useTodos'
@@ -193,6 +193,7 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
             {todo ? (
               <>
                 <TodoPriorityBadge priority={todo.priority} />
+                <TodoAxisBadges todo={todo} />
                 <span className="min-w-0 truncate"><InlineMarkdown text={todo.title} /></span>
               </>
             ) : t('todos.editTodo')}

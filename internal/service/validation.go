@@ -101,9 +101,24 @@ func validTodoPriority(p string) bool {
 	return p == "high" || p == "normal" || p == "low" || p == "none"
 }
 
-func validateTodoPriority(priority string) error {
-	if priority != "" && !validTodoPriority(priority) {
-		return fmt.Errorf("%w: priority must be 'high', 'normal', 'low' or 'none'", ErrInvalidTodo)
+// validateTodoTier validates one of the four-tier string fields (priority and
+// the Eisenhower axes importance/urgency share the same vocabulary). Empty
+// means "leave unchanged" on update, so it is accepted here.
+func validateTodoTier(field, value string) error {
+	if value != "" && !validTodoPriority(value) {
+		return fmt.Errorf("%w: %s must be 'high', 'normal', 'low' or 'none'", ErrInvalidTodo, field)
 	}
 	return nil
+}
+
+func validateTodoPriority(priority string) error {
+	return validateTodoTier("priority", priority)
+}
+
+func validateTodoImportance(importance string) error {
+	return validateTodoTier("importance", importance)
+}
+
+func validateTodoUrgency(urgency string) error {
+	return validateTodoTier("urgency", urgency)
 }

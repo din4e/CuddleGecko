@@ -59,6 +59,8 @@ interface FormValues {
   desc: string
   status: TodoStatus
   priority: 'none' | 'low' | 'normal' | 'high'
+  importance: 'none' | 'low' | 'normal' | 'high'
+  urgency: 'none' | 'low' | 'normal' | 'high'
   dueTime: string
   startTime: string
   duration: string
@@ -78,6 +80,8 @@ function initialFormValues(editing: Todo | null, initialDueTime?: string): FormV
     desc: editing?.description ?? '',
     status: editing?.status ?? 'pending',
     priority: editing?.priority ?? 'none',
+    importance: editing?.importance ?? 'none',
+    urgency: editing?.urgency ?? 'none',
     dueTime: editing?.due_time ? isoToLocalInput(editing.due_time) : initialDueTime ?? '',
     startTime: editing?.start_time ? isoToLocalInput(editing.start_time) : '',
     duration: editing?.duration ? String(editing.duration) : '',
@@ -101,6 +105,8 @@ function snapshotOf(v: FormValues): string {
     description: v.desc,
     status: v.status,
     priority: v.priority,
+    importance: v.importance,
+    urgency: v.urgency,
     due_time: v.dueTime,
     start_time: v.startTime,
     duration: v.duration,
@@ -131,6 +137,8 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   const [formDesc, setFormDesc] = useState(init.desc)
   const [formStatus, setFormStatus] = useState<TodoStatus>(init.status)
   const [formPriority, setFormPriority] = useState<'none' | 'low' | 'normal' | 'high'>(init.priority)
+  const [formImportance, setFormImportance] = useState<'none' | 'low' | 'normal' | 'high'>(init.importance)
+  const [formUrgency, setFormUrgency] = useState<'none' | 'low' | 'normal' | 'high'>(init.urgency)
   const [formDueTime, setFormDueTime] = useState(init.dueTime)
   const [formStartTime, setFormStartTime] = useState(init.startTime)
   // Estimated effort in minutes (TickTick 持续时长); '' = unset.
@@ -164,6 +172,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   // the unmount flush can compare without stale closures.
   const currentSnapshot = snapshotOf({
     title: formTitle, desc: formDesc, status: formStatus, priority: formPriority,
+    importance: formImportance, urgency: formUrgency,
     dueTime: formDueTime, startTime: formStartTime, duration: formDuration, amount: formAmount,
     amountType: formAmountType, contactIds: formContactIds, color: formColor, repeat: formRepeat,
     repeatInterval: formRepeatInterval, tagIds: formTagIds, parentId: formParentId,
@@ -213,6 +222,8 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             description: formDesc,
             status: formStatus,
             priority: formPriority,
+            importance: formImportance,
+            urgency: formUrgency,
             due_time: formDueTime ? new Date(formDueTime).toISOString() : null,
             start_time: formStartTime ? new Date(formStartTime).toISOString() : null,
             duration: formDuration ? parseInt(formDuration, 10) : 0,
@@ -237,6 +248,8 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             description: formDesc,
             status: formStatus === 'pending' ? undefined : formStatus,
             priority: formPriority,
+            importance: formImportance,
+            urgency: formUrgency,
             due_time: formDueTime ? new Date(formDueTime).toISOString() : undefined,
             start_time: formStartTime ? new Date(formStartTime).toISOString() : undefined,
             duration: formDuration ? parseInt(formDuration, 10) : undefined,
@@ -270,6 +283,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
         // while the requests were in flight; those must stay dirty).
         savedSnapshotRef.current = snapshotOf({
           title: formTitle, desc: formDesc, status: formStatus, priority: formPriority,
+          importance: formImportance, urgency: formUrgency,
           dueTime: formDueTime, startTime: formStartTime, duration: formDuration, amount: formAmount,
           amountType: formAmountType, contactIds: formContactIds, color: formColor, repeat: formRepeat,
           repeatInterval: formRepeatInterval, tagIds: formTagIds, parentId: formParentId,
@@ -286,7 +300,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
     const p = run()
     inFlightRef.current = p
     await p
-  }, [labelCreating, formTitle, formDesc, formStatus, formPriority, formDueTime, formStartTime, formDuration, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
+  }, [labelCreating, formTitle, formDesc, formStatus, formPriority, formImportance, formUrgency, formDueTime, formStartTime, formDuration, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
 
   // Keep the "latest value" refs current after every render (effect order
   // matters: this runs before the auto-save/flush effects below, so they and
@@ -446,6 +460,32 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
                 </Button>
               ))}
             </div>
+          </div>
+          {/* Eisenhower axes — the four-quadrant view buckets by these. */}
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { key: 'importance', label: t('todos.importance'), value: formImportance, setter: setFormImportance },
+              { key: 'urgency', label: t('todos.urgency'), value: formUrgency, setter: setFormUrgency },
+            ] as const).map(({ key, label, value, setter }) => (
+              <div key={key} className="space-y-1">
+                <Label>{label}</Label>
+                <div className="flex gap-1">
+                  {(['none', 'low', 'normal', 'high'] as const).map((lv) => (
+                    <Button
+                      key={lv}
+                      type="button"
+                      variant={value === lv ? 'default' : 'outline'}
+                      size="sm"
+                      className="flex-1 px-0 text-xs"
+                      aria-pressed={value === lv}
+                      onClick={() => setter(lv)}
+                    >
+                      {t(`todos.${lv}`)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
           <div className="space-y-1">
             <Label>{t('todos.dueTime')}</Label>

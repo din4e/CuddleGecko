@@ -8,25 +8,29 @@ import (
 )
 
 func (s *MCPServer) registerTodoTools() {
-	s.registerTool("list_todos", "List todos with optional filters (status, priority, search, sort).", map[string]interface{}{
+	s.registerTool("list_todos", "List todos with optional filters (status, priority, importance, urgency, search, sort).", map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
-			"status":   map[string]interface{}{"type": "string", "description": "Filter by status: pending, done or abandoned"},
-			"priority": map[string]interface{}{"type": "string", "description": "Filter by priority: none, low, normal or high"},
-			"q":        map[string]interface{}{"type": "string", "description": "Case-insensitive substring match on title"},
-			"sort":     map[string]interface{}{"type": "string", "description": "Sort key: due_date (default), priority, title or created"},
-			"order":    map[string]interface{}{"type": "string", "description": "Sort order: asc (default) or desc"},
-			"overdue":  map[string]interface{}{"type": "boolean", "description": "Only pending todos whose due time is in the past"},
+			"status":     map[string]interface{}{"type": "string", "description": "Filter by status: pending, done or abandoned"},
+			"priority":   map[string]interface{}{"type": "string", "description": "Filter by priority: none, low, normal or high"},
+			"importance": map[string]interface{}{"type": "string", "description": "Filter by Eisenhower importance: none, low, normal or high"},
+			"urgency":    map[string]interface{}{"type": "string", "description": "Filter by Eisenhower urgency: none, low, normal or high"},
+			"q":          map[string]interface{}{"type": "string", "description": "Case-insensitive substring match on title"},
+			"sort":       map[string]interface{}{"type": "string", "description": "Sort key: due_date (default), priority, title or created"},
+			"order":      map[string]interface{}{"type": "string", "description": "Sort order: asc (default) or desc"},
+			"overdue":    map[string]interface{}{"type": "boolean", "description": "Only pending todos whose due time is in the past"},
 		},
 	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
 		q := model.TodoListQuery{
-			Status:   toString(getArg(args, "status")),
-			Priority: toString(getArg(args, "priority")),
-			Search:   toString(getArg(args, "q")),
-			Sort:     toString(getArg(args, "sort")),
-			Order:    toString(getArg(args, "order")),
-			Page:     1,
-			PageSize: 200,
+			Status:     toString(getArg(args, "status")),
+			Priority:   toString(getArg(args, "priority")),
+			Importance: toString(getArg(args, "importance")),
+			Urgency:    toString(getArg(args, "urgency")),
+			Search:     toString(getArg(args, "q")),
+			Sort:       toString(getArg(args, "sort")),
+			Order:      toString(getArg(args, "order")),
+			Page:       1,
+			PageSize:   200,
 		}
 		if v := getArg(args, "overdue"); v != nil {
 			q.Overdue = toBool(v)
@@ -42,6 +46,8 @@ func (s *MCPServer) registerTodoTools() {
 			"description":  map[string]interface{}{"type": "string", "description": "Todo description"},
 			"status":       map[string]interface{}{"type": "string", "description": "Status: pending, done or abandoned (default pending)"},
 			"priority":    map[string]interface{}{"type": "string", "description": "Priority: none, low, normal or high (default none)"},
+			"importance":  map[string]interface{}{"type": "string", "description": "Eisenhower importance: none, low, normal or high (default none)"},
+			"urgency":     map[string]interface{}{"type": "string", "description": "Eisenhower urgency: none, low, normal or high (default none)"},
 			"due_time":     map[string]interface{}{"type": "string", "description": "Due time (RFC3339)"},
 			"duration":     map[string]interface{}{"type": "integer", "description": "Estimated effort in minutes (0 = unset)"},
 			"amount":       map[string]interface{}{"type": "number", "description": "Associated amount"},
@@ -65,6 +71,8 @@ func (s *MCPServer) registerTodoTools() {
 			Description: toString(getArg(args, "description")),
 			Status:      toString(getArg(args, "status")),
 			Priority:    toString(getArg(args, "priority")),
+			Importance:  toString(getArg(args, "importance")),
+			Urgency:     toString(getArg(args, "urgency")),
 			DueTime:     toTimePtr(getArg(args, "due_time")),
 			Duration:    int(toUint(getArg(args, "duration"))),
 			Amount:      toFloat64Ptr(getArg(args, "amount")),
@@ -86,6 +94,8 @@ func (s *MCPServer) registerTodoTools() {
 			"description":    map[string]interface{}{"type": "string", "description": "Todo description"},
 			"status":         map[string]interface{}{"type": "string", "description": "Status: pending, done or abandoned"},
 			"priority":       map[string]interface{}{"type": "string", "description": "Priority: none, low, normal or high"},
+			"importance":     map[string]interface{}{"type": "string", "description": "Eisenhower importance: none, low, normal or high"},
+			"urgency":        map[string]interface{}{"type": "string", "description": "Eisenhower urgency: none, low, normal or high"},
 			"due_time":       map[string]interface{}{"type": "string", "description": "Due time (RFC3339)"},
 			"clear_due_time": map[string]interface{}{"type": "boolean", "description": "Clear the due time"},
 			"duration":       map[string]interface{}{"type": "integer", "description": "Estimated effort in minutes (0 = unset)"},
@@ -107,6 +117,8 @@ func (s *MCPServer) registerTodoTools() {
 			Description: toString(getArg(args, "description")),
 			Status:      toString(getArg(args, "status")),
 			Priority:    toString(getArg(args, "priority")),
+			Importance:  toString(getArg(args, "importance")),
+			Urgency:     toString(getArg(args, "urgency")),
 			DueTime:     toTimePtr(getArg(args, "due_time")),
 			Duration:    int(toUint(getArg(args, "duration"))),
 			Amount:      toFloat64Ptr(getArg(args, "amount")),

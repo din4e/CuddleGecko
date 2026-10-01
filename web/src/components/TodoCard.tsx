@@ -14,7 +14,7 @@ import { cn } from '../lib/utils'
 import { formatDueLabel } from '../lib/dueLabel'
 import { formatDuration } from '../lib/duration'
 import { collapseKey, useTodoCollapseStore } from '../stores/todoCollapse'
-import TodoPriorityBadge from './TodoPriorityBadge'
+import TodoPriorityBadge, { TodoAxisBadges } from './TodoPriorityBadge'
 import TodoProgressBar from './TodoProgressBar'
 import { todoProgressPercent } from '../lib/todoProgress'
 import { useSetTodoProgress } from '../hooks/api/useTodos'
@@ -309,6 +309,7 @@ const TodoCard = memo(function TodoCard({
               // 嵌套在 button(交互内容)里;键盘 Enter/Space 直接开抽屉。
               <div className="flex items-start gap-1.5">
                 <TodoPriorityBadge priority={todo.priority} className="mt-0.5" />
+                <TodoAxisBadges todo={todo} className="mt-0.5" />
                 <span
                   role="button"
                   tabIndex={0}

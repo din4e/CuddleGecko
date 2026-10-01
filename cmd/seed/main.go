@@ -277,26 +277,26 @@ func seedTodos(db *gorm.DB, user model.User, tags []model.Tag, contacts []model.
 		todo model.Todo
 		tags []uint
 	}{
-		// Today + pinned, high priority.
-		{model.Todo{Title: "完成季度汇报", Description: "整理 Q2 数据并提交给管理层", Priority: "high", Pinned: true, DueTime: todayAt(18, 0), Color: "#ef4444", ContactIDs: []uint{contacts[2].ID}}, tagIDs(tags[0].ID)},
-		// Overdue.
-		{model.Todo{Title: "给旺财洗澡", Priority: "normal", DueTime: relAt(-48 * time.Hour), ContactIDs: []uint{contacts[3].ID}}, tagIDs(tags[3].ID)},
-		// Next 7 days.
-		{model.Todo{Title: "订机票去上海", Priority: "high", DueTime: relAt(72 * time.Hour)}, tagIDs(tags[2].ID)},
+		// Today + pinned, high priority. Matrix Q1 (重要且紧急).
+		{model.Todo{Title: "完成季度汇报", Description: "整理 Q2 数据并提交给管理层", Priority: "high", Importance: "high", Urgency: "high", Pinned: true, DueTime: todayAt(18, 0), Color: "#ef4444", ContactIDs: []uint{contacts[2].ID}}, tagIDs(tags[0].ID)},
+		// Overdue — urgent but not important (matrix Q3).
+		{model.Todo{Title: "给旺财洗澡", Priority: "normal", Importance: "low", Urgency: "high", DueTime: relAt(-48 * time.Hour), ContactIDs: []uint{contacts[3].ID}}, tagIDs(tags[3].ID)},
+		// Next 7 days — urgent, not important (matrix Q3).
+		{model.Todo{Title: "订机票去上海", Priority: "high", Importance: "low", Urgency: "high", DueTime: relAt(72 * time.Hour)}, tagIDs(tags[2].ID)},
 		// Recurring daily.
 		{model.Todo{Title: "每日站会", Priority: "normal", Repeat: "daily", DueTime: todayAt(9, 30)}, nil},
 		// Recurring weekly.
 		{model.Todo{Title: "每周复盘周报", Priority: "normal", Repeat: "weekly", DueTime: relAt(5 * 24 * time.Hour)}, nil},
 		// Recurring weekdays.
 		{model.Todo{Title: "健身房锻炼", Priority: "low", Repeat: "weekdays", DueTime: todayAt(19, 0)}, nil},
-		// Finance-linked (expense amount).
-		{model.Todo{Title: "缴房租", Description: "本月房租", Priority: "high", Amount: amt(3500), AmountType: "expense", DueTime: relAt(5 * 24 * time.Hour)}, tagIDs(tags[1].ID)},
-		// Parent with a partially-done checklist.
-		{model.Todo{Title: "读完《设计模式》", Priority: "normal", DueTime: relAt(10 * 24 * time.Hour)}, nil},
+		// Finance-linked (expense amount). Matrix Q2 (重要不紧急).
+		{model.Todo{Title: "缴房租", Description: "本月房租", Priority: "high", Importance: "high", Urgency: "normal", Amount: amt(3500), AmountType: "expense", DueTime: relAt(5 * 24 * time.Hour)}, tagIDs(tags[1].ID)},
+		// Parent with a partially-done checklist. Matrix Q2.
+		{model.Todo{Title: "读完《设计模式》", Priority: "normal", Importance: "normal", DueTime: relAt(10 * 24 * time.Hour)}, nil},
 		// Parent with an untouched checklist.
 		{model.Todo{Title: "准备小红生日聚会", Priority: "normal", DueTime: relAt(6 * 24 * time.Hour), ContactIDs: []uint{contacts[1].ID}}, tagIDs(tags[0].ID)},
-		// Deferred (future start_time) — hidden from actionable views, counted in stats.
-		{model.Todo{Title: "学习 Rust 新语言", Priority: "low", StartTime: relAt(10 * 24 * time.Hour)}, nil},
+		// Deferred (future start_time) — hidden from actionable views, counted in stats. Matrix Q4.
+		{model.Todo{Title: "学习 Rust 新语言", Priority: "low", Importance: "low", Urgency: "none", StartTime: relAt(10 * 24 * time.Hour)}, nil},
 		// Done today.
 		{model.Todo{Title: "整理上月报销", Priority: "normal", Status: "done", CompletedAt: relAt(-2 * time.Hour)}, nil},
 		// Done this week.

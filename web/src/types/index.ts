@@ -257,6 +257,9 @@ export type TodoPriority = 'none' | 'low' | 'normal' | 'high'
 export type AmountType = '' | 'income' | 'expense'
 export type TodoSort = 'due_date' | 'priority' | 'title' | 'created' | 'manual'
 
+/** Eisenhower-matrix quadrant keys (importance × urgency). */
+export type TodoQuadrant = 'q1' | 'q2' | 'q3' | 'q4'
+
 /** Batch actions for POST /todos/bulk ("priority" also carries a value). */
 export type TodoBulkAction = 'complete' | 'delete' | 'postpone' | 'priority'
 
@@ -264,6 +267,8 @@ export type TodoBulkAction = 'complete' | 'delete' | 'postpone' | 'priority'
 export interface TodoListParams {
   status?: TodoStatus
   priority?: TodoPriority
+  importance?: TodoPriority
+  urgency?: TodoPriority
   q?: string
   due_before?: string
   due_after?: string
@@ -349,6 +354,10 @@ export interface Todo {
   description: string
   status: TodoStatus
   priority: TodoPriority
+  /** Eisenhower axes — same four-tier vocabulary as priority (中 = normal).
+   *  Optional on the client for resilience (older cached rows, test mocks). */
+  importance?: TodoPriority
+  urgency?: TodoPriority
   due_time: string | null
   start_time?: string | null
   /** Estimated effort in minutes (TickTick 持续时长). 0/undefined = unset. */

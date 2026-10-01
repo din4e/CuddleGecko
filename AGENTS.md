@@ -102,7 +102,7 @@ web/src/pages/         # route-level views
 - **Reminder** — title, description, remind_at, status (pending/done/snoozed), contact_id
 - **ContactRelation** — contact_id_a, contact_id_b, relation_type
 - **Event** — title, description, start_time, end_time, location, color, contact_ids[]
-- **Todo** — title, description, status, priority, pinned, due_time, start_time, repeat/repeat_interval, sort_order, parent_id (nested tree), item_total/item_done, pomodoro_count, contact_ids[], tags[]
+- **Todo** — title, description, status, priority, importance/urgency (Eisenhower axes, same four tiers as priority; normal+ counts as important/urgent → the matrix view's quadrants), pinned, due_time, start_time, repeat/repeat_interval, sort_order, parent_id (nested tree), item_total/item_done, pomodoro_count, contact_ids[], tags[]
 - **Workout** — name, type, status, intensity, scheduled_at, duration, calories, exercises[] (sets/reps/weight), sort_order
 - **BodyMetric** — recorded_at, weight, height, body_fat, resting_hr, sleep, steps, energy, mood
 - **Transaction** — title, amount, type (income/expense), category, contact_ids[], date, notes

@@ -101,6 +101,8 @@ type todoExport struct {
 	Description    string       `json:"description"`
 	Status         string       `json:"status"`
 	Priority       string       `json:"priority"`
+	Importance     string       `json:"importance"`
+	Urgency        string       `json:"urgency"`
 	DueTime        *time.Time   `json:"due_time"`
 	StartTime      *time.Time   `json:"start_time"`
 	Amount         *float64     `json:"amount"`
@@ -396,6 +398,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 		todoExports = append(todoExports, todoExport{
 			ID: td.ID, ParentID: td.ParentID, SortOrder: td.SortOrder,
 			Title: td.Title, Description: td.Description, Status: td.Status, Priority: td.Priority,
+			Importance: td.Importance, Urgency: td.Urgency,
 			DueTime: td.DueTime, StartTime: td.StartTime, Amount: td.Amount, AmountType: td.AmountType, Progress: td.Progress,
 			ContactIDs: td.ContactIDs, Color: td.Color, Repeat: td.Repeat, RepeatInterval: td.RepeatInterval,
 			Pinned: td.Pinned, CompletedAt: td.CompletedAt, TagNames: tagNames, Items: itemsOut,
@@ -905,6 +908,8 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 			Description: te.Description,
 			Status:      status,
 			Priority:    priority,
+			Importance:  tierOrDefault(te.Importance, "none"),
+			Urgency:     tierOrDefault(te.Urgency, "none"),
 			DueTime:     te.DueTime,
 			StartTime:   te.StartTime,
 			Amount:      te.Amount,
@@ -1257,6 +1262,18 @@ func csvWriteRow(w *csv.Writer, cells []string) {
 	_ = w.Write(cells)
 }
 
+// tierOrDefault maps an imported four-tier field (priority / importance /
+// urgency) to a valid value, falling back when the source carries junk or an
+// older schema without the column.
+func tierOrDefault(v, fallback string) string {
+	switch v {
+	case "none", "low", "normal", "high":
+		return v
+	default:
+		return fallback
+	}
+}
+
 func (s *ExportService) ExportTodosCSV(ctx context.Context, workspaceID uint) (string, error) {
 	todos, _, err := s.todoRepo.List(ctx, workspaceID, model.TodoListQuery{Page: 1, PageSize: 100000})
 	if err != nil {
@@ -1265,7 +1282,7 @@ func (s *ExportService) ExportTodosCSV(ctx context.Context, workspaceID uint) (s
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
 	csvWriteRow(w, []string{
-		"id", "title", "description", "status", "priority", "due_time", "start_time",
+		"id", "title", "description", "status", "priority", "importance", "urgency", "due_time", "start_time",
 		"parent_id", "sort_order", "amount", "amount_type", "color", "repeat",
 		"repeat_interval", "pinned", "completed_at", "tags", "item_done", "item_total", "created_at",
 	})
@@ -1280,6 +1297,8 @@ func (s *ExportService) ExportTodosCSV(ctx context.Context, workspaceID uint) (s
 			t.Description,
 			t.Status,
 			t.Priority,
+			tierOrDefault(t.Importance, "none"),
+			tierOrDefault(t.Urgency, "none"),
 			timeToStr(t.DueTime),
 			timeToStr(t.StartTime),
 			uintPtrToStr(t.ParentID),
@@ -1617,6 +1636,8 @@ func (s *ExportService) ImportTodosCSV(ctx context.Context, userID, workspaceID 
 		if pr := t.field(row, "priority"); pr == "none" || pr == "low" || pr == "normal" || pr == "high" {
 			todo.Priority = pr
 		}
+		todo.Importance = tierOrDefault(t.field(row, "importance"), "none")
+		todo.Urgency = tierOrDefault(t.field(row, "urgency"), "none")
 		todo.DueTime = csvTime(t.field(row, "due_time"))
 		if c := t.field(row, "color"); c != "" {
 			todo.Color = c
