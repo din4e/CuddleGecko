@@ -144,6 +144,29 @@ func (h *TodoHandler) List(c *gin.Context) {
 	response.OKPaginated(c, todos, total, q.Page, q.PageSize)
 }
 
+// Get returns a single todo by id — used to resolve references (e.g. a parent
+// task) that the caller's current view hasn't loaded.
+func (h *TodoHandler) Get(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	workspaceID := middleware.GetWorkspaceID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid todo id")
+		return
+	}
+
+	todo, err := h.svc.GetByID(c.Request.Context(), userID, workspaceID, uint(id))
+	if errors.Is(err, service.ErrTodoNotFound) {
+		response.NotFound(c, "todo not found")
+		return
+	}
+	if err != nil {
+		response.InternalError(c, "failed to get todo")
+		return
+	}
+	response.OK(c, todo)
+}
+
 func (h *TodoHandler) Stats(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
