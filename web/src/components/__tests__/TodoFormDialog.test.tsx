@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   replaceTags: vi.fn(),
   moveTodo: vi.fn(),
   list: vi.fn<(params?: unknown, options?: unknown) => { data: { items: Todo[]; total: number; page: number; page_size: number } | undefined; isFetching: boolean }>(),
+  get: vi.fn<(id: number | null) => { data: Todo | undefined }>(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -28,6 +29,8 @@ vi.mock('../../hooks/api/useTodos', () => ({
   useMoveTodo: () => ({ mutateAsync: mocks.moveTodo, isPending: false }),
   // Parent picker search: no results by default (overridable per test).
   useTodosList: (params: Record<string, unknown>, options?: { enabled?: boolean }) => mocks.list(params, options),
+  // Parent picker by-id fallback: unresolved by default.
+  useTodo: (id: number | null) => mocks.get(id),
 }))
 
 vi.mock('../../api/contacts', () => ({
@@ -56,6 +59,8 @@ describe('TodoFormDialog', () => {
     mocks.moveTodo.mockReset()
     mocks.list.mockReset()
     mocks.list.mockReturnValue({ data: undefined, isFetching: false })
+    mocks.get.mockReset()
+    mocks.get.mockReturnValue({ data: undefined })
   })
 
   it('finds a parent through the searchable picker and reparents on save', async () => {
