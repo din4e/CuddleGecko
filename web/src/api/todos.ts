@@ -24,6 +24,9 @@ export const todosApi = {
   stats: () =>
     request.get<TodoStats>('/todos/stats').then((data) => ({ data })),
 
+  get: (id: number, signal?: AbortSignal) =>
+    request.get<Todo>(`/todos/${id}`, { signal }).then((data) => ({ data })),
+
   listTrash: () =>
     request.get<Todo[]>('/todos/trash').then((data) => ({ data })),
 

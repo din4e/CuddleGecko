@@ -56,6 +56,19 @@ export async function fetchAllTodoPages(query: ReturnType<typeof useTodosInfinit
   }
 }
 
+/** Single todo by id — resolves references the current view hasn't loaded
+ *  (e.g. a parent task outside the active filter). No retry: a missing todo
+ *  (trashed / deleted) just stays unresolved. */
+export function useTodo(id: number | null) {
+  const queryKey = [...allKey(), 'detail', id] as const
+  return useQuery<Todo>({
+    queryKey,
+    queryFn: ({ signal }) => todosApi.get(id!, signal).then((r) => r.data),
+    enabled: id != null,
+    retry: false,
+  })
+}
+
 /** Per-parent children slice consumed by the lazy tree. */
 export interface TodoChildrenState {
   items: Todo[]

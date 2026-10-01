@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, Circle, CheckCircle2, Ban, CornerDownRight } from 'lucide-react'
 import { cn } from '../lib/utils'
-import { useTodosList } from '../hooks/api/useTodos'
+import { useTodo, useTodosList } from '../hooks/api/useTodos'
 import type { Todo } from '../types'
 
 // Searchable parent-task picker (TodoForm's 父任务 field): a combobox that
@@ -85,13 +85,25 @@ export default function TodoParentPicker({ value, onChange, candidates, blocked 
 
   // The closed state shows the selected parent's title: from the loaded
   // candidates, the search results, or the remembered pick — else its id.
+  // A parent outside the current view (filtered out, other page) is in none of
+  // those, so fetch it by id to show a real title instead of a bare "#id".
+  const locallyKnown =
+    value != null &&
+    (picked?.id === value ||
+      candidates.some((c) => c.id === value) ||
+      (results?.items ?? []).some((c) => c.id === value))
+  const { data: fetchedParent } = useTodo(!locallyKnown ? value : null)
+
   const knownTitle = useMemo(() => {
     if (value == null) return null
     if (picked?.id === value) return picked.title
     const local = candidates.find((c) => c.id === value)?.title
     if (local) return local
-    return results?.items?.find((c) => c.id === value)?.title ?? `#${value}`
-  }, [value, picked, candidates, results])
+    const fromSearch = results?.items?.find((c) => c.id === value)?.title
+    if (fromSearch) return fromSearch
+    if (fetchedParent?.id === value) return fetchedParent.title
+    return `#${value}`
+  }, [value, picked, candidates, results, fetchedParent])
 
   const choose = (parentId: number | null, title?: string) => {
     onChange(parentId)
