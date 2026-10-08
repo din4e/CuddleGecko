@@ -109,6 +109,7 @@ type todoExport struct {
 	AmountType     string       `json:"amount_type"`
 	Progress       *int         `json:"progress"`
 	ContactIDs     []uint       `json:"contact_ids"`
+	TodoIDs        []uint       `json:"todo_ids"`
 	Color          string       `json:"color"`
 	Repeat         string       `json:"repeat"`
 	RepeatInterval int          `json:"repeat_interval"`
@@ -400,7 +401,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 			Title: td.Title, Description: td.Description, Status: td.Status, Priority: td.Priority,
 			Importance: td.Importance, Urgency: td.Urgency,
 			DueTime: td.DueTime, StartTime: td.StartTime, Amount: td.Amount, AmountType: td.AmountType, Progress: td.Progress,
-			ContactIDs: td.ContactIDs, Color: td.Color, Repeat: td.Repeat, RepeatInterval: td.RepeatInterval,
+			ContactIDs: td.ContactIDs, TodoIDs: td.TodoIDs, Color: td.Color, Repeat: td.Repeat, RepeatInterval: td.RepeatInterval,
 			Pinned: td.Pinned, CompletedAt: td.CompletedAt, TagNames: tagNames, Items: itemsOut,
 		})
 	}
@@ -886,6 +887,9 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	// todos so links to pre-existing parents survive a partial import.
 	ordered := topoSortTodos(todos)
 	oldToNew := todoIDMap
+	// Links can target todos created later in this batch, so raw ids are
+	// collected here and remapped once the whole set exists (below).
+	linksByNewID := make(map[uint][]uint)
 	for _, te := range ordered {
 		remappedContacts := make([]uint, 0, len(te.ContactIDs))
 		for _, cid := range te.ContactIDs {
@@ -928,6 +932,9 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 			continue
 		}
 		oldToNew[te.ID] = newTodo.ID
+		if len(te.TodoIDs) > 0 {
+			linksByNewID[newTodo.ID] = te.TodoIDs
+		}
 		for _, ie := range te.Items {
 			_ = s.todoItemRepo.CreateItem(ctx, &model.TodoItem{
 				TodoID: newTodo.ID, Content: ie.Content, Done: ie.Done, SortOrder: ie.SortOrder,
@@ -945,6 +952,21 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 				tags = append(tags, model.Tag{ID: id})
 			}
 			_ = s.todoRepo.ReplaceTags(ctx, newTodo.ID, tags)
+		}
+	}
+
+	// Re-link todos now that every imported row has its fresh id. Unresolvable
+	// targets (not in the file, not pre-existing) are dropped like dangling
+	// contact references above.
+	for newID, oldLinks := range linksByNewID {
+		remappedLinks := make([]uint, 0, len(oldLinks))
+		for _, lid := range oldLinks {
+			if nl, ok := oldToNew[lid]; ok && nl != newID {
+				remappedLinks = append(remappedLinks, nl)
+			}
+		}
+		if len(remappedLinks) > 0 {
+			_ = s.todoRepo.SetTodoIDs(ctx, workspaceID, newID, remappedLinks)
 		}
 	}
 

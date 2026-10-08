@@ -38,6 +38,18 @@ func (m *mockTodoSvcRepo) GetByID(ctx context.Context, workspaceID, id uint) (*m
 	return args.Get(0).(*model.Todo), args.Error(1)
 }
 
+func (m *mockTodoSvcRepo) ExistingIDs(ctx context.Context, workspaceID uint, ids []uint) ([]uint, error) {
+	args := m.Called(ctx, workspaceID, ids)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]uint), args.Error(1)
+}
+
+func (m *mockTodoSvcRepo) SetTodoIDs(ctx context.Context, workspaceID, id uint, ids []uint) error {
+	return m.Called(ctx, workspaceID, id, ids).Error(0)
+}
+
 func (m *mockTodoSvcRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQuery) ([]model.Todo, int64, error) {
 	args := m.Called(ctx, workspaceID, q)
 	if args.Get(0) == nil {

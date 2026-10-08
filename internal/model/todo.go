@@ -26,6 +26,9 @@ type Todo struct {
 	Amount      *float64       `json:"amount"`
 	AmountType  string         `gorm:"size:20" json:"amount_type"` // "" / income / expense
 	ContactIDs  []uint         `gorm:"type:longtext;serializer:json" json:"contact_ids"`
+	// Links to related todos (jump targets). Deliberately separate from the
+	// parent/child tree: a link is a cross-reference, not a hierarchy edge.
+	TodoIDs     []uint         `gorm:"type:longtext;serializer:json" json:"todo_ids"`
 	Tags        []Tag          `gorm:"many2many:todo_tags" json:"tags"`
 	Color       string         `gorm:"size:20" json:"color"`
 	Repeat      string         `gorm:"size:20" json:"repeat"` // ""/daily/weekly/weekdays/monthly/yearly
@@ -127,6 +130,7 @@ type TodoListQuery struct {
 	TagIDs    []uint     // only todos tagged with any of these
 	ParentID  *uint      // only direct children of this todo
 	RootsOnly bool       // only top-level todos (parent_id IS NULL) — lazy tree roots
+	LinkingTo *uint      // only todos whose todo_ids contain this id (backlinks)
 	Sort      string     // due_date (default) | priority | title | created
 	Order     string     // asc (default) | desc
 	Page      int

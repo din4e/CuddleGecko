@@ -141,6 +141,53 @@ func TestExport_TodoNestingRoundTrip(t *testing.T) {
 	assert.Equal(t, c2.ID, *g2.ParentID, "grandchild nested under the imported child")
 }
 
+// TestExport_TodoLinksRoundTrip verifies todo→todo links survive an export →
+// import into a fresh workspace, including forward references (a link to a todo
+// created later in the batch).
+func TestExport_TodoLinksRoundTrip(t *testing.T) {
+	db := newExportTestDB(t)
+	contactRepo := repository.NewContactRepo(db)
+	tagRepo := repository.NewTagRepo(db)
+	interactionRepo := repository.NewInteractionRepo(db)
+	reminderRepo := repository.NewReminderRepo(db)
+	relationRepo := repository.NewRelationRepo(db)
+	todoRepo := repository.NewTodoRepo(db)
+
+	svc := NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo)
+	ctx := context.Background()
+
+	hub := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "hub", Status: "pending", Priority: "normal"}
+	spoke := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "spoke", Status: "pending", Priority: "normal"}
+	require.NoError(t, todoRepo.Create(ctx, hub))
+	require.NoError(t, todoRepo.Create(ctx, spoke))
+	// Hub links to spoke via the struct path (what the service writes).
+	hub.TodoIDs = []uint{spoke.ID}
+	require.NoError(t, todoRepo.Update(ctx, hub))
+
+	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
+	require.NoError(t, err)
+
+	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
+
+	todos, _, err := todoRepo.List(ctx, 2, model.TodoListQuery{Page: 1, PageSize: 100})
+	require.NoError(t, err)
+	require.Len(t, todos, 2)
+	byTitle := make(map[string]model.Todo, len(todos))
+	for _, td := range todos {
+		byTitle[td.Title] = td
+	}
+	h2 := byTitle["hub"]
+	s2 := byTitle["spoke"]
+
+	// The remapped link must point at the NEW spoke, and the backlink filter
+	// must see the relationship (proves the re-link pass used serializer-
+	// compatible bytes).
+	assert.Equal(t, []uint{s2.ID}, h2.TodoIDs, "imported hub links to the imported spoke")
+	_, total, err := todoRepo.List(ctx, 2, model.TodoListQuery{LinkingTo: &s2.ID})
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, total, "backlink filter finds the imported hub")
+}
+
 // TestExport_TodosCSV verifies the CSV export emits a header row and one row
 // per todo, with proper escaping.
 func TestExport_TodosCSV(t *testing.T) {

@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,6 +42,41 @@ func (r *TodoRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.To
 		return nil, err
 	}
 	return &todo, nil
+}
+
+// ExistingIDs returns which of the requested ids exist (live, same workspace) —
+// one query for link validation instead of N GetByID round-trips.
+func (r *TodoRepo) ExistingIDs(ctx context.Context, workspaceID uint, ids []uint) ([]uint, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var found []uint
+	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
+		Where("workspace_id = ? AND id IN ?", workspaceID, ids).
+		Pluck("id", &found).Error; err != nil {
+		return nil, fmt.Errorf("check todo ids: %w", err)
+	}
+	return found, nil
+}
+
+// SetTodoIDs overwrites the link set in one UPDATE (imports re-link after all
+// rows exist, since a link may target a todo created later in the same batch).
+// The column uses GORM's json serializer, but map-style UpdateColumn bypasses
+// it — marshal here so the stored bytes match what struct updates write.
+func (r *TodoRepo) SetTodoIDs(ctx context.Context, workspaceID, id uint, ids []uint) error {
+	if ids == nil {
+		ids = []uint{}
+	}
+	arr, err := json.Marshal(ids)
+	if err != nil {
+		return fmt.Errorf("set todo links: %w", err)
+	}
+	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
+		Where("id = ? AND workspace_id = ?", id, workspaceID).
+		UpdateColumn("todo_ids", string(arr)).Error; err != nil {
+		return fmt.Errorf("set todo links: %w", err)
+	}
+	return nil
 }
 
 func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQuery) ([]model.Todo, int64, error) {
@@ -112,6 +149,16 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQ
 	if q.ParentID != nil {
 		query = query.Where("parent_id = ?", *q.ParentID)
 	}
+	if q.LinkingTo != nil {
+		// todo_ids is a JSON-serialized array ([]uint); match rows whose set
+		// contains the id — same dialect split as the transactions contact filter.
+		switch r.db.Dialector.Name() {
+		case "sqlite":
+			query = query.Where("EXISTS (SELECT 1 FROM json_each(todo_ids) WHERE value = ?)", *q.LinkingTo)
+		default:
+			query = query.Where("JSON_CONTAINS(todo_ids, ?)", strconv.FormatUint(uint64(*q.LinkingTo), 10))
+		}
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -169,7 +216,7 @@ func todoOrderClause(sort, order string) string {
 
 func (r *TodoRepo) Update(ctx context.Context, todo *model.Todo) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{ID: todo.ID}).
-		Select("title", "description", "status", "priority", "importance", "urgency", "due_time", "start_time", "duration", "amount", "amount_type", "progress", "contact_ids", "color", "repeat", "repeat_interval", "completed_at", "status_before_cascade").
+		Select("title", "description", "status", "priority", "importance", "urgency", "due_time", "start_time", "duration", "amount", "amount_type", "progress", "contact_ids", "todo_ids", "color", "repeat", "repeat_interval", "completed_at", "status_before_cascade").
 		Updates(todo).Error; err != nil {
 		return fmt.Errorf("update todo: %w", err)
 	}
@@ -658,6 +705,7 @@ func (r *TodoRepo) Duplicate(ctx context.Context, userID, workspaceID, id uint) 
 		Amount:      src.Amount,
 		AmountType:  src.AmountType,
 		ContactIDs:  src.ContactIDs,
+		TodoIDs:     src.TodoIDs,
 		Color:       src.Color,
 		Repeat:      src.Repeat,
 		ParentID:    src.ParentID,

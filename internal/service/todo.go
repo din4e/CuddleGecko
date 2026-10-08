@@ -28,6 +28,8 @@ const (
 type TodoRepository interface {
 	Create(ctx context.Context, todo *model.Todo) error
 	GetByID(ctx context.Context, workspaceID, id uint) (*model.Todo, error)
+	ExistingIDs(ctx context.Context, workspaceID uint, ids []uint) ([]uint, error)
+	SetTodoIDs(ctx context.Context, workspaceID, id uint, ids []uint) error
 	List(ctx context.Context, workspaceID uint, q model.TodoListQuery) ([]model.Todo, int64, error)
 	Update(ctx context.Context, todo *model.Todo) error
 	Delete(ctx context.Context, workspaceID, id uint) error
@@ -177,6 +179,11 @@ func (s *TodoService) Create(ctx context.Context, userID, workspaceID uint, todo
 			return nil, ErrTodoInvalidParent
 		}
 	}
+	links, err := s.normalizeTodoLinks(ctx, workspaceID, 0, todo.TodoIDs)
+	if err != nil {
+		return nil, err
+	}
+	todo.TodoIDs = links
 	if err := s.repo.Create(ctx, todo); err != nil {
 		return nil, err
 	}
@@ -191,6 +198,46 @@ func (s *TodoService) GetByID(ctx context.Context, userID, workspaceID, id uint)
 		return nil, ErrTodoNotFound
 	}
 	return todo, nil
+}
+
+// normalizeTodoLinks validates and canonicalizes a todo's link set: drops
+// duplicates, rejects a self-link, and requires every target to exist (live)
+// in the same workspace. Returns the normalized slice ready to persist.
+func (s *TodoService) normalizeTodoLinks(ctx context.Context, workspaceID, selfID uint, ids []uint) ([]uint, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	seen := make(map[uint]struct{}, len(ids))
+	unique := make([]uint, 0, len(ids))
+	for _, id := range ids {
+		if id == 0 {
+			return nil, fmt.Errorf("%w: linked todo id must not be 0", ErrInvalidTodo)
+		}
+		if id == selfID {
+			return nil, fmt.Errorf("%w: a todo cannot link to itself", ErrInvalidTodo)
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	existing, err := s.repo.ExistingIDs(ctx, workspaceID, unique)
+	if err != nil {
+		return nil, err
+	}
+	if len(existing) != len(unique) {
+		known := make(map[uint]struct{}, len(existing))
+		for _, id := range existing {
+			known[id] = struct{}{}
+		}
+		for _, id := range unique {
+			if _, ok := known[id]; !ok {
+				return nil, fmt.Errorf("%w: linked todo %d not found in this workspace", ErrInvalidTodo, id)
+			}
+		}
+	}
+	return unique, nil
 }
 
 func (s *TodoService) List(ctx context.Context, userID, workspaceID uint, q model.TodoListQuery) ([]model.Todo, int64, error) {
@@ -221,6 +268,10 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 		return nil, ErrTodoNotFound
 	}
 	before := *todo
+	links, err := s.normalizeTodoLinks(ctx, workspaceID, id, updates.TodoIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	if updates.Title != "" {
 		todo.Title = updates.Title
@@ -270,6 +321,7 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 	}
 	todo.AmountType = updates.AmountType
 	todo.ContactIDs = updates.ContactIDs
+	todo.TodoIDs = links
 	todo.Color = updates.Color
 	todo.Repeat = updates.Repeat
 	if updates.RepeatInterval > 0 {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -133,6 +134,9 @@ func diffTodoUpdates(before, after *model.Todo) []model.TodoActivity {
 	if before.Repeat != after.Repeat {
 		add("repeat", before.Repeat, after.Repeat)
 	}
+	if !uintSlicesEqual(before.TodoIDs, after.TodoIDs) {
+		add("todo_ids", uintSliceString(before.TodoIDs), uintSliceString(after.TodoIDs))
+	}
 	if before.Duration != after.Duration {
 		add("duration", strconv.Itoa(before.Duration), strconv.Itoa(after.Duration))
 	}
@@ -190,6 +194,36 @@ func uintPtrEqual(a, b *uint) bool {
 		return a == b
 	}
 	return *a == *b
+}
+
+// uintSlicesEqual compares two id sets order-insensitively — link edits are
+// replaces, and the picker may hand back the same set in a different order.
+func uintSlicesEqual(a, b []uint) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[uint]int, len(a))
+	for _, id := range a {
+		seen[id]++
+	}
+	for _, id := range b {
+		seen[id]--
+		if seen[id] < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func uintSliceString(ids []uint) string {
+	if len(ids) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(ids))
+	for _, id := range ids {
+		parts = append(parts, fmt.Sprintf("%d", id))
+	}
+	return strings.Join(parts, ",")
 }
 
 func uintPtrString(u *uint) string {

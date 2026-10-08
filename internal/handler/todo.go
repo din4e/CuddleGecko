@@ -35,6 +35,7 @@ type createTodoRequest struct {
 	AmountType  string   `json:"amount_type"`
 	Progress    *int     `json:"progress"`
 	ContactIDs  []uint   `json:"contact_ids"`
+	TodoIDs     []uint   `json:"todo_ids"`
 	Color       string   `json:"color"`
 	Repeat      string   `json:"repeat"`
 	RepeatInterval int   `json:"repeat_interval"`
@@ -60,6 +61,7 @@ type updateTodoRequest struct {
 	Progress     *int     `json:"progress"`
 	ClearProgress bool    `json:"clear_progress"`
 	ContactIDs   []uint   `json:"contact_ids"`
+	TodoIDs      []uint   `json:"todo_ids"`
 	Color        string   `json:"color"`
 	Repeat       string   `json:"repeat"`
 	RepeatInterval int    `json:"repeat_interval"`
@@ -115,6 +117,13 @@ func (h *TodoHandler) List(c *gin.Context) {
 		if id, err := strconv.ParseUint(raw, 10, 32); err == nil {
 			parentID := uint(id)
 			q.ParentID = &parentID
+		}
+	}
+	// Backlinks: todos whose todo_ids contain this id.
+	if raw := c.Query("linking_to"); raw != "" {
+		if id, err := strconv.ParseUint(raw, 10, 32); err == nil {
+			linkingTo := uint(id)
+			q.LinkingTo = &linkingTo
 		}
 	}
 	for _, raw := range c.QueryArray("tag_id") {
@@ -384,6 +393,7 @@ func (h *TodoHandler) Create(c *gin.Context) {
 		AmountType:  req.AmountType,
 		Progress:    req.Progress,
 		ContactIDs:  req.ContactIDs,
+		TodoIDs:     req.TodoIDs,
 		Color:       req.Color,
 		Repeat:      req.Repeat,
 		RepeatInterval: req.RepeatInterval,
@@ -448,6 +458,7 @@ func (h *TodoHandler) Update(c *gin.Context) {
 		AmountType:  req.AmountType,
 		Progress:    req.Progress,
 		ContactIDs:  req.ContactIDs,
+		TodoIDs:     req.TodoIDs,
 		Color:       req.Color,
 		Repeat:      req.Repeat,
 		RepeatInterval: req.RepeatInterval,
