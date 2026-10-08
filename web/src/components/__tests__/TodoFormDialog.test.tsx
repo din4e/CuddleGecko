@@ -31,6 +31,8 @@ vi.mock('../../hooks/api/useTodos', () => ({
   useTodosList: (params: Record<string, unknown>, options?: { enabled?: boolean }) => mocks.list(params, options),
   // Parent picker by-id fallback: unresolved by default.
   useTodo: (id: number | null) => mocks.get(id),
+  // Link picker title resolution for targets outside the loaded candidates.
+  useTodoDetails: () => ({ todos: new Map(), pending: new Set<number>() }),
 }))
 
 vi.mock('../../api/contacts', () => ({

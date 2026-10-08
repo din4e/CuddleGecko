@@ -42,9 +42,11 @@ import { buildLazyTree, descendantIds, isSettledStatus, type TodoNode } from '..
 import { subtreeProgressFromMap, type SubtreeProgress } from '../lib/todoProgress'
 import { usePomodoroStore } from '../stores/pomodoro'
 import { useTodoCollapseStore, collapseKey } from '../stores/todoCollapse'
+import { TodoJumpContext } from '../lib/todoJump'
 import {
   useTodosInfinite,
   fetchAllTodoPages,
+  fetchTodoById,
   useTodoChildrenMap,
   useCreateTodo,
   useUpdateTodo,
@@ -161,6 +163,7 @@ interface CardRowCtx {
   onDuplicate: (todo: Todo) => void
   onDelete: (todo: Todo) => void
   formatDate: (dateStr: string | null) => string
+  onOpenTodo: (id: number) => void
   onCreateChild: (parent: Todo, title: string) => void
   onStartPomodoro: (todo: Todo) => void
   onPostpone: (todo: Todo) => void
@@ -213,6 +216,7 @@ const TodoCardRow = memo(function TodoCardRow({
       onDuplicate={ctx.onDuplicate}
       onDelete={ctx.onDelete}
       formatDate={ctx.formatDate}
+      onOpenTodo={ctx.onOpenTodo}
       // Flat views show a "↳ parent" breadcrumb on subtask cards; the tree
       // nests rows visually under the parent card, so it would be redundant.
       parentTitle={ctx.view === 'tree' ? undefined : todo.parent_id ? ctx.todoTitleById.get(todo.parent_id) : undefined}
@@ -513,6 +517,20 @@ export default function TodosPage() {
     setEditing(todo)
     setDrawerOpen(true)
   }, [])
+
+  // Jump target for link chips and todo:<id> markdown links: prefer the loaded
+  // copies (instant), else fetch through the shared detail cache. A target
+  // outside the current filter still opens — the drawer is self-sufficient.
+  const openTodoById = useCallback(async (id: number) => {
+    const local = todoByIdLoaded.get(id)
+    if (local) {
+      openEdit(local)
+      return
+    }
+    const fetched = await fetchTodoById(qc, id)
+    if (fetched) openEdit(fetched)
+    else toast.error(t('todos.linkBroken'))
+  }, [todoByIdLoaded, qc, openEdit, t])
 
   // Keep the drawer's todo snapshot fresh: mutations (progress scrub,
   // renames, status flips elsewhere) patch the list caches, and without this
@@ -1339,6 +1357,7 @@ export default function TodosPage() {
     onDuplicate: handleDuplicate,
     onDelete: setConfirmDelete,
     formatDate,
+    onOpenTodo: openTodoById,
     onCreateChild: handleCreateChild,
     onStartPomodoro: handleStartPomodoro,
     onPostpone: handlePostpone,
@@ -1353,7 +1372,7 @@ export default function TodosPage() {
     // appear in the deps only because the ctx object carries them (the
     // compiler-based lint demands source deps match inferred deps); they can
     // never invalidate the memo.
-  }), [view, hideDone, childrenByParent, subtaskProgress, todoTitleById, treeDragId, getContactNames, toggleSelect, handleToggle, handleSetStatus, handleTogglePin, handleSync, openEdit, handleRename, handleDuplicate, setConfirmDelete, formatDate, handleCreateChild, handleStartPomodoro, handlePostpone, handleNest, handleToggleSub, handleTreeMove, setTreeDragId, navEnabled, selectedTodoId, handleSelectTodo])
+  }), [view, hideDone, childrenByParent, subtaskProgress, todoTitleById, treeDragId, getContactNames, toggleSelect, handleToggle, handleSetStatus, handleTogglePin, handleSync, openEdit, openTodoById, handleRename, handleDuplicate, setConfirmDelete, formatDate, handleCreateChild, handleStartPomodoro, handlePostpone, handleNest, handleToggleSub, handleTreeMove, setTreeDragId, navEnabled, selectedTodoId, handleSelectTodo])
 
   const renderTodoCard = useCallback(
     (todo: Todo, compact = false) => (
@@ -1395,7 +1414,12 @@ export default function TodosPage() {
     [pendingTodos],
   )
 
+  // In-app jump for todo:<id> markdown links rendered anywhere on this page
+  // (card titles/descriptions, drawer, subtask rows).
+  const jumpCtx = useMemo(() => ({ openTodo: openTodoById }), [openTodoById])
+
   return (
+    <TodoJumpContext.Provider value={jumpCtx}>
     <div className="space-y-2">
       {/* Header — view toggle + one overflow menu; creating lives in the
           quick-add bar below (fast path) with a "detailed" button for the
@@ -2064,6 +2088,7 @@ export default function TodosPage() {
             onDeleteTodo={setConfirmDelete}
             onStartPomodoro={handleStartPomodoro}
             onOpenTodo={openEdit}
+            onOpenTodoById={openTodoById}
             onCreateChild={handleCreateChild}
             hideDone={hideDone}
             subtaskDragId={treeDragId}
@@ -2137,5 +2162,6 @@ export default function TodosPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </TodoJumpContext.Provider>
   )
 }

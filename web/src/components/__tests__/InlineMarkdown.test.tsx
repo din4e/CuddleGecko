@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { InlineMarkdown } from '../InlineMarkdown'
+import { TodoJumpContext } from '../../lib/todoJump'
 
 describe('InlineMarkdown', () => {
   it('renders plain text as-is (fast path, no markdown parsing)', () => {
@@ -77,5 +78,24 @@ describe('InlineMarkdown', () => {
     )
     fireEvent.click(screen.getByRole('link', { name: 'docs' }))
     expect(onHostClick).not.toHaveBeenCalled()
+  })
+
+  it('renders todo:<id> links as in-app jumps when a jump context is mounted', () => {
+    const openTodo = vi.fn()
+    render(
+      <TodoJumpContext.Provider value={{ openTodo }}>
+        <InlineMarkdown text="see [the plan](todo:42)" />
+      </TodoJumpContext.Provider>,
+    )
+    const a = screen.getByRole('link', { name: 'the plan' })
+    expect(a).not.toHaveAttribute('target') // in-app, not a new browser tab
+    fireEvent.click(a)
+    expect(openTodo).toHaveBeenCalledWith(42)
+  })
+
+  it('renders todo:<id> links as inert styled text without a jump context', () => {
+    render(<InlineMarkdown text="see [the plan](todo:42)" />)
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.getByText('the plan')).toBeInTheDocument()
   })
 })

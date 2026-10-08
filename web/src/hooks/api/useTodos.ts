@@ -56,17 +56,68 @@ export async function fetchAllTodoPages(query: ReturnType<typeof useTodosInfinit
   }
 }
 
+/** Cache key of one todo's detail entry — shared by useTodo, useTodoDetails
+ *  and fetchTodoById so a jump populates the same cache the hooks read. */
+export function todoDetailKey(id: number) {
+  return [...allKey(), 'detail', id] as const
+}
+
 /** Single todo by id — resolves references the current view hasn't loaded
- *  (e.g. a parent task outside the active filter). No retry: a missing todo
- *  (trashed / deleted) just stays unresolved. */
+ * (e.g. a parent task outside the active filter). No retry: a missing todo
+ * (trashed / deleted) just stays unresolved. */
 export function useTodo(id: number | null) {
-  const queryKey = [...allKey(), 'detail', id] as const
   return useQuery<Todo>({
-    queryKey,
+    queryKey: todoDetailKey(id!),
     queryFn: ({ signal }) => todosApi.get(id!, signal).then((r) => r.data),
     enabled: id != null,
     retry: false,
   })
+}
+
+/** Several todos by id (link chips whose targets the current view hasn't
+ *  loaded). One cached query per id; missing todos just stay unresolved. */
+export interface TodoDetailsState {
+  todos: Map<number, Todo>
+  /** Ids whose queries are still in flight (distinguishes "loading" from
+   *  "gone" so chips don't flash a dead-reference look at first paint). */
+  pending: Set<number>
+}
+
+export function useTodoDetails(ids: number[]): TodoDetailsState {
+  const queries = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: todoDetailKey(id),
+      queryFn: ({ signal }: { signal?: AbortSignal }) => todosApi.get(id, signal).then((r) => r.data),
+      retry: false,
+    })),
+  })
+  return useMemo(() => {
+    const todos = new Map<number, Todo>()
+    const pending = new Set<number>()
+    queries.forEach((q, i) => {
+      if (q.data) todos.set(ids[i], q.data)
+      else if (q.isPending) pending.add(ids[i])
+    })
+    return { todos, pending }
+    // ids identity: callers memoize the id array (unknown-link derivation).
+  }, [queries, ids])
+}
+
+/** Fetch one todo by id through the shared detail cache — the jump path for
+ *  link chips when no loaded list holds the target. Returns null when the
+ *  target is gone (trashed / deleted / cross-workspace). */
+export async function fetchTodoById(
+  qc: ReturnType<typeof useQueryClient>,
+  id: number,
+): Promise<Todo | null> {
+  try {
+    return await qc.fetchQuery({
+      queryKey: todoDetailKey(id),
+      queryFn: ({ signal }: { signal?: AbortSignal }) => todosApi.get(id, signal).then((r) => r.data),
+    })
+  } catch {
+    return null
+  }
 }
 
 /** Per-parent children slice consumed by the lazy tree. */

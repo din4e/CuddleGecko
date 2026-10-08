@@ -10,6 +10,7 @@ import { DialogFooter } from './ui/dialog'
 import { Markdown } from './Markdown'
 import BuddyPicker from './BuddyPicker'
 import TodoParentPicker from './TodoParentPicker'
+import TodoLinkPicker from './TodoLinkPicker'
 import LabelPicker from './LabelPicker'
 import { useCreateTodo, useUpdateTodo, useReplaceTodoTags, useMoveTodo } from '../hooks/api/useTodos'
 import { descendantIds } from '../lib/buildTodoTree'
@@ -40,6 +41,9 @@ export interface TodoFormProps {
   contacts: Contact[]
   tags: Tag[]
   parentCandidates?: Todo[]
+  /** Loaded todos offered to the link picker; falls back to parentCandidates
+   *  (both are "the todos the current view has loaded"). */
+  linkCandidates?: Todo[]
   onContactsChange: (contacts: Contact[]) => void
   onClose: () => void
   /** Prefilled due time for create (local datetime-local string) — the
@@ -67,6 +71,7 @@ interface FormValues {
   amount: string
   amountType: '' | 'income' | 'expense'
   contactIds: number[]
+  todoIds: number[]
   color: string
   repeat: string
   repeatInterval: number
@@ -88,6 +93,7 @@ function initialFormValues(editing: Todo | null, initialDueTime?: string): FormV
     amount: editing?.amount != null ? String(editing.amount) : '',
     amountType: editing?.amount_type ?? '',
     contactIds: editing?.contact_ids ?? [],
+    todoIds: editing?.todo_ids ?? [],
     color: editing?.color ?? '',
     repeat: editing?.repeat ?? '',
     repeatInterval: editing?.repeat_interval && editing.repeat_interval > 0 ? editing.repeat_interval : 1,
@@ -113,6 +119,7 @@ function snapshotOf(v: FormValues): string {
     amount: v.amount,
     amount_type: v.amountType,
     contact_ids: [...v.contactIds].sort((a, b) => a - b),
+    todo_ids: [...v.todoIds].sort((a, b) => a - b),
     color: v.color,
     repeat: v.repeat,
     repeat_interval: v.repeatInterval,
@@ -124,7 +131,7 @@ function snapshotOf(v: FormValues): string {
 /** Shared todo create/edit fields — hosted by TodoFormDialog (create modal)
  *  and TodoDetailDrawer (right slide-over). State initializes from `editing`
  *  once per mount; both shells remount via a key on the todo id. */
-export function TodoForm({ editing, contacts, tags, parentCandidates, onContactsChange, onClose, initialDueTime, autoSave }: TodoFormProps) {
+export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandidates, onContactsChange, onClose, initialDueTime, autoSave }: TodoFormProps) {
   const { t } = useTranslation()
   const formId = useId()
   const createTodo = useCreateTodo()
@@ -146,6 +153,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   const [formAmount, setFormAmount] = useState(init.amount)
   const [formAmountType, setFormAmountType] = useState<'' | 'income' | 'expense'>(init.amountType)
   const [formContactIds, setFormContactIds] = useState<number[]>(init.contactIds)
+  const [formTodoIds, setFormTodoIds] = useState<number[]>(init.todoIds)
   const [formColor, setFormColor] = useState(init.color)
   const [formRepeat, setFormRepeat] = useState<string>(init.repeat)
   const [formRepeatInterval, setFormRepeatInterval] = useState<number>(init.repeatInterval)
@@ -174,7 +182,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
     title: formTitle, desc: formDesc, status: formStatus, priority: formPriority,
     importance: formImportance, urgency: formUrgency,
     dueTime: formDueTime, startTime: formStartTime, duration: formDuration, amount: formAmount,
-    amountType: formAmountType, contactIds: formContactIds, color: formColor, repeat: formRepeat,
+    amountType: formAmountType, contactIds: formContactIds, todoIds: formTodoIds, color: formColor, repeat: formRepeat,
     repeatInterval: formRepeatInterval, tagIds: formTagIds, parentId: formParentId,
   })
   const currentSnapshotRef = useRef(currentSnapshot)
@@ -204,6 +212,12 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
     () => (editing ? new Set([editing.id, ...descendantIds(parentCandidates ?? [], editing.id)]) : new Set<number>()),
     [editing, parentCandidates],
   )
+  // Links are cross-references, not hierarchy — only self is disallowed.
+  const blockedLinks = useMemo(
+    () => (editing ? new Set([editing.id]) : new Set<number>()),
+    [editing],
+  )
+  const linkPool = linkCandidates ?? parentCandidates
 
   /** Persists the form. `close: false` (auto-save) keeps the form mounted —
    *  only an explicit Save (create dialog / Enter) closes the shell. */
@@ -230,6 +244,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             amount: formAmount ? parseFloat(formAmount) : null,
             amount_type: formAmountType,
             contact_ids: formContactIds,
+            todo_ids: formTodoIds,
             color: formColor,
             repeat: formRepeat,
             repeat_interval: formRepeatInterval,
@@ -256,6 +271,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
             amount: formAmount ? parseFloat(formAmount) : undefined,
             amount_type: formAmountType,
             contact_ids: formContactIds,
+            todo_ids: formTodoIds.length > 0 ? formTodoIds : undefined,
             color: formColor,
             repeat: formRepeat || undefined,
             repeat_interval: formRepeatInterval || undefined,
@@ -285,7 +301,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
           title: formTitle, desc: formDesc, status: formStatus, priority: formPriority,
           importance: formImportance, urgency: formUrgency,
           dueTime: formDueTime, startTime: formStartTime, duration: formDuration, amount: formAmount,
-          amountType: formAmountType, contactIds: formContactIds, color: formColor, repeat: formRepeat,
+          amountType: formAmountType, contactIds: formContactIds, todoIds: formTodoIds, color: formColor, repeat: formRepeat,
           repeatInterval: formRepeatInterval, tagIds: formTagIds, parentId: formParentId,
         })
         if (close) onClose()
@@ -300,7 +316,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
     const p = run()
     inFlightRef.current = p
     await p
-  }, [labelCreating, formTitle, formDesc, formStatus, formPriority, formImportance, formUrgency, formDueTime, formStartTime, formDuration, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
+  }, [labelCreating, formTitle, formDesc, formStatus, formPriority, formImportance, formUrgency, formDueTime, formStartTime, formDuration, formAmount, formAmountType, formContactIds, formTodoIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
 
   // Keep the "latest value" refs current after every render (effect order
   // matters: this runs before the auto-save/flush effects below, so they and
@@ -408,6 +424,21 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
               onChange={setFormParentId}
               candidates={parentCandidates}
               blocked={blockedParents}
+            />
+          </div>
+        )}
+        {linkPool && (
+          <div className="space-y-1">
+            <Label>{t('todos.links')}</Label>
+            {/* Multi-select cross-references — clicking a chip elsewhere jumps
+                to the target todo's drawer. Same search model as the parent
+                picker; only self is excluded (links aren't hierarchy). */}
+            <TodoLinkPicker
+              value={formTodoIds}
+              onChange={setFormTodoIds}
+              candidates={linkPool}
+              blocked={blockedLinks}
+              disabled={saving}
             />
           </div>
         )}

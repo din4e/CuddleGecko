@@ -16,6 +16,7 @@ import { formatDuration } from '../lib/duration'
 import { collapseKey, useTodoCollapseStore } from '../stores/todoCollapse'
 import TodoPriorityBadge, { TodoAxisBadges } from './TodoPriorityBadge'
 import TodoProgressBar from './TodoProgressBar'
+import TodoLinkChips from './TodoLinkChips'
 import { todoProgressPercent } from '../lib/todoProgress'
 import { useSetTodoProgress } from '../hooks/api/useTodos'
 import { AddChildInput } from './AddChildInput'
@@ -57,6 +58,8 @@ export interface TodoCardProps {
   onDelete: (todo: Todo) => void
   formatDate: (dateStr: string | null) => string
   parentTitle?: string
+  /** Jump to a linked todo (todo_ids chip click) — opens its detail drawer. */
+  onOpenTodo?: (id: number) => void
   onStartPomodoro?: (todo: Todo) => void
   /** One-click "postpone to tomorrow" (TickTick's signature reschedule). */
   onPostpone?: (todo: Todo) => void
@@ -102,6 +105,7 @@ const TodoCard = memo(function TodoCard({
   onDelete,
   formatDate,
   parentTitle,
+  onOpenTodo,
   onStartPomodoro,
   onPostpone,
   onCreateChild,
@@ -428,6 +432,9 @@ const TodoCard = memo(function TodoCard({
             )}
             {todo.contact_ids?.length > 0 && contactNames && (
               <span>{contactNames}</span>
+            )}
+            {onOpenTodo && (todo.todo_ids?.length ?? 0) > 0 && (
+              <TodoLinkChips ids={todo.todo_ids!} onOpen={onOpenTodo} />
             )}
           </div>
         )}

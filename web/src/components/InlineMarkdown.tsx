@@ -1,6 +1,8 @@
 import { memo, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { TODO_LINK_RE, todoLinkUrlTransform } from '../lib/todoJump'
+import { TodoJumpAnchor } from './TodoJumpAnchor'
 
 // 标题是一行文本:只认行内语法。任何块级结构(标题/列表/引用/表格/
 // 代码块)都降级为行内内容,图片只留 alt 文本 —— 否则多行布局会撑破
@@ -17,18 +19,23 @@ const components: Components = {
   tr: passthrough, th: passthrough, td: passthrough,
   img: ({ alt }) => <>{alt ?? null}</>,
   // 链接吞掉 click/dblclick,避免冒泡触发宿主"点标题开抽屉 / 双击重命名"。
-  a: ({ children, href }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      onClick={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
-      className="text-primary underline underline-offset-2 hover:opacity-80"
-    >
-      {children}
-    </a>
-  ),
+  // todo:<id> 是应用内跳转(见 lib/todoJump),其余走外部浏览器。
+  a: ({ children, href }) => {
+    const m = href != null ? TODO_LINK_RE.exec(href) : null
+    if (m) return <TodoJumpAnchor id={Number(m[1])}>{children}</TodoJumpAnchor>
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+        className="text-primary underline underline-offset-2 hover:opacity-80"
+      >
+        {children}
+      </a>
+    )
+  },
   code: ({ children }) => (
     <code className="rounded bg-foreground/10 px-1 font-mono text-[0.85em]">{children}</code>
   ),
@@ -64,7 +71,7 @@ export const InlineMarkdown = memo(function InlineMarkdown({ text }: InlineMarkd
   // 拼接(FirstSecond),压行后交给 HTML 空白折叠自然得到空格。
   const flat = text.replace(/\n{2,}/g, '\n')
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={todoLinkUrlTransform}>
       {escapeBlockMarkers(flat)}
     </ReactMarkdown>
   )

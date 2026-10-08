@@ -2,6 +2,8 @@ import { memo } from 'react'
 import { CodeBlock } from './CodeBlock'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { TODO_LINK_RE, todoLinkUrlTransform } from '../lib/todoJump'
+import { TodoJumpAnchor } from './TodoJumpAnchor'
 
 // 区分行内代码与代码块：有 language-* class，或内容含换行 → 视为代码块（外层 <pre> 负责容器样式）
 function isBlockCode(className?: string, children?: unknown) {
@@ -22,11 +24,16 @@ const components: Components = {
     <blockquote className="my-2 border-l-2 border-border pl-3 italic text-muted-foreground">{children}</blockquote>
   ),
   hr: () => <hr className="my-3 border-border" />,
-  a: ({ children, href }) => (
-    <a href={href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2 hover:opacity-80">
-      {children}
-    </a>
-  ),
+  // todo:<id> 是应用内跳转(见 lib/todoJump),其余走外部浏览器。
+  a: ({ children, href }) => {
+    const m = href != null ? TODO_LINK_RE.exec(href) : null
+    if (m) return <TodoJumpAnchor id={Number(m[1])}>{children}</TodoJumpAnchor>
+    return (
+      <a href={href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2 hover:opacity-80">
+        {children}
+      </a>
+    )
+  },
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
   pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   code: ({ className, children }) =>
@@ -52,7 +59,7 @@ interface MarkdownProps {
 export const Markdown = memo(function Markdown({ content }: MarkdownProps) {
   return (
     <div className="break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={todoLinkUrlTransform}>
         {content}
       </ReactMarkdown>
     </div>

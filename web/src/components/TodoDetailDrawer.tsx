@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Eye, EyeOff, Plus, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, Link2, Plus, Trash2 } from 'lucide-react'
 import { isSettledStatus } from '../lib/buildTodoTree'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs'
 import { Button } from './ui/button'
 import { TodoForm } from './TodoForm'
 import TodoSubtaskList from './TodoSubtaskList'
+import TodoLinkChips from './TodoLinkChips'
 import { AddChildInput } from './AddChildInput'
 import { InlineMarkdown } from './InlineMarkdown'
 import { TodoHistory } from './TodoHistory'
 import TodoPriorityBadge, { TodoAxisBadges } from './TodoPriorityBadge'
 import TodoProgressBar from './TodoProgressBar'
 import { todoProgressPercent } from '../lib/todoProgress'
-import { useSetTodoProgress } from '../hooks/api/useTodos'
+import { useSetTodoProgress, useTodosList } from '../hooks/api/useTodos'
 import { useTodoChildrenMap } from '../hooks/api/useTodos'
 import type { SubtaskMoveAfterId } from './TodoSubtaskList'
 import type { Todo, Contact, Tag } from '../types'
@@ -35,6 +36,8 @@ interface TodoDetailDrawerProps {
   onDeleteTodo?: (todo: Todo) => void
   onStartPomodoro?: (todo: Todo) => void
   onOpenTodo?: (todo: Todo) => void
+  /** Jump to a todo by id (link chips): opens the target's drawer. */
+  onOpenTodoById?: (id: number) => void
   /** Inline quick-add under any subtask row (page's create handler). */
   onCreateChild?: (parent: Todo, title: string) => void
   /** The page's one-click "hide completed" toggle — done subtask rows whose
@@ -175,12 +178,53 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
   )
 }
 
+/** Links of the viewed todo + who links back to it. Forward links come off
+ *  the todo itself; backlinks are one filtered list query (?linking_to=). */
+function DrawerLinks({ todo, onOpen }: { todo: Todo; onOpen?: (id: number) => void }) {
+  const { t } = useTranslation()
+  const { data: backlinks, isLoading } = useTodosList(
+    { linking_to: todo.id, page_size: 50 },
+    { enabled: onOpen != null },
+  )
+  const backlinkItems = backlinks?.items ?? []
+  const forward = todo.todo_ids ?? []
+  if (forward.length === 0 && (isLoading || backlinkItems.length === 0)) return null
+
+  return (
+    <div className="mt-3 space-y-2">
+      {forward.length > 0 && (
+        <div>
+          <h3 className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <Link2 className="h-3 w-3" />
+            {t('todos.links')}
+          </h3>
+          <TodoLinkChips ids={forward} onOpen={onOpen} candidates={backlinkItems} size="sm" />
+        </div>
+      )}
+      {backlinkItems.length > 0 && (
+        <div>
+          <h3 className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <Link2 className="h-3 w-3" />
+            {t('todos.linkedFrom')}
+          </h3>
+          <TodoLinkChips
+            ids={backlinkItems.map((b) => b.id)}
+            onOpen={onOpen}
+            candidates={backlinkItems}
+            size="sm"
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** Right-side slide-over for viewing/editing a todo — opened by clicking a
  *  card/row anywhere in the todo views. Two tabs keep the form and the
  *  modification history each one click away instead of stacked in a very long
  *  scroll. The form remounts per todo id so its state always matches the todo
  *  being viewed. */
-export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates, onContactsChange, onClose, onToggleSubtask, onDeleteSubtask, onDeleteTodo, onStartPomodoro, onOpenTodo, onCreateChild, hideDone, subtaskDragId, onSubtaskDragIdChange, onMoveSubtask }: TodoDetailDrawerProps) {
+export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates, onContactsChange, onClose, onToggleSubtask, onDeleteSubtask, onDeleteTodo, onStartPomodoro, onOpenTodo, onOpenTodoById, onCreateChild, hideDone, subtaskDragId, onSubtaskDragIdChange, onMoveSubtask }: TodoDetailDrawerProps) {
   const { t } = useTranslation()
   // Same drag-to-set control as the rows, wider and with a percent label.
   const setProgress = useSetTodoProgress()
@@ -241,6 +285,7 @@ export function TodoDetailDrawer({ todo, open, contacts, tags, parentCandidates,
                 onClose={onClose}
                 autoSave
               />
+              <DrawerLinks key={`links-${todo.id}`} todo={todo} onOpen={onOpenTodoById} />
               <DrawerSubtasks
                 key={`subs-${todo.id}`}
                 todo={todo}

@@ -287,6 +287,8 @@ export interface TodoListParams {
   parent_id?: number | null
   /** Only top-level todos (parent_id IS NULL) — lazy tree roots. */
   roots_only?: boolean
+  /** Only todos whose todo_ids contain this id (backlinks). */
+  linking_to?: number
   page?: number
   page_size?: number
 }
@@ -365,6 +367,10 @@ export interface Todo {
   amount: number | null
   amount_type: AmountType
   contact_ids: number[]
+  /** Cross-reference links to other todos — jump targets, deliberately
+   *  separate from the parent/child tree. Optional for resilience (older
+   *  cached rows, test mocks). */
+  todo_ids?: number[]
   tags?: Tag[]
   color: string
   pinned?: boolean
