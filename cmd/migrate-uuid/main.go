@@ -220,11 +220,12 @@ func migrateTable(db *sql.DB, sp tableSpec, maps map[string]map[string]string) {
 	var mods []string
 	for _, c := range cols {
 		if idCols[c] {
-			// Polymorphic ref columns (whiteboard note nodes) legitimately
-			// hold NULL — only the hard keys get NOT NULL.
-			null := " NOT NULL"
-			if _, isPoly := sp.poly[c]; isPoly {
-				null = " NULL"
+			// Primary-key columns (the id, or every column of a composite-key
+			// join table) stay NOT NULL; plain reference columns (parent_id,
+			// polymorphic refs, …) keep NULL — their rows legitimately carry it.
+			null := " NULL"
+			if c == "id" || sp.noPK {
+				null = " NOT NULL"
 			}
 			mods = append(mods, "MODIFY `"+c+"` CHAR(36)"+null)
 		}
@@ -272,7 +273,10 @@ func migrateTable(db *sql.DB, sp tableSpec, maps map[string]map[string]string) {
 	fmt.Printf("%-28s %d rows rewritten\n", sp.name, n)
 }
 
-// rewrite maps ids in a single row record in place.
+// rewrite maps ids in a single row record in place. NULL/absent reference
+// columns must stay NULL — an empty string would satisfy CHAR(36) NOT NULL
+// shadows and silently detach every root row (that exact bug orphaned all
+// todos.parent_id on the first production run).
 func rewrite(sp tableSpec, rec map[string]any, maps map[string]map[string]string) {
 	// Primary key.
 	if !sp.noPK {
@@ -283,24 +287,36 @@ func rewrite(sp tableSpec, rec map[string]any, maps map[string]map[string]string
 	}
 	// Scalar refs.
 	for col, table := range sp.refs {
+		if rec[col] == nil {
+			continue // NULL stays NULL
+		}
 		old := idString(rec[col])
+		if old == "" {
+			continue // empty string stays (never a valid id)
+		}
 		if v, ok := mapID(maps, table, old); ok {
 			rec[col] = v
-		} else if old != "" {
+		} else {
 			log.Fatalf("%s.%s: dangling ref %q -> %s", sp.name, col, old, table)
 		}
 	}
 	// Polymorphic refs.
 	for col, pr := range sp.poly {
+		if rec[col] == nil {
+			continue
+		}
 		typ := idString(rec[pr.disc])
 		table, known := pr.types[typ]
 		if !known {
 			continue // note-type rows carry an empty ref
 		}
 		old := idString(rec[col])
+		if old == "" {
+			continue
+		}
 		if v, ok := mapID(maps, table, old); ok {
 			rec[col] = v
-		} else if old != "" {
+		} else {
 			log.Fatalf("%s.%s: dangling poly ref %q (%s=%s)", sp.name, col, old, pr.disc, typ)
 		}
 	}
