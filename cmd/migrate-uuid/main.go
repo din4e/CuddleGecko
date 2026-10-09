@@ -52,12 +52,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
-	// Raw handle, deliberately NOT database.Init: its AutoMigrate would try to
-	// widen legacy integer columns that real foreign keys still reference,
-	// failing before this tool can do the swap dance itself.
-	if cfg.Database.Driver != "mysql" {
-		log.Fatal("migrate-uuid targets MySQL only (the production datastore)")
+	// Raw handles, deliberately NOT database.Init: its AutoMigrate would try
+	// to widen legacy integer columns that real foreign keys still reference,
+	// failing before this tool can rewrite them itself.
+	switch cfg.Database.Driver {
+	case "mysql":
+		runMySQL(cfg)
+	case "sqlite":
+		runSQLite(cfg)
+	default:
+		log.Fatal("migrate-uuid supports mysql and sqlite")
 	}
+}
+
+func runMySQL(cfg *config.Config) {
 	db, err := gorm.Open(mysql.Open(cfg.Database.MySQLDSN), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("db: %v", err)
@@ -231,7 +239,7 @@ func migrateTable(db *sql.DB, sp tableSpec, maps map[string]map[string]string) {
 	}
 
 	insert, err := db.Prepare("INSERT INTO `" + sp.name + "__uuid` (" +
-		"`"+strings.Join(cols, "`, `")+"`) VALUES (" + strings.TrimSuffix(strings.Repeat("?,", len(cols)), ",") + ")")
+		"`" + strings.Join(cols, "`, `") + "`) VALUES (" + strings.TrimSuffix(strings.Repeat("?,", len(cols)), ",") + ")")
 	if err != nil {
 		log.Fatalf("%s: prepare insert: %v", sp.name, err)
 	}

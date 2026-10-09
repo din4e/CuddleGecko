@@ -3,6 +3,8 @@ package middleware
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	"github.com/din4e/cuddlegecko/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -29,8 +31,11 @@ func WorkspaceAuth(checker WorkspaceMemberChecker) gin.HandlerFunc {
 		headerVal := c.GetHeader("X-Workspace-ID")
 		var workspaceID string
 
-		if headerVal != "" {
-			// Entity ids are UUIDs now — opaque strings straight from the header.
+		// Only a well-formed UUID header selects a workspace; anything else
+		// (empty, or a stale pre-uuid integer left in a browser's localStorage)
+		// falls back to the user's default so clients self-heal instead of
+		// seeing a wall of 403s after the id migration.
+		if headerVal != "" && uuid.Validate(headerVal) == nil {
 			workspaceID = headerVal
 		} else {
 			wsID, err := checker.GetDefaultWorkspaceID(ctx, userID)

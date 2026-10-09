@@ -143,7 +143,7 @@ export async function refreshAccessToken(): Promise<string> {
 client.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean }
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean; _wsRetry?: boolean }
     const url = originalRequest?.url || ''
     // Auth endpoints manage tokens themselves; a 401 there (bad login) must
     // reach the caller instead of triggering a refresh loop.
@@ -172,6 +172,17 @@ client.interceptors.response.use(
         localStorage.removeItem('access_token')
         cachedToken = null
         window.location.href = '/login'
+      }
+    }
+    // Stale workspace header (e.g. a pre-uuid integer left in localStorage
+    // after the id migration): drop it once and reload — the workspace store
+    // re-seeds it from the user's workspace list on the next boot.
+    if (error.response?.status === 403 && !originalRequest._wsRetry) {
+      const msg = String(error.response?.data?.message || '')
+      if (msg.includes('workspace')) {
+        originalRequest._wsRetry = true
+        localStorage.removeItem('current_workspace_id')
+        window.location.reload()
       }
     }
     return Promise.reject(error)
