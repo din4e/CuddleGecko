@@ -103,6 +103,7 @@ web/src/pages/         # route-level views
 - **Reminder** — title, description, remind_at, status (pending/done/snoozed), contact_id
 - **ContactRelation** — contact_id_a, contact_id_b, relation_type
 - **Event** — title, description, start_time, end_time, location, color, contact_ids[]
+- **Every entity id is a UUID v4 string** (CHAR(36), minted in `model.NewID` via GORM BeforeCreate hooks) — never autoincrement. JWT `user_id` claims are strings; numeric claims are rejected. Indexed string columns carry `size:36` (MySQL longtext can't key). Creation-order listings sort by `created_at` (+ id tiebreak); todo manual order adds `created_at` before the id tiebreak; `todo_activities.seq` is an app-assigned monotonic (unix-nano + batch offset) ordering key. Frontend ids are strings everywhere; id sort tiebreakers use `localeCompare`.
 - **Todo** — title, description, status, priority, importance/urgency (Eisenhower axes, same four tiers as priority; normal+ counts as important/urgent → the matrix view's quadrants), pinned, due_time, start_time, repeat/repeat_interval, sort_order, parent_id (nested tree), item_total/item_done, pomodoro_count, contact_ids[], todo_ids[] (structured cross-reference links, API/MCP-only — no form UI; the user-facing link is inline text), tags[]
 - **Workout** — name, type, status, intensity, scheduled_at, duration, calories, exercises[] (sets/reps/weight), sort_order
 - **BodyMetric** — recorded_at, weight, height, body_fat, resting_hr, sleep, steps, energy, mood
