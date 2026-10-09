@@ -40,7 +40,7 @@ vi.mock('../../hooks/api/useTodos', () => ({
   useTodoItems: () => ({ data: [] }),
   // Drawer subtask area: empty children slices by default (overridable).
   // childrenMapArgs records the (parentIds, filters) the drawer queries with.
-  useTodoChildrenMap: (parentIds: number[], filters: { sort?: string; order?: string }) => {
+  useTodoChildrenMap: (parentIds: string[], filters: { sort?: string; order?: string }) => {
     mocks.childrenMapArgs(parentIds, filters)
     return mocks.childrenMap()
   },
@@ -59,12 +59,12 @@ vi.mock('../../api/contacts', () => ({
 }))
 
 vi.mock('../../stores/auth', () => ({
-  useAuthStore: (sel: (s: { user: { id: number } | null }) => unknown) => sel({ user: { id: 1 } }),
+  useAuthStore: (sel: (s: { user: { id: string } | null }) => unknown) => sel({ user: { id: '1' } }),
 }))
 
 function todo(over: Partial<Todo> = {}): Todo {
   return {
-    id: 7, user_id: 1, workspace_id: 1, title: 'Drawer task', description: '',
+    id: '7', user_id: '1', workspace_id: '1', title: 'Drawer task', description: '',
     status: 'pending', priority: 'normal', due_time: null, amount: null,
     amount_type: '', contact_ids: [], color: '', completed_at: null,
     created_at: '', updated_at: '', ...over,
@@ -126,7 +126,7 @@ describe('TodoDetailDrawer', () => {
       expect(mocks.updateTodo).toHaveBeenCalledTimes(1)
     }, { timeout: 3000 })
     expect(mocks.updateTodo).toHaveBeenCalledWith(expect.objectContaining({
-      id: 7,
+      id: '7',
       data: expect.objectContaining({ title: 'Drawer task!' }),
     }))
     // The status footer confirms the round-trip.
@@ -171,13 +171,13 @@ describe('TodoDetailDrawer', () => {
       />,
     )
     await user.click(screen.getByRole('button', { name: 'common.delete' }))
-    expect(onDeleteTodo).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }))
+    expect(onDeleteTodo).toHaveBeenCalledWith(expect.objectContaining({ id: '7' }))
   })
 
   it('renders the subtask subtree and toggles a subtask', async () => {
     const user = userEvent.setup()
-    const sub = { ...todo({ id: 8, title: 'Deep subtask', parent_id: 7 }) }
-    mocks.childrenMap.mockReturnValue(new Map([[7, { items: [sub], total: 1, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
+    const sub = { ...todo({ id: '8', title: 'Deep subtask', parent_id: '7' }) }
+    mocks.childrenMap.mockReturnValue(new Map([['7', { items: [sub], total: 1, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
     const onToggleSubtask = vi.fn()
     renderWithClient(
       <TodoDetailDrawer
@@ -197,9 +197,9 @@ describe('TodoDetailDrawer', () => {
   })
 
   it('hides done subtask rows when the page toggle is on (hideDone)', () => {
-    const doneSub = todo({ id: 8, title: 'Done subtask', parent_id: 7, status: 'done', completed_at: '2026-05-01' })
-    const openSub = todo({ id: 9, title: 'Open subtask', parent_id: 7 })
-    mocks.childrenMap.mockReturnValue(new Map([[7, { items: [doneSub, openSub], total: 2, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
+    const doneSub = todo({ id: '8', title: 'Done subtask', parent_id: '7', status: 'done', completed_at: '2026-05-01' })
+    const openSub = todo({ id: '9', title: 'Open subtask', parent_id: '7' })
+    mocks.childrenMap.mockReturnValue(new Map([['7', { items: [doneSub, openSub], total: 2, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
     renderWithClient(
       <TodoDetailDrawer
         todo={todo()}
@@ -228,15 +228,15 @@ describe('TodoDetailDrawer', () => {
     )
     // Subtask rows are drag-reorderable; a non-manual fetch sort (default
     // due_date) would snap a dropped row back to its old slot on refetch.
-    expect(mocks.childrenMapArgs).toHaveBeenCalledWith([7], { sort: 'manual', order: 'asc' })
+    expect(mocks.childrenMapArgs).toHaveBeenCalledWith(['7'], { sort: 'manual', order: 'asc' })
   })
 
   it('only grows the children queries for loaded children that have their own children', async () => {
     // A leaf child (child_count 0) would only ever fetch an empty list —
     // querying it is pure request overhead (1+N per drawer open otherwise).
-    const leaf = { ...todo({ id: 8, title: 'Leaf subtask', parent_id: 7 }) }
-    const parent = { ...todo({ id: 9, title: 'Parent subtask', parent_id: 7, child_count: 2 }) }
-    mocks.childrenMap.mockReturnValue(new Map([[7, { items: [leaf, parent], total: 2, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
+    const leaf = { ...todo({ id: '8', title: 'Leaf subtask', parent_id: '7' }) }
+    const parent = { ...todo({ id: '9', title: 'Parent subtask', parent_id: '7', child_count: 2 }) }
+    mocks.childrenMap.mockReturnValue(new Map([['7', { items: [leaf, parent], total: 2, loaded: true, hasMore: false, loadMore: vi.fn() }]]))
     renderWithClient(
       <TodoDetailDrawer
         todo={todo()}
@@ -248,7 +248,7 @@ describe('TodoDetailDrawer', () => {
       />,
     )
     await waitFor(() => {
-      expect(mocks.childrenMapArgs).toHaveBeenCalledWith([7, 9], { sort: 'manual', order: 'asc' })
+      expect(mocks.childrenMapArgs).toHaveBeenCalledWith(['7', '9'], { sort: 'manual', order: 'asc' })
     })
     const requestedParents = mocks.childrenMapArgs.mock.calls.flatMap(([ids]) => ids as number[])
     expect(requestedParents).not.toContain(8)

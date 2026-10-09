@@ -50,7 +50,7 @@ export default function HabitsPage() {
   const [formName, setFormName] = useState('')
   const [formEmoji, setFormEmoji] = useState('✅')
   const [formColor, setFormColor] = useState('')
-  const [formLabelIds, setFormLabelIds] = useState<number[]>([])
+  const [formLabelIds, setFormLabelIds] = useState<string[]>([])
   const [labelCreating, setLabelCreating] = useState(false)
   const labelCandidates = useMemo(
     () => mergeLabelCandidates(tagsData?.items, editing?.tags),

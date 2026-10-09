@@ -50,7 +50,7 @@ export function WorkoutFormDialog({ open, editing, onClose }: WorkoutFormDialogP
   const [location, setLocation] = useState(editing?.location ?? '')
   const [notes, setNotes] = useState(editing?.notes ?? '')
   const [color, setColor] = useState(editing?.color ?? '')
-  const [labelIds, setLabelIds] = useState<number[]>(editing?.tags?.map((tg) => tg.id) ?? [])
+  const [labelIds, setLabelIds] = useState<string[]>(editing?.tags?.map((tg) => tg.id) ?? [])
   const [labelCreating, setLabelCreating] = useState(false)
 
   const handleSave = useCallback(async () => {

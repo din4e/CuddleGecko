@@ -22,11 +22,11 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => {} },
 }))
 
-const tags: Tag[] = [{ id: 1, name: 'work', color: '#3b82f6', user_id: 1, created_at: '' }]
+const tags: Tag[] = [{ id: '1', name: 'work', color: '#3b82f6', user_id: '1', created_at: '' }]
 
 function makeTodo(partial: Partial<Todo>): Todo {
   return {
-    id: 1,
+    id: '1',
     title: 'task',
     description: '',
     status: 'pending',
@@ -37,9 +37,9 @@ function makeTodo(partial: Partial<Todo>): Todo {
 }
 
 const todos = [
-  makeTodo({ id: 1, title: 'Buy milk', status: 'pending' }),
-  makeTodo({ id: 2, title: 'Ship release', status: 'done' }),
-  makeTodo({ id: 3, title: 'Unmatched', status: 'pending', priority: 'high' }),
+  makeTodo({ id: '1', title: 'Buy milk', status: 'pending' }),
+  makeTodo({ id: '2', title: 'Ship release', status: 'done' }),
+  makeTodo({ id: '3', title: 'Unmatched', status: 'pending', priority: 'high' }),
 ]
 
 const columns = [
@@ -114,11 +114,11 @@ describe('KanbanBoard', () => {
   it('drags a divider to resize the column and persists the width', () => {
     renderBoard()
     const divider = screen.getAllByLabelText('todos.kanbanResizeColumn')[0]
-    fireEvent.pointerDown(divider, { pointerId: 1, clientX: 200 })
-    fireEvent.pointerMove(divider, { pointerId: 1, clientX: 412 }) // +212 → 256+212=468
+    fireEvent.pointerDown(divider, { pointerId: '1', clientX: 200 })
+    fireEvent.pointerMove(divider, { pointerId: '1', clientX: 412 }) // +212 → 256+212=468
     const colEl = document.querySelector('[data-kanban-col="status-pending"]') as HTMLElement
     expect(colEl.style.width).toBe('468px')
-    fireEvent.pointerUp(divider, { pointerId: 1 })
+    fireEvent.pointerUp(divider, { pointerId: '1' })
     expect(localStorage.getItem('kanbanColWidths')).toBe(
       JSON.stringify({ 'status-pending': 468 }),
     )
@@ -127,13 +127,13 @@ describe('KanbanBoard', () => {
   it('clamps divider drags to the min/max column width', () => {
     renderBoard()
     const divider = screen.getAllByLabelText('todos.kanbanResizeColumn')[0]
-    fireEvent.pointerDown(divider, { pointerId: 1, clientX: 200 })
-    fireEvent.pointerMove(divider, { pointerId: 1, clientX: 1200 })
+    fireEvent.pointerDown(divider, { pointerId: '1', clientX: 200 })
+    fireEvent.pointerMove(divider, { pointerId: '1', clientX: 1200 })
     let colEl = document.querySelector('[data-kanban-col="status-pending"]') as HTMLElement
     expect(colEl.style.width).toBe('480px')
-    fireEvent.pointerMove(divider, { pointerId: 1, clientX: -1000 })
+    fireEvent.pointerMove(divider, { pointerId: '1', clientX: -1000 })
     colEl = document.querySelector('[data-kanban-col="status-pending"]') as HTMLElement
     expect(colEl.style.width).toBe('180px')
-    fireEvent.pointerUp(divider, { pointerId: 1 })
+    fireEvent.pointerUp(divider, { pointerId: '1' })
   })
 })

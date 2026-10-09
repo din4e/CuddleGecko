@@ -68,12 +68,12 @@ interface FormValues {
   duration: string
   amount: string
   amountType: '' | 'income' | 'expense'
-  contactIds: number[]
+  contactIds: string[]
   color: string
   repeat: string
   repeatInterval: number
-  tagIds: number[]
-  parentId: number | null
+  tagIds: string[]
+  parentId: string | null
 }
 
 function initialFormValues(editing: Todo | null, initialDueTime?: string): FormValues {
@@ -114,12 +114,12 @@ function snapshotOf(v: FormValues): string {
     duration: v.duration,
     amount: v.amount,
     amount_type: v.amountType,
-    contact_ids: [...v.contactIds].sort((a, b) => a - b),
+    contact_ids: [...v.contactIds].sort(),
     color: v.color,
     repeat: v.repeat,
     repeat_interval: v.repeatInterval,
     parent_id: v.parentId,
-    tag_ids: [...v.tagIds].sort((a, b) => a - b),
+    tag_ids: [...v.tagIds].sort(),
   })
 }
 
@@ -147,12 +147,12 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   const [formDuration, setFormDuration] = useState(init.duration)
   const [formAmount, setFormAmount] = useState(init.amount)
   const [formAmountType, setFormAmountType] = useState<'' | 'income' | 'expense'>(init.amountType)
-  const [formContactIds, setFormContactIds] = useState<number[]>(init.contactIds)
+  const [formContactIds, setFormContactIds] = useState<string[]>(init.contactIds)
   const [formColor, setFormColor] = useState(init.color)
   const [formRepeat, setFormRepeat] = useState<string>(init.repeat)
   const [formRepeatInterval, setFormRepeatInterval] = useState<number>(init.repeatInterval)
-  const [formTagIds, setFormTagIds] = useState<number[]>(init.tagIds)
-  const [formParentId, setFormParentId] = useState<number | null>(init.parentId)
+  const [formTagIds, setFormTagIds] = useState<string[]>(init.tagIds)
+  const [formParentId, setFormParentId] = useState<string | null>(init.parentId)
   const savingRef = useRef(false)
   const savedTodoId = useRef(editing?.id)
   const savedParentId = useRef(editing?.parent_id ?? null)
@@ -203,7 +203,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, onContacts
   // Disallow picking self or a descendant as the new parent (backend would reject
   // the cycle); keeps the picker honest when editing.
   const blockedParents = useMemo(
-    () => (editing ? new Set([editing.id, ...descendantIds(parentCandidates ?? [], editing.id)]) : new Set<number>()),
+    () => (editing ? new Set([editing.id, ...descendantIds(parentCandidates ?? [], editing.id)]) : new Set<string>()),
     [editing, parentCandidates],
   )
 

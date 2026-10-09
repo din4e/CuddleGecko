@@ -90,7 +90,7 @@ describe('InlineMarkdown', () => {
     const a = screen.getByRole('link', { name: 'the plan' })
     expect(a).not.toHaveAttribute('target') // in-app, not a new browser tab
     fireEvent.click(a)
-    expect(openTodo).toHaveBeenCalledWith(42)
+    expect(openTodo).toHaveBeenCalledWith('42')
   })
 
   it('renders todo:<id> links as inert styled text without a jump context', () => {

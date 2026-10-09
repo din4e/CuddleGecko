@@ -30,13 +30,13 @@ import type { WhiteboardDetail, WhiteboardNode, WhiteboardNodeInput } from '../t
 
 const nodeTypes = { board: BoardNode }
 
-const toEdge = (id: number, source: number, target: number, label: string): Edge => ({
-  id: String(id), source: String(source), target: String(target), label: label || undefined,
+const toEdge = (id: string, source: string, target: string, label: string): Edge => ({
+  id, source, target, label: label || undefined,
 })
 
 function BoardCanvas({ board, onNodeClick }: {
   board: WhiteboardDetail
-  onNodeClick: (nodeId: number | null) => void
+  onNodeClick: (nodeId: string | null) => void
 }) {
   const { createNode, updateNode, deleteNode, createEdge, deleteEdge } = useWhiteboardNodeMutations(board.id)
   // mutation object identities change every render — bind the stable fns so
@@ -47,7 +47,7 @@ function BoardCanvas({ board, onNodeClick }: {
   const updateNodeMutate = updateNode.mutate
   const deleteNodeMutate = deleteNode.mutate
 
-  const expandNode = useCallback(async (nodeId: number) => {
+  const expandNode = useCallback(async (nodeId: string) => {
     const parent = board.nodes.find((n) => n.id === nodeId)
     if (!parent) return
     const res = await whiteboardsApi.expand(board.id, nodeId)
@@ -77,8 +77,8 @@ function BoardCanvas({ board, onNodeClick }: {
       note: n.note,
       color: n.color,
       hasRef: !!(n.ref_id && n.ref_type && n.ref_type !== 'note'),
-      onExpand: (id: string) => { void expandNode(Number(id)) },
-      onDelete: (id: string) => { deleteNodeMutate(Number(id)) },
+      onExpand: (id: string) => { void expandNode(id) },
+      onDelete: (id: string) => { deleteNodeMutate(id) },
     } satisfies BoardNodeData,
   }), [expandNode, deleteNodeMutate])
 
@@ -93,7 +93,7 @@ function BoardCanvas({ board, onNodeClick }: {
   }, [board, toFlowNode, setNodes, setEdges])
 
   const onConnect = useCallback((conn: Connection) => {
-    createEdgeMutate({ from: Number(conn.source), to: Number(conn.target) })
+    createEdgeMutate({ from: conn.source, to: conn.target })
   }, [createEdgeMutate])
 
   // persist drag end: the final position change carries dragging === false
@@ -101,7 +101,7 @@ function BoardCanvas({ board, onNodeClick }: {
     onNodesChange(changes)
     for (const ch of changes) {
       if (ch.type === 'position' && !ch.dragging && ch.position) {
-        const n = board.nodes.find((x) => x.id === Number(ch.id))
+        const n = board.nodes.find((x) => x.id === ch.id)
         if (!n) continue
         updateNodeMutate({
           nodeId: n.id,
@@ -112,7 +112,7 @@ function BoardCanvas({ board, onNodeClick }: {
   }, [onNodesChange, board.nodes, updateNodeMutate])
 
   const onPaneClick = useCallback(() => onNodeClick(null), [onNodeClick])
-  const handleNodeClick: NodeMouseHandler = useCallback((_, node) => onNodeClick(Number(node.id)), [onNodeClick])
+  const handleNodeClick: NodeMouseHandler = useCallback((_, node) => onNodeClick(node.id), [onNodeClick])
 
   return (
     <div className="h-[calc(100vh-11rem)] min-h-[26rem] w-full overflow-hidden rounded-lg border bg-background">
@@ -125,7 +125,7 @@ function BoardCanvas({ board, onNodeClick }: {
         onConnect={onConnect}
         onNodeClick={handleNodeClick}
         onPaneClick={onPaneClick}
-        onEdgeDoubleClick={(_, edge) => deleteEdge.mutate(Number(edge.id))}
+        onEdgeDoubleClick={(_, edge) => deleteEdge.mutate(edge.id)}
         fitView
         minZoom={0.2}
         maxZoom={2}
@@ -141,7 +141,7 @@ function BoardCanvas({ board, onNodeClick }: {
 }
 
 /** Side panel: edit a node's title/note; entity nodes also show the link. */
-function NodeDetailPanel({ board, nodeId }: { board: WhiteboardDetail; nodeId: number }) {
+function NodeDetailPanel({ board, nodeId }: { board: WhiteboardDetail; nodeId: string }) {
   const { t } = useTranslation()
   const node = board.nodes.find((n) => n.id === nodeId)
   const { updateNode } = useWhiteboardNodeMutations(board.id)
@@ -207,12 +207,12 @@ function WhiteboardPageInner() {
   const createBoard = useCreateWhiteboard()
   const renameBoard = useRenameWhiteboard()
   const deleteBoard = useDeleteWhiteboard()
-  const [activeId, setActiveId] = useState<number | null>(null)
-  const [selectedNode, setSelectedNode] = useState<number | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [addAt, setAddAt] = useState<{ x: number; y: number } | null>(null)
   const [newBoardOpen, setNewBoardOpen] = useState(false)
   const [newName, setNewName] = useState('')
-  const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const list = boards ?? []
   const current = activeId ?? list[0]?.id ?? null
@@ -251,7 +251,7 @@ function WhiteboardPageInner() {
         <select
           className={`${selectCls} min-w-40`}
           value={current ?? ''}
-          onChange={(e) => { setActiveId(Number(e.target.value)); setSelectedNode(null) }}
+          onChange={(e) => { setActiveId(e.target.value || null); setSelectedNode(null) }}
           aria-label={t('whiteboard.selectBoard')}
         >
           {list.length === 0 && <option value="">{t('whiteboard.noBoards')}</option>}

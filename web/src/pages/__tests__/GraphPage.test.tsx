@@ -93,10 +93,10 @@ const mockedGraphGet = vi.mocked(graphApi.get)
 
 const sampleGraph: GraphData = {
   nodes: [
-    { id: 1, name: '张三', relationship_labels: ['friend'], avatar_emoji: '', avatar_url: '' },
-    { id: 2, name: '李四', relationship_labels: ['family'], avatar_emoji: '', avatar_url: '' },
+    { id: '1', name: '张三', relationship_labels: ['friend'], avatar_emoji: '', avatar_url: '' },
+    { id: '2', name: '李四', relationship_labels: ['family'], avatar_emoji: '', avatar_url: '' },
   ],
-  edges: [{ source: 1, target: 2, relation_type: 'friend' }],
+  edges: [{ source: '1', target: '2', relation_type: 'friend' }],
 }
 
 type NodeCanvasFn = (node: Record<string, unknown>, ctx: CanvasRenderingContext2D, scale: number) => void
@@ -150,7 +150,7 @@ describe('GraphPage', () => {
 
     const ctx = makeCtx()
     const nodeCanvasObject = lastGraphProps!.nodeCanvasObject as NodeCanvasFn
-    nodeCanvasObject({ id: 1, name: '张三', x: 0, y: 0, relationship_labels: [], avatar_emoji: '' }, ctx as unknown as CanvasRenderingContext2D, 1)
+    nodeCanvasObject({ id: '1', name: '张三', x: 0, y: 0, relationship_labels: [], avatar_emoji: '' }, ctx as unknown as CanvasRenderingContext2D, 1)
     expect(ctx.fillText).toHaveBeenCalledWith('张三', expect.any(Number), expect.any(Number))
   })
 
@@ -166,7 +166,7 @@ describe('GraphPage', () => {
 
     const ctx = makeCtx()
     const nodeCanvasObject = lastGraphProps!.nodeCanvasObject as NodeCanvasFn
-    nodeCanvasObject({ id: 1, name: '张三', x: 0, y: 0, relationship_labels: [], avatar_emoji: '😀' }, ctx as unknown as CanvasRenderingContext2D, 1)
+    nodeCanvasObject({ id: '1', name: '张三', x: 0, y: 0, relationship_labels: [], avatar_emoji: '😀' }, ctx as unknown as CanvasRenderingContext2D, 1)
     expect(ctx.fillText).not.toHaveBeenCalledWith('张三', expect.any(Number), expect.any(Number))
     expect(ctx.fillText).toHaveBeenCalledWith('😀', expect.any(Number), expect.any(Number))
   })

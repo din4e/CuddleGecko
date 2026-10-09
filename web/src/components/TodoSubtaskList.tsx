@@ -18,14 +18,14 @@ import type { Todo } from '../types'
 /** afterId targets: a sibling id to place after, null for the top of the
  *  sibling group, or 'last' to append at the end (the backend resolves it —
  *  same contract as the tree view's move). */
-export type SubtaskMoveAfterId = number | null | 'last'
+export type SubtaskMoveAfterId = string | null | 'last'
 
 /** Where over a row the pointer is releasing. */
 type DropZone = 'before' | 'child' | 'after'
 
 export interface TodoSubtaskListProps {
   todo: Todo
-  childrenByParent: Map<number, Todo[]>
+  childrenByParent: Map<string, Todo[]>
   onToggle: (todo: Todo) => void
   onEdit: (todo: Todo) => void
   /** Inline quick-add: every row's trailing hover "+" (the row's rightmost
@@ -51,14 +51,14 @@ export interface TodoSubtaskListProps {
    *  wired, rows become draggable and act as tri-zone drop targets: upper
    *  band = place before the row, middle = nest as its last child, lower
    *  band = place after it. Not wired → rows are static. */
-  onMove?: (id: number, parentId: number | null, afterId: SubtaskMoveAfterId) => void
+  onMove?: (id: string, parentId: string | null, afterId: SubtaskMoveAfterId) => void
   /** The subtask id currently being dragged (page-level, so a drag spans
    *  cards and the drawer), or null when none. */
-  dragId?: number | null
-  onDragIdChange?: (id: number | null) => void
+  dragId?: string | null
+  onDragIdChange?: (id: string | null) => void
   /** Ancestor ids of this section's todo (its parent chain) — rows refuse a
    *  drop of their own ancestor (cycle). Internal, threaded by recursion. */
-  ancestorIds?: Set<number>
+  ancestorIds?: Set<string>
 }
 
 // Bands mirror the tree rows (30/70) so nesting feels identical everywhere.
@@ -84,13 +84,13 @@ export default function TodoSubtaskList({ todo, childrenByParent, onToggle, onEd
   const setProgress = useSetTodoProgress()
   const children = childrenByParent.get(todo.id)
   // Id of the row whose inline adder is open. null = hidden.
-  const [addingFor, setAddingFor] = useState<number | null>(null)
+  const [addingFor, setAddingFor] = useState<string | null>(null)
   const collapsed = useTodoCollapseStore((s) => s.collapsed)
   const toggleCollapse = useTodoCollapseStore((s) => s.toggle)
   const reveal = useTodoCollapseStore((s) => s.reveal)
   // Tri-zone hover for this section's rows (only one row can be hovered at a
   // time, so a single section-level slot replaces per-row state).
-  const [hover, setHover] = useState<{ id: number; zone: DropZone } | null>(null)
+  const [hover, setHover] = useState<{ id: string; zone: DropZone } | null>(null)
   const draggable = onMove != null && onDragIdChange != null
   // True while a pointer press is held on a row's progress bar: the row's
   // draggable flag drops for the gesture, so the browser never arms a native

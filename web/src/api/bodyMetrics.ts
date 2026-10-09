@@ -18,10 +18,10 @@ export const bodyMetricsApi = {
   create: (data: BodyMetricInput) =>
     request.post<BodyMetric>('/body-metrics', data).then((d) => ({ data: d })),
 
-  update: (id: number, data: BodyMetricInput) =>
+  update: (id: string, data: BodyMetricInput) =>
     request.put<BodyMetric>(`/body-metrics/${id}`, data).then((d) => ({ data: d })),
 
-  delete: (id: number) =>
+  delete: (id: string) =>
     request.delete<void>(`/body-metrics/${id}`).then(() => {}),
 
   /** Bulk-import records from external platforms (Garmin Connect, …). */

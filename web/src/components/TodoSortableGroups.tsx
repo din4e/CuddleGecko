@@ -40,10 +40,10 @@ export interface TodoSortableGroupsProps {
   onGroupDrop?: (todo: Todo, groupKey: string) => void
   /** Same-group reorder: place id right after afterId (null = first). Omit to
    *  disable in-group reordering (views sorted by the server ignore it). */
-  onReorder?: (id: number, afterId: number | null) => void
+  onReorder?: (id: string, afterId: string | null) => void
   /** Drop onto the middle of another card: make the dragged todo a child of
    *  it (tree-view semantics — the page reparents via the move API). */
-  onNest?: (draggedId: number, parentId: number) => void
+  onNest?: (draggedId: string, parentId: string) => void
   /** Class of the group stack (the outer container). */
   className?: string
   /** Class of each group's card container — lists vs grid layouts. */
@@ -53,7 +53,7 @@ export interface TodoSortableGroupsProps {
 // Drag ids are namespaced so handlers can tell cards apart from group bodies.
 // A group's SortableContext and droppable body share the same id: dropping on
 // a card reports it via sortable.containerId, on the body via the id itself.
-const itemId = (todoId: number) => `t${todoId}`
+const itemId = (todoId: string) => `t${todoId}`
 const groupId = (key: string) => `group:${key}`
 
 
@@ -76,7 +76,7 @@ export default function TodoSortableGroups({
   itemAreaClass = 'space-y-1.5',
 }: TodoSortableGroupsProps) {
   const todoById = useMemo(() => {
-    const m = new Map<number, Todo>()
+    const m = new Map<string, Todo>()
     for (const g of groups) for (const t of g.items) m.set(t.id, t)
     return m
   }, [groups])
@@ -84,7 +84,7 @@ export default function TodoSortableGroups({
   // Local group→ids state drives the cross-group drag preview (the card jumps
   // to the hovered group before the server mutation lands). Re-synced whenever
   // the derived groups change, but never mid-drag.
-  const [byGroup, setByGroup] = useState<Record<string, number[]>>(() =>
+  const [byGroup, setByGroup] = useState<Record<string, string[]>>(() =>
     Object.fromEntries(groups.map((g) => [g.key, g.items.map((t) => t.id)])),
   )
   const dragging = useRef(false)
@@ -102,13 +102,13 @@ export default function TodoSortableGroups({
     useSensor(KeyboardSensor),
   )
 
-  const [activeId, setActiveId] = useState<number | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
   // Card currently hovered in its middle zone — rendered with a nest affordance
   // (ring + ↳ badge) so the user sees the drop will create a parent-child link.
-  const [nestTarget, setNestTarget] = useState<number | null>(null)
+  const [nestTarget, setNestTarget] = useState<string | null>(null)
 
   const findGroupOfCard = (cardId: string): string | null => {
-    const id = Number(cardId.slice(1))
+    const id = cardId.slice(1)
     for (const [key, ids] of Object.entries(byGroup)) {
       if (ids.includes(id)) return key
     }
@@ -126,7 +126,7 @@ export default function TodoSortableGroups({
   const handleDragStart = (e: DragStartEvent) => {
     dragging.current = true
     sourceGroup.current = findGroupOfCard(String(e.active.id))
-    setActiveId(Number(String(e.active.id).slice(1)))
+    setActiveId(String(e.active.id).slice(1))
   }
 
   // Live preview: while dragging over another group, move the card into that
@@ -143,8 +143,8 @@ export default function TodoSortableGroups({
     const to = overGroup(over)
     if (!from || !to) return
     const overStr = String(over.id)
-    const overCardId = overStr.startsWith('group:') ? null : Number(overStr.slice(1))
-    const draggedId = Number(String(active.id).slice(1))
+    const overCardId = overStr.startsWith('group:') ? null : overStr.slice(1)
+    const draggedId = String(active.id).slice(1)
     if (overCardId != null && overCardId !== draggedId && onNest &&
         cardDropZone(active.rect.current.translated, over.rect) === 'middle') {
       setNestTarget(overCardId)
@@ -155,12 +155,12 @@ export default function TodoSortableGroups({
     setByGroup((prev) => {
       const fromIds = prev[from] ?? []
       const toIds = prev[to] ?? []
-      const id = Number(String(active.id).slice(1))
+      const id = String(active.id).slice(1)
       if (!fromIds.includes(id)) return prev
       let insertAt = toIds.length
       const s = String(over.id)
       if (!s.startsWith('group:')) {
-        const overIdx = toIds.indexOf(Number(s.slice(1)))
+        const overIdx = toIds.indexOf(s.slice(1))
         if (overIdx >= 0) insertAt = overIdx
       }
       return {
@@ -179,7 +179,7 @@ export default function TodoSortableGroups({
     const from = sourceGroup.current ?? findGroupOfCard(String(active.id))
     sourceGroup.current = null
     if (!over) return
-    const id = Number(String(active.id).slice(1))
+    const id = String(active.id).slice(1)
     const todo = todoById.get(id)
     const to = overGroup(over)
     if (!todo || !to || !from) return
@@ -188,7 +188,7 @@ export default function TodoSortableGroups({
     // (appended as its last child). Takes precedence over group semantics so
     // "drop ON a task" always means nesting, in every group.
     const overStr = String(over.id)
-    const overCardId = overStr.startsWith('group:') ? null : Number(overStr.slice(1))
+    const overCardId = overStr.startsWith('group:') ? null : overStr.slice(1)
     if (overCardId != null && overCardId !== id && onNest &&
         cardDropZone(active.rect.current.translated, over.rect) === 'middle') {
       onNest(id, overCardId)
@@ -273,8 +273,8 @@ function GroupArea({
   itemIds: string[]
   itemAreaClass: string
   renderCard: (todo: Todo) => ReactNode
-  todoById: Map<number, Todo>
-  nestTarget: number | null
+  todoById: Map<string, Todo>
+  nestTarget: string | null
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: groupId(groupKey) })
   return (
@@ -286,10 +286,10 @@ function GroupArea({
         {itemIds.map((sid) => (
           <SortableCard
             key={sid}
-            todoId={Number(sid.slice(1))}
+            todoId={sid.slice(1)}
             todoById={todoById}
             renderCard={renderCard}
-            nest={nestTarget === Number(sid.slice(1))}
+            nest={nestTarget === sid.slice(1)}
           />
         ))}
       </div>
@@ -303,8 +303,8 @@ function SortableCard({
   renderCard,
   nest,
 }: {
-  todoId: number
-  todoById: Map<number, Todo>
+  todoId: string
+  todoById: Map<string, Todo>
   renderCard: (todo: Todo) => ReactNode
   nest?: boolean
 }) {

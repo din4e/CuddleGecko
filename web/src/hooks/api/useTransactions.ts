@@ -24,7 +24,7 @@ interface ListParams extends DateRange {
   page?: number
   page_size?: number
   type?: string
-  contact_id?: number
+  contact_id?: string
   q?: string
 }
 
@@ -90,7 +90,7 @@ export function useCreateTransaction() {
 export function useUpdateTransaction() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Transaction> }) => transactionsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<Transaction> }) => transactionsApi.update(id, data),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -99,7 +99,7 @@ export function useUpdateTransaction() {
 export function useDeleteTransaction() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => transactionsApi.delete(id),
+    mutationFn: (id: string) => transactionsApi.delete(id),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -108,7 +108,7 @@ export function useDeleteTransaction() {
 export function useReplaceTransactionTags() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => transactionsApi.replaceTags(id, tagIds),
+    mutationFn: ({ id, tagIds }: { id: string; tagIds: string[] }) => transactionsApi.replaceTags(id, tagIds),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }

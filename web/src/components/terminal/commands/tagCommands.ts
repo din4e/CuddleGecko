@@ -40,7 +40,7 @@ export async function executeUpdateTag(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: update tag <id>')
 
     const name = (args.name as string) || 'unnamed'
@@ -58,7 +58,7 @@ export async function executeDeleteTag(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: delete tag <id>')
 
     await adapters.tag.delete(id)

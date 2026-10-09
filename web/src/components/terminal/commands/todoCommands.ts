@@ -52,7 +52,7 @@ export async function executeUpdateTodo(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: update todo <id>')
 
     const data: Record<string, unknown> = {}
@@ -75,7 +75,7 @@ export async function executeToggleTodo(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: toggle todo <id>')
 
     const todo = await adapters.todo.toggleStatus(id)
@@ -90,7 +90,7 @@ export async function executeSyncTodo(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: sync todo <id>')
 
     const event = await adapters.todo.syncToEvent(id)
@@ -105,7 +105,7 @@ export async function executeDeleteTodo(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: delete todo <id>')
 
     await adapters.todo.delete(id)

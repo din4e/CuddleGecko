@@ -38,7 +38,7 @@ export function ExerciseLibraryPanel() {
   const { create, update, remove } = useExerciseLibraryMutations()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<ExerciseLibraryItem | null>(null)
-  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   return (
     <div className="space-y-3">
@@ -175,7 +175,7 @@ export function WorkoutTemplatesPanel() {
   const { create, update, remove } = useWorkoutTemplateMutations()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<WorkoutTemplate | null>(null)
-  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   return (
     <div className="space-y-3">

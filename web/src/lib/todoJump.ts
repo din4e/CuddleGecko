@@ -9,7 +9,7 @@ import { defaultUrlTransform } from 'react-markdown'
  * styled text instead of navigating to a bogus URL.
  */
 export interface TodoJump {
-  openTodo: (id: number) => void
+  openTodo: (id: string) => void
 }
 
 export const TodoJumpContext = createContext<TodoJump | null>(null)
@@ -18,8 +18,9 @@ export function useTodoJump(): TodoJump | null {
   return useContext(TodoJumpContext)
 }
 
-/** Matches the in-app link scheme: `todo:<id>`. */
-export const TODO_LINK_RE = /^todo:(\d+)$/
+/** Matches the in-app link scheme: `todo:<id>` — a UUID v4, or a bare
+ *  integer from pre-migration notes (both resolve by lookup). */
+export const TODO_LINK_RE = /^todo:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d+)$/
 
 /** react-markdown URL filter: the default allowlist plus the in-app todo:<id>
  *  scheme (defaultUrlTransform strips unknown protocols to ""). */

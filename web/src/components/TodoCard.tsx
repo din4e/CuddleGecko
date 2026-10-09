@@ -45,14 +45,14 @@ export interface TodoCardProps {
   contactNames: string
   selectable?: boolean
   selected?: boolean
-  onSelectToggle?: (id: number) => void
-  onToggle: (id: number) => void
+  onSelectToggle?: (id: string) => void
+  onToggle: (id: string) => void
   /** Explicit status change (abandon / restore / done without recurring advance). */
-  onSetStatus?: (id: number, status: Todo['status']) => void
+  onSetStatus?: (id: string, status: Todo['status']) => void
   onTogglePin: (todo: Todo) => void
   onSync: (todo: Todo) => void
   onEdit: (todo: Todo) => void
-  onRename: (id: number, title: string) => void
+  onRename: (id: string, title: string) => void
   onDuplicate: (todo: Todo) => void
   onDelete: (todo: Todo) => void
   formatDate: (dateStr: string | null) => string
@@ -81,8 +81,8 @@ export interface TodoCardProps {
    *  the whole card is a nest drop target: dropping a subtask ON a task
    *  makes it that task's last child — mirroring the dnd-kit middle-zone
    *  nesting card drags already have (TodoSortableGroups.onNest). */
-  subtaskDragId?: number | null
-  onNestSubtask?: (draggedId: number, parentId: number) => void
+  subtaskDragId?: string | null
+  onNestSubtask?: (draggedId: string, parentId: string) => void
 }
 
 const TodoCard = memo(function TodoCard({

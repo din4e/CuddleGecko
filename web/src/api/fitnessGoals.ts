@@ -8,9 +8,9 @@ export const fitnessGoalsApi = {
   create: (data: FitnessGoalInput) =>
     request.post<FitnessGoal>('/fitness-goals', data).then((d) => ({ data: d })),
 
-  update: (id: number, data: FitnessGoalInput) =>
+  update: (id: string, data: FitnessGoalInput) =>
     request.put<FitnessGoal>(`/fitness-goals/${id}`, data).then((d) => ({ data: d })),
 
-  delete: (id: number) =>
+  delete: (id: string) =>
     request.delete<void>(`/fitness-goals/${id}`).then(() => {}),
 }

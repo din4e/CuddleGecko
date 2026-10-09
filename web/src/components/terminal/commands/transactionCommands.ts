@@ -82,7 +82,7 @@ export async function executeUpdateTransaction(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: update transaction <id>')
 
     const data: Record<string, unknown> = {}
@@ -105,7 +105,7 @@ export async function executeDeleteTransaction(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: delete transaction <id>')
 
     await adapters.transaction.delete(id)

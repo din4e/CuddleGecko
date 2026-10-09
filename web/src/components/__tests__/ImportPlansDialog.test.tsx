@@ -32,20 +32,20 @@ import { useHabitsList } from '../../hooks/api/useHabits'
 import { useCreateWorkout } from '../../hooks/api/useWorkouts'
 
 const todo: Todo = {
-  id: 1, user_id: 1, workspace_id: 1, title: '周三夜跑 5 公里', description: '',
+  id: '1', user_id: '1', workspace_id: '1', title: '周三夜跑 5 公里', description: '',
   status: 'pending', priority: 'normal', due_time: '2026-09-10T19:00:00Z',
   amount: null, amount_type: '', contact_ids: [], color: '',
   completed_at: null, created_at: '', updated_at: '',
 }
 
 const event: Event = {
-  id: 2, user_id: 1, title: '羽毛球局', description: '',
+  id: '2', user_id: '1', title: '羽毛球局', description: '',
   start_time: '2026-09-11T20:00:00Z', end_time: null, location: '体育馆',
   contact_ids: [], color: '', created_at: '', updated_at: '',
 }
 
 const habit: Habit = {
-  id: 3, user_id: 1, workspace_id: 1, name: '每日俯卧撑', color: '', emoji: '💪',
+  id: '3', user_id: '1', workspace_id: '1', name: '每日俯卧撑', color: '', emoji: '💪',
   frequency: 'daily', archived: false, sort_order: 0,
   created_at: '', updated_at: '',
   today_done: false, streak: 4, best: 10, rate_30: 0.8, recent: [],

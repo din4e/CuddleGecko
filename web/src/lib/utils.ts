@@ -48,7 +48,7 @@ export function formatMoney(v: number): string {
  * not first-of-next-month.
  */
 export function lastDayOfMonth(year: string, month: string): string {
-  const days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  const days = ['31', 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
   const y = Number(year)
   const m = Number(month)
   const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0

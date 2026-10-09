@@ -3,7 +3,7 @@ export type InteractionType = 'meeting' | 'call' | 'message' | 'email' | 'other'
 export type ReminderStatus = 'pending' | 'done' | 'snoozed'
 
 export interface User {
-  id: number
+  id: string
   username: string
   email: string
   created_at: string
@@ -11,8 +11,8 @@ export interface User {
 }
 
 export interface Contact {
-  id: number
-  user_id: number
+  id: string
+  user_id: string
   name: string
   nickname: string
   avatar_emoji: string
@@ -41,17 +41,17 @@ export interface UpcomingBirthday {
 }
 
 export interface Tag {
-  id: number
-  user_id: number
+  id: string
+  user_id: string
   name: string
   color: string
   created_at: string
 }
 
 export interface Interaction {
-  id: number
-  user_id: number
-  contact_id: number
+  id: string
+  user_id: string
+  contact_id: string
   type: InteractionType
   title: string
   content: string
@@ -61,9 +61,9 @@ export interface Interaction {
 }
 
 export interface Reminder {
-  id: number
-  user_id: number
-  contact_id: number
+  id: string
+  user_id: string
+  contact_id: string
   title: string
   description: string
   remind_at: string
@@ -75,16 +75,16 @@ export interface Reminder {
 }
 
 export interface ContactRelation {
-  id: number
-  user_id: number
-  contact_id_a: number
-  contact_id_b: number
+  id: string
+  user_id: string
+  contact_id_a: string
+  contact_id_b: string
   relation_type: string
   created_at: string
 }
 
 export interface GraphNode {
-  id: number
+  id: string
   name: string
   relationship_labels: string[]
   avatar_emoji: string
@@ -93,8 +93,8 @@ export interface GraphNode {
 }
 
 export interface GraphEdge {
-  source: number
-  target: number
+  source: string
+  target: string
   relation_type: string
   created_at?: string
 }
@@ -124,14 +124,14 @@ export interface PaginatedData<T> {
 }
 
 export interface Event {
-  id: number
-  user_id: number
+  id: string
+  user_id: string
   title: string
   description: string
   start_time: string
   end_time: string | null
   location: string
-  contact_ids: number[]
+  contact_ids: string[]
   color: string
   created_at: string
   updated_at: string
@@ -140,13 +140,13 @@ export interface Event {
 }
 
 export interface Transaction {
-  id: number
-  user_id: number
+  id: string
+  user_id: string
   title: string
   amount: number
   type: 'income' | 'expense'
   category: string
-  contact_ids: number[]
+  contact_ids: string[]
   date: string
   notes: string
   created_at: string
@@ -208,8 +208,8 @@ export interface FinanceMortgage {
 }
 
 export interface AIProvider {
-  id: number
-  user_id: number
+  id: string
+  user_id: string
   provider_type: string
   name: string
   base_url: string
@@ -220,16 +220,16 @@ export interface AIProvider {
 }
 
 export interface AIConversation {
-  id: number
-  user_id: number
+  id: string
+  user_id: string
   title: string
   created_at: string
   updated_at: string
 }
 
 export interface AIMessage {
-  id: number
-  conversation_id: number
+  id: string
+  conversation_id: string
   role: 'system' | 'user' | 'assistant'
   content: string
   created_at: string
@@ -243,11 +243,11 @@ export interface AIProviderPreset {
 }
 
 export interface Workspace {
-  id: number
+  id: string
   name: string
   description: string
   icon: string
-  owner_id: number
+  owner_id: string
   created_at: string
   updated_at: string
 }
@@ -281,10 +281,10 @@ export interface TodoListParams {
   /** completed_at at or after this time (done-today / done-this-week lists). */
   done_after?: string
   /** Single tag id, or several for an any-of (OR) filter. */
-  tag_id?: number | number[]
+  tag_id?: string | number[]
   sort?: TodoSort
   order?: 'asc' | 'desc'
-  parent_id?: number | null
+  parent_id?: string | null
   /** Only top-level todos (parent_id IS NULL) — lazy tree roots. */
   roots_only?: boolean
   /** Only todos whose todo_ids contain this id (backlinks). */
@@ -305,9 +305,9 @@ export interface TodoUpdateInput extends Partial<Omit<Todo, 'due_time' | 'amount
 }
 
 export interface Habit {
-  id: number
-  user_id: number
-  workspace_id: number
+  id: string
+  user_id: string
+  workspace_id: string
   name: string
   color: string
   emoji: string
@@ -329,10 +329,10 @@ export interface Habit {
 export type PomodoroKind = 'focus' | 'break'
 
 export interface PomodoroSession {
-  id: number
-  user_id: number
-  workspace_id: number
-  todo_id: number | null
+  id: string
+  user_id: string
+  workspace_id: string
+  todo_id: string | null
   duration_seconds: number
   kind: PomodoroKind
   completed: boolean
@@ -349,9 +349,9 @@ export interface PomodoroSummary {
 }
 
 export interface Todo {
-  id: number
-  user_id: number
-  workspace_id: number
+  id: string
+  user_id: string
+  workspace_id: string
   title: string
   description: string
   status: TodoStatus
@@ -366,17 +366,17 @@ export interface Todo {
   duration?: number
   amount: number | null
   amount_type: AmountType
-  contact_ids: number[]
+  contact_ids: string[]
   /** Cross-reference links to other todos — jump targets, deliberately
    *  separate from the parent/child tree. Optional for resilience (older
    *  cached rows, test mocks). */
-  todo_ids?: number[]
+  todo_ids?: string[]
   tags?: Tag[]
   color: string
   pinned?: boolean
   repeat?: string
   repeat_interval?: number
-  parent_id?: number | null
+  parent_id?: string | null
   sort_order?: number
   completed_at: string | null
   // Denormalized checklist progress (optional on the client for resilience).
@@ -393,8 +393,8 @@ export interface Todo {
 }
 
 export interface TodoItem {
-  id: number
-  todo_id: number
+  id: string
+  todo_id: string
   content: string
   done: boolean
   due_time?: string | null
@@ -405,9 +405,9 @@ export interface TodoItem {
 
 /** One audit-log line: which user changed what on a todo, when. */
 export interface TodoActivity {
-  id: number
-  todo_id: number
-  user_id: number
+  id: string
+  todo_id: string
+  user_id: string
   username: string
   /** created / updated / completed / reopened / pinned / unpinned / moved / deleted / restored */
   action: string
@@ -435,9 +435,9 @@ export type WorkoutIntensity = '' | 'low' | 'medium' | 'high'
 export type WorkoutSort = 'scheduled' | 'created' | 'manual'
 
 export interface Workout {
-  id: number
-  user_id: number
-  workspace_id: number
+  id: string
+  user_id: string
+  workspace_id: string
   name: string
   type: WorkoutType
   status: WorkoutStatus
@@ -460,8 +460,8 @@ export interface Workout {
 }
 
 export interface WorkoutExercise {
-  id: number
-  workout_id: number
+  id: string
+  workout_id: string
   name: string
   category: string
   sets: number | null
@@ -478,9 +478,9 @@ export interface WorkoutExercise {
 }
 
 export interface BodyMetric {
-  id: number
-  user_id: number
-  workspace_id: number
+  id: string
+  user_id: string
+  workspace_id: string
   recorded_at: string
   weight: number | null
   height: number | null
@@ -627,7 +627,7 @@ export type WorkoutPR = {
 }
 
 export interface ExerciseLibraryItem {
-  id: number
+  id: string
   name: string
   category: string
   muscle_groups: string[]
@@ -640,7 +640,7 @@ export interface ExerciseLibraryItem {
 export type ExerciseLibraryInput = Partial<Omit<ExerciseLibraryItem, 'id' | 'created_at' | 'updated_at'>>
 
 export interface WorkoutTemplateItem {
-  id: number
+  id: string
   name: string
   category: string
   sets: number | null
@@ -653,7 +653,7 @@ export interface WorkoutTemplateItem {
 }
 
 export interface WorkoutTemplate {
-  id: number
+  id: string
   name: string
   type: WorkoutType
   notes: string
@@ -670,7 +670,7 @@ export interface WorkoutTemplateInput {
 }
 
 export interface SetLog {
-  id: number
+  id: string
   set_index: number
   reps: number | null
   weight: number | null
@@ -693,7 +693,7 @@ export type FitnessGoalType = 'weekly_workouts' | 'weight_target'
 export type FitnessGoalStatus = 'active' | 'done'
 
 export interface FitnessGoal {
-  id: number
+  id: string
   type: FitnessGoalType
   target_value: number
   /** weight_target only: weight when the goal was opened; target vs start
@@ -727,19 +727,19 @@ export interface BodyMetricStat {
 export type WhiteboardRefType = '' | 'note' | 'contact' | 'todo' | 'event' | 'workout' | 'transaction'
 
 export interface Whiteboard {
-  id: number
-  user_id: number
-  workspace_id: number
+  id: string
+  user_id: string
+  workspace_id: string
   name: string
   created_at: string
   updated_at: string
 }
 
 export interface WhiteboardNode {
-  id: number
-  whiteboard_id: number
+  id: string
+  whiteboard_id: string
   ref_type: WhiteboardRefType
-  ref_id: number | null
+  ref_id: string | null
   label: string
   note: string
   x: number
@@ -750,10 +750,10 @@ export interface WhiteboardNode {
 }
 
 export interface WhiteboardEdge {
-  id: number
-  whiteboard_id: number
-  from_node_id: number
-  to_node_id: number
+  id: string
+  whiteboard_id: string
+  from_node_id: string
+  to_node_id: string
   label: string
   created_at: string
   updated_at: string
@@ -767,7 +767,7 @@ export interface WhiteboardDetail extends Whiteboard {
 
 export interface WhiteboardNodeInput {
   ref_type?: WhiteboardRefType
-  ref_id?: number | null
+  ref_id?: string | null
   label?: string
   note?: string
   x?: number
@@ -777,7 +777,7 @@ export interface WhiteboardNodeInput {
 
 export interface WhiteboardRelated {
   ref_type: WhiteboardRefType
-  ref_id: number
+  ref_id: string
   label: string
   detail: string
 }
@@ -799,12 +799,12 @@ export type SearchEntityType =
 /** One global-search result row, unified across entity types. */
 export interface SearchHit {
   type: SearchEntityType
-  id: number
+  id: string
   title: string
   subtitle?: string
   snippet?: string
   matched_fields?: string[]
-  contact_id?: number
+  contact_id?: string
   updated_at: string
 }
 

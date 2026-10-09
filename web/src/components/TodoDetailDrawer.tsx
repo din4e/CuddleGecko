@@ -42,9 +42,9 @@ interface TodoDetailDrawerProps {
   hideDone?: boolean
   /** Subtask drag & drop, sharing the page's drag state so a drag started on
    *  a card's subtask can finish on a drawer row (and vice versa). */
-  subtaskDragId?: number | null
-  onSubtaskDragIdChange?: (id: number | null) => void
-  onMoveSubtask?: (id: number, parentId: number | null, afterId: SubtaskMoveAfterId) => void
+  subtaskDragId?: string | null
+  onSubtaskDragIdChange?: (id: string | null) => void
+  onMoveSubtask?: (id: string, parentId: string | null, afterId: SubtaskMoveAfterId) => void
 }
 
 /** Loads the todo's whole subtree: starts with direct children, then keeps
@@ -59,16 +59,16 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
   onOpenTodo: (todo: Todo) => void
   onCreateChild?: (parent: Todo, title: string) => void
   hideDone?: boolean
-  dragId?: number | null
-  onDragIdChange?: (id: number | null) => void
-  onMove?: (id: number, parentId: number | null, afterId: SubtaskMoveAfterId) => void
+  dragId?: string | null
+  onDragIdChange?: (id: string | null) => void
+  onMove?: (id: string, parentId: string | null, afterId: SubtaskMoveAfterId) => void
 }) {
   const { t } = useTranslation()
   // Accumulated parent ids whose children slices we need (root + descendants
   // with children). Grows as slices land — mirrors the page's "expand all";
   // the component is keyed by todo.id (see usage) so switching todos remounts
   // with a fresh, empty set.
-  const [extraIds, setExtraIds] = useState<Set<number>>(() => new Set())
+  const [extraIds, setExtraIds] = useState<Set<string>>(() => new Set())
 
   const parentIds = [todo.id, ...extraIds]
   // Pinned manual/asc (same as the tree and the flat views' subtask sections):
@@ -78,7 +78,7 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    const found = new Set<number>()
+    const found = new Set<string>()
     for (const slice of childrenMap.values()) {
       for (const c of slice.items) {
         // Leaf children get no slice of their own (child_count 0 can only
@@ -93,7 +93,7 @@ function DrawerSubtasks({ todo, onToggle, onDelete, onStartPomodoro, onOpenTodo,
     })
   }, [childrenMap])
   /* eslint-enable react-hooks/set-state-in-effect */
-  const childrenByParent = new Map<number, Todo[]>()
+  const childrenByParent = new Map<string, Todo[]>()
   for (const [parentId, slice] of childrenMap) {
     if (slice.items?.length > 0) childrenByParent.set(parentId, slice.items)
   }

@@ -44,7 +44,7 @@ export default function WorkspaceSwitcher() {
     loadWorkspaces()
   }, [loadWorkspaces])
 
-  const handleSwitch = async (id: number) => {
+  const handleSwitch = async (id: string) => {
     await switchWorkspace(id)
     window.location.reload()
   }

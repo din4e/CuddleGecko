@@ -30,7 +30,7 @@ vi.mock('@dnd-kit/sortable', () => ({
 import KanbanBoard from '../KanbanBoard'
 
 const todo: Todo = {
-  id: 1,
+  id: '1',
   title: 'Task',
   description: '',
   status: 'pending',
@@ -40,8 +40,8 @@ const todo: Todo = {
   amount: null,
   amount_type: '',
   color: '',
-  user_id: 1,
-  workspace_id: 1,
+  user_id: '1',
+  workspace_id: '1',
   completed_at: null,
   created_at: '',
   updated_at: '',

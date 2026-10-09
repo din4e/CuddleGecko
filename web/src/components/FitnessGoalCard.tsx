@@ -20,7 +20,7 @@ export function FitnessGoalCard() {
   const { create, update, remove } = useFitnessGoalMutations()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<FitnessGoal | null>(null)
-  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   return (
     <Card>

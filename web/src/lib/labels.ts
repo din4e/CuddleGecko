@@ -4,7 +4,7 @@ import type { Tag } from '../types'
  * into one candidate list, so ids that are selected but sit beyond the loaded
  * page still resolve to a name and stay visible. */
 export function mergeLabelCandidates(...groups: Array<Tag[] | undefined>): Tag[] {
-  const map = new Map<number, Tag>()
+  const map = new Map<string, Tag>()
   for (const group of groups) {
     for (const tag of group ?? []) map.set(tag.id, tag)
   }

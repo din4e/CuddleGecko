@@ -8,7 +8,7 @@ export async function executeAnalyzeRelationship(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: analyze relationship <id>')
 
     const result = await adapters.ai.analyzeRelationship(id)
@@ -23,7 +23,7 @@ export async function executeAnalyzeEvent(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: analyze event <id>')
 
     const result = await adapters.ai.analyzeEvent(id)
@@ -43,10 +43,10 @@ export async function executeAnalyzeComprehensive(
     const question = args.question as string | undefined
 
     const contactIds = contactsStr
-      ? contactsStr.split(',').map(Number).filter((n) => !isNaN(n))
+      ? contactsStr.split(',').map((s) => s.trim()).filter(Boolean)
       : undefined
     const eventIds = eventsStr
-      ? eventsStr.split(',').map(Number).filter((n) => !isNaN(n))
+      ? eventsStr.split(',').map((s) => s.trim()).filter(Boolean)
       : undefined
 
     const result = await adapters.ai.analyzeComprehensive({

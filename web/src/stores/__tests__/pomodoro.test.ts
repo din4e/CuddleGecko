@@ -12,17 +12,17 @@ describe('usePomodoroStore', () => {
   })
 
   it('starts in work phase with focus todo', () => {
-    usePomodoroStore.getState().start(5, 'Write tests')
+    usePomodoroStore.getState().start('5', 'Write tests')
     const s = usePomodoroStore.getState()
     expect(s.phase).toBe('work')
     expect(s.running).toBe(true)
-    expect(s.focusTodoId).toBe(5)
+    expect(s.focusTodoId).toBe('5')
     expect(s.focusTodoTitle).toBe('Write tests')
     expect(s.secondsLeft).toBe(25 * 60)
   })
 
   it('ticks down over time', () => {
-    usePomodoroStore.getState().start(1, 'task')
+    usePomodoroStore.getState().start('1', 'task')
     vi.advanceTimersByTime(3000) // 3 seconds
     expect(usePomodoroStore.getState().secondsLeft).toBe(25 * 60 - 3)
   })
@@ -30,7 +30,7 @@ describe('usePomodoroStore', () => {
   it('transitions work→break at 0 and fires onComplete', () => {
     const onComplete = vi.fn()
     usePomodoroStore.getState().setOnComplete(onComplete)
-    usePomodoroStore.getState().start(1, 'task')
+    usePomodoroStore.getState().start('1', 'task')
     vi.advanceTimersByTime(25 * 60 * 1000) // full work duration
 
     const s = usePomodoroStore.getState()
@@ -41,7 +41,7 @@ describe('usePomodoroStore', () => {
   })
 
   it('pause stops the countdown', () => {
-    usePomodoroStore.getState().start(1, 'task')
+    usePomodoroStore.getState().start('1', 'task')
     usePomodoroStore.getState().pause()
     expect(usePomodoroStore.getState().running).toBe(false)
     const before = usePomodoroStore.getState().secondsLeft
@@ -50,7 +50,7 @@ describe('usePomodoroStore', () => {
   })
 
   it('reset returns to idle and clears focus', () => {
-    usePomodoroStore.getState().start(1, 'task')
+    usePomodoroStore.getState().start('1', 'task')
     usePomodoroStore.getState().reset()
     const s = usePomodoroStore.getState()
     expect(s.phase).toBe('idle')

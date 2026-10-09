@@ -58,14 +58,14 @@ export async function fetchAllTodoPages(query: ReturnType<typeof useTodosInfinit
 
 /** Cache key of one todo's detail entry — shared by useTodo, useTodoDetails
  *  and fetchTodoById so a jump populates the same cache the hooks read. */
-export function todoDetailKey(id: number) {
+export function todoDetailKey(id: string) {
   return [...allKey(), 'detail', id] as const
 }
 
 /** Single todo by id — resolves references the current view hasn't loaded
  * (e.g. a parent task outside the active filter). No retry: a missing todo
  * (trashed / deleted) just stays unresolved. */
-export function useTodo(id: number | null) {
+export function useTodo(id: string | null) {
   return useQuery<Todo>({
     queryKey: todoDetailKey(id!),
     queryFn: ({ signal }) => todosApi.get(id!, signal).then((r) => r.data),
@@ -79,7 +79,7 @@ export function useTodo(id: number | null) {
  *  target is gone (trashed / deleted / cross-workspace). */
 export async function fetchTodoById(
   qc: ReturnType<typeof useQueryClient>,
-  id: number,
+  id: string,
 ): Promise<Todo | null> {
   try {
     return await qc.fetchQuery({
@@ -109,11 +109,11 @@ const CHILDREN_MAX_MULT = 16 // page_size caps at 1600 — enough for any sane p
 // (100 → 200 → 400 …) instead of stacking pages. Queries live in the shared
 // 'list' key family (filtered by parent_id) so mutations, WS-triggered
 // invalidations and optimistic patches apply automatically.
-export function useTodoChildrenMap(parentIds: number[], filters: TodoListParams = {}): Map<number, TodoChildrenState> {
+export function useTodoChildrenMap(parentIds: string[], filters: TodoListParams = {}): Map<string, TodoChildrenState> {
   // Children pages always start at 1 (load-more grows page_size) — strip page.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { page: _page, ...rest } = filters
-  const [multByParent, setMultByParent] = useState<Record<number, number>>({})
+  const [multByParent, setMultByParent] = useState<Record<string, number>>({})
   // combine returns a plain array of data-only records (no Map, no closures):
   // the queries observer keeps the previous result identity via
   // replaceEqualDeep when nothing changed, so the Map built from it below is
@@ -146,7 +146,7 @@ export function useTodoChildrenMap(parentIds: number[], filters: TodoListParams 
       }),
   })
   return useMemo(() => {
-    const map = new Map<number, TodoChildrenState>()
+    const map = new Map<string, TodoChildrenState>()
     for (const s of slices) {
       map.set(s.parentId, {
         items: s.items,
@@ -198,7 +198,7 @@ export function useTodoTrash(enabled = true) {
 export function useRestoreTodo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => todosApi.restore(id),
+    mutationFn: (id: string) => todosApi.restore(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [...allKey(), 'trash'] })
       invalidateScope(qc, scope)
@@ -227,10 +227,10 @@ export function useEmptyTodoTrash() {
 // present) marks a children-slice entry, and its absence means a root list.
 type TodoListKey = readonly unknown[]
 
-function listEntryParentId(key: TodoListKey): number | null {
+function listEntryParentId(key: TodoListKey): string | null {
   const params = key[3]
   if (params != null && typeof params === 'object' && 'parent_id' in params) {
-    const pid = (params as { parent_id?: number }).parent_id
+    const pid = (params as { parent_id?: string }).parent_id
     return pid ?? null
   }
   return null
@@ -272,7 +272,7 @@ function mapListItems(data: unknown, fn: (items: Todo[]) => Todo[]): unknown {
 // Reorders `moved` after `afterId` (or at the sibling group's top/end) inside
 // one items array. Items from other parents stay put; the position only
 // matters within the moved todo's new sibling group.
-function reorderItems(items: Todo[], moved: Todo, afterId: number | null, position?: string): Todo[] {
+function reorderItems(items: Todo[], moved: Todo, afterId: string | null, position?: string): Todo[] {
   const rest = items.filter((t) => t.id !== moved.id)
   let insertAt: number
   if (afterId != null) {
@@ -293,9 +293,9 @@ function reorderItems(items: Todo[], moved: Todo, afterId: number | null, positi
 // root lists. Returns a rollback snapshot (Map key → original data).
 function optimisticallyMoveTodo(
   qc: ReturnType<typeof useQueryClient>,
-  id: number,
-  parentId: number | null,
-  afterId: number | null,
+  id: string,
+  parentId: string | null,
+  afterId: string | null,
   position?: string,
 ): Map<TodoListKey, unknown> {
   const entries = qc.getQueriesData({ queryKey: [...allKey(), 'list'] })
@@ -356,7 +356,7 @@ function createdInsertComparator(sort: string | undefined, order: string | undef
     if (c) return c
     switch (sort) {
       case 'manual':
-        return (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id
+        return (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id)
       case 'priority':
         c = rank(a) - rank(b)
         if (c) return c
@@ -457,7 +457,7 @@ export function useCreateTodo() {
 export function useUpdateTodo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: TodoUpdateInput }) => todosApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: TodoUpdateInput }) => todosApi.update(id, data),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }
@@ -469,7 +469,7 @@ export function useUpdateTodo() {
 export function useSetTodoProgress() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, progress }: { id: number; progress: number | null }) => todosApi.setProgress(id, progress),
+    mutationFn: ({ id, progress }: { id: string; progress: number | null }) => todosApi.setProgress(id, progress),
     onMutate: async ({ id, progress }) => {
       await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
       const previous = qc.getQueriesData({ queryKey: [...allKey(), 'list'] })
@@ -495,8 +495,8 @@ export function useSetTodoProgress() {
 export function useToggleTodoStatus() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => todosApi.toggleStatus(id),
-    onMutate: async (id: number) => {
+    mutationFn: (id: string) => todosApi.toggleStatus(id),
+    onMutate: async (id: string) => {
       await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
       // Snapshot every cached list entry (paged + infinite), then flip the field
       // per key. (v5's setQueriesData updater receives only `old` — no query
@@ -527,7 +527,7 @@ export function useToggleTodoStatus() {
 export function useSetTodoStatus() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, status }: { id: number; status: TodoStatus }) => todosApi.setStatus(id, status),
+    mutationFn: ({ id, status }: { id: string; status: TodoStatus }) => todosApi.setStatus(id, status),
     onMutate: async ({ id, status }) => {
       await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
       const previous = qc.getQueriesData({ queryKey: [...allKey(), 'list'] })
@@ -552,7 +552,7 @@ export function useSetTodoStatus() {
 export function useReorderTodo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, afterId }: { id: number; afterId: number | null }) =>
+    mutationFn: ({ id, afterId }: { id: string; afterId: string | null }) =>
       todosApi.reorder(id, afterId),
     onMutate: async ({ id, afterId }) => {
       await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
@@ -572,7 +572,7 @@ export function useReorderTodo() {
 }
 
 // The todo's current parent, read from any cached list (null = root / unknown).
-function listEntryParentIdOfTodo(qc: ReturnType<typeof useQueryClient>, id: number): number | null {
+function listEntryParentIdOfTodo(qc: ReturnType<typeof useQueryClient>, id: string): string | null {
   for (const [, data] of qc.getQueriesData({ queryKey: [...allKey(), 'list'] })) {
     const items: Todo[] =
       data != null && typeof data === 'object' && 'pages' in data
@@ -590,9 +590,9 @@ export function useMoveTodo() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, parentId, afterId, position }: {
-      id: number
-      parentId: number | null
-      afterId: number | null
+      id: string
+      parentId: string | null
+      afterId: string | null
       /** Appends at the end of the sibling group when afterId is null. */
       position?: 'first' | 'last'
     }) => todosApi.move(id, parentId, afterId, position),
@@ -615,7 +615,7 @@ export function useMoveTodo() {
 export function usePomodoroTodo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => todosApi.pomodoro(id),
+    mutationFn: (id: string) => todosApi.pomodoro(id),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }
@@ -625,8 +625,8 @@ export function usePomodoroTodo() {
 export function useTogglePin() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => todosApi.togglePin(id),
-    onMutate: async (id: number) => {
+    mutationFn: (id: string) => todosApi.togglePin(id),
+    onMutate: async (id: string) => {
       await qc.cancelQueries({ queryKey: [...allKey(), 'list'] })
       const previous = qc.getQueriesData({ queryKey: [...allKey(), 'list'] })
       for (const [key, old] of previous) {
@@ -646,7 +646,7 @@ export function useTogglePin() {
 export function useSyncTodoToEvent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => todosApi.syncToEvent(id),
+    mutationFn: (id: string) => todosApi.syncToEvent(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: rootKey('todos') })
       qc.invalidateQueries({ queryKey: rootKey('events') })
@@ -659,7 +659,7 @@ export function useSyncTodoToEvent() {
 export function useDuplicateTodo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => todosApi.duplicate(id),
+    mutationFn: (id: string) => todosApi.duplicate(id),
     onSuccess: () => invalidateScope(qc, scope),
     // TodosPage shows a specific duplicate-failed toast; suppress the global one.
     meta: { localErrorHandling: true },
@@ -669,7 +669,7 @@ export function useDuplicateTodo() {
 export function useDeleteTodo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => todosApi.delete(id),
+    mutationFn: (id: string) => todosApi.delete(id),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }
@@ -677,7 +677,7 @@ export function useDeleteTodo() {
 export function useBulkActionTodo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ ids, action, priority }: { ids: number[]; action: TodoBulkAction; priority?: TodoPriority }) =>
+    mutationFn: ({ ids, action, priority }: { ids: string[]; action: TodoBulkAction; priority?: TodoPriority }) =>
       todosApi.bulk(ids, action, priority),
     onSuccess: () => invalidateScope(qc, scope),
     // TodosPage shows a specific bulk-failed toast; suppress the global one.
@@ -689,17 +689,17 @@ export function useBulkActionTodo() {
 // Item mutations invalidate both the item list and the todo list so the
 // denormalized item_total / item_done counts on cards stay fresh.
 
-const itemsKey = (todoId: number) => [...allKey(), 'items', todoId] as const
+const itemsKey = (todoId: string) => [...allKey(), 'items', todoId] as const
 
-export function useTodoItems(todoId: number | null) {
+export function useTodoItems(todoId: string | null) {
   return useQuery<TodoItem[]>({
     queryKey: [...allKey(), 'items', todoId] as const,
-    queryFn: ({ signal }) => todosApi.listItems(todoId as number, signal).then((r) => r.data),
+    queryFn: ({ signal }) => todosApi.listItems(todoId!, signal).then((r) => r.data),
     enabled: todoId != null,
   })
 }
 
-export function useCreateTodoItem(todoId: number) {
+export function useCreateTodoItem(todoId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (content: string) => todosApi.createItem(todoId, content),
@@ -710,10 +710,10 @@ export function useCreateTodoItem(todoId: number) {
   })
 }
 
-export function useToggleTodoItem(todoId: number) {
+export function useToggleTodoItem(todoId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (itemId: number) => todosApi.toggleItem(todoId, itemId),
+    mutationFn: (itemId: string) => todosApi.toggleItem(todoId, itemId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: itemsKey(todoId) })
       invalidateScope(qc, scope)
@@ -721,19 +721,19 @@ export function useToggleTodoItem(todoId: number) {
   })
 }
 
-export function useReorderTodoItem(todoId: number) {
+export function useReorderTodoItem(todoId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ itemId, afterId }: { itemId: number; afterId: number | null }) =>
+    mutationFn: ({ itemId, afterId }: { itemId: string; afterId: string | null }) =>
       todosApi.reorderItem(todoId, itemId, afterId),
     onSuccess: () => qc.invalidateQueries({ queryKey: itemsKey(todoId) }),
   })
 }
 
-export function usePromoteTodoItem(todoId: number) {
+export function usePromoteTodoItem(todoId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (itemId: number) => todosApi.promoteItem(todoId, itemId),
+    mutationFn: (itemId: string) => todosApi.promoteItem(todoId, itemId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: itemsKey(todoId) })
       invalidateScope(qc, scope)
@@ -741,10 +741,10 @@ export function usePromoteTodoItem(todoId: number) {
   })
 }
 
-export function useDeleteTodoItem(todoId: number) {
+export function useDeleteTodoItem(todoId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (itemId: number) => todosApi.deleteItem(todoId, itemId),
+    mutationFn: (itemId: string) => todosApi.deleteItem(todoId, itemId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: itemsKey(todoId) })
       invalidateScope(qc, scope)
@@ -752,10 +752,10 @@ export function useDeleteTodoItem(todoId: number) {
   })
 }
 
-export function useUpdateTodoItem(todoId: number) {
+export function useUpdateTodoItem(todoId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ itemId, content, due_time, clear_due_time }: { itemId: number; content: string; due_time?: string | null; clear_due_time?: boolean }) =>
+    mutationFn: ({ itemId, content, due_time, clear_due_time }: { itemId: string; content: string; due_time?: string | null; clear_due_time?: boolean }) =>
       todosApi.updateItem(todoId, itemId, { content, due_time, clear_due_time }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: itemsKey(todoId) })
@@ -768,7 +768,7 @@ export function useUpdateTodoItem(todoId: number) {
 export function useReplaceTodoTags() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ todoId, tagIds }: { todoId: number; tagIds: number[] }) =>
+    mutationFn: ({ todoId, tagIds }: { todoId: string; tagIds: string[] }) =>
       todosApi.replaceTags(todoId, tagIds),
     onSuccess: () => invalidateScope(qc, scope),
   })
@@ -776,12 +776,12 @@ export function useReplaceTodoTags() {
 
 // --- Modification history ---
 
-const activitiesKey = (todoId: number) => [...allKey(), 'activities', todoId] as const
+const activitiesKey = (todoId: string) => [...allKey(), 'activities', todoId] as const
 
-export function useTodoActivities(todoId: number | null) {
+export function useTodoActivities(todoId: string | null) {
   return useQuery<TodoActivity[]>({
-    queryKey: activitiesKey(todoId as number),
-    queryFn: ({ signal }) => todosApi.listActivities(todoId as number, signal).then((r) => r.data),
+    queryKey: activitiesKey(todoId!),
+    queryFn: ({ signal }) => todosApi.listActivities(todoId!, signal).then((r) => r.data),
     enabled: todoId != null,
   })
 }

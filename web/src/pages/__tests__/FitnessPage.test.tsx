@@ -116,7 +116,7 @@ import { workoutTemplatesApi } from '../../api/workoutTemplates'
 import { fitnessGoalsApi } from '../../api/fitnessGoals'
 
 const sampleWorkout: Workout = {
-  id: 1, user_id: 1, workspace_id: 1, name: '晨跑 5 公里', type: 'cardio',
+  id: '1', user_id: '1', workspace_id: '1', name: '晨跑 5 公里', type: 'cardio',
   status: 'planned', intensity: '', scheduled_at: null, duration_min: 30,
   calories: 300, color: '', location: '', notes: '配速 6 分 24 秒，状态不错。', sort_order: 0,
   completed_at: null, item_total: 0, item_done: 0, created_at: '', updated_at: '',

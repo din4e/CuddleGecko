@@ -148,31 +148,31 @@ function smartListParams(list: SmartList): TodoListParams {
 interface CardRowCtx {
   view: TodoView
   hideDone: boolean
-  childrenByParent: Map<number, Todo[]>
-  subtaskProgress: Map<number, SubtreeProgress>
-  todoTitleById: Map<number, string>
-  treeDragId: number | null
-  getContactNames: (ids: number[]) => string
-  onSelectToggle: (id: number) => void
-  onToggle: (id: number) => void
-  onSetStatus: (id: number, status: Todo['status']) => void
+  childrenByParent: Map<string, Todo[]>
+  subtaskProgress: Map<string, SubtreeProgress>
+  todoTitleById: Map<string, string>
+  treeDragId: string | null
+  getContactNames: (ids: string[]) => string
+  onSelectToggle: (id: string) => void
+  onToggle: (id: string) => void
+  onSetStatus: (id: string, status: Todo['status']) => void
   onTogglePin: (todo: Todo) => void
   onSync: (todo: Todo) => void
   onEdit: (todo: Todo) => void
-  onRename: (id: number, title: string) => void
+  onRename: (id: string, title: string) => void
   onDuplicate: (todo: Todo) => void
   onDelete: (todo: Todo) => void
   formatDate: (dateStr: string | null) => string
   onCreateChild: (parent: Todo, title: string) => void
   onStartPomodoro: (todo: Todo) => void
   onPostpone: (todo: Todo) => void
-  onNest: (id: number, parentId: number) => void
+  onNest: (id: string, parentId: string) => void
   onToggleSub: (sub: Todo) => void
-  onMoveSubtask: (id: number, parentId: number | null, afterId: number | null | 'last') => void
-  onDragIdChange: (id: number | null) => void
+  onMoveSubtask: (id: string, parentId: string | null, afterId: string | null | 'last') => void
+  onDragIdChange: (id: string | null) => void
   /** Arrow-key navigation (see the page's handleNavKey). */
   navEnabled: boolean
-  selectedTodoId: number | null
+  selectedTodoId: string | null
   onSelect: (todo: Todo) => void
 }
 
@@ -283,7 +283,7 @@ export default function TodosPage() {
   const [quickDue, setQuickDue] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<'' | 'none' | 'low' | 'normal' | 'high'>('')
   // Multi-label filter (any-of): tasks tagged with ANY of the selected tags.
-  const [tagFilters, setTagFilters] = useState<number[]>([])
+  const [tagFilters, setTagFilters] = useState<string[]>([])
   const [searchInput, setSearchInput] = useState('')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<TodoSort>('due_date')
@@ -300,10 +300,10 @@ export default function TodosPage() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   // Lazy tree expand state: ids in the set are expanded (default: all
   // collapsed — children are fetched per node on first expand).
-  const [expanded, setExpanded] = useState<Set<number>>(() => {
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem('todoTreeExpanded')
-      return raw ? new Set<number>(JSON.parse(raw)) : new Set()
+      return raw ? new Set<string>(JSON.parse(raw)) : new Set()
     } catch {
       return new Set()
     }
@@ -311,8 +311,8 @@ export default function TodosPage() {
   const [expandingAll, setExpandingAll] = useState(false)
   // Arrow-key navigation target: the clicked row/card (highlighted). ↑/↓ move
   // it through the visible rows, ←/→ fold/unfold around it (see handleNavKey).
-  const [selectedTodoId, setSelectedTodoId] = useState<number | null>(null)
-  const selectTodoId = useCallback((id: number) => setSelectedTodoId(id), [])
+  const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null)
+  const selectTodoId = useCallback((id: string) => setSelectedTodoId(id), [])
   const handleSelectTodo = useCallback((todo: Todo) => setSelectedTodoId(todo.id), [])
   const searchRef = useRef<HTMLInputElement>(null)
   // One-click "hide completed & abandoned": keeps the working list lean.
@@ -359,10 +359,13 @@ export default function TodosPage() {
     localStorage.removeItem('todoTreeCollapsed')
   }, [])
 
+  // TodoListParams['tag_id'] is still a mid-migration `string | number[]`
+  // union; the query serializer treats any id array alike, so pass the string
+  // ids through (same workaround as TodoCalendarGrid's tagIdParam).
   const listParams: TodoListParams = {
     ...smartListParams(smartList),
     priority: priorityFilter || undefined,
-    tag_id: tagFilters.length > 0 ? tagFilters : undefined,
+    tag_id: tagFilters.length > 0 ? (tagFilters as unknown as TodoListParams['tag_id']) : undefined,
     q: q || undefined,
     sort,
     order,
@@ -404,7 +407,7 @@ export default function TodosPage() {
 
   // Bulk selection state.
   const [selectionMode, setSelectionMode] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const replaceTags = useReplaceTodoTags()
 
   const todos = useMemo(() => {
@@ -449,7 +452,7 @@ export default function TodosPage() {
   // live in the per-parent slices. Lookups that must reach them (rename, the
   // parent-title hint, the nest cycle guard) go through this map instead.
   const todoByIdLoaded = useMemo(() => {
-    const m = new Map<number, Todo>()
+    const m = new Map<string, Todo>()
     for (const t of todos) m.set(t.id, t)
     for (const slice of childrenMap.values()) for (const t of slice.items) m.set(t.id, t)
     return m
@@ -519,7 +522,7 @@ export default function TodosPage() {
   // Jump target for link chips and todo:<id> markdown links: prefer the loaded
   // copies (instant), else fetch through the shared detail cache. A target
   // outside the current filter still opens — the drawer is self-sufficient.
-  const openTodoById = useCallback(async (id: number) => {
+  const openTodoById = useCallback(async (id: string) => {
     const local = todoByIdLoaded.get(id)
     if (local) {
       openEdit(local)
@@ -569,7 +572,7 @@ export default function TodosPage() {
       if (todoId != null && parsed.tags.length > 0) {
         const tagIds = parsed.tags
           .map((name) => tags.find((tg) => tg.name.toLowerCase() === name.toLowerCase())?.id)
-          .filter((id): id is number => id != null)
+          .filter((id): id is string => id != null)
         if (tagIds.length > 0) {
           try {
             await replaceTags.mutateAsync({ todoId, tagIds })
@@ -588,7 +591,7 @@ export default function TodosPage() {
     }
   }
 
-  const handleToggle = useCallback(async (id: number) => {
+  const handleToggle = useCallback(async (id: string) => {
     try {
       const res = await toggleTodo.mutateAsync(id)
       // A recurring task that is still pending after toggling was advanced to
@@ -616,7 +619,7 @@ export default function TodosPage() {
   // Explicit status change (done / abandoned / back to pending) — everything
   // except the plain pending↔done flip, which keeps using the toggle so
   // completing a recurring task still advances it.
-  const handleSetStatus = useCallback(async (id: number, status: Todo['status']) => {
+  const handleSetStatus = useCallback(async (id: string, status: Todo['status']) => {
     try {
       await setStatusTodo.mutateAsync({ id, status })
     } catch {
@@ -624,7 +627,7 @@ export default function TodosPage() {
     }
   }, [setStatusTodo])
 
-  const handleRestore = useCallback(async (id: number) => {
+  const handleRestore = useCallback(async (id: string) => {
     try {
       await restoreTodo.mutateAsync(id)
       toast.success(t('todos.restored'))
@@ -755,7 +758,7 @@ export default function TodosPage() {
   const handleKanbanColumnsReorder = useCallback((next: KanbanColumn[]) => {
     setKanbanColumns(next)
   }, [setKanbanColumns])
-  const handleKanbanReorder = useCallback((id: number, afterId: number | null) => {
+  const handleKanbanReorder = useCallback((id: string, afterId: string | null) => {
     reorderTodo.mutate({ id, afterId })
   }, [reorderTodo])
   // Quick-create inside a column carries the column's predicate (status /
@@ -779,7 +782,7 @@ export default function TodosPage() {
     }
   }, [createTodo, replaceTags, tags, t])
 
-  const handleRename = useCallback(async (id: number, title: string) => {
+  const handleRename = useCallback(async (id: string, title: string) => {
     // Search every loaded todo, not just the current list — tree-view children
     // come from the per-parent slices and aren't part of `todos`.
     const todo = todoByIdLoaded.get(id)
@@ -810,7 +813,7 @@ export default function TodosPage() {
   }, [t, duplicateTodo])
 
   // --- Bulk selection ---
-  const toggleSelect = useCallback((id: number) => {
+  const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) {
@@ -837,7 +840,7 @@ export default function TodosPage() {
     }
   }
 
-  const handleDelete = useCallback(async (id: number) => {
+  const handleDelete = useCallback(async (id: string) => {
     try {
       await deleteTodo.mutateAsync(id)
       setConfirmDelete(null)
@@ -853,12 +856,12 @@ export default function TodosPage() {
   }, [deleteTodo, editing])
 
   const contactNameMap = useMemo(() => {
-    const m = new Map<number, string>()
+    const m = new Map<string, string>()
     for (const c of contacts) m.set(c.id, c.name)
     return m
   }, [contacts])
 
-  const getContactNames = useCallback((ids: number[]) =>
+  const getContactNames = useCallback((ids: string[]) =>
     ids.map((id) => contactNameMap.get(id)).filter(Boolean).join(', '),
     [contactNameMap])
 
@@ -920,14 +923,14 @@ export default function TodosPage() {
   )
   // Grandchildren cascade: any loaded child with children of its own joins
   // the id set so every depth renders (same accumulation as the drawer).
-  const [deepChildIds, setDeepChildIds] = useState<Set<number>>(() => new Set())
+  const [deepChildIds, setDeepChildIds] = useState<Set<string>>(() => new Set())
   const flatChildrenMap = useTodoChildrenMap(
     view !== 'tree' && view !== 'calendar' && smartList !== 'trash' ? [...new Set([...flatChildParents, ...deepChildIds])] : [],
     { sort: 'manual', order: 'asc' },
   )
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    const found = new Set<number>()
+    const found = new Set<string>()
     for (const slice of flatChildrenMap.values()) {
       for (const c of slice.items) {
         if ((c.child_count ?? 0) > 0) found.add(c.id)
@@ -940,7 +943,7 @@ export default function TodosPage() {
   }, [flatChildrenMap])
   /* eslint-enable react-hooks/set-state-in-effect */
   const childrenByParent = useMemo(() => {
-    const m = new Map<number, Todo[]>()
+    const m = new Map<string, Todo[]>()
     if (view === 'tree') return m
     for (const [parentId, slice] of flatChildrenMap) {
       if (slice.items.length > 0) m.set(parentId, slice.items)
@@ -950,7 +953,7 @@ export default function TodosPage() {
   // Cross-subtask completion roll-up for card chips (incl. kanban): done/total
   // over every descendant, computed from the loaded children map.
   const subtaskProgress = useMemo(() => {
-    const m = new Map<number, { done: number; total: number }>()
+    const m = new Map<string, { done: number; total: number }>()
     for (const t of todos) m.set(t.id, subtreeProgressFromMap(childrenByParent, t.id))
     return m
   }, [todos, childrenByParent])
@@ -962,7 +965,7 @@ export default function TodosPage() {
   // Manual reordering (only meaningful when sort === 'manual'). Positions are
   // expressed as "move to right after afterId" (or to the top when null),
   // computed from the currently displayed pending order.
-  const handleMove = async (id: number, afterId: number | null) => {
+  const handleMove = async (id: string, afterId: string | null) => {
     try {
       await reorderTodo.mutateAsync({ id, afterId })
     } catch {
@@ -986,7 +989,7 @@ export default function TodosPage() {
   // Tree-view reparenting: indent/outdent/up/down all reduce to a single move
   // call (parent_id + place-after sibling). afterId 'last' appends at the end
   // of the sibling group (the server resolves it — see TodoTreeRow.MoveAfterId).
-  const handleTreeMove = useCallback(async (id: number, parentId: number | null, afterId: number | null | 'last') => {
+  const handleTreeMove = useCallback(async (id: string, parentId: string | null, afterId: string | null | 'last') => {
     try {
       await moveTodo.mutateAsync({
         id,
@@ -1003,13 +1006,13 @@ export default function TodosPage() {
   // child of the target. Guarded against cycles client-side so an illegal drop
   // just no-ops instead of flashing an error toast (the backend would reject
   // it anyway).
-  const handleNest = useCallback((id: number, parentId: number) => {
+  const handleNest = useCallback((id: string, parentId: string) => {
     if (id === parentId || descendantIds([...todoByIdLoaded.values()], id).has(parentId)) return
     // Reveal the target's subtask section so the nested todo lands in view.
     useTodoCollapseStore.getState().reveal(parentId)
     void handleTreeMove(id, parentId, 'last')
   }, [todoByIdLoaded, handleTreeMove])
-  const toggleExpand = useCallback((id: number) =>
+  const toggleExpand = useCallback((id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -1019,7 +1022,7 @@ export default function TodosPage() {
   , [])
   // Stable so TreeRow's memo isn't defeated by a fresh closure per render
   // (childrenMap itself is identity-stable across renders).
-  const handleLoadChildren = useCallback((id: number) => {
+  const handleLoadChildren = useCallback((id: string) => {
     childrenMap.get(id)?.loadMore()
   }, [childrenMap])
 
@@ -1033,7 +1036,7 @@ export default function TodosPage() {
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!expandingAll) return
-    const toExpand: number[] = []
+    const toExpand: string[] = []
     let pending = 0
     const walk = (nodes: TodoNode[]) => {
       for (const n of nodes) {
@@ -1060,7 +1063,7 @@ export default function TodosPage() {
   }, [expandingAll, todoTree, expanded, childrenMap])
   /* eslint-enable react-hooks/set-state-in-effect */
   // Tree drag & drop: id of the row being dragged (whole subtree follows).
-  const [treeDragId, setTreeDragId] = useState<number | null>(null)
+  const [treeDragId, setTreeDragId] = useState<string | null>(null)
   const dragSubtreeSize = useMemo(() => {
     if (treeDragId == null) return 0
     const find = (nodes: TodoNode[]): TodoNode | null => {
@@ -1087,11 +1090,11 @@ export default function TodosPage() {
   // chip-drag only. Trash has no nav either.
   const navEnabled = smartList !== 'trash' && view !== 'kanban' && view !== 'calendar'
   const nav = useMemo(() => {
-    const ids: number[] = []
-    const parentById = new Map<number, number | null>()
-    const hasChildrenById = new Map<number, boolean>()
+    const ids: string[] = []
+    const parentById = new Map<string, string | null>()
+    const hasChildrenById = new Map<string, boolean>()
     if (view === 'tree') {
-      const walk = (nodes: TodoNode[], parent: number | null) => {
+      const walk = (nodes: TodoNode[], parent: string | null) => {
         for (const n of nodes) {
           if (n.hidden) continue
           ids.push(n.todo.id)
@@ -1119,7 +1122,7 @@ export default function TodosPage() {
     const { ids, parentById, hasChildrenById } = nav
     if (ids.length === 0) return
     const idx = selectedTodoId != null ? ids.indexOf(selectedTodoId) : -1
-    const select = (id: number | undefined) => { if (id != null) setSelectedTodoId(id) }
+    const select = (id: string | undefined) => { if (id != null) setSelectedTodoId(id) }
     if (key === 'ArrowDown') return select(idx < 0 ? ids[0] : ids[Math.min(idx + 1, ids.length - 1)])
     if (key === 'ArrowUp') return select(idx < 0 ? ids[0] : ids[Math.max(idx - 1, 0)])
     if (selectedTodoId == null || idx < 0) return
@@ -1268,7 +1271,7 @@ export default function TodosPage() {
       replaceTags.mutate({ todoId: todo.id, tagIds: [] })
       return
     }
-    const tagId = Number(key.slice(2))
+    const tagId = key.slice(2)
     const tag = tags.find((tg) => tg.id === tagId)
     if (!tag) return
     const next = [...(todo.tags ?? [])]
@@ -1592,7 +1595,7 @@ export default function TodosPage() {
               {tagFilters.length === 0
                 ? t('todos.allTags')
                 : tagFilters.length === 1
-                  ? tags.find((tg) => tg.id === tagFilters[0])?.name ?? t('todos.tags')
+                  ? tags.find((tg) => tg.id === tagFilters['0'])?.name ?? t('todos.tags')
                   : t('todos.tagsSelected', { n: tagFilters.length })}
             </span>
           </DropdownMenuTrigger>

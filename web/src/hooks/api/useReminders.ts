@@ -19,7 +19,7 @@ export function useRemindersList(status: ReminderStatus | '', page = 1, pageSize
 export function useCreateReminder() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ contactId, data }: { contactId: number; data: Partial<Reminder> }) =>
+    mutationFn: ({ contactId, data }: { contactId: string; data: Partial<Reminder> }) =>
       remindersApi.create(contactId, data),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
@@ -29,7 +29,7 @@ export function useCreateReminder() {
 export function useUpdateReminder() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Reminder> }) => remindersApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<Reminder> }) => remindersApi.update(id, data),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -38,7 +38,7 @@ export function useUpdateReminder() {
 export function useDeleteReminder() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => remindersApi.delete(id),
+    mutationFn: (id: string) => remindersApi.delete(id),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -47,7 +47,7 @@ export function useDeleteReminder() {
 export function useReplaceReminderTags() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => remindersApi.replaceTags(id, tagIds),
+    mutationFn: ({ id, tagIds }: { id: string; tagIds: string[] }) => remindersApi.replaceTags(id, tagIds),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }

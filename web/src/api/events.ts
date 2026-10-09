@@ -8,17 +8,17 @@ export const eventsApi = {
   create: (data: Partial<Event>) =>
     request.post<Event>('/events', data).then((d) => ({ data: d })),
 
-  update: (id: number, data: Partial<Event>) =>
+  update: (id: string, data: Partial<Event>) =>
     request.put<Event>(`/events/${id}`, data).then((d) => ({ data: d })),
 
-  delete: (id: number) =>
+  delete: (id: string) =>
     request.delete<void>(`/events/${id}`).then(() => {}),
 
   // --- Workspace labels ---
 
-  getTags: (id: number) =>
+  getTags: (id: string) =>
     request.get<Tag[]>(`/events/${id}/tags`).then((data) => ({ data })),
 
-  replaceTags: (id: number, tagIds: number[]) =>
+  replaceTags: (id: string, tagIds: string[]) =>
     request.put<void>(`/events/${id}/tags`, { tag_ids: tagIds }).then(() => {}),
 }

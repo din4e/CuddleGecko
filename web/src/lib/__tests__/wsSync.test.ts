@@ -45,7 +45,7 @@ describe('startTodoWsSync', () => {
   })
 
   it('connects with token + workspace_id in the URL', () => {
-    startTodoWsSync({ getToken: () => 'abc', workspaceId: 3, onDataChanged: () => {} })
+    startTodoWsSync({ getToken: () => 'abc', workspaceId: '3', onDataChanged: () => {} })
     expect(FakeWebSocket.instances).toHaveLength(1)
     const url = FakeWebSocket.instances[0].url
     expect(url).toMatch(/^ws:\/\//)
@@ -55,22 +55,22 @@ describe('startTodoWsSync', () => {
 
   it('parses todo.changed frames and calls onDataChanged', () => {
     const onDataChanged = vi.fn()
-    startTodoWsSync({ getToken: () => 'abc', workspaceId: 1, onDataChanged })
+    startTodoWsSync({ getToken: () => 'abc', workspaceId: '1', onDataChanged })
     FakeWebSocket.instances[0].fireMessage(
-      JSON.stringify({ type: 'data.changed', workspace_id: 1, resource: 'todos', kind: 'updated', id: 42, entity: { id: 42, title: 'x' } }),
+      JSON.stringify({ type: 'data.changed', workspace_id: '1', resource: 'todos', kind: 'updated', id: '42', entity: { id: '42', title: 'x' } }),
     )
     expect(onDataChanged).toHaveBeenCalledWith({
-      workspaceId: 1,
+      workspaceId: '1',
       resource: 'todos',
       kind: 'updated',
-      id: 42,
-      entity: { id: 42, title: 'x' },
+      id: '42',
+      entity: { id: '42', title: 'x' },
     })
   })
 
   it('ignores other frame types and malformed frames', () => {
     const onDataChanged = vi.fn()
-    startTodoWsSync({ getToken: () => 'abc', workspaceId: 1, onDataChanged })
+    startTodoWsSync({ getToken: () => 'abc', workspaceId: '1', onDataChanged })
     const ws = FakeWebSocket.instances[0]
     ws.fireMessage('hello')
     ws.fireMessage(JSON.stringify({ type: 'ping' }))
@@ -79,7 +79,7 @@ describe('startTodoWsSync', () => {
   })
 
   it('reconnects with backoff after close', () => {
-    const ctrl = startTodoWsSync({ getToken: () => 'abc', workspaceId: 1, onDataChanged: () => {} })
+    const ctrl = startTodoWsSync({ getToken: () => 'abc', workspaceId: '1', onDataChanged: () => {} })
     expect(FakeWebSocket.instances).toHaveLength(1)
     FakeWebSocket.instances[0].fireClose()
     // attempt 1 backoff = 1000ms (+ 0 jitter)
@@ -89,7 +89,7 @@ describe('startTodoWsSync', () => {
   })
 
   it('stop() closes the socket and prevents further reconnection', () => {
-    const ctrl = startTodoWsSync({ getToken: () => 'abc', workspaceId: 1, onDataChanged: () => {} })
+    const ctrl = startTodoWsSync({ getToken: () => 'abc', workspaceId: '1', onDataChanged: () => {} })
     const first = FakeWebSocket.instances[0]
     ctrl.stop()
     expect(first.closed).toBe(true)
@@ -100,12 +100,12 @@ describe('startTodoWsSync', () => {
   })
 
   it('does not connect when there is no token', () => {
-    startTodoWsSync({ getToken: () => null, workspaceId: 1, onDataChanged: () => {} })
+    startTodoWsSync({ getToken: () => null, workspaceId: '1', onDataChanged: () => {} })
     expect(FakeWebSocket.instances).toHaveLength(0)
   })
 
   it('resets backoff after a successful connection', () => {
-    startTodoWsSync({ getToken: () => 'abc', workspaceId: 1, onDataChanged: () => {} })
+    startTodoWsSync({ getToken: () => 'abc', workspaceId: '1', onDataChanged: () => {} })
     const ws = FakeWebSocket.instances[0]
     ws.fireOpen() // resets attempt counter
     ws.fireClose()

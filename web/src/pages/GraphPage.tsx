@@ -41,7 +41,15 @@ function pseudoRandom(seed: number): number {
   return x - Math.floor(x)
 }
 
-const SELF_NODE_ID = -1
+// Deterministic string-id → numeric seed, so random/cluster layouts stay stable
+// across renders now that node ids are UUID strings.
+function hashSeed(id: string): number {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+
+const SELF_NODE_ID = '__self__'
 const LARGE_GRAPH_THRESHOLD = 300
 
 function SegmentedControl<T extends string>({
@@ -219,7 +227,7 @@ function GraphSettingsPanel() {
 }
 
 type GraphNodeData = {
-  id: number
+  id: string
   name: string
   relationship_labels: string[]
   avatar_emoji?: string
@@ -411,7 +419,7 @@ export default function GraphPage() {
         nodes = nodes.filter((n) => (n.relationship_labels || []).some((l) => activeFilters.has(l)))
       } else {
         const matchingEdges = edges.filter((e) => activeFilters.has(e.relation_type))
-        const connectedIds = new Set<number>()
+        const connectedIds = new Set<string>()
         matchingEdges.forEach((e) => { connectedIds.add(e.source); connectedIds.add(e.target) })
         nodes = nodes.filter((n) => connectedIds.has(n.id))
         edges = matchingEdges
@@ -422,7 +430,7 @@ export default function GraphPage() {
     edges = edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
 
     // Precompute link counts before adding self node
-    const linkCounts = new Map<number, number>()
+    const linkCounts = new Map<string, number>()
     for (const e of edges) {
       linkCounts.set(e.source, (linkCounts.get(e.source) || 0) + 1)
       linkCounts.set(e.target, (linkCounts.get(e.target) || 0) + 1)
@@ -458,8 +466,8 @@ export default function GraphPage() {
         const spread = Math.sqrt(nodes.length) * 25
         return {
           ...base,
-          x: (pseudoRandom(n.id) - 0.5) * spread * 2,
-          y: (pseudoRandom(n.id + 10000) - 0.5) * spread * 2,
+          x: (pseudoRandom(hashSeed(n.id)) - 0.5) * spread * 2,
+          y: (pseudoRandom(hashSeed(n.id) + 10000) - 0.5) * spread * 2,
         }
       }
 
@@ -468,8 +476,8 @@ export default function GraphPage() {
 
     // For cluster mode, compute cluster center positions and assign
     if (layoutMode === 'cluster') {
-      const clusterMap = new Map<string, number[]>()
-      const layoutById = new Map<number, GraphNode>()
+      const clusterMap = new Map<string, string[]>()
+      const layoutById = new Map<string, GraphNode>()
       layoutNodes.forEach((n: GraphNode) => {
         if (n.id === SELF_NODE_ID) return
         layoutById.set(n.id, n)
@@ -491,8 +499,8 @@ export default function GraphPage() {
         memberIds.forEach((id) => {
           const node = layoutById.get(id)
           if (node) {
-            node.x = cx + (pseudoRandom(id + 20000) - 0.5) * innerSpread * 2
-            node.y = cy + (pseudoRandom(id + 30000) - 0.5) * innerSpread * 2
+            node.x = cx + (pseudoRandom(hashSeed(id) + 20000) - 0.5) * innerSpread * 2
+            node.y = cy + (pseudoRandom(hashSeed(id) + 30000) - 0.5) * innerSpread * 2
           }
         })
       })

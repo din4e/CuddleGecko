@@ -4,7 +4,7 @@ import type { Todo } from '../../types'
 
 function todo(over: Partial<Todo> = {}): Todo {
   return {
-    id: 1, user_id: 1, workspace_id: 1, title: 'Buy milk', description: '',
+    id: '1', user_id: '1', workspace_id: '1', title: 'Buy milk', description: '',
     status: 'pending', priority: 'normal', due_time: null, amount: null,
     amount_type: '', contact_ids: [], color: '', completed_at: null,
     created_at: '', updated_at: '', ...over,
@@ -14,8 +14,8 @@ function todo(over: Partial<Todo> = {}): Todo {
 describe('buildICS', () => {
   it('wraps due todos in a VCALENDAR and skips todos without a due time', () => {
     const ics = buildICS([
-      todo({ id: 1, title: 'Task A', due_time: '2026-05-01T09:00:00Z' }),
-      todo({ id: 2, title: 'No due', due_time: null }),
+      todo({ id: '1', title: 'Task A', due_time: '2026-05-01T09:00:00Z' }),
+      todo({ id: '2', title: 'No due', due_time: null }),
     ])
     expect(ics.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true)
     expect(ics.endsWith('END:VCALENDAR')).toBe(true)
@@ -46,7 +46,7 @@ describe('buildICS', () => {
   // RFC 5545 §3.1: lines >75 octets must fold with CRLF + space — unfolded long
   // lines make Outlook drop the whole event.
   it('folds long SUMMARY lines and stays lossless', () => {
-    const ics = buildICS([todo({ id: 5, title: 'A'.repeat(200), due_time: '2026-05-01T09:00:00Z' })])
+    const ics = buildICS([todo({ id: '5', title: 'A'.repeat(200), due_time: '2026-05-01T09:00:00Z' })])
     const lines = ics.split('\r\n')
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(75)
     // The SUMMARY's continuation lines start with a space…
@@ -60,7 +60,7 @@ describe('buildICS', () => {
 
   // DTSTAMP must be the generation time, not the event's future due time.
   it('uses generation time for DTSTAMP, keeping DTSTART at the due time', () => {
-    const ics = buildICS([todo({ id: 9, due_time: '2030-01-01T09:00:00Z' })])
+    const ics = buildICS([todo({ id: '9', due_time: '2030-01-01T09:00:00Z' })])
     const stamp = ics.match(/DTSTAMP:(\d{8}T\d{6})Z/)?.[1]
     expect(stamp).toBeTruthy()
     expect(stamp?.startsWith('2026')).toBe(true) // ~now, not 2030

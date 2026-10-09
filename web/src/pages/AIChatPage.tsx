@@ -31,7 +31,7 @@ type MentionTab = 'contact' | 'event' | 'tag'
 
 interface MentionItem {
   type: 'contact' | 'event' | 'tag' | 'finance'
-  id: number
+  id: string
   name: string
   avatar_emoji?: string
   avatar_url?: string
@@ -46,7 +46,7 @@ export default function AIChatPage() {
   const { t } = useTranslation()
   const adapters = useModeStore((s) => s.adapters)
   const [conversations, setConversations] = useState<AIConversation[]>([])
-  const [activeConvId, setActiveConvId] = useState<number | null>(null)
+  const [activeConvId, setActiveConvId] = useState<string | null>(null)
   const [messages, setMessages] = useState<AIMessage[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -60,7 +60,7 @@ export default function AIChatPage() {
   const [tags, setTags] = useState<Tag[]>([])
   const [analyzing, setAnalyzing] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
@@ -76,7 +76,7 @@ export default function AIChatPage() {
   // unmounted/wrong-conversation view).
   const abortRef = useRef<AbortController | null>(null)
 
-  const createLocalMessage = useCallback((conversationId: number, role: AIMessage['role'], content: string): AIMessage => ({
+  const createLocalMessage = useCallback((conversationId: string, role: AIMessage['role'], content: string): AIMessage => ({
     id: nextMessageId(),
     conversation_id: conversationId,
     role,
@@ -127,7 +127,7 @@ export default function AIChatPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const loadMessages = useCallback(async (convId: number) => {
+  const loadMessages = useCallback(async (convId: string) => {
     abortRef.current?.abort() // stop any in-flight stream before switching
     if (!adapters?.ai) return
     try {
@@ -152,7 +152,7 @@ export default function AIChatPage() {
     }
   }
 
-  const handleDeleteConv = async (id: number) => {
+  const handleDeleteConv = async (id: string) => {
     if (!adapters?.ai) return
     try {
       await adapters.ai.deleteConversation(id)
@@ -167,7 +167,7 @@ export default function AIChatPage() {
     }
   }
 
-  const ensureConversation = async (): Promise<number> => {
+  const ensureConversation = async (): Promise<string> => {
     if (!adapters?.ai) throw new Error('AI adapter not ready')
     if (activeConvId) return activeConvId
     const conv = await adapters.ai.createConversation({})
@@ -225,13 +225,13 @@ export default function AIChatPage() {
     setMentions((prev) => (
       prev.some((m) => m.type === 'finance')
         ? prev
-        : [...prev, { type: 'finance', id: 0, name: t('ai.financialInsight') }]
+        : [...prev, { type: 'finance', id: '0', name: t('ai.financialInsight') }]
     ))
     inputRef.current?.focus()
   }, [t])
 
-  const resolveContactIds = (): number[] => {
-    const ids = new Set<number>()
+  const resolveContactIds = (): string[] => {
+    const ids = new Set<string>()
     mentions.forEach((m) => {
       if (m.type === 'contact') ids.add(m.id)
       if (m.type === 'tag') {

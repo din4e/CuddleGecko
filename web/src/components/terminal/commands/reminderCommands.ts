@@ -53,7 +53,7 @@ export async function executeUpdateReminder(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: update reminder <id>')
 
     const data: Record<string, unknown> = {}
@@ -76,7 +76,7 @@ export async function executeDeleteReminder(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: delete reminder <id>')
 
     await adapters.reminder.delete(id)

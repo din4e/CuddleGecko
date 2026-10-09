@@ -17,9 +17,9 @@ const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: fa
 
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return {
-    id: 1,
-    user_id: 1,
-    workspace_id: 1,
+    id: '1',
+    user_id: '1',
+    workspace_id: '1',
     name: '晨跑 5 公里',
     type: 'cardio',
     status: 'planned',

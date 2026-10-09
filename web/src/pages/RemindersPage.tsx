@@ -35,7 +35,7 @@ export default function RemindersPage() {
     snoozed: { icon: AlertCircle, label: statusLabels.snoozed, variant: 'outline' },
   }
   const [statusFilter, setStatusFilter] = useState<ReminderStatus | ''>('')
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [view, setView] = useViewMode('reminders')
   const [page, setPage] = useState(1)
   const pageSize = 50
@@ -55,7 +55,7 @@ export default function RemindersPage() {
   const [formDesc, setFormDesc] = useState('')
   const [formRemindAt, setFormRemindAt] = useState('')
   const [formStatus, setFormStatus] = useState<ReminderStatus>('pending')
-  const [formLabelIds, setFormLabelIds] = useState<number[]>([])
+  const [formLabelIds, setFormLabelIds] = useState<string[]>([])
   const [labelCreating, setLabelCreating] = useState(false)
   const labelCandidates = mergeLabelCandidates(tagsData?.items, editing?.tags)
 
@@ -95,7 +95,7 @@ export default function RemindersPage() {
     setDialogOpen(false)
   }
 
-  const handleStatusChange = async (id: number, status: ReminderStatus) => {
+  const handleStatusChange = async (id: string, status: ReminderStatus) => {
     await updateReminder.mutateAsync({ id, data: { status } })
   }
 

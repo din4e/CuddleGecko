@@ -24,12 +24,12 @@ export function useFitnessGoalMutations() {
     onError: mutationErrorToast,
   })
   const update = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: FitnessGoalInput }) => fitnessGoalsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: FitnessGoalInput }) => fitnessGoalsApi.update(id, data),
     onSuccess: invalidate,
     onError: mutationErrorToast,
   })
   const remove = useMutation({
-    mutationFn: (id: number) => fitnessGoalsApi.delete(id),
+    mutationFn: (id: string) => fitnessGoalsApi.delete(id),
     onSuccess: invalidate,
     onError: mutationErrorToast,
   })

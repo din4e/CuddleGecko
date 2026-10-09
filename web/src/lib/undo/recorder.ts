@@ -61,13 +61,13 @@ function captureCache(): CacheSnapshot {
   return qc!.getQueryCache().getAll().map((q) => [q.queryKey, q.state.data] as const)
 }
 
-/** Every number an id-bearing field of `variables` could refer to. */
-function variableIds(variables: unknown): Set<number> {
-  const ids = new Set<number>()
+/** Every id a field of `variables` could refer to (ids are strings now). */
+function variableIds(variables: unknown): Set<string> {
+  const ids = new Set<string>()
   const addValue = (value: unknown): void => {
-    if (typeof value === 'number') ids.add(value)
+    if (typeof value === 'string') ids.add(value)
     else if (Array.isArray(value)) value.forEach((v) => {
-      if (typeof v === 'number') ids.add(v)
+      if (typeof v === 'string') ids.add(v)
     })
   }
   if (variables == null || typeof variables !== 'object') {
@@ -83,11 +83,12 @@ function variableIds(variables: unknown): Set<number> {
   return ids
 }
 
-function numericIdsIn(value: unknown): Set<number> {
-  const ids = new Set<number>()
-  if (typeof value === 'number') ids.add(value)
+/** Ids inside an id-bearing request-body field ('ids', 'after_id', 'parent_id'). */
+function idsIn(value: unknown): Set<string> {
+  const ids = new Set<string>()
+  if (typeof value === 'string') ids.add(value)
   else if (Array.isArray(value)) value.forEach((v) => {
-    if (typeof v === 'number') ids.add(v)
+    if (typeof v === 'string') ids.add(v)
   })
   return ids
 }
@@ -104,7 +105,7 @@ export function pickPending(
   const wanted = new Set(ctx.ids)
   const body = (data && typeof data === 'object' ? data : {}) as Entity
   for (const key of ['ids', 'after_id', 'parent_id']) {
-    for (const id of numericIdsIn(body[key])) wanted.add(id)
+    for (const id of idsIn(body[key])) wanted.add(id)
   }
   if (wanted.size > 0) {
     const matched = pendings.filter((p) => {
@@ -264,12 +265,12 @@ export function makeFinders(snapshot: CacheSnapshot): SnapshotFinders {
       for (const { items } of ordered) {
         const entity = items.find((it) => it != null && it.id === id)
         if (!entity) continue
-        const parentId = (entity as { parent_id?: number | null }).parent_id ?? null
-        const siblings = items.filter((it) => ((it as { parent_id?: number | null }).parent_id ?? null) === parentId)
+        const parentId = (entity as { parent_id?: string | null }).parent_id ?? null
+        const siblings = items.filter((it) => ((it as { parent_id?: string | null }).parent_id ?? null) === parentId)
         const idx = siblings.findIndex((it) => it.id === id)
         if (idx < 0) continue
         const prevId = idx === 0 ? null : siblings[idx - 1]?.id
-        return typeof prevId === 'number' ? prevId : null
+        return typeof prevId === 'string' ? prevId : null
       }
       return undefined
     },
@@ -277,16 +278,17 @@ export function makeFinders(snapshot: CacheSnapshot): SnapshotFinders {
       for (const [key, data] of snapshot) {
         if (key[0] !== scope || key[2] !== kind) continue
         // Key tail after the marker must match the owner path: [items, tid],
-        // [exercises, wid], [sets, wid, eid].
-        const tail = key.slice(3).filter((seg) => typeof seg === 'number')
-        if (tail.length !== ownerIds.length || tail.some((seg, i) => seg !== ownerIds[i])) continue
+        // [exercises, wid], [sets, wid, eid]. Segments compare as strings
+        // (ids are strings; String() tolerates numeric leftovers).
+        const tail = key.slice(3).filter((seg) => typeof seg === 'string' || typeof seg === 'number')
+        if (tail.length !== ownerIds.length || tail.some((seg, i) => String(seg) !== String(ownerIds[i]))) continue
         if (Array.isArray(data)) return data as Entity[]
       }
       return undefined
     },
     boardLists(boardId) {
       for (const [key, data] of snapshot) {
-        if (key[0] !== 'whiteboards' || key[2] !== 'board' || key[3] !== boardId) continue
+        if (key[0] !== 'whiteboards' || key[2] !== 'board' || String(key[3]) !== String(boardId)) continue
         const obj = data as Entity | null | undefined
         const nodes = obj?.nodes
         const edges = obj?.edges

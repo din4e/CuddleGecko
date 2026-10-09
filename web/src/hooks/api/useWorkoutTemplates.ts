@@ -24,12 +24,12 @@ export function useWorkoutTemplateMutations() {
     onError: mutationErrorToast,
   })
   const update = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: WorkoutTemplateInput }) => workoutTemplatesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: WorkoutTemplateInput }) => workoutTemplatesApi.update(id, data),
     onSuccess: invalidate,
     onError: mutationErrorToast,
   })
   const remove = useMutation({
-    mutationFn: (id: number) => workoutTemplatesApi.delete(id),
+    mutationFn: (id: string) => workoutTemplatesApi.delete(id),
     onSuccess: invalidate,
     onError: mutationErrorToast,
   })
@@ -40,7 +40,7 @@ export function useWorkoutTemplateMutations() {
 export function useInstantiateTemplate() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, scheduledAt }: { id: number; scheduledAt?: string }): Promise<{ data: Workout }> =>
+    mutationFn: ({ id, scheduledAt }: { id: string; scheduledAt?: string }): Promise<{ data: Workout }> =>
       workoutTemplatesApi.instantiate(id, scheduledAt),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workouts', ...rootKey('workouts').slice(1)] })

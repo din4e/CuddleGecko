@@ -61,8 +61,8 @@ interface TxFormData {
   category: string
   date: string
   notes: string
-  contact_ids: number[]
-  label_ids: number[]
+  contact_ids: string[]
+  label_ids: string[]
 }
 
 const emptyForm: TxFormData = {
@@ -97,7 +97,7 @@ export default function FinancePage() {
   const deferredQ = useDeferredValue(q)
   const [year, setYear] = useState('')
   const [month, setMonth] = useState('') // '01'..'12'; '' = all months (needs a year)
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [form, setForm] = useState<TxFormData>(emptyForm)

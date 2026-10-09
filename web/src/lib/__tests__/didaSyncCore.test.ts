@@ -45,7 +45,7 @@ const DidaSync = ((globalThis as unknown as { DidaSync?: DidaSyncApi }).DidaSync
 /* ---------- tiny in-memory backend mirroring pkg/response + todo routes ---------- */
 interface Call { method: string; url: string; body: Record<string, unknown> | null }
 
-function makeBackend(opts: { existing?: { id: number; description: string }[]; failTitle?: string } = {}) {
+function makeBackend(opts: { existing?: { id: string; description: string }[]; failTitle?: string } = {}) {
   const calls: Call[] = []
   let nextTodoId = 100
   let nextItemId = 500
@@ -61,9 +61,9 @@ function makeBackend(opts: { existing?: { id: number; description: string }[]; f
       if (opts.failTitle && body?.title === opts.failTitle) {
         return { ok: false, status: 500, json: async () => ({ code: 500, data: null, message: 'boom' }) }
       }
-      return ok({ id: nextTodoId++ })
+      return ok({ id: String(nextTodoId++) })
     }
-    if (method === 'POST' && /^\/api\/todos\/\d+\/items$/.test(url)) return ok({ id: nextItemId++ })
+    if (method === 'POST' && /^\/api\/todos\/\d+\/items$/.test(url)) return ok({ id: String(nextItemId++) })
     if (method === 'PATCH' && /\/items\/\d+\/toggle$/.test(url)) return ok(null)
     if (method === 'DELETE') return ok(null)
     throw new Error('unexpected request: ' + method + ' ' + url)
@@ -128,14 +128,14 @@ describe('runSync', () => {
       { title: DidaSync.ROOT_TITLE, description: expect.stringContaining(DidaSync.MARKER),
         status: 'pending', priority: 'normal', due_time: '', start_time: '', parent_id: null },
       { title: '📋 工作', description: '', status: 'pending', priority: 'normal',
-        due_time: '', start_time: '', parent_id: 100 },
+        due_time: '', start_time: '', parent_id: '100' },
       { title: '父任务', description: '', status: 'pending', priority: 'high',
-        due_time: '2026-08-22T03:00:00.000Z', start_time: '', parent_id: 101 },
+        due_time: '2026-08-22T03:00:00.000Z', start_time: '', parent_id: '101' },
       { title: '子任务', description: '', status: 'pending', priority: 'normal',
-        due_time: '', start_time: '', parent_id: 102 },
+        due_time: '', start_time: '', parent_id: '102' },
       // 收集箱是清单概念,不建节点——任务直接挂同步根
       { title: '收件箱任务', description: '', status: 'done', priority: 'low',
-        due_time: '', start_time: '', parent_id: 100 },
+        due_time: '', start_time: '', parent_id: '100' },
     ])
 
     // checklist items: two creates under todo #103, one toggle for the completed one
@@ -153,8 +153,8 @@ describe('runSync', () => {
   it('deletes previously synced roots (MARKER in description) before rebuilding', async () => {
     const { calls } = makeBackend({
       existing: [
-        { id: 7, description: DidaSync.MARKER + ' 上次同步:…' },
-        { id: 8, description: 'hand-written note, must survive' },
+        { id: '7', description: DidaSync.MARKER + ' 上次同步:…' },
+        { id: '8', description: 'hand-written note, must survive' },
       ],
     })
     await DidaSync.runSync({ projects: [], tasks: [{ id: 'x', title: 't', status: 0 }] },

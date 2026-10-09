@@ -39,7 +39,7 @@ const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as ty
 const interactionTypes: InteractionType[] = ['meeting', 'call', 'message', 'email', 'other']
 
 type MiniGraphNodeData = {
-  id: number
+  id: string
   name: string
   relationship_labels: string[]
   avatar_emoji: string
@@ -52,8 +52,7 @@ export default function ContactDetailPage() {
   const { t } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
-  const numericId = id ? Number(id) : NaN
-  const contactId = Number.isInteger(numericId) && numericId > 0 ? numericId : 0
+  const contactId = id ?? ''
 
   const [contact, setContact] = useState<Contact | null>(null)
   const [interactions, setInteractions] = useState<Interaction[]>([])
@@ -123,14 +122,14 @@ export default function ContactDetailPage() {
   }, [measureGraph])
   const miniGraphData = useMemo(() => {
     if (!contact) return { nodes: [], links: [] }
-    const connectedIds = new Set<number>()
-    const links: { source: number; target: number; relation_type: string }[] = []
+    const connectedIds = new Set<string>()
+    const links: { source: string; target: string; relation_type: string }[] = []
     for (const r of relations) {
       const otherId = r.contact_id_a === contact.id ? r.contact_id_b : r.contact_id_a
       connectedIds.add(otherId)
       links.push({ source: r.contact_id_a, target: r.contact_id_b, relation_type: r.relation_type })
     }
-    const contactMap = new Map<number, Contact>()
+    const contactMap = new Map<string, Contact>()
     for (const c of allContacts) contactMap.set(c.id, c)
     const nodes = [
       { id: contact.id, name: contact.name, relationship_labels: contact.relationship_labels || [], avatar_emoji: contact.avatar_emoji || '', __isCenter: true },
@@ -144,7 +143,7 @@ export default function ContactDetailPage() {
 
   // id → name lookup so relation rows render the buddy's name, not a bare "#id".
   const contactNameById = useMemo(() => {
-    const m = new Map<number, string>()
+    const m = new Map<string, string>()
     for (const c of allContacts) m.set(c.id, c.name)
     return m
   }, [allContacts])
@@ -152,7 +151,7 @@ export default function ContactDetailPage() {
   // Edit contact dialog
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', nickname: '', emails: [] as string[], phones: [] as string[], birthday: '', birthday_calendar: 'solar' as 'solar' | 'lunar', notes: '', relationship_labels: [] as string[], avatar_emoji: '', avatar_url: '' })
-  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([])
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   // Interaction dialog
@@ -165,7 +164,7 @@ export default function ContactDetailPage() {
 
   // Relation dialog
   const [relDialog, setRelDialog] = useState(false)
-  const [relForm, setRelForm] = useState({ contact_ids: [] as number[], relation_type: '' })
+  const [relForm, setRelForm] = useState({ contact_ids: [] as string[], relation_type: '' })
 
   // Delete confirmation
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -309,7 +308,7 @@ export default function ContactDetailPage() {
     setIntDialog({ open: false, editing: null })
     fetchInteractions()
   }
-  const handleDeleteInt = async (intId: number) => {
+  const handleDeleteInt = async (intId: string) => {
     await interactionsApi.delete(intId)
     fetchInteractions()
   }
@@ -338,7 +337,7 @@ export default function ContactDetailPage() {
     setRemDialog({ open: false, editing: null })
     fetchReminders()
   }
-  const handleDeleteRem = async (remId: number) => {
+  const handleDeleteRem = async (remId: string) => {
     await remindersApi.delete(remId)
     fetchReminders()
   }
@@ -356,7 +355,7 @@ export default function ContactDetailPage() {
     setRelDialog(false)
     fetchRelations()
   }
-  const handleDeleteRel = async (relId: number) => {
+  const handleDeleteRel = async (relId: string) => {
     await relationsApi.delete(relId)
     fetchRelations()
   }

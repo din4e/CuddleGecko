@@ -25,7 +25,7 @@ export function useCreateHabit() {
 export function useUpdateHabit() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Habit> }) => habitsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<Habit> }) => habitsApi.update(id, data),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }
@@ -33,7 +33,7 @@ export function useUpdateHabit() {
 export function useDeleteHabit() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => habitsApi.delete(id),
+    mutationFn: (id: string) => habitsApi.delete(id),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }
@@ -41,7 +41,7 @@ export function useDeleteHabit() {
 export function useCheckinHabit() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, date }: { id: number; date?: string }) => habitsApi.checkin(id, date),
+    mutationFn: ({ id, date }: { id: string; date?: string }) => habitsApi.checkin(id, date),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }
@@ -49,7 +49,7 @@ export function useCheckinHabit() {
 export function useReplaceHabitTags() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => habitsApi.replaceTags(id, tagIds),
+    mutationFn: ({ id, tagIds }: { id: string; tagIds: string[] }) => habitsApi.replaceTags(id, tagIds),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }

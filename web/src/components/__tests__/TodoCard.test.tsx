@@ -20,9 +20,9 @@ vi.mock('react-i18next', () => ({
 
 function makeTodo(overrides: Partial<Todo> = {}): Todo {
   return {
-    id: 1,
-    user_id: 1,
-    workspace_id: 1,
+    id: '1',
+    user_id: '1',
+    workspace_id: '1',
     title: 'Buy milk',
     description: '',
     status: 'pending',
@@ -101,7 +101,7 @@ describe('TodoCard', () => {
     const onToggle = vi.fn()
     renderCard({}, { onToggle })
     await userEvent.click(screen.getByRole('button', { name: 'todos.markDone' }))
-    expect(onToggle).toHaveBeenCalledWith(1)
+    expect(onToggle).toHaveBeenCalledWith('1')
   })
 
   it('double-click title edits inline; Enter commits via onRename', async () => {
@@ -114,7 +114,7 @@ describe('TodoCard', () => {
     await user.clear(input)
     await user.type(input, 'New title{Enter}')
 
-    expect(onRename).toHaveBeenCalledWith(1, 'New title')
+    expect(onRename).toHaveBeenCalledWith('1', 'New title')
   })
 
   it('Escape cancels inline edit without renaming', async () => {
@@ -172,7 +172,7 @@ describe('TodoCard', () => {
       />,
     )
     await userEvent.click(screen.getByRole('checkbox', { name: 'Buy milk' }))
-    expect(onSelectToggle).toHaveBeenCalledWith(1)
+    expect(onSelectToggle).toHaveBeenCalledWith('1')
   })
 
   it('the progress chip folds and unfolds the subtask list (non-compact)', async () => {
@@ -239,14 +239,14 @@ describe('TodoCard', () => {
       onDelete: vi.fn(),
       formatDate: () => 'Jan 1',
       subtasks: <div data-testid="subtask-list">list</div>,
-      subtaskDragId: 7 as number | null,
+      subtaskDragId: '7' as string | null,
       onNestSubtask,
     }
     renderWithClient(<TodoCard {...props} todo={makeTodo()} />)
     const card = screen.getByText('Buy milk').closest('[data-slot="card"]')!
     fireEvent.dragOver(card, { dataTransfer: dtStub() })
     fireEvent.drop(card, { dataTransfer: dtStub() })
-    expect(onNestSubtask).toHaveBeenCalledWith(7, 1)
+    expect(onNestSubtask).toHaveBeenCalledWith('7', '1')
   })
 
   it('ignores a subtask drop of the card onto itself', () => {
@@ -263,7 +263,7 @@ describe('TodoCard', () => {
         onDuplicate={vi.fn()}
         onDelete={vi.fn()}
         formatDate={() => 'Jan 1'}
-        subtaskDragId={1}
+        subtaskDragId={'1'}
         onNestSubtask={onNestSubtask}
       />,
     )

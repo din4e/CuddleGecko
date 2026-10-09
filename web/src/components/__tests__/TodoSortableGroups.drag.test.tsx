@@ -32,7 +32,7 @@ vi.mock('@dnd-kit/sortable', () => ({
 
 import TodoSortableGroups from '../TodoSortableGroups'
 
-const todo = (id: number, title: string): Todo => ({
+const todo = (id: string, title: string): Todo => ({
   id,
   title,
   description: '',
@@ -43,8 +43,8 @@ const todo = (id: number, title: string): Todo => ({
   amount: null,
   amount_type: '',
   color: '',
-  user_id: 1,
-  workspace_id: 1,
+  user_id: '1',
+  workspace_id: '1',
   completed_at: null,
   created_at: '',
   updated_at: '',
@@ -57,8 +57,8 @@ describe('TodoSortableGroups cross-group dragging', () => {
     render(
       <TodoSortableGroups
         groups={[
-          { key: 'today', items: [todo(1, 'Today task')] },
-          { key: 'later', items: [todo(2, 'Later task')] },
+          { key: 'today', items: [todo('1', 'Today task')] },
+          { key: 'later', items: [todo('2', 'Later task')] },
         ]}
         renderCard={(item) => <span>{item.title}</span>}
         onGroupDrop={onGroupDrop}
@@ -79,6 +79,6 @@ describe('TodoSortableGroups cross-group dragging', () => {
     await act(async () => { dnd.props?.onDragOver({ active, over } as never) })
     await act(async () => { dnd.props?.onDragEnd({ active, over } as never) })
 
-    expect(onGroupDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), 'later')
+    expect(onGroupDrop).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }), 'later')
   })
 })

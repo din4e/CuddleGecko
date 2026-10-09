@@ -10,11 +10,11 @@ interface PomodoroStore {
   secondsLeft: number
   running: boolean
   completed: number
-  focusTodoId: number | null
+  focusTodoId: string | null
   focusTodoTitle: string | null
   intervalId: ReturnType<typeof setInterval> | null
   onComplete: (() => void) | null
-  start: (todoId: number | null, todoTitle?: string) => void
+  start: (todoId: string | null, todoTitle?: string) => void
   pause: () => void
   reset: () => void
   skip: () => void

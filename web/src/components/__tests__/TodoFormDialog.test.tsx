@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   replaceTags: vi.fn(),
   moveTodo: vi.fn(),
   list: vi.fn<(params?: unknown, options?: unknown) => { data: { items: Todo[]; total: number; page: number; page_size: number } | undefined; isFetching: boolean }>(),
-  get: vi.fn<(id: number | null) => { data: Todo | undefined }>(),
+  get: vi.fn<(id: string | null) => { data: Todo | undefined }>(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -30,7 +30,7 @@ vi.mock('../../hooks/api/useTodos', () => ({
   // Parent picker + "[[" link mention search: no results by default (overridable per test).
   useTodosList: (params: Record<string, unknown>, options?: { enabled?: boolean }) => mocks.list(params, options),
   // Parent picker by-id fallback: unresolved by default.
-  useTodo: (id: number | null) => mocks.get(id),
+  useTodo: (id: string | null) => mocks.get(id),
 }))
 
 vi.mock('../../api/contacts', () => ({
@@ -44,7 +44,7 @@ function render(ui: React.ReactElement) {
 
 function todo(over: Partial<Todo> = {}): Todo {
   return {
-    id: 1, user_id: 1, workspace_id: 1, title: 'Task', description: '',
+    id: '1', user_id: '1', workspace_id: '1', title: 'Task', description: '',
     status: 'pending', priority: 'normal', due_time: null, amount: null,
     amount_type: '', contact_ids: [], color: '', completed_at: null,
     created_at: '', updated_at: '', ...over,
@@ -67,14 +67,14 @@ describe('TodoFormDialog', () => {
     // Local candidates are empty — the parent only exists server-side, found
     // through the q search (exactly the case the picker exists for).
     mocks.list.mockReturnValue({
-      data: { items: [todo({ id: 7, title: 'Deep parent' })], total: 1, page: 1, page_size: 20 },
+      data: { items: [todo({ id: '7', title: 'Deep parent' })], total: 1, page: 1, page_size: 20 },
       isFetching: false,
     })
     const user = userEvent.setup()
     render(
       <TodoFormDialog
         open
-        editing={todo({ id: 1, parent_id: null })}
+        editing={todo({ id: '1', parent_id: null })}
         contacts={[]}
         tags={[]}
         parentCandidates={[]}
@@ -101,7 +101,7 @@ describe('TodoFormDialog', () => {
 
     // Save kept the title payload intact and reparented via the move endpoint.
     expect(mocks.updateTodo).toHaveBeenCalledTimes(1)
-    expect(mocks.moveTodo).toHaveBeenCalledWith({ id: 1, parentId: 7, afterId: null })
+    expect(mocks.moveTodo).toHaveBeenCalledWith({ id: '1', parentId: '7', afterId: null })
   })
 
   it('typing "[[" in title/description offers tasks and inserts a markdown todo link', async () => {
@@ -112,7 +112,7 @@ describe('TodoFormDialog', () => {
         editing={null}
         contacts={[]}
         tags={[]}
-        parentCandidates={[todo({ id: 7, title: 'Alpha task' }), todo({ id: 9, title: 'Beta task' })]}
+        parentCandidates={[todo({ id: '7', title: 'Alpha task' }), todo({ id: '9', title: 'Beta task' })]}
         onContactsChange={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -142,10 +142,10 @@ describe('TodoFormDialog', () => {
     render(
       <TodoFormDialog
         open
-        editing={todo({ parent_id: 5 })}
+        editing={todo({ parent_id: '5' })}
         contacts={[]}
         tags={[]}
-        parentCandidates={[todo({ id: 5, title: 'Current parent' })]}
+        parentCandidates={[todo({ id: '5', title: 'Current parent' })]}
         onContactsChange={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -242,10 +242,10 @@ describe('TodoFormDialog', () => {
     render(
       <TodoFormDialog
         open
-        editing={todo({ parent_id: 5 })}
+        editing={todo({ parent_id: '5' })}
         contacts={[]}
         tags={[]}
-        parentCandidates={[todo({ id: 5, title: 'Parent' })]}
+        parentCandidates={[todo({ id: '5', title: 'Parent' })]}
         onContactsChange={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -258,9 +258,9 @@ describe('TodoFormDialog', () => {
   it('keeps failed tag saves open and retries a created task without duplicating it', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
-    mocks.createTodo.mockResolvedValue({ data: todo({ id: 99 }) })
+    mocks.createTodo.mockResolvedValue({ data: todo({ id: '99' }) })
     mocks.replaceTags.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(undefined)
-    render(<TodoFormDialog open editing={null} contacts={[]} tags={[{ id: 7, name: 'Work', color: '#22c55e' } as Tag]} onContactsChange={vi.fn()} onClose={onClose} />)
+    render(<TodoFormDialog open editing={null} contacts={[]} tags={[{ id: '7', name: 'Work', color: '#22c55e' } as Tag]} onContactsChange={vi.fn()} onClose={onClose} />)
     await user.type(screen.getByLabelText('todos.title_field *'), 'New task')
     await user.click(screen.getByRole('button', { name: 'labels.title' }))
     await user.click(screen.getByRole('option', { name: 'Work' }))
@@ -271,19 +271,19 @@ describe('TodoFormDialog', () => {
     await user.click(screen.getByText('common.create'))
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
     expect(mocks.createTodo).toHaveBeenCalledTimes(1)
-    expect(mocks.updateTodo).toHaveBeenCalledWith(expect.objectContaining({ id: 99 }))
-    expect(mocks.replaceTags).toHaveBeenLastCalledWith({ todoId: 99, tagIds: [7] })
+    expect(mocks.updateTodo).toHaveBeenCalledWith(expect.objectContaining({ id: '99' }))
+    expect(mocks.replaceTags).toHaveBeenLastCalledWith({ todoId: '99', tagIds: ['7'] })
   })
 
   it('preserves existing labels when saving unrelated fields and can clear all labels', async () => {
     const user = userEvent.setup()
-    const tag = { id: 250, name: 'Beyond first page', color: '#22c55e' } as Tag
+    const tag = { id: '250', name: 'Beyond first page', color: '#22c55e' } as Tag
     render(<TodoFormDialog open editing={todo({ tags: [tag] })} contacts={[]} tags={[]} onContactsChange={vi.fn()} onClose={vi.fn()} />)
     await user.click(screen.getByText('common.save'))
     expect(mocks.replaceTags).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'labels.remove' }))
     await user.click(screen.getByText('common.save'))
-    await waitFor(() => expect(mocks.replaceTags).toHaveBeenCalledWith({ todoId: 1, tagIds: [] }))
+    await waitFor(() => expect(mocks.replaceTags).toHaveBeenCalledWith({ todoId: '1', tagIds: [] }))
   })
 
 })

@@ -24,12 +24,12 @@ export function useExerciseLibraryMutations() {
     onError: mutationErrorToast,
   })
   const update = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: ExerciseLibraryInput }) => exerciseLibraryApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: ExerciseLibraryInput }) => exerciseLibraryApi.update(id, data),
     onSuccess: invalidate,
     onError: mutationErrorToast,
   })
   const remove = useMutation({
-    mutationFn: (id: number) => exerciseLibraryApi.delete(id),
+    mutationFn: (id: string) => exerciseLibraryApi.delete(id),
     onSuccess: invalidate,
     onError: mutationErrorToast,
   })

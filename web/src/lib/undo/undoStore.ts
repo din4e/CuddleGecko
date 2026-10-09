@@ -4,7 +4,7 @@
 import { create } from 'zustand'
 
 export interface UndoEntry {
-  id: number
+  id: string
   label: { action: string; entity: string }
   /** Identity for merging consecutive edits of the same entity (auto-save). */
   mergeKey: string
@@ -47,7 +47,7 @@ export const useUndoStore = create<UndoState>((set, get) => ({
         entries.push(merged)
         return { entries }
       }
-      const entries = [...state.entries, { ...entry, id: nextId++, at: now }]
+      const entries = [...state.entries, { ...entry, id: String(nextId++), at: now }]
       return { entries: entries.length > MAX_ENTRIES ? entries.slice(entries.length - MAX_ENTRIES) : entries }
     }),
 

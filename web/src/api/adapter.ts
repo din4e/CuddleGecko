@@ -16,41 +16,41 @@ export interface CaptchaAdapter {
 }
 
 export interface ContactAdapter {
-  list(params: { page: number; page_size: number; search?: string; tag_ids?: number[] }): Promise<{ items: Contact[]; total: number; page: number; page_size: number }>
+  list(params: { page: number; page_size: number; search?: string; tag_ids?: string[] }): Promise<{ items: Contact[]; total: number; page: number; page_size: number }>
   create(data: Partial<Contact>): Promise<Contact>
-  getByID(id: number): Promise<Contact>
-  update(id: number, data: Partial<Contact>): Promise<Contact>
-  delete(id: number): Promise<void>
-  getTags(id: number): Promise<Tag[]>
-  replaceTags(id: number, tagIDs: number[]): Promise<void>
+  getByID(id: string): Promise<Contact>
+  update(id: string, data: Partial<Contact>): Promise<Contact>
+  delete(id: string): Promise<void>
+  getTags(id: string): Promise<Tag[]>
+  replaceTags(id: string, tagIDs: string[]): Promise<void>
 }
 
 export interface TagAdapter {
   list(): Promise<Tag[]>
   create(data: { name: string; color: string }): Promise<Tag>
-  update(id: number, data: { name: string; color: string }): Promise<Tag>
-  delete(id: number): Promise<void>
+  update(id: string, data: { name: string; color: string }): Promise<Tag>
+  delete(id: string): Promise<void>
 }
 
 export interface InteractionAdapter {
   listByContact(contactID: number, page: number, pageSize: number): Promise<{ items: Interaction[]; total: number }>
   create(contactID: number, data: Partial<Interaction>): Promise<Interaction>
-  update(id: number, data: Partial<Interaction>): Promise<Interaction>
-  delete(id: number): Promise<void>
+  update(id: string, data: Partial<Interaction>): Promise<Interaction>
+  delete(id: string): Promise<void>
 }
 
 export interface ReminderAdapter {
   list(status?: string): Promise<Reminder[]>
   create(contactID: number, data: Partial<Reminder>): Promise<Reminder>
-  update(id: number, data: Partial<Reminder>): Promise<Reminder>
-  delete(id: number): Promise<void>
+  update(id: string, data: Partial<Reminder>): Promise<Reminder>
+  delete(id: string): Promise<void>
 }
 
 export interface GraphAdapter {
   getGraph(): Promise<GraphData>
   getRelations(contactID: number): Promise<ContactRelation[]>
   createRelation(contactIDA: number, data: { contact_id_b: number; relation_type: string }): Promise<ContactRelation>
-  deleteRelation(id: number): Promise<void>
+  deleteRelation(id: string): Promise<void>
 }
 
 export interface ExportAdapter {
@@ -76,16 +76,16 @@ export interface TodoImportResult {
 export interface EventAdapter {
   list(params?: { page?: number; page_size?: number; start_after?: string; end_before?: string }): Promise<{ items: Event[]; total: number; page: number; page_size: number }>
   create(data: Partial<Event>): Promise<Event>
-  update(id: number, data: Partial<Event>): Promise<Event>
-  delete(id: number): Promise<void>
+  update(id: string, data: Partial<Event>): Promise<Event>
+  delete(id: string): Promise<void>
 }
 
 export interface TransactionAdapter {
   list(params?: { page?: number; page_size?: number; type?: string }): Promise<{ items: Transaction[]; total: number; page: number; page_size: number }>
   summary(): Promise<TransactionSummary>
   create(data: Partial<Transaction>): Promise<Transaction>
-  update(id: number, data: Partial<Transaction>): Promise<Transaction>
-  delete(id: number): Promise<void>
+  update(id: string, data: Partial<Transaction>): Promise<Transaction>
+  delete(id: string): Promise<void>
 }
 
 export interface AIAdapter {
@@ -93,39 +93,39 @@ export interface AIAdapter {
   listPresets(): Promise<AIProviderPreset[]>
   listProviders(): Promise<AIProvider[]>
   saveProvider(data: { provider_type: string; api_key: string; model?: string; base_url?: string }): Promise<AIProvider>
-  activateProvider(id: number): Promise<void>
-  testConnection(id: number): Promise<{ success: boolean; error?: string }>
+  activateProvider(id: string): Promise<void>
+  testConnection(id: string): Promise<{ success: boolean; error?: string }>
   listConversations(params?: { page?: number; page_size?: number }): Promise<{ items: AIConversation[]; total: number; page: number; page_size: number }>
   createConversation(data?: { title?: string }): Promise<AIConversation>
-  getMessages(conversationId: number): Promise<AIMessage[]>
-  deleteConversation(id: number): Promise<void>
-  analyzeRelationship(contactId: number): Promise<{ analysis: string }>
-  analyzeEvent(eventId: number): Promise<{ analysis: string }>
+  getMessages(conversationId: string): Promise<AIMessage[]>
+  deleteConversation(id: string): Promise<void>
+  analyzeRelationship(contactId: string): Promise<{ analysis: string }>
+  analyzeEvent(eventId: string): Promise<{ analysis: string }>
   analyzeComprehensive(data: {
     type: 'contact' | 'event' | 'financial' | 'comprehensive'
-    contact_ids?: number[]
-    event_ids?: number[]
+    contact_ids?: string[]
+    event_ids?: string[]
     question?: string
   }): Promise<{ analysis: string }>
-  chat(conversationId: number, message: string): Promise<string>
+  chat(conversationId: string, message: string): Promise<string>
 }
 
 export interface WorkspaceAdapter {
   list(): Promise<Workspace[]>
   create(data: { name: string; description?: string; icon?: string }): Promise<Workspace>
-  update(id: number, data: { name?: string; description?: string; icon?: string }): Promise<Workspace>
-  delete(id: number): Promise<void>
-  switch(id: number): Promise<Workspace>
+  update(id: string, data: { name?: string; description?: string; icon?: string }): Promise<Workspace>
+  delete(id: string): Promise<void>
+  switch(id: string): Promise<Workspace>
   getDefault(): Promise<Workspace>
 }
 
 export interface TodoAdapter {
   list(status?: string): Promise<Todo[]>
   create(data: Partial<Todo>): Promise<Todo>
-  update(id: number, data: Partial<Todo>): Promise<Todo>
-  toggleStatus(id: number): Promise<Todo>
-  syncToEvent(id: number): Promise<Event>
-  delete(id: number): Promise<void>
+  update(id: string, data: Partial<Todo>): Promise<Todo>
+  toggleStatus(id: string): Promise<Todo>
+  syncToEvent(id: string): Promise<Event>
+  delete(id: string): Promise<void>
 }
 
 export interface AppAdapters {

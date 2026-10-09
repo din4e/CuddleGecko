@@ -52,15 +52,15 @@ export interface KanbanBoardProps {
    *  e.g. priority, when swimlanes are on). */
   onCardDropColumn: (todo: Todo, col: KanbanColumn, lane?: KanbanLane) => void
   /** Reorder within a cell; afterId = the todo to place behind, null = first. */
-  onReorder: (id: number, afterId: number | null) => void
+  onReorder: (id: string, afterId: string | null) => void
   /** Drop onto the middle of a card in the SAME cell: make the dragged todo a
    *  child of it. Cross-cell drops keep applying the column predicate. */
-  onNest?: (draggedId: number, parentId: number) => void
+  onNest?: (draggedId: string, parentId: string) => void
   /** Quick-create inside a column/lane cell; the page applies the predicates. */
   onCreateInColumn: (title: string, col: KanbanColumn, lane?: KanbanLane) => void
   /** Selected card ids while the page is in selection mode — dragging a
    *  selected card drags the whole selection (batch apply). */
-  selectedIds?: Set<number>
+  selectedIds?: Set<string>
 }
 
 type SwimlaneMode = 'none' | 'priority'
@@ -80,7 +80,7 @@ const RESIZER_STRIP_W = 12
 //   t<todoId>            sortable card
 //   colsort:<colId>      sortable column header (column reorder)
 //   cell:<lane>|<colId>  droppable cell body (lane id is 'all' when off)
-const itemId = (todoId: number) => `t${todoId}`
+const itemId = (todoId: string) => `t${todoId}`
 const colSortId = (colId: string) => `colsort:${colId}`
 const cellDroppableId = (cellKey: string) => `cell:${cellKey}`
 const cellKeyOf = (laneId: string, colId: string) => `${laneId}|${colId}`
@@ -139,8 +139,8 @@ export default function KanbanBoard({
   )
   const derived = useMemo(() => {
     const { byColumn, unmatched } = bucketByColumns(filteredTodos, columns)
-    const cells: Record<string, number[]> = {}
-    const unmatchedByLane: Record<string, number[]> = {}
+    const cells: Record<string, string[]> = {}
+    const unmatchedByLane: Record<string, string[]> = {}
     for (const lane of laneDefs) {
       for (const col of columns) {
         cells[cellKeyOf(lane.id, col.id)] = (byColumn.get(col.id) ?? [])
@@ -156,7 +156,7 @@ export default function KanbanBoard({
   // Local cell state drives the drag preview (cards move across cells before
   // the server mutation lands). Re-synced whenever the derived board changes,
   // but never mid-drag so an in-flight refetch can't clobber the preview.
-  const [cells, setCells] = useState<Record<string, number[]>>(() => ({ ...derived.cells }))
+  const [cells, setCells] = useState<Record<string, string[]>>(() => ({ ...derived.cells }))
   const dragging = useRef(false)
   useEffect(() => {
     if (dragging.current) return
@@ -233,10 +233,10 @@ export default function KanbanBoard({
   }
 
   // --- DnD ---
-  const [active, setActive] = useState<{ type: 'card' | 'column'; id: number | string } | null>(null)
+  const [active, setActive] = useState<{ type: 'card' | 'column'; id: string } | null>(null)
   // Card hovered in its middle zone within the same cell — rendered with a
   // nest affordance so the user sees the drop creates a parent-child link.
-  const [nestTarget, setNestTarget] = useState<number | null>(null)
+  const [nestTarget, setNestTarget] = useState<string | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor),
@@ -252,7 +252,7 @@ export default function KanbanBoard({
   }
 
   const findCellOfCard = (cardId: string): string | null => {
-    const id = Number(cardId.slice(1))
+    const id = cardId.slice(1)
     for (const [key, ids] of Object.entries(cells)) {
       if (ids.includes(id)) return key
     }
@@ -270,7 +270,7 @@ export default function KanbanBoard({
   // whole selection across.
   const batchIds = useMemo(() => {
     if (!active || active.type !== 'card' || !selectedIds || selectedIds.size === 0) return []
-    const dragId = Number(String(active.id).slice(1))
+    const dragId = String(active.id).slice(1)
     if (!selectedIds.has(dragId)) return []
     return filteredTodos.filter((td) => selectedIds.has(td.id)).map((td) => td.id)
   }, [active, selectedIds, filteredTodos])
@@ -278,7 +278,7 @@ export default function KanbanBoard({
   const handleDragStart = (e: DragStartEvent) => {
     dragging.current = true
     const type = (e.active.data.current?.type as 'card' | 'column') ?? 'card'
-    setActive({ type, id: type === 'card' ? Number(String(e.active.id).slice(1)) : String(e.active.id) })
+    setActive({ type, id: type === 'card' ? String(e.active.id).slice(1) : String(e.active.id) })
   }
 
   // Live preview: while dragging over another cell, move the card into that
@@ -292,8 +292,8 @@ export default function KanbanBoard({
     if (!from || !to) return
     if (from === to) {
       const overStr = String(over.id)
-      const overCardId = overStr.startsWith('cell:') ? null : Number(overStr.slice(1))
-      const draggedId = Number(String(a.id).slice(1))
+      const overCardId = overStr.startsWith('cell:') ? null : overStr.slice(1)
+      const draggedId = String(a.id).slice(1)
       if (overCardId != null && overCardId !== draggedId && onNest &&
           cardDropZone(a.rect.current.translated, over.rect) === 'middle') {
         setNestTarget(overCardId)
@@ -306,12 +306,12 @@ export default function KanbanBoard({
     setCells((prev) => {
       const fromIds = prev[from] ?? []
       const toIds = prev[to] ?? []
-      const id = Number(String(a.id).slice(1))
+      const id = String(a.id).slice(1)
       if (!fromIds.includes(id)) return prev
       let insertAt = toIds.length
       const s = String(over.id)
       if (!s.startsWith('cell:')) {
-        const overIdx = toIds.indexOf(Number(s.slice(1)))
+        const overIdx = toIds.indexOf(s.slice(1))
         if (overIdx >= 0) insertAt = overIdx
       }
       return {
@@ -339,7 +339,7 @@ export default function KanbanBoard({
       return
     }
 
-    const id = Number(String(a.id).slice(1))
+    const id = String(a.id).slice(1)
     const todo = todoById.get(id)
     if (!todo) return
     const to = overCell(over)
@@ -371,7 +371,7 @@ export default function KanbanBoard({
     // drops nest every selected card). Takes precedence over reordering.
     {
       const overStr = String(over.id)
-      const overCardId = overStr.startsWith('cell:') ? null : Number(overStr.slice(1))
+      const overCardId = overStr.startsWith('cell:') ? null : overStr.slice(1)
       if (overCardId != null && overCardId !== id && onNest &&
           cardDropZone(a.rect.current.translated, over.rect) === 'middle') {
         if (batchIds.length > 1) {
@@ -392,7 +392,7 @@ export default function KanbanBoard({
     const ids = cells[to] ?? []
     const idx = ids.indexOf(id)
     const overStr = String(over.id)
-    const overTodoId = overStr.startsWith('cell:') ? null : Number(overStr.slice(1))
+    const overTodoId = overStr.startsWith('cell:') ? null : overStr.slice(1)
     const overIdx = overTodoId == null ? -1 : ids.indexOf(overTodoId)
     if (overIdx < 0 || overIdx === idx) return
     if (overIdx < idx) {
@@ -422,7 +422,7 @@ export default function KanbanBoard({
     setAddColumnOpen(false)
   }
 
-  const activeTodo = active?.type === 'card' ? todoById.get(active.id as number) : undefined
+  const activeTodo = active?.type === 'card' ? todoById.get(active.id) : undefined
   const activeCol = active?.type === 'column' ? columns.find((c) => colSortId(c.id) === active.id) : undefined
 
   return (
@@ -720,8 +720,8 @@ function BoardCell({
   itemIds: string[]
   showEmpty: boolean
   renderCard: (todo: Todo) => ReactNode
-  todoById: Map<number, Todo>
-  nestTarget: number | null
+  todoById: Map<string, Todo>
+  nestTarget: string | null
   onCreate: (title: string) => void
 }) {
   const { t } = useTranslation()
@@ -749,10 +749,10 @@ function BoardCell({
         {itemIds.map((sid) => (
           <SortableCard
             key={sid}
-            todoId={Number(sid.slice(1))}
+            todoId={sid.slice(1)}
             todoById={todoById}
             renderCard={renderCard}
-            nest={nestTarget === Number(sid.slice(1))}
+            nest={nestTarget === sid.slice(1)}
           />
         ))}
         {adding ? (
@@ -789,8 +789,8 @@ function SortableCard({
   renderCard,
   nest,
 }: {
-  todoId: number
-  todoById: Map<number, Todo>
+  todoId: string
+  todoById: Map<string, Todo>
   renderCard: (todo: Todo) => ReactNode
   nest?: boolean
 }) {

@@ -35,7 +35,7 @@ function fmtDuration(sec: number): string {
   return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`
 }
 
-export function ExerciseList({ workoutId }: { workoutId: number }) {
+export function ExerciseList({ workoutId }: { workoutId: string }) {
   const { t } = useTranslation()
   const { data: exercises, isLoading } = useWorkoutExercises(workoutId)
   const { data: prs } = useWorkoutPrs()
@@ -44,9 +44,9 @@ export function ExerciseList({ workoutId }: { workoutId: number }) {
   const deleteEx = useDeleteWorkoutExercise(workoutId)
   const [draft, setDraft] = useState('')
   // Lazily fetched set logs: expanded exercise ids only.
-  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  const toggleExpand = (exerciseId: number) => {
+  const toggleExpand = (exerciseId: string) => {
     setExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(exerciseId)) next.delete(exerciseId)
@@ -127,7 +127,7 @@ function PrBadge({ pr }: { pr: { best_weight: number; best_e1rm: number } }) {
   )
 }
 
-function SetLogRows({ workoutId, exerciseId }: { workoutId: number; exerciseId: number }) {
+function SetLogRows({ workoutId, exerciseId }: { workoutId: string; exerciseId: string }) {
   const { t } = useTranslation()
   const { data: sets, isLoading } = useSetLogs(workoutId, exerciseId, true)
   const { create, update, remove } = useSetLogMutations(workoutId, exerciseId)

@@ -18,9 +18,9 @@ import type { BodyMetric, FitnessGoal, Workout, WorkoutPR } from '../../types'
 
 function metric(partial: Partial<BodyMetric>): BodyMetric {
   return {
-    id: 0,
-    user_id: 0,
-    workspace_id: 0,
+    id: '0',
+    user_id: '0',
+    workspace_id: '0',
     recorded_at: '2026-08-01T00:00:00Z',
     weight: null,
     height: null,
@@ -109,10 +109,10 @@ describe('toBodyChartData', () => {
 
   it('collapses same-day records into one averaged point', () => {
     const rows = [
-      metric({ id: 3, recorded_at: localIso(2026, 9, 17, 21), weight: 76.8 }),
-      metric({ id: 2, recorded_at: localIso(2026, 9, 17, 12), weight: 77.4 }),
-      metric({ id: 1, recorded_at: localIso(2026, 9, 17, 8), weight: 76.8 }),
-      metric({ id: 0, recorded_at: localIso(2026, 9, 16, 8), weight: 77 }),
+      metric({ id: '3', recorded_at: localIso(2026, 9, 17, 21), weight: 76.8 }),
+      metric({ id: '2', recorded_at: localIso(2026, 9, 17, 12), weight: 77.4 }),
+      metric({ id: '1', recorded_at: localIso(2026, 9, 17, 8), weight: 76.8 }),
+      metric({ id: '0', recorded_at: localIso(2026, 9, 16, 8), weight: 77 }),
     ]
     const points = toBodyChartData(rows, 'weight')
     expect(points).toHaveLength(2)
@@ -149,35 +149,35 @@ describe('workoutDayKey', () => {
 describe('metricByDay', () => {
   it('keeps the newest record per day from newest-first input', () => {
     const rows = [
-      metric({ id: 2, recorded_at: localIso(2026, 8, 1, 20), weight: 70.5 }),
-      metric({ id: 1, recorded_at: localIso(2026, 8, 1, 8), weight: 70 }),
-      metric({ id: 0, recorded_at: localIso(2026, 7, 31, 9), weight: 69 }),
+      metric({ id: '2', recorded_at: localIso(2026, 8, 1, 20), weight: 70.5 }),
+      metric({ id: '1', recorded_at: localIso(2026, 8, 1, 8), weight: 70 }),
+      metric({ id: '0', recorded_at: localIso(2026, 7, 31, 9), weight: 69 }),
     ]
     const map = metricByDay(rows)
     expect(map.size).toBe(2)
-    expect(map.get('2026-08-01')?.id).toBe(2)
-    expect(map.get('2026-07-31')?.id).toBe(0)
+    expect(map.get('2026-08-01')?.id).toBe('2')
+    expect(map.get('2026-07-31')?.id).toBe('0')
   })
 })
 
 describe('workoutsByDay', () => {
-  const workout = (id: number, scheduled_at: string | null, completed_at: string | null = null): Pick<Workout, 'scheduled_at' | 'completed_at' | 'created_at'> & { id: number } =>
+  const workout = (id: string, scheduled_at: string | null, completed_at: string | null = null): Pick<Workout, 'scheduled_at' | 'completed_at' | 'created_at'> & { id: string } =>
     ({ id, scheduled_at, completed_at, created_at: localIso(2020, 1, 1) })
 
   it('groups by day and preserves order within a day', () => {
     const map = workoutsByDay([
-      workout(1, localIso(2026, 8, 1, 7)),
-      workout(2, localIso(2026, 8, 1, 19)),
-      workout(3, localIso(2026, 8, 3, 7)),
+      workout('1', localIso(2026, 8, 1, 7)),
+      workout('2', localIso(2026, 8, 1, 19)),
+      workout('3', localIso(2026, 8, 3, 7)),
     ] as Workout[])
     expect(map.size).toBe(2)
-    expect(map.get('2026-08-01')?.map((w) => w.id)).toEqual([1, 2])
-    expect(map.get('2026-08-03')?.map((w) => w.id)).toEqual([3])
+    expect(map.get('2026-08-01')?.map((w) => w.id)).toEqual(['1', '2'])
+    expect(map.get('2026-08-03')?.map((w) => w.id)).toEqual(['3'])
   })
 
   it('falls back to completed_at when scheduled_at is null', () => {
-    const map = workoutsByDay([workout(9, null, localIso(2026, 8, 5, 21))] as Workout[])
-    expect(map.get('2026-08-05')?.map((w) => w.id)).toEqual([9])
+    const map = workoutsByDay([workout('9', null, localIso(2026, 8, 5, 21))] as Workout[])
+    expect(map.get('2026-08-05')?.map((w) => w.id)).toEqual(['9'])
   })
 })
 
@@ -232,7 +232,7 @@ describe('epley1rm', () => {
 
 describe('goalPercent', () => {
   const goal = (target: number, current: number | null): FitnessGoal => ({
-    id: 1,
+    id: '1',
     type: 'weekly_workouts',
     target_value: target,
     start_value: null,

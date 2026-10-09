@@ -14,7 +14,7 @@ export async function executeListBuddies(
     const search = args.search as string | undefined
     const tagIdsStr = args.tagIds as string | undefined
     const tagIds = tagIdsStr
-      ? tagIdsStr.split(',').map(Number).filter((n) => !isNaN(n))
+      ? tagIdsStr.split(',').map((s) => s.trim()).filter(Boolean)
       : undefined
 
     const result = await adapters.contact.list({
@@ -45,7 +45,7 @@ export async function executeGetBuddy(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: get buddy <id>')
 
     const contact = await adapters.contact.getByID(id)
@@ -100,7 +100,7 @@ export async function executeUpdateBuddy(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: update buddy <id>')
 
     const data: Record<string, unknown> = {}
@@ -127,7 +127,7 @@ export async function executeDeleteBuddy(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: delete buddy <id>')
 
     await adapters.contact.delete(id)
@@ -142,12 +142,12 @@ export async function executeTagBuddy(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: tag buddy <id> --tag-ids <id1,id2>')
     const tagIdsStr = args.tagIds as string
     if (!tagIdsStr) return formatError('--tag-ids is required')
 
-    const tagIds = tagIdsStr.split(',').map(Number).filter((n) => !isNaN(n))
+    const tagIds = tagIdsStr.split(',').map((s) => s.trim()).filter(Boolean)
     await adapters.contact.replaceTags(id, tagIds)
     return formatSuccess('Tags updated successfully')
   } catch (e: unknown) {

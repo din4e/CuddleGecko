@@ -46,9 +46,9 @@ export interface UndoCtx {
   resource: string
   /** Query scope that caches this resource's lists. */
   scope: string
-  /** Numeric path segments in order (e.g. /todos/5/items/9 → [5, 9]). */
-  ids: number[]
-  /** Non-numeric segments after the resource (['items', 'toggle'], ['tags']). */
+  /** Id path segments in order, as strings (e.g. /todos/<id>/items/<id> → [tid, iid]). */
+  ids: string[]
+  /** Non-id segments after the resource (['items', 'toggle'], ['tags']). */
   tail: string[]
 }
 
@@ -71,19 +71,19 @@ const RESOURCES: Record<string, ResourceInfo> = {
     scope: 'contacts',
     entity: 'interactions',
     crossScopes: ['contacts'],
-    createUrl: (pre) => (typeof pre.contact_id === 'number' ? `/buddies/${pre.contact_id}/interactions` : null),
+    createUrl: (pre) => (typeof pre.contact_id === 'string' ? `/buddies/${pre.contact_id}/interactions` : null),
   },
   relations: {
     scope: 'contacts',
     entity: 'relations',
     crossScopes: ['contacts'],
-    createUrl: (pre) => (typeof pre.contact_id_a === 'number' ? `/buddies/${pre.contact_id_a}/relations` : null),
+    createUrl: (pre) => (typeof pre.contact_id_a === 'string' ? `/buddies/${pre.contact_id_a}/relations` : null),
   },
   reminders: {
     scope: 'reminders',
     entity: 'reminders',
     crossScopes: ['contacts'],
-    createUrl: (pre) => (typeof pre.contact_id === 'number' ? `/buddies/${pre.contact_id}/reminders` : null),
+    createUrl: (pre) => (typeof pre.contact_id === 'string' ? `/buddies/${pre.contact_id}/reminders` : null),
   },
   events: { scope: 'events', entity: 'events' },
   todos: { scope: 'todos', entity: 'todos' },
@@ -98,15 +98,19 @@ const RESOURCES: Record<string, ResourceInfo> = {
   tags: { scope: 'tags', entity: 'tags' },
 }
 
+// An id path segment: a UUID v4 (the backend's NewID) or a plain number
+// string. Everything else after the resource is a sub-resource/action word.
+const ID_SEGMENT = /^(?:\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i
+
 export function classify(method: UndoMethod, url: string): UndoCtx | null {
   const segments = (url.split('?')[0] ?? '').split('/').filter(Boolean)
   const info = RESOURCES[segments[0] ?? '']
   if (!info) return null
   const rest = segments.slice(1)
-  const ids: number[] = []
+  const ids: string[] = []
   const tail: string[] = []
   for (const seg of rest) {
-    if (/^\d+$/.test(seg)) ids.push(Number(seg))
+    if (ID_SEGMENT.test(seg)) ids.push(seg)
     else tail.push(seg)
   }
   return { method, url, resource: segments[0], scope: info.scope, ids, tail }
@@ -114,17 +118,17 @@ export function classify(method: UndoMethod, url: string): UndoCtx | null {
 
 export interface SnapshotFinders {
   /** Pre-mutation entity by id, searched across the given scopes' cached lists. */
-  entity(scopes: string[], id: number): Entity | undefined
+  entity(scopes: string[], id: string): Entity | undefined
   /**
    * Id of the sibling preceding `id` in the cached (server) order of `scope`,
    * within the entity's own parent group. null = it was first;
    * undefined = no cached order for it.
    */
-  prevSibling(scope: string, id: number): number | null | undefined
+  prevSibling(scope: string, id: string): string | null | undefined
   /** Cached owned sub-list: ('todos','items',[tid]) / ('workouts','exercises',[wid]) / ('workouts','sets',[wid,eid]). */
-  subList(scope: string, kind: string, ownerIds: number[]): Entity[] | undefined
+  subList(scope: string, kind: string, ownerIds: string[]): Entity[] | undefined
   /** Cached whiteboard board detail (nodes + edges). */
-  boardLists(boardId: number): { nodes: Entity[]; edges: Entity[] } | undefined
+  boardLists(boardId: string): { nodes: Entity[]; edges: Entity[] } | undefined
 }
 
 // Finders over no snapshot: pre-state lookups miss, so only pre-free inverses
@@ -251,15 +255,15 @@ function updatePayload(resource: string, pre: Entity): Entity {
   }
 }
 
-function createdId(result: unknown): number | null {
+function createdId(result: unknown): string | null {
   const id = (result as Entity | null | undefined)?.id
-  return typeof id === 'number' ? id : null
+  return typeof id === 'string' ? id : null
 }
 
-function tagIdsOf(pre: Entity | undefined): number[] | null {
+function tagIdsOf(pre: Entity | undefined): string[] | null {
   const tags = pre?.tags
   if (!Array.isArray(tags)) return null
-  return tags.map((t) => (t as Entity)?.id).filter((id): id is number => typeof id === 'number')
+  return tags.map((t) => (t as Entity)?.id).filter((id): id is string => typeof id === 'string')
 }
 
 interface BuildInput {
@@ -352,7 +356,7 @@ export function buildUndoPlan(ctx: UndoCtx, input: BuildInput): UndoPlan | null 
 
   // ---- bulk actions: POST /todos/bulk {ids, action} ----
   if (method === 'POST' && resource === 'todos' && act === 'bulk' && ids.length === 0) {
-    const idsIn = Array.isArray(body.ids) ? (body.ids as unknown[]).filter((v): v is number => typeof v === 'number') : []
+    const idsIn = Array.isArray(body.ids) ? (body.ids as unknown[]).filter((v): v is string => typeof v === 'string') : []
     if (idsIn.length === 0) return null
     const action = typeof body.action === 'string' ? body.action : ''
     const ops: UndoOp[] = []
@@ -555,9 +559,9 @@ export function buildUndoPlan(ctx: UndoCtx, input: BuildInput): UndoPlan | null 
   return null
 }
 
-function prevInList(items: Entity[], id: number): number | null | undefined {
+function prevInList(items: Entity[], id: string): string | null | undefined {
   const idx = items.findIndex((it) => it?.id === id)
   if (idx < 0) return undefined
   const prevId = idx === 0 ? null : items[idx - 1]?.id
-  return typeof prevId === 'number' ? prevId : null
+  return typeof prevId === 'string' ? prevId : null
 }

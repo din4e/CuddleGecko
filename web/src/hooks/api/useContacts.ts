@@ -12,7 +12,7 @@ interface ListParams {
   page?: number
   page_size?: number
   search?: string
-  tag_ids?: number[]
+  tag_ids?: string[]
   signal?: AbortSignal
 }
 
@@ -37,7 +37,7 @@ export function useUpcomingBirthdays(days = 30) {
 export function useCreateBirthdayReminder() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (contactId: number) => contactsApi.createBirthdayReminder(contactId),
+    mutationFn: (contactId: string) => contactsApi.createBirthdayReminder(contactId),
     onSuccess: () => {
       // The new reminder feeds the reminders list and the dashboard card.
       qc.invalidateQueries({ queryKey: ['reminders', ...rootKey('reminders').slice(1)] })
@@ -58,7 +58,7 @@ export function useCreateContact() {
 export function useUpdateContact() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Contact> }) => contactsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<Contact> }) => contactsApi.update(id, data),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -67,7 +67,7 @@ export function useUpdateContact() {
 export function useDeleteContact() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => contactsApi.delete(id),
+    mutationFn: (id: string) => contactsApi.delete(id),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })

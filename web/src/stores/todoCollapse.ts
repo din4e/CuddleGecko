@@ -10,15 +10,15 @@ import { persist } from 'zustand/middleware'
  *  views' default is fully expanded. */
 interface TodoCollapseState {
   collapsed: Set<string>
-  toggle: (scope: string, id: number) => void
+  toggle: (scope: string, id: string) => void
   /** Un-fold one id in EVERY scope (no-op when already expanded). Used after
    *  a drop or a create lands a new child under a folded node so the result
    *  is visible on whichever surface renders it. */
-  reveal: (id: number) => void
+  reveal: (id: string) => void
 }
 
 /** Default scope for surfaces that don't name one. */
-export const collapseKey = (scope: string, id: number) => `${scope}:${id}`
+export const collapseKey = (scope: string, id: string) => `${scope}:${id}`
 
 export const useTodoCollapseStore = create<TodoCollapseState>()(
   persist(

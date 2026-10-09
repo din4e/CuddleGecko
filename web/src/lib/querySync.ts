@@ -27,7 +27,7 @@ export function markLocalMutation(scope: string): void {
 }
 
 interface Identifiable {
-  id: number
+  id: string
 }
 
 // Cached list data comes in three shapes: a bare array (habits, goals, …),
@@ -60,7 +60,7 @@ export function patchEntityInScope(qc: QueryClient, scope: string, entity: Ident
 }
 
 /** Removes the entity with id from every cached list of the scope. */
-export function removeEntityFromScope(qc: QueryClient, scope: string, id: number): void {
+export function removeEntityFromScope(qc: QueryClient, scope: string, id: string): void {
   for (const [key, data] of qc.getQueriesData({ queryKey: [scope] })) {
     const next = mapListEntries<Identifiable>(data, (items) => items.filter((it) => it == null || it.id !== id))
     if (next != null) qc.setQueryData(key, next)
@@ -83,7 +83,7 @@ export function applyDataChanged(qc: QueryClient, msg: DataChangedMessage): void
 
   switch (msg.kind) {
     case 'updated':
-      if (msg.entity && typeof msg.entity.id === 'number') {
+      if (msg.entity && typeof msg.entity.id === 'string') {
         patchEntityInScope(qc, scope, msg.entity as unknown as Identifiable)
       } else {
         void qc.invalidateQueries({ queryKey: [scope, ...workspaceTail(), 'list'] })

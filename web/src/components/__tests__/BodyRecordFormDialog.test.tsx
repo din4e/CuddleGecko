@@ -16,7 +16,7 @@ vi.mock('../../hooks/api/useBodyMetrics', () => ({
 import { useCreateBodyMetric, useUpdateBodyMetric } from '../../hooks/api/useBodyMetrics'
 
 const yesterday: BodyMetric = {
-  id: 1, user_id: 1, workspace_id: 1,
+  id: '1', user_id: '1', workspace_id: '1',
   recorded_at: '2026-09-10T09:00:00+08:00',
   weight: 70.9, height: 175, body_fat: 18.5, muscle_mass: 32,
   resting_hr: 52, systolic: 115, diastolic: 75,

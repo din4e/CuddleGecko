@@ -49,7 +49,7 @@ export function useCreateWorkout() {
 export function useUpdateWorkout() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: WorkoutUpdateInput }) => workoutsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: WorkoutUpdateInput }) => workoutsApi.update(id, data),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -58,7 +58,7 @@ export function useUpdateWorkout() {
 export function useToggleWorkout() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => workoutsApi.toggle(id),
+    mutationFn: (id: string) => workoutsApi.toggle(id),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -67,7 +67,7 @@ export function useToggleWorkout() {
 export function useReorderWorkout() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, afterId }: { id: number; afterId: number | null }) => workoutsApi.reorder(id, afterId),
+    mutationFn: ({ id, afterId }: { id: string; afterId: string | null }) => workoutsApi.reorder(id, afterId),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -76,7 +76,7 @@ export function useReorderWorkout() {
 export function useDeleteWorkout() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => workoutsApi.delete(id),
+    mutationFn: (id: string) => workoutsApi.delete(id),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -84,17 +84,17 @@ export function useDeleteWorkout() {
 
 // --- Exercise checklist ---
 
-const exercisesKey = (workoutId: number) => [...allKey(), 'exercises', workoutId] as const
+const exercisesKey = (workoutId: string) => [...allKey(), 'exercises', workoutId] as const
 
-export function useWorkoutExercises(workoutId: number | null) {
+export function useWorkoutExercises(workoutId: string | null) {
   return useQuery<WorkoutExercise[]>({
     queryKey: [...allKey(), 'exercises', workoutId] as const,
-    queryFn: ({ signal }) => workoutsApi.listExercises(workoutId as number, signal).then((r) => r.data),
+    queryFn: ({ signal }) => workoutsApi.listExercises(workoutId!, signal).then((r) => r.data),
     enabled: workoutId != null,
   })
 }
 
-export function useCreateWorkoutExercise(workoutId: number) {
+export function useCreateWorkoutExercise(workoutId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: WorkoutExerciseInput) => workoutsApi.createExercise(workoutId, input),
@@ -106,20 +106,20 @@ export function useCreateWorkoutExercise(workoutId: number) {
   })
 }
 
-export function useUpdateWorkoutExercise(workoutId: number) {
+export function useUpdateWorkoutExercise(workoutId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ exerciseId, data }: { exerciseId: number; data: WorkoutExerciseInput }) =>
+    mutationFn: ({ exerciseId, data }: { exerciseId: string; data: WorkoutExerciseInput }) =>
       workoutsApi.updateExercise(workoutId, exerciseId, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: exercisesKey(workoutId) }),
     onError: mutationErrorToast,
   })
 }
 
-export function useToggleWorkoutExercise(workoutId: number) {
+export function useToggleWorkoutExercise(workoutId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (exerciseId: number) => workoutsApi.toggleExercise(workoutId, exerciseId),
+    mutationFn: (exerciseId: string) => workoutsApi.toggleExercise(workoutId, exerciseId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: exercisesKey(workoutId) })
       invalidateScope(qc, scope)
@@ -128,10 +128,10 @@ export function useToggleWorkoutExercise(workoutId: number) {
   })
 }
 
-export function useDeleteWorkoutExercise(workoutId: number) {
+export function useDeleteWorkoutExercise(workoutId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (exerciseId: number) => workoutsApi.deleteExercise(workoutId, exerciseId),
+    mutationFn: (exerciseId: string) => workoutsApi.deleteExercise(workoutId, exerciseId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: exercisesKey(workoutId) })
       invalidateScope(qc, scope)
@@ -156,9 +156,9 @@ export function useWorkoutPrs() {
   })
 }
 
-const setsKey = (workoutId: number, exerciseId: number) => [...allKey(), 'sets', workoutId, exerciseId] as const
+const setsKey = (workoutId: string, exerciseId: string) => [...allKey(), 'sets', workoutId, exerciseId] as const
 
-export function useSetLogs(workoutId: number, exerciseId: number, enabled: boolean) {
+export function useSetLogs(workoutId: string, exerciseId: string, enabled: boolean) {
   return useQuery<SetLog[]>({
     queryKey: setsKey(workoutId, exerciseId),
     queryFn: ({ signal }) => workoutsApi.listSets(workoutId, exerciseId, signal).then((r) => r.data),
@@ -166,7 +166,7 @@ export function useSetLogs(workoutId: number, exerciseId: number, enabled: boole
   })
 }
 
-export function useSetLogMutations(workoutId: number, exerciseId: number) {
+export function useSetLogMutations(workoutId: string, exerciseId: string) {
   const qc = useQueryClient()
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: setsKey(workoutId, exerciseId) })
@@ -180,13 +180,13 @@ export function useSetLogMutations(workoutId: number, exerciseId: number) {
     onError: mutationErrorToast,
   })
   const update = useMutation({
-    mutationFn: ({ setId, data }: { setId: number; data: SetLogInput }) =>
+    mutationFn: ({ setId, data }: { setId: string; data: SetLogInput }) =>
       workoutsApi.updateSet(workoutId, exerciseId, setId, data),
     onSuccess: invalidate,
     onError: mutationErrorToast,
   })
   const remove = useMutation({
-    mutationFn: (setId: number) => workoutsApi.deleteSet(workoutId, exerciseId, setId),
+    mutationFn: (setId: string) => workoutsApi.deleteSet(workoutId, exerciseId, setId),
     onSuccess: invalidate,
     onError: mutationErrorToast,
   })
@@ -196,7 +196,7 @@ export function useSetLogMutations(workoutId: number, exerciseId: number) {
 export function useReplaceWorkoutTags() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => workoutsApi.replaceTags(id, tagIds),
+    mutationFn: ({ id, tagIds }: { id: string; tagIds: string[] }) => workoutsApi.replaceTags(id, tagIds),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }

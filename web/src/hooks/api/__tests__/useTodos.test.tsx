@@ -34,7 +34,7 @@ const page = (items: Todo[]): PaginatedData<Todo> => ({ items, total: items.leng
 
 function makeTodo(partial: Partial<Todo>): Todo {
   return {
-    id: 1, title: 't', status: 'pending', priority: 'normal', pinned: false,
+    id: '1', title: 't', status: 'pending', priority: 'normal', pinned: false,
     contact_ids: [], tags: [], pomodoro_count: 0, item_total: 0, item_done: 0,
     sort_order: 0, repeat: '', repeat_interval: 1, created_at: '', updated_at: '',
     ...partial,
@@ -54,8 +54,8 @@ function createWrapper() {
 }
 
 const twoPages = {
-  filterA: page([makeTodo({ id: 1, status: 'pending' })]),
-  filterB: page([makeTodo({ id: 1, status: 'pending' }), makeTodo({ id: 2 })]),
+  filterA: page([makeTodo({ id: '1', status: 'pending' })]),
+  filterB: page([makeTodo({ id: '1', status: 'pending' }), makeTodo({ id: '2' })]),
 }
 
 describe('useToggleTodoStatus (optimistic)', () => {
@@ -69,7 +69,7 @@ describe('useToggleTodoStatus (optimistic)', () => {
     let serverStatus = 'pending'
     const mockedList = vi.mocked(todosApi.list)
     mockedList.mockImplementation(async () => ({
-      data: page([makeTodo({ id: 1, status: serverStatus as Todo['status'] })]),
+      data: page([makeTodo({ id: '1', status: serverStatus as Todo['status'] })]),
     }) as never)
     const toggled = vi.mocked(todosApi.toggleStatus)
     toggled.mockImplementation(async () => {
@@ -88,21 +88,21 @@ describe('useToggleTodoStatus (optimistic)', () => {
     )
 
     const toggle = renderHook(() => useToggleTodoStatus(), { wrapper: Wrapper })
-    await act(async () => { await toggle.result.current.mutateAsync(1) })
+    await act(async () => { await toggle.result.current.mutateAsync('1') })
 
     // THE critical assertion: the request must actually be sent (the old
     // updater-arity bug threw in onMutate before mutationFn ever ran).
-    expect(toggled).toHaveBeenCalledWith(1)
+    expect(toggled).toHaveBeenCalledWith('1')
 
     // Both cached pages show the toggled state after reconciliation.
     await waitFor(() => {
       const a = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'pending' }])
-      expect(a?.items.find((t) => t.id === 1)?.status).toBe('done')
+      expect(a?.items.find((t) => t.id === '1')?.status).toBe('done')
     })
     // The manually-seeded page was optimistically flipped too (it's inactive —
     // no refetch — so the optimistic value persists there).
     const b = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'done' }])
-    expect(b?.items.find((t) => t.id === 1)?.status).toBe('done')
+    expect(b?.items.find((t) => t.id === '1')?.status).toBe('done')
   })
 
   it('rolls back every page when the request fails', async () => {
@@ -121,19 +121,19 @@ describe('useToggleTodoStatus (optimistic)', () => {
 
     const toggle = renderHook(() => useToggleTodoStatus(), { wrapper: Wrapper })
     await act(async () => {
-      await toggle.result.current.mutateAsync(1).catch(() => {}) // expected failure
+      await toggle.result.current.mutateAsync('1').catch(() => {}) // expected failure
     })
 
     const a = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'pending' }])
     const b = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'done' }])
-    expect(a?.items.find((t) => t.id === 1)?.status).toBe('pending')
-    expect(b?.items.find((t) => t.id === 1)?.status).toBe('pending')
+    expect(a?.items.find((t) => t.id === '1')?.status).toBe('pending')
+    expect(b?.items.find((t) => t.id === '1')?.status).toBe('pending')
   })
 
   it('does not optimistically flip recurring pending todos (server advances them instead)', async () => {
     const mockedList = vi.mocked(todosApi.list)
     mockedList.mockResolvedValue({
-      data: page([makeTodo({ id: 7, status: 'pending', repeat: 'daily' })]),
+      data: page([makeTodo({ id: '7', status: 'pending', repeat: 'daily' })]),
     } as never)
     const toggled = vi.mocked(todosApi.toggleStatus)
     toggled.mockResolvedValue({ data: undefined } as never)
@@ -143,16 +143,16 @@ describe('useToggleTodoStatus (optimistic)', () => {
     await waitFor(() => expect(list.result.current.data).toBeDefined())
 
     const toggle = renderHook(() => useToggleTodoStatus(), { wrapper: Wrapper })
-    await act(async () => { await toggle.result.current.mutateAsync(7) })
+    await act(async () => { await toggle.result.current.mutateAsync('7') })
 
-    expect(toggled).toHaveBeenCalledWith(7) // request still sent
+    expect(toggled).toHaveBeenCalledWith('7') // request still sent
     const cached = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'pending' }])
-    expect(cached?.items.find((t) => t.id === 7)?.status).toBe('pending') // but no local flip
+    expect(cached?.items.find((t) => t.id === '7')?.status).toBe('pending') // but no local flip
   })
 
   it('flips status inside infinite-shaped cache entries too', async () => {
     const mockedList = vi.mocked(todosApi.list)
-    mockedList.mockResolvedValue({ data: page([makeTodo({ id: 1, status: 'pending' })]) } as never)
+    mockedList.mockResolvedValue({ data: page([makeTodo({ id: '1', status: 'pending' })]) } as never)
     const toggled = vi.mocked(todosApi.toggleStatus)
     toggled.mockResolvedValue({ data: undefined } as never)
 
@@ -163,16 +163,16 @@ describe('useToggleTodoStatus (optimistic)', () => {
     // Seed an inactive infinite-shaped entry (the lazy-tree roots query) with
     // the same todo — patchTodoItems must reach into .pages[].items.
     const infiniteSeed: InfiniteData<PaginatedData<Todo>> = {
-      pages: [page([makeTodo({ id: 1, status: 'pending' })])],
+      pages: [page([makeTodo({ id: '1', status: 'pending' })])],
       pageParams: [1],
     }
     queryClient.setQueryData(['todos', 'default', 'list', { page_size: 50, roots_only: true }], infiniteSeed)
 
     const toggle = renderHook(() => useToggleTodoStatus(), { wrapper: Wrapper })
-    await act(async () => { await toggle.result.current.mutateAsync(1) })
+    await act(async () => { await toggle.result.current.mutateAsync('1') })
 
     const seeded = queryClient.getQueryData<InfiniteData<PaginatedData<Todo>>>(['todos', 'default', 'list', { page_size: 50, roots_only: true }])
-    expect(seeded?.pages[0].items.find((t) => t.id === 1)?.status).toBe('done')
+    expect(seeded?.pages[0].items.find((t) => t.id === '1')?.status).toBe('done')
   })
 })
 
@@ -183,9 +183,9 @@ describe('useTodosInfinite', () => {
     const mockedList = vi.mocked(todosApi.list)
     mockedList.mockImplementation(async (params?: TodoListParams) => {
       if ((params?.page ?? 1) === 1) {
-        return { data: { items: [makeTodo({ id: 1 })], total: 3, page: 1, page_size: 2 } } as never
+        return { data: { items: [makeTodo({ id: '1' })], total: 3, page: 1, page_size: 2 } } as never
       }
-      return { data: { items: [makeTodo({ id: 2 }), makeTodo({ id: 3 })], total: 3, page: 2, page_size: 2 } } as never
+      return { data: { items: [makeTodo({ id: '2' }), makeTodo({ id: '3' })], total: 3, page: 2, page_size: 2 } } as never
     })
 
     const { Wrapper } = createWrapper()
@@ -198,7 +198,7 @@ describe('useTodosInfinite', () => {
     // The appended page lands asynchronously from fetchNextPage's resolution,
     // so wait for the accumulated data instead of reading synchronously.
     await waitFor(() => expect(list.result.current.data?.pages).toHaveLength(2))
-    expect(list.result.current.data?.pages.flatMap((p) => p.items.map((t) => t.id))).toEqual([1, 2, 3])
+    expect(list.result.current.data?.pages.flatMap((p) => p.items.map((t) => t.id))).toEqual(['1', '2', '3'])
     expect(list.result.current.hasNextPage).toBe(false)
   })
 })
@@ -209,29 +209,29 @@ describe('useTodoChildrenMap', () => {
   it('runs one parent-filtered list query per parent id', async () => {
     const mockedList = vi.mocked(todosApi.list)
     mockedList.mockImplementation(async (params?: TodoListParams) => ({
-      data: page([makeTodo({ id: (params?.parent_id ?? 0) + 100, parent_id: params?.parent_id ?? null })]),
+      data: page([makeTodo({ id: String(Number(params?.parent_id ?? 0) + 100), parent_id: params?.parent_id ?? null })]),
     }) as never)
 
     const { Wrapper } = createWrapper()
-    const children = renderHook(() => useTodoChildrenMap([5, 9], {}), { wrapper: Wrapper })
-    await waitFor(() => expect(children.result.current.get(5)?.loaded).toBe(true))
+    const children = renderHook(() => useTodoChildrenMap(['5', '9'], {}), { wrapper: Wrapper })
+    await waitFor(() => expect(children.result.current.get('5')?.loaded).toBe(true))
 
-    expect(children.result.current.get(5)?.items.map((t) => t.id)).toEqual([105])
-    expect(children.result.current.get(9)?.items.map((t) => t.id)).toEqual([109])
-    expect(children.result.current.get(5)?.hasMore).toBe(false)
-    expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ parent_id: 5, page: 1, page_size: 100 }), expect.anything())
-    expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ parent_id: 9, page: 1, page_size: 100 }), expect.anything())
+    expect(children.result.current.get('5')?.items.map((t) => t.id)).toEqual(['105'])
+    expect(children.result.current.get('9')?.items.map((t) => t.id)).toEqual(['109'])
+    expect(children.result.current.get('5')?.hasMore).toBe(false)
+    expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ parent_id: '5', page: 1, page_size: 100 }), expect.anything())
+    expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ parent_id: '9', page: 1, page_size: 100 }), expect.anything())
   })
 
   it('keeps the returned Map identity across re-renders while data is unchanged', async () => {
     const mockedList = vi.mocked(todosApi.list)
     mockedList.mockImplementation(async (params?: TodoListParams) => ({
-      data: page([makeTodo({ id: (params?.parent_id ?? 0) + 100, parent_id: params?.parent_id ?? null })]),
+      data: page([makeTodo({ id: String(Number(params?.parent_id ?? 0) + 100), parent_id: params?.parent_id ?? null })]),
     }) as never)
 
     const { Wrapper } = createWrapper()
-    const children = renderHook(() => useTodoChildrenMap([5], {}), { wrapper: Wrapper })
-    await waitFor(() => expect(children.result.current.get(5)?.loaded).toBe(true))
+    const children = renderHook(() => useTodoChildrenMap(['5'], {}), { wrapper: Wrapper })
+    await waitFor(() => expect(children.result.current.get('5')?.loaded).toBe(true))
     const first = children.result.current
     // An unrelated re-render (parent state change) must NOT produce a fresh
     // Map: downstream memos (buildLazyTree, childrenByParent, subtaskProgress)
@@ -248,7 +248,7 @@ describe('useCreateTodo', () => {
   it('refreshes the stats query after placing the created todo (the stat strip has no other invalidation path)', async () => {
     const mockedList = vi.mocked(todosApi.list)
     mockedList.mockResolvedValue({ data: page([]) } as never)
-    vi.mocked(todosApi.create).mockResolvedValue({ data: makeTodo({ id: 42, title: 'New' }) } as never)
+    vi.mocked(todosApi.create).mockResolvedValue({ data: makeTodo({ id: '42', title: 'New' }) } as never)
 
     const { Wrapper, queryClient } = createWrapper()
     const spy = vi.spyOn(queryClient, 'invalidateQueries')
@@ -264,15 +264,15 @@ describe('useCreateTodo', () => {
   })
 
   it('inserts the created todo at its sorted position in the first page and bumps total', async () => {
-    const mkDated = (id: number, due: string | null, created: string): Todo =>
+    const mkDated = (id: string, due: string | null, created: string): Todo =>
       makeTodo({ id, title: `t${id}`, due_time: due, created_at: created })
     const seedPages: InfiniteData<PaginatedData<Todo>> = {
-      pages: [page([mkDated(1, '2026-01-01T10:00:00Z', '2026-01-01T00:00:00Z'), mkDated(2, '2026-01-01T12:00:00Z', '2026-01-01T00:01:00Z')])],
+      pages: [page([mkDated('1', '2026-01-01T10:00:00Z', '2026-01-01T00:00:00Z'), mkDated('2', '2026-01-01T12:00:00Z', '2026-01-01T00:01:00Z')])],
       pageParams: [1],
     }
     vi.mocked(todosApi.create)
-      .mockResolvedValueOnce({ data: mkDated(3, '2026-01-01T11:00:00Z', '2026-01-02T00:00:00Z') } as never)
-      .mockResolvedValueOnce({ data: mkDated(4, null, '2026-01-03T00:00:00Z') } as never)
+      .mockResolvedValueOnce({ data: mkDated('3', '2026-01-01T11:00:00Z', '2026-01-02T00:00:00Z') } as never)
+      .mockResolvedValueOnce({ data: mkDated('4', null, '2026-01-03T00:00:00Z') } as never)
 
     const { Wrapper, queryClient } = createWrapper()
     const key = ['todos', 'default', 'list', { sort: 'due_date', order: 'asc', page_size: 50 }]
@@ -282,13 +282,13 @@ describe('useCreateTodo', () => {
     await act(async () => { await created.result.current.mutateAsync({ title: 't3' }) })
     let entry = queryClient.getQueryData<InfiniteData<PaginatedData<Todo>>>(key)
     // Sorted insert (due 11:00 between 10:00 and 12:00), honest total.
-    expect(entry?.pages[0].items.map((t) => t.id)).toEqual([1, 3, 2])
+    expect(entry?.pages[0].items.map((t) => t.id)).toEqual(['1', '3', '2'])
     expect(entry?.pages[0].total).toBe(3)
 
     // An undated todo lands last (the backend's dueNullsLast), not on top.
     await act(async () => { await created.result.current.mutateAsync({ title: 't4' }) })
     entry = queryClient.getQueryData<InfiniteData<PaginatedData<Todo>>>(key)
-    expect(entry?.pages[0].items.map((t) => t.id)).toEqual([1, 3, 2, 4])
+    expect(entry?.pages[0].items.map((t) => t.id)).toEqual(['1', '3', '2', '4'])
     expect(entry?.pages[0].total).toBe(4)
   })
 })
@@ -300,10 +300,10 @@ describe('useSetTodoStatus (optimistic)', () => {
     let serverStatus = 'pending'
     const mockedList = vi.mocked(todosApi.list)
     mockedList.mockImplementation(async () => ({
-      data: page([makeTodo({ id: 1, status: serverStatus as Todo['status'] })]),
+      data: page([makeTodo({ id: '1', status: serverStatus as Todo['status'] })]),
     }) as never)
     const setStatus = vi.mocked(todosApi.setStatus)
-    setStatus.mockImplementation(async (_id: number, status: Todo['status']) => {
+    setStatus.mockImplementation(async (_id: string, status: Todo['status']) => {
       serverStatus = status
       return { data: undefined } as never
     })
@@ -314,26 +314,26 @@ describe('useSetTodoStatus (optimistic)', () => {
     // Seed a second (inactive) cached page containing the same todo.
     queryClient.setQueryData(
       ['todos', 'default', 'list', { page: 1, page_size: 50, status: 'done' }],
-      page([makeTodo({ id: 1, status: 'pending' })]),
+      page([makeTodo({ id: '1', status: 'pending' })]),
     )
 
     const setter = renderHook(() => useSetTodoStatus(), { wrapper: Wrapper })
-    await act(async () => { await setter.result.current.mutateAsync({ id: 1, status: 'abandoned' }) })
+    await act(async () => { await setter.result.current.mutateAsync({ id: '1', status: 'abandoned' }) })
 
-    expect(setStatus).toHaveBeenCalledWith(1, 'abandoned')
+    expect(setStatus).toHaveBeenCalledWith('1', 'abandoned')
     await waitFor(() => {
       const a = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50 }])
-      expect(a?.items.find((t) => t.id === 1)?.status).toBe('abandoned')
+      expect(a?.items.find((t) => t.id === '1')?.status).toBe('abandoned')
     })
     const b = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50, status: 'done' }])
-    expect(b?.items.find((t) => t.id === 1)?.status).toBe('abandoned')
+    expect(b?.items.find((t) => t.id === '1')?.status).toBe('abandoned')
 
     // Failure path: a rejected request restores the previous status everywhere.
     setStatus.mockRejectedValue(new Error('network') as never)
     await act(async () => {
-      await setter.result.current.mutateAsync({ id: 1, status: 'pending' }).catch(() => {})
+      await setter.result.current.mutateAsync({ id: '1', status: 'pending' }).catch(() => {})
     })
-    expect(b?.items.find((t) => t.id === 1)?.status).toBe('abandoned') // rolled back to the pre-mutation value
+    expect(b?.items.find((t) => t.id === '1')?.status).toBe('abandoned') // rolled back to the pre-mutation value
   })
 })
 
@@ -346,7 +346,7 @@ describe('useTogglePin (optimistic)', () => {
     let serverPinned = false
     const mockedList = vi.mocked(todosApi.list)
     mockedList.mockImplementation(async () => ({
-      data: page([makeTodo({ id: 1, pinned: serverPinned })]),
+      data: page([makeTodo({ id: '1', pinned: serverPinned })]),
     }) as never)
     const pin = vi.mocked(todosApi.togglePin)
     pin.mockImplementation(async () => {
@@ -359,12 +359,12 @@ describe('useTogglePin (optimistic)', () => {
     await waitFor(() => expect(list.result.current.data).toBeDefined())
 
     const toggle = renderHook(() => useTogglePin(), { wrapper: Wrapper })
-    await act(async () => { await toggle.result.current.mutateAsync(1) })
+    await act(async () => { await toggle.result.current.mutateAsync('1') })
 
-    expect(pin).toHaveBeenCalledWith(1)
+    expect(pin).toHaveBeenCalledWith('1')
     await waitFor(() => {
       const cached = queryClient.getQueryData<PaginatedData<Todo>>(['todos', 'default', 'list', { page: 1, page_size: 50 }])
-      expect(cached?.items.find((t) => t.id === 1)?.pinned).toBe(true)
+      expect(cached?.items.find((t) => t.id === '1')?.pinned).toBe(true)
     })
   })
 })

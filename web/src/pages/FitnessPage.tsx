@@ -87,7 +87,7 @@ export default function FitnessPage() {
   const [bodyDialogOpen, setBodyDialogOpen] = useState(false)
   const [importDataOpen, setImportDataOpen] = useState(false)
   const [editingMetric, setEditingMetric] = useState<BodyMetric | null>(null)
-  const [deleteMetricId, setDeleteMetricId] = useState<number | null>(null)
+  const [deleteMetricId, setDeleteMetricId] = useState<string | null>(null)
   const [chartMetric, setChartMetric] = useState<BodyChartMetric>('weight')
   const [chartRange, setChartRange] = useState<'30d' | '90d' | '1y' | 'all'>('all')
   // Memoized on the range: dateAfterForRange calls Date.now(), so an inline
@@ -134,8 +134,8 @@ export default function FitnessPage() {
 
   // Cross-link jumps: scroll the target row into view and ring it briefly.
   // Filters/chart range reset first so the target is actually rendered.
-  const [highlightMetricId, setHighlightMetricId] = useState<number | null>(null)
-  const [highlightWorkoutId, setHighlightWorkoutId] = useState<number | null>(null)
+  const [highlightMetricId, setHighlightMetricId] = useState<string | null>(null)
+  const [highlightWorkoutId, setHighlightWorkoutId] = useState<string | null>(null)
 
   const jumpToMetric = (m: BodyMetric) => {
     if (!rangeMetrics.some((x) => x.id === m.id)) setChartRange('all')
@@ -229,7 +229,7 @@ export default function FitnessPage() {
                 const id = e.target.value
                 setTemplateId(id)
                 if (id) {
-                  await instantiate.mutateAsync({ id: parseInt(id, 10) })
+                  await instantiate.mutateAsync({ id: id })
                   setTemplateId('')
                 }
               }}

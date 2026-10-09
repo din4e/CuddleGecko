@@ -6,8 +6,8 @@ import type { Contact } from '../types'
 
 interface BuddyPickerProps {
   buddies: Contact[]
-  selectedIds: number[]
-  onChange: (ids: number[]) => void
+  selectedIds: string[]
+  onChange: (ids: string[]) => void
   onBuddiesUpdate: (buddies: Contact[]) => void
   placeholder?: string
 }
@@ -52,7 +52,7 @@ export default function BuddyPicker({ buddies, selectedIds, onChange, onBuddiesU
     .filter((b) => !search || b.name.toLowerCase().includes(search.toLowerCase()))
     .slice(0, 20), [buddies, selectedIds, search])
 
-  const toggle = (id: number) => {
+  const toggle = (id: string) => {
     onChange(selectedIds.includes(id) ? selectedIds.filter((i) => i !== id) : [...selectedIds, id])
   }
 

@@ -13,12 +13,12 @@ vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeIt
 
 vi.mock('../../api/tags', () => ({ tagsApi: { list: vi.fn(), create: vi.fn() } }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string, values?: { name?: string }) => values?.name ? `${key} ${values.name}` : key }) }))
-const a = { id: 1, name: 'Work', color: '#22c55e' } as Tag
-const b = { id: 2, name: 'Home', color: '#3b82f6' } as Tag
-const remote = { id: 250, name: 'Remote label', color: '#f97316' } as Tag
+const a = { id: '1', name: 'Work', color: '#22c55e' } as Tag
+const b = { id: '2', name: 'Home', color: '#3b82f6' } as Tag
+const remote = { id: '250', name: 'Remote label', color: '#f97316' } as Tag
 const pending = vi.fn()
 
-function setup(candidates: Tag[] = [], initial: number[] = []) {
+function setup(candidates: Tag[] = [], initial: string[] = []) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   function Harness() {
     const [ids, setIds] = useState(initial)

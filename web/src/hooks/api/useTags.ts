@@ -37,7 +37,7 @@ export function useTagSearch(query: string, enabled: boolean) {
 export function useUpdateTag() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Tag> }) => tagsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<Tag> }) => tagsApi.update(id, data),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }
@@ -45,7 +45,7 @@ export function useUpdateTag() {
 export function useDeleteTag() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => tagsApi.delete(id),
+    mutationFn: (id: string) => tagsApi.delete(id),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }

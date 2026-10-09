@@ -14,12 +14,12 @@ const MAX_BACKOFF_MS = 30000
 export type DataChangedKind = 'created' | 'updated' | 'deleted' | 'items_changed' | 'bulk'
 
 export interface DataChangedMessage {
-  workspaceId: number
+  workspaceId: string
   /** Cache scope of the changed domain — matches the frontend query scopes. */
   resource: string
   kind: DataChangedKind
-  /** The changed entity's id (0 for bulk events). */
-  id: number
+  /** The changed entity's id (empty string for bulk events). */
+  id: string
   /** Post-mutation entity in REST shape; present on created/updated when the server has it. */
   entity?: Record<string, unknown>
 }
@@ -35,7 +35,7 @@ export interface TodoWsSyncOptions {
    */
   refreshToken?: () => Promise<string>
   /** Workspace to scope the connection to (captured from the URL at connect time). */
-  workspaceId: number | null
+  workspaceId: string | null
   /** Called for each inbound data.changed frame. */
   onDataChanged: (msg: DataChangedMessage) => void
 }
@@ -153,10 +153,10 @@ function parseDataChanged(raw: unknown): DataChangedMessage | null {
   }
   if (!parsed || parsed.type !== 'data.changed') return null
   return {
-    workspaceId: Number(parsed.workspace_id),
+    workspaceId: String(parsed.workspace_id ?? ''),
     resource: String(parsed.resource ?? ''),
     kind: String(parsed.kind ?? '') as DataChangedKind,
-    id: Number(parsed.id ?? 0),
+    id: String(parsed.id ?? ''),
     entity: (parsed.entity && typeof parsed.entity === 'object'
       ? parsed.entity as Record<string, unknown>
       : undefined),

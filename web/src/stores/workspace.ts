@@ -15,10 +15,10 @@ interface WorkspaceState {
   currentWorkspace: Workspace | null
   isLoading: boolean
   loadWorkspaces: () => Promise<void>
-  switchWorkspace: (id: number) => Promise<void>
+  switchWorkspace: (id: string) => Promise<void>
   createWorkspace: (name: string, description?: string, icon?: string) => Promise<Workspace>
-  updateWorkspace: (id: number, data: { name?: string; description?: string; icon?: string }) => Promise<Workspace>
-  deleteWorkspace: (id: number) => Promise<void>
+  updateWorkspace: (id: string, data: { name?: string; description?: string; icon?: string }) => Promise<Workspace>
+  deleteWorkspace: (id: string) => Promise<void>
   initDefault: () => Promise<void>
 }
 

@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
  *  sibling group, or 'last' to append at the end (the backend resolves it, so
  *  the client doesn't need the current last child id — collapsed or partially
  *  loaded parents would otherwise nest at the wrong position). */
-export type MoveAfterId = number | null | 'last'
+export type MoveAfterId = string | null | 'last'
 
 /** Tree-specific context the row injects into its card body: the tree-only
  *  move actions (appended to the card's toolbar) and the subtree progress
@@ -23,22 +23,22 @@ export interface TreeCardExtras {
 }
 
 export interface TodoTreeHandlers {
-  expanded: Set<number>
-  onToggleExpand: (id: number) => void
-  onMove: (id: number, parentId: number | null, afterId: MoveAfterId) => void
+  expanded: Set<string>
+  onToggleExpand: (id: string) => void
+  onMove: (id: string, parentId: string | null, afterId: MoveAfterId) => void
   /** Renders the row body as the same full card the flat views use. */
   renderCard: (todo: Todo, extras: TreeCardExtras) => ReactNode
   /** Arrow-key navigation target: the row with this id carries the selection
    *  highlight (the page moves it on ↑/↓ and folds around it on ←/→). */
-  selectedId?: number | null
+  selectedId?: string | null
   /** Click-to-select: rows report mousedown so the selection tracks clicks. */
-  onSelect?: (id: number) => void
+  onSelect?: (id: string) => void
   /** Drag & drop reparenting. dragId is the id being dragged (null = none). */
-  dragId?: number | null
+  dragId?: string | null
   dragSubtreeSize?: number
-  onDragIdChange?: (id: number | null) => void
+  onDragIdChange?: (id: string | null) => void
   /** Lazy tree: grow this node's children page (useTodoChildrenMap). */
-  onLoadChildren?: (id: number) => void
+  onLoadChildren?: (id: string) => void
 }
 
 /** dropZone describes where over a row the pointer is releasing. */
@@ -47,12 +47,12 @@ type DropZone = 'before' | 'child' | 'after'
 interface RowProps extends TodoTreeHandlers {
   /** Ancestor todo ids of this row (its parent chain) — used to refuse drops
    *  that would place a node into its own subtree (cycle). */
-  ancestorIds: Set<number>
+  ancestorIds: Set<string>
   node: TodoNode
   siblings: TodoNode[]
   index: number
-  parentId: number | null
-  grandparentId: number | null
+  parentId: string | null
+  grandparentId: string | null
   depth: number
 }
 

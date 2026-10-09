@@ -29,7 +29,7 @@ export default function TagsPage() {
   const [color, setColor] = useState('#6366f1')
   const [view, setView] = useViewMode('tags')
   const [page, setPage] = useState(1)
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const pageSize = 50
 
   const { data, isLoading } = useTagsList(page, pageSize)

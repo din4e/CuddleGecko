@@ -24,7 +24,7 @@ export const todosApi = {
   stats: () =>
     request.get<TodoStats>('/todos/stats').then((data) => ({ data })),
 
-  get: (id: number, signal?: AbortSignal) =>
+  get: (id: string, signal?: AbortSignal) =>
     request.get<Todo>(`/todos/${id}`, { signal }).then((data) => ({ data })),
 
   listTrash: () =>
@@ -33,81 +33,81 @@ export const todosApi = {
   emptyTrash: () =>
     request.delete<{ purged: number }>('/todos/trash').then((data) => ({ data })),
 
-  restore: (id: number) =>
+  restore: (id: string) =>
     request.post<void>(`/todos/${id}/restore`).then(() => {}),
 
   create: (data: Partial<Todo>) =>
     request.post<Todo>('/todos', data).then((d) => ({ data: d })),
 
-  update: (id: number, data: TodoUpdateInput) =>
+  update: (id: string, data: TodoUpdateInput) =>
     request.put<Todo>(`/todos/${id}`, data).then((d) => ({ data: d })),
 
-  toggleStatus: (id: number) =>
+  toggleStatus: (id: string) =>
     request.patch<Todo>(`/todos/${id}/toggle`).then((data) => ({ data })),
 
-  setProgress: (id: number, progress: number | null) =>
+  setProgress: (id: string, progress: number | null) =>
     request.patch<void>(`/todos/${id}/progress`, progress === null ? { clear: true } : { progress }).then(() => {}),
 
-  setStatus: (id: number, status: TodoStatus) =>
+  setStatus: (id: string, status: TodoStatus) =>
     request.patch<Todo>(`/todos/${id}/status`, { status }).then((data) => ({ data })),
 
-  reorder: (id: number, afterId: number | null) =>
+  reorder: (id: string, afterId: string | null) =>
     request.patch<void>(`/todos/${id}/reorder`, { after_id: afterId }).then(() => {}),
 
-  move: (id: number, parentId: number | null, afterId: number | null, position?: 'first' | 'last') =>
+  move: (id: string, parentId: string | null, afterId: string | null, position?: 'first' | 'last') =>
     request.patch<void>(`/todos/${id}/move`, { parent_id: parentId, after_id: afterId, position }).then(() => {}),
 
-  togglePin: (id: number) =>
+  togglePin: (id: string) =>
     request.patch<Todo>(`/todos/${id}/pin`).then((data) => ({ data })),
 
-  syncToEvent: (id: number) =>
+  syncToEvent: (id: string) =>
     request.post<Event>(`/todos/${id}/sync-event`).then((data) => ({ data })),
 
-  duplicate: (id: number) =>
+  duplicate: (id: string) =>
     request.post<Todo>(`/todos/${id}/duplicate`).then((d) => ({ data: d })),
 
-  pomodoro: (id: number) =>
+  pomodoro: (id: string) =>
     request.post<void>(`/todos/${id}/pomodoro`).then(() => {}),
 
-  delete: (id: number) =>
+  delete: (id: string) =>
     request.delete<void>(`/todos/${id}`).then(() => {}),
 
-  bulk: (ids: number[], action: TodoBulkAction, priority?: TodoPriority) =>
+  bulk: (ids: string[], action: TodoBulkAction, priority?: TodoPriority) =>
     request.post<{ affected: number }>('/todos/bulk', { ids, action, priority }).then((data) => ({ data })),
 
   // --- Checklist (subtask) items ---
 
-  listItems: (todoId: number, signal?: AbortSignal) =>
+  listItems: (todoId: string, signal?: AbortSignal) =>
     request.get<TodoItem[]>(`/todos/${todoId}/items`, { signal }).then((data) => ({ data })),
 
-  createItem: (todoId: number, content: string) =>
+  createItem: (todoId: string, content: string) =>
     request.post<TodoItem>(`/todos/${todoId}/items`, { content }).then((d) => ({ data: d })),
 
-  updateItem: (todoId: number, itemId: number, data: { content: string; due_time?: string | null; clear_due_time?: boolean }) =>
+  updateItem: (todoId: string, itemId: string, data: { content: string; due_time?: string | null; clear_due_time?: boolean }) =>
     request.put<TodoItem>(`/todos/${todoId}/items/${itemId}`, data).then((d) => ({ data: d })),
 
-  toggleItem: (todoId: number, itemId: number) =>
+  toggleItem: (todoId: string, itemId: string) =>
     request.patch<TodoItem>(`/todos/${todoId}/items/${itemId}/toggle`).then((data) => ({ data })),
 
-  reorderItem: (todoId: number, itemId: number, afterId: number | null) =>
+  reorderItem: (todoId: string, itemId: string, afterId: string | null) =>
     request.patch<void>(`/todos/${todoId}/items/${itemId}/reorder`, { after_id: afterId }).then(() => {}),
 
-  deleteItem: (todoId: number, itemId: number) =>
+  deleteItem: (todoId: string, itemId: string) =>
     request.delete<void>(`/todos/${todoId}/items/${itemId}`).then(() => {}),
 
-  promoteItem: (todoId: number, itemId: number) =>
+  promoteItem: (todoId: string, itemId: string) =>
     request.post<Todo>(`/todos/${todoId}/items/${itemId}/promote`).then((d) => ({ data: d })),
 
   // --- Tag associations ---
 
-  getTags: (todoId: number) =>
+  getTags: (todoId: string) =>
     request.get<Tag[]>(`/todos/${todoId}/tags`).then((data) => ({ data })),
 
-  replaceTags: (todoId: number, tagIds: number[]) =>
+  replaceTags: (todoId: string, tagIds: string[]) =>
     request.put<void>(`/todos/${todoId}/tags`, { tag_ids: tagIds }).then(() => {}),
 
   // --- Modification history (audit log) ---
 
-  listActivities: (todoId: number, signal?: AbortSignal) =>
+  listActivities: (todoId: string, signal?: AbortSignal) =>
     request.get<TodoActivity[]>(`/todos/${todoId}/activities`, { signal }).then((data) => ({ data })),
 }

@@ -22,7 +22,7 @@ vi.mock('../../hooks/api/useContacts', () => ({
 function occ(partial: Partial<UpcomingBirthday>): UpcomingBirthday {
   return {
     contact: {
-      id: 1, user_id: 1, name: '小明', nickname: '', avatar_emoji: '🐱', avatar_url: '',
+      id: '1', user_id: '1', name: '小明', nickname: '', avatar_emoji: '🐱', avatar_url: '',
       phones: [], emails: [], birthday: '1990-07-15T00:00:00Z', birthday_calendar: 'lunar',
       notes: '', relationship_labels: [], tags: [], created_at: '', updated_at: '',
     },
@@ -60,7 +60,7 @@ describe('UpcomingBirthdaysCard', () => {
   it('marks today birthdays and omits lunar text for solar ones', () => {
     mocks.birthdays = [
       occ({
-        contact: Object.assign(occ({}).contact, { id: 2, name: '小红', birthday_calendar: 'solar' }),
+        contact: Object.assign(occ({}).contact, { id: '2', name: '小红', birthday_calendar: 'solar' }),
         calendar: 'solar',
         is_today: true,
         days_until: 0,

@@ -25,7 +25,7 @@ export async function executeSwitchWorkspace(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: switch workspace <id>')
 
     const ws = await adapters.workspace.switch(id)

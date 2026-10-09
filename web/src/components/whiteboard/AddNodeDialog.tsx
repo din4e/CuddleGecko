@@ -81,7 +81,7 @@ export function AddNodeDialog({ open, at, onClose, onAdd }: {
     setName('')
   }
 
-  const addEntity = async (id: number, entityLabel: string) => {
+  const addEntity = async (id: string, entityLabel: string) => {
     setAdding(true)
     try {
       await onAdd({ ref_type: kind as WhiteboardRefType, ref_id: id, label: entityLabel, x: at.x, y: at.y })
@@ -111,7 +111,7 @@ export function AddNodeDialog({ open, at, onClose, onAdd }: {
     if (!trimmed) return
     setAdding(true)
     try {
-      let id: number | undefined
+      let id: string | undefined
       let entityLabel = trimmed
       switch (kind) {
         case 'contact': {

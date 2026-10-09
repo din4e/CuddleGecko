@@ -41,7 +41,7 @@ export interface LazyChildrenSlice {
  */
 export function buildTodoTree(todos: Todo[]): TodoNode[] {
   const present = new Set(todos.map((t) => t.id))
-  const byParent = new Map<number | null, Todo[]>()
+  const byParent = new Map<string | null, Todo[]>()
 
   for (const t of todos) {
     const pid = t.parent_id ?? null
@@ -52,9 +52,9 @@ export function buildTodoTree(todos: Todo[]): TodoNode[] {
     byParent.set(key, arr)
   }
 
-  const build = (parent: number | null): TodoNode[] => {
+  const build = (parent: string | null): TodoNode[] => {
     const arr = (byParent.get(parent) ?? []).slice()
-    arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id)
+    arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id))
     return arr.map((todo) => ({ todo, children: build(todo.id) }))
   }
   return build(null)
@@ -74,7 +74,7 @@ export function buildTodoTree(todos: Todo[]): TodoNode[] {
  */
 export function buildLazyTree(
   roots: Todo[],
-  slices: Map<number, LazyChildrenSlice>,
+  slices: Map<string, LazyChildrenSlice>,
   opts?: { hideDone?: boolean },
 ): TodoNode[] {
   // "Settled" = the node and its whole loaded subtree are done/abandoned AND
@@ -105,8 +105,8 @@ export function buildLazyTree(
  * row can't swallow open work. */
 export function subtreeSettledFromMap(
   todo: Todo,
-  childrenByParent: Map<number, Todo[]>,
-  seen: Set<number> = new Set(),
+  childrenByParent: Map<string, Todo[]>,
+  seen: Set<string> = new Set(),
 ): boolean {
   if (seen.has(todo.id)) return false // cycle in the map → unknown → keep visible
   seen.add(todo.id)
@@ -138,15 +138,15 @@ export function flattenTree(nodes: TodoNode[]): TodoNode[] {
  * todo's own descendant as a new parent (which the backend would reject as a
  * cycle).
  */
-export function descendantIds(todos: Todo[], rootId: number): Set<number> {
-  const childrenOf = new Map<number, number[]>()
+export function descendantIds(todos: Todo[], rootId: string): Set<string> {
+  const childrenOf = new Map<string, string[]>()
   for (const t of todos) {
     if (t.parent_id == null) continue
     const arr = childrenOf.get(t.parent_id) ?? []
     arr.push(t.id)
     childrenOf.set(t.parent_id, arr)
   }
-  const out = new Set<number>()
+  const out = new Set<string>()
   const queue = [rootId]
   while (queue.length) {
     const cur = queue.shift()!

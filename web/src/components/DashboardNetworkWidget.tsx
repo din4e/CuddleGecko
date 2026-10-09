@@ -13,7 +13,7 @@ import { Loader2, Network } from 'lucide-react'
 // and a self node — so node count stays bounded even for users with many buddies.
 const ForceGraph2D = lazy(() => import('react-force-graph-2d')) as unknown as typeof ForceGraph2DType
 
-const SELF_NODE_ID = -1
+const SELF_NODE_ID = '__self__'
 const avatarImageCache = new Map<string, HTMLImageElement>()
 
 function isDarkMode(): boolean {
@@ -32,7 +32,7 @@ function loadAvatarImages(nodes: { avatar_url?: string }[]) {
 }
 
 type GraphNodeData = {
-  id: number
+  id: string
   name: string
   relationship_labels: string[]
   avatar_emoji?: string
@@ -44,7 +44,7 @@ type GraphLink = LinkObject<GraphNodeData, { relation_type: string }>
 
 interface Props {
   graphData: GraphData | null
-  recentIds: Set<number>
+  recentIds: Set<string>
   height?: number
 }
 

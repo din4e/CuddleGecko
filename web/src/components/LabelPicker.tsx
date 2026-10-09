@@ -7,8 +7,8 @@ import { cn } from '../lib/utils'
 import type { Tag } from '../types'
 
 interface LabelPickerProps {
-  value: number[]
-  onChange: (ids: number[]) => void
+  value: string[]
+  onChange: (ids: string[]) => void
   candidates: Tag[]
   disabled?: boolean
   onPendingChange: (pending: boolean) => void
@@ -40,7 +40,7 @@ export default function LabelPicker({ value, onChange, candidates, disabled, onP
   }, [query])
 
   const known = useMemo(() => {
-    const map = new Map<number, Tag>()
+    const map = new Map<string, Tag>()
     for (const tag of [...candidates, ...remembered]) map.set(tag.id, tag)
     for (const page of search.data?.pages ?? []) {
       for (const tag of page.items ?? []) map.set(tag.id, tag)

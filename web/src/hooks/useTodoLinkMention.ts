@@ -48,7 +48,7 @@ export function useTodoLinkMention({ candidates, onApply }: UseTodoLinkMentionOp
   // Local candidates filter instantly; server results (whole workspace) merge
   // in once the debounced query lands.
   const items = useMemo(() => {
-    const seen = new Set<number>()
+    const seen = new Set<string>()
     const out: Todo[] = []
     const add = (todo: Todo) => {
       if (!seen.has(todo.id)) {

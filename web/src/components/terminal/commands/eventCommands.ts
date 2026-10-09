@@ -57,7 +57,7 @@ export async function executeUpdateEvent(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: update event <id>')
 
     const data: Record<string, unknown> = {}
@@ -81,7 +81,7 @@ export async function executeDeleteEvent(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: delete event <id>')
 
     await adapters.event.delete(id)

@@ -12,12 +12,12 @@ import type { Todo } from '../types'
 // descendants are excluded client-side (the backend rejects those moves too).
 
 export interface TodoParentPickerProps {
-  value: number | null
-  onChange: (parentId: number | null) => void
+  value: string | null
+  onChange: (parentId: string | null) => void
   /** Loaded todos offered instantly, before any server search kicks in. */
   candidates: Todo[]
   /** Disallowed parents: the edited todo itself plus all its descendants. */
-  blocked: Set<number>
+  blocked: Set<string>
 }
 
 export default function TodoParentPicker({ value, onChange, candidates, blocked }: TodoParentPickerProps) {
@@ -27,7 +27,7 @@ export default function TodoParentPicker({ value, onChange, candidates, blocked 
   const [highlight, setHighlight] = useState(0)
   // Remember the title of the parent picked this session so the closed state
   // stays readable even after the option list no longer contains it.
-  const [picked, setPicked] = useState<{ id: number; title: string } | null>(null)
+  const [picked, setPicked] = useState<{ id: string; title: string } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -46,7 +46,7 @@ export default function TodoParentPicker({ value, onChange, candidates, blocked 
   // Local candidates filter instantly; server results (whole workspace) merge
   // in once the debounced query lands. Blocked/self never appear.
   const options = useMemo(() => {
-    const seen = new Set<number>(blocked)
+    const seen = new Set<string>(blocked)
     const out: Todo[] = []
     const add = (todo: Todo) => {
       if (seen.has(todo.id)) return
@@ -105,7 +105,7 @@ export default function TodoParentPicker({ value, onChange, candidates, blocked 
     return `#${value}`
   }, [value, picked, candidates, results, fetchedParent])
 
-  const choose = (parentId: number | null, title?: string) => {
+  const choose = (parentId: string | null, title?: string) => {
     onChange(parentId)
     if (parentId != null && title) setPicked({ id: parentId, title })
     setOpen(false)

@@ -59,7 +59,7 @@ export async function executeUpdateInteraction(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: update interaction <id>')
 
     const data: Record<string, unknown> = {}
@@ -81,7 +81,7 @@ export async function executeDeleteInteraction(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: delete interaction <id>')
 
     await adapters.interaction.delete(id)

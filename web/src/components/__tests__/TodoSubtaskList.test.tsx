@@ -18,21 +18,21 @@ vi.mock('react-i18next', () => ({
 }))
 import type { Todo } from '../../types'
 
-const base = (over: Partial<Todo> & { id: number; title: string; parent_id: number | null }): Todo => ({
+const base = (over: Partial<Todo> & { id: string; title: string; parent_id: string | null }): Todo => ({
   status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '',
-  contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1,
+  contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1',
   completed_at: null, created_at: '', updated_at: '',
   ...over,
 } as Todo)
 
-const parent = base({ id: 1, title: 'Parent', parent_id: null })
-const child = base({ id: 2, title: 'Child', parent_id: 1 })
-const grandchild = base({ id: 3, title: 'Grandchild', parent_id: 2 })
+const parent = base({ id: '1', title: 'Parent', parent_id: null })
+const child = base({ id: '2', title: 'Child', parent_id: '1' })
+const grandchild = base({ id: '3', title: 'Grandchild', parent_id: '2' })
 
 function makeMap() {
   return new Map([
-    [1, [child]],
-    [2, [grandchild]],
+    ['1', [child]],
+    ['2', [grandchild]],
   ])
 }
 
@@ -57,17 +57,17 @@ const dragWithY = (type: 'dragOver' | 'drop', el: Element, y: number) => {
 /** Holds dragId in state like the page does, so dragStart → re-render → the
  *  rows see the new drag id and act as drop targets. */
 function DndHarness(props: Omit<TodoSubtaskListProps, 'dragId' | 'onDragIdChange'>) {
-  const [dragId, setDragId] = useState<number | null>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
   return <TodoSubtaskList {...props} dragId={dragId} onDragIdChange={setDragId} />
 }
 
-const childB = base({ id: 4, title: 'Child B', parent_id: 1 })
-const childBKid = base({ id: 5, title: 'Child B kid', parent_id: 4 })
+const childB = base({ id: '4', title: 'Child B', parent_id: '1' })
+const childBKid = base({ id: '5', title: 'Child B kid', parent_id: '4' })
 function makeDndMap() {
-  return new Map<number, Todo[]>([
-    [1, [child, childB]],
-    [2, [grandchild]],
-    [4, [childBKid]],
+  return new Map<string, Todo[]>([
+    ['1', [child, childB]],
+    ['2', [grandchild]],
+    ['4', [childBKid]],
   ])
 }
 
@@ -99,9 +99,9 @@ describe('TodoSubtaskList', () => {
     // Corrupted/imported data can loop: child 2's children list the root
     // itself. Without the ancestor-chain guard the render walk re-enters the
     // cycle endlessly (freezes the tab; found as an OOM in a page test).
-    const cycMap = new Map<number, Todo[]>([
-      [1, [child]],
-      [2, [parent]],
+    const cycMap = new Map<string, Todo[]>([
+      ['1', [child]],
+      ['2', [parent]],
     ])
     renderWithClient(
       <TodoSubtaskList todo={parent} childrenByParent={cycMap}
@@ -162,7 +162,7 @@ describe('TodoSubtaskList', () => {
     const onDelete = vi.fn()
     const dated = { ...child, due_time: '2999-01-01T10:00:00Z' }
     renderWithClient(
-      <TodoSubtaskList todo={parent} childrenByParent={new Map([[1, [dated]]])}
+      <TodoSubtaskList todo={parent} childrenByParent={new Map([['1', [dated]]])}
         onToggle={vi.fn()} onEdit={vi.fn()} onDelete={onDelete} />,
     )
     fireEvent.click(screen.getAllByLabelText('common.delete')[0])
@@ -208,15 +208,15 @@ describe('TodoSubtaskList', () => {
   })
 
   it('hideDone drops settled done rows but keeps done rows with open descendants', () => {
-    const doneChild = base({ id: 4, title: 'Done child', parent_id: 1, status: 'done', completed_at: '2026-05-01' })
-    const openChild = base({ id: 5, title: 'Open child', parent_id: 1 })
-    const doneParentOfOpen = base({ id: 6, title: 'Done parent of open', parent_id: 1, status: 'done', completed_at: '2026-05-01', child_count: 1 })
-    const openGrandchild = base({ id: 7, title: 'Open grandchild', parent_id: 6 })
+    const doneChild = base({ id: '4', title: 'Done child', parent_id: '1', status: 'done', completed_at: '2026-05-01' })
+    const openChild = base({ id: '5', title: 'Open child', parent_id: '1' })
+    const doneParentOfOpen = base({ id: '6', title: 'Done parent of open', parent_id: '1', status: 'done', completed_at: '2026-05-01', child_count: 1 })
+    const openGrandchild = base({ id: '7', title: 'Open grandchild', parent_id: '6' })
     renderWithClient(
       <TodoSubtaskList todo={parent}
-        childrenByParent={new Map<number, Todo[]>([
-          [1, [doneChild, openChild, doneParentOfOpen]],
-          [6, [openGrandchild]],
+        childrenByParent={new Map<string, Todo[]>([
+          ['1', [doneChild, openChild, doneParentOfOpen]],
+          ['6', [openGrandchild]],
         ])}
         onToggle={vi.fn()} onEdit={vi.fn()} hideDone />,
     )
@@ -229,14 +229,14 @@ describe('TodoSubtaskList', () => {
   })
 
   it('hideDone drops abandoned rows too, unless they hide open descendants', () => {
-    const abandonedChild = base({ id: 12, title: 'Abandoned child', parent_id: 1, status: 'abandoned' })
-    const abandonedParentOfOpen = base({ id: 13, title: 'Abandoned parent of open', parent_id: 1, status: 'abandoned', child_count: 1 })
-    const openGrandchild = base({ id: 14, title: 'Open under abandoned', parent_id: 13 })
+    const abandonedChild = base({ id: '12', title: 'Abandoned child', parent_id: '1', status: 'abandoned' })
+    const abandonedParentOfOpen = base({ id: '13', title: 'Abandoned parent of open', parent_id: '1', status: 'abandoned', child_count: 1 })
+    const openGrandchild = base({ id: '14', title: 'Open under abandoned', parent_id: '13' })
     renderWithClient(
       <TodoSubtaskList todo={parent}
-        childrenByParent={new Map<number, Todo[]>([
-          [1, [abandonedChild, abandonedParentOfOpen]],
-          [13, [openGrandchild]],
+        childrenByParent={new Map<string, Todo[]>([
+          ['1', [abandonedChild, abandonedParentOfOpen]],
+          ['13', [openGrandchild]],
         ])}
         onToggle={vi.fn()} onEdit={vi.fn()} hideDone />,
     )
@@ -250,31 +250,31 @@ describe('TodoSubtaskList', () => {
   it('hideDone keeps a done row whose children are not loaded yet', () => {
     // child_count > 0 with no slice in the map: the descendants are unknown,
     // so the row stays until they load (pending work never disappears).
-    const unloaded = base({ id: 8, title: 'Unloaded done', parent_id: 1, status: 'done', completed_at: '2026-05-01', child_count: 2 })
+    const unloaded = base({ id: '8', title: 'Unloaded done', parent_id: '1', status: 'done', completed_at: '2026-05-01', child_count: 2 })
     renderWithClient(
-      <TodoSubtaskList todo={parent} childrenByParent={new Map([[1, [unloaded]]])}
+      <TodoSubtaskList todo={parent} childrenByParent={new Map([['1', [unloaded]]])}
         onToggle={vi.fn()} onEdit={vi.fn()} hideDone />,
     )
     expect(screen.getByText('Unloaded done')).toBeInTheDocument()
   })
 
   it('hideDone renders nothing when every row is settled-done and no adder is wired', () => {
-    const onlyDone = base({ id: 9, title: 'Only done', parent_id: 1, status: 'done', completed_at: '2026-05-01' })
+    const onlyDone = base({ id: '9', title: 'Only done', parent_id: '1', status: 'done', completed_at: '2026-05-01' })
     const { container } = renderWithClient(
-      <TodoSubtaskList todo={parent} childrenByParent={new Map([[1, [onlyDone]]])}
+      <TodoSubtaskList todo={parent} childrenByParent={new Map([['1', [onlyDone]]])}
         onToggle={vi.fn()} onEdit={vi.fn()} hideDone />,
     )
     expect(container).toBeEmptyDOMElement()
   })
 
   it('hideDone keeps the progress chip truthful while hiding the done rows themselves', () => {
-    const pendingParent = base({ id: 10, title: 'Pending row', parent_id: 1 })
-    const doneGrand = base({ id: 11, title: 'Done grand', parent_id: 10, status: 'done', completed_at: '2026-05-01' })
+    const pendingParent = base({ id: '10', title: 'Pending row', parent_id: '1' })
+    const doneGrand = base({ id: '11', title: 'Done grand', parent_id: '10', status: 'done', completed_at: '2026-05-01' })
     renderWithClient(
       <TodoSubtaskList todo={parent}
-        childrenByParent={new Map<number, Todo[]>([
-          [1, [pendingParent]],
-          [10, [doneGrand]],
+        childrenByParent={new Map<string, Todo[]>([
+          ['1', [pendingParent]],
+          ['10', [doneGrand]],
         ])}
         onToggle={vi.fn()} onEdit={vi.fn()} hideDone />,
     )
@@ -301,7 +301,7 @@ describe('TodoSubtaskList', () => {
     // Middle band (20/40) → nest under Child B as its last child.
     dragWithY('dragOver', rowB, 20)
     dragWithY('drop', rowB, 20)
-    expect(onMove).toHaveBeenCalledWith(3, 4, 'last')
+    expect(onMove).toHaveBeenCalledWith('3', '4', 'last')
     expect(screen.getByText('Child B kid')).toBeInTheDocument()
   })
 
@@ -317,12 +317,12 @@ describe('TodoSubtaskList', () => {
     // Top band → before Child, which is first → afterId null (top of group).
     dragWithY('dragOver', rowChild, 4)
     dragWithY('drop', rowChild, 4)
-    expect(onMove).toHaveBeenCalledWith(4, 1, null)
+    expect(onMove).toHaveBeenCalledWith('4', '1', null)
     // Bottom band → after Child.
     fireEvent.dragStart(rowOf('Child B'), { dataTransfer: dt() })
     dragWithY('dragOver', rowChild, 36)
     dragWithY('drop', rowChild, 36)
-    expect(onMove).toHaveBeenCalledWith(4, 1, 2)
+    expect(onMove).toHaveBeenCalledWith('4', '1', '2')
   })
 
   it('refuses a drop onto the drag\'s own descendant (cycle)', () => {
@@ -351,7 +351,7 @@ it('progress-bar press suppresses row drag for the gesture and restores it on re
   mockRect(slider)
 
   expect(row.draggable).toBe(true)
-  fireEvent.pointerDown(slider, { pointerId: 1, clientX: 20 })
+  fireEvent.pointerDown(slider, { pointerId: '1', clientX: 20 })
   expect(row.draggable).toBe(false)
 
   // even if a dragstart slips through (state flip loses the race), the
@@ -360,7 +360,7 @@ it('progress-bar press suppresses row drag for the gesture and restores it on re
   fireEvent(row, ds)
   expect(ds.defaultPrevented).toBe(true)
 
-  fireEvent.pointerUp(slider, { pointerId: 1, clientX: 60 })
+  fireEvent.pointerUp(slider, { pointerId: '1', clientX: 60 })
   expect(row.draggable).toBe(true)
 })
 })

@@ -10,10 +10,10 @@ import {
 type Entity = Record<string, unknown>
 
 interface Fixture {
-  entities: Record<number, Entity>
-  prev: Record<number, number | null | undefined>
+  entities: Record<string, Entity>
+  prev: Record<string, string | null | undefined>
   subLists: Record<string, Entity[]>
-  boards: Record<number, { nodes: Entity[]; edges: Entity[] }>
+  boards: Record<string, { nodes: Entity[]; edges: Entity[] }>
 }
 
 function makeFinders(fixture: Fixture): SnapshotFinders {
@@ -40,7 +40,7 @@ const noFixture: Fixture = { entities: {}, prev: {}, subLists: {}, boards: {} }
 describe('classify', () => {
   it('parses resource, ids and action tail', () => {
     const ctx = classify('PATCH', '/todos/5/items/9/toggle')
-    expect(ctx).toMatchObject({ resource: 'todos', ids: [5, 9], tail: ['items', 'toggle'], scope: 'todos' })
+    expect(ctx).toMatchObject({ resource: 'todos', ids: ['5', '9'], tail: ['items', 'toggle'], scope: 'todos' })
   })
 
   it('rejects non-undoable resources', () => {
@@ -54,7 +54,7 @@ describe('classify', () => {
 
 describe('create → delete', () => {
   it('builds a delete for the created id', () => {
-    const { plan } = planFor('POST', '/buddies', { result: { id: 7, name: 'A' } })
+    const { plan } = planFor('POST', '/buddies', { result: { id: '7', name: 'A' } })
     expect(plan?.ops).toEqual([{ method: 'DELETE', url: '/buddies/7' }])
     expect(plan?.label).toEqual({ action: 'create', entity: 'contacts' })
     expect(plan?.scopes).toContain('contacts')
@@ -66,12 +66,12 @@ describe('create → delete', () => {
   })
 
   it('nested interaction create deletes via its own collection', () => {
-    const { plan } = planFor('POST', '/buddies/3/interactions', { result: { id: 11 } })
+    const { plan } = planFor('POST', '/buddies/3/interactions', { result: { id: '11' } })
     expect(plan?.ops).toEqual([{ method: 'DELETE', url: '/interactions/11' }])
   })
 
   it('todo duplicate removes the copy', () => {
-    const { plan } = planFor('POST', '/todos/5/duplicate', { result: { id: 12 } })
+    const { plan } = planFor('POST', '/todos/5/duplicate', { result: { id: '12' } })
     expect(plan?.ops).toEqual([{ method: 'DELETE', url: '/todos/12' }])
   })
 })
@@ -80,7 +80,7 @@ describe('update → restore previous value', () => {
   it('sends the pre-state without server fields', () => {
     const { plan } = planFor('PUT', '/buddies/7', {
       data: { name: 'New' },
-      fixture: { ...noFixture, entities: { 7: { id: 7, user_id: 1, name: 'Old', notes: 'n', tags: [{ id: 2 }], created_at: 'x' } } },
+      fixture: { ...noFixture, entities: { 7: { id: '7', user_id: '1', name: 'Old', notes: 'n', tags: [{ id: '2' }], created_at: 'x' } } },
     })
     expect(plan?.ops[0]?.method).toBe('PUT')
     expect(plan?.ops[0]?.url).toBe('/buddies/7')
@@ -90,7 +90,7 @@ describe('update → restore previous value', () => {
   it('todo payload carries clear flags for nulls', () => {
     const { plan } = planFor('PUT', '/todos/5', {
       data: { title: 'New' },
-      fixture: { ...noFixture, entities: { 5: { id: 5, title: 'Old', status: 'pending', priority: 'high', due_time: null, start_time: null, amount: null, progress: null, contact_ids: [3] } } },
+      fixture: { ...noFixture, entities: { 5: { id: '5', title: 'Old', status: 'pending', priority: 'high', due_time: null, start_time: null, amount: null, progress: null, contact_ids: [3] } } },
     })
     const data = plan?.ops[0]?.data as Entity
     expect(data.title).toBe('Old')
@@ -114,19 +114,19 @@ describe('delete → recreate / restore', () => {
 
   it('contact delete recreates and re-applies tags on the new id', () => {
     const { plan } = planFor('DELETE', '/buddies/7', {
-      fixture: { ...noFixture, entities: { 7: { id: 7, name: 'A', phones: ['1'], tags: [{ id: 2 }, { id: 4 }] } } },
+      fixture: { ...noFixture, entities: { 7: { id: '7', name: 'A', phones: ['1'], tags: [{ id: '2' }, { id: '4' }] } } },
     })
     expect(plan?.ops.length).toBe(2)
     expect(plan?.ops[0]).toMatchObject({ method: 'POST', url: '/buddies' })
     expect(plan?.ops[0]?.data).toEqual({ name: 'A', phones: ['1'] })
     const urlFn = plan?.ops[1]?.url as (results: unknown[]) => string
-    expect(urlFn([{ id: 99 }])).toBe('/buddies/99/tags')
-    expect(plan?.ops[1]?.data).toEqual({ tag_ids: [2, 4] })
+    expect(urlFn([{ id: '99' }])).toBe('/buddies/99/tags')
+    expect(plan?.ops[1]?.data).toEqual({ tag_ids: ['2', '4'] })
   })
 
   it('reminder delete recreates under its contact (nested create URL)', () => {
     const { plan } = planFor('DELETE', '/reminders/9', {
-      fixture: { ...noFixture, entities: { 9: { id: 9, contact_id: 3, title: 'T', remind_at: '2026-01-01T00:00:00Z', status: 'pending' } } },
+      fixture: { ...noFixture, entities: { 9: { id: '9', contact_id: '3', title: 'T', remind_at: '2026-01-01T00:00:00Z', status: 'pending' } } },
     })
     expect(plan?.ops[0]).toMatchObject({ method: 'POST', url: '/buddies/3/reminders' })
     expect(plan?.ops[0]?.data).toEqual({ title: 'T', remind_at: '2026-01-01T00:00:00Z', status: 'pending' })
@@ -141,13 +141,13 @@ describe('tag association', () => {
   it('restores the previous tag set from the pre-state entity', () => {
     const { plan } = planFor('PUT', '/todos/5/tags', {
       data: { tag_ids: [9] },
-      fixture: { ...noFixture, entities: { 5: { id: 5, title: 'T', tags: [{ id: 2 }, { id: 3 }] } } },
+      fixture: { ...noFixture, entities: { 5: { id: '5', title: 'T', tags: [{ id: '2' }, { id: '3' }] } } },
     })
-    expect(plan?.ops[0]?.data).toEqual({ tag_ids: [2, 3] })
+    expect(plan?.ops[0]?.data).toEqual({ tag_ids: ['2', '3'] })
   })
 
   it('skips without cached tags', () => {
-    expect(planFor('PUT', '/todos/5/tags', { data: { tag_ids: [9] }, fixture: { ...noFixture, entities: { 5: { id: 5 } } } }).plan).toBeNull()
+    expect(planFor('PUT', '/todos/5/tags', { data: { tag_ids: [9] }, fixture: { ...noFixture, entities: { 5: { id: '5' } } } }).plan).toBeNull()
   })
 })
 
@@ -159,7 +159,7 @@ describe('todo patch actions', () => {
 
   it('recurring toggle restores the full todo (server advances due date)', () => {
     const { plan } = planFor('PATCH', '/todos/5/toggle', {
-      fixture: { ...noFixture, entities: { 5: { id: 5, title: 'R', repeat: 'daily', due_time: '2026-01-01T00:00:00Z', status: 'pending' } } },
+      fixture: { ...noFixture, entities: { 5: { id: '5', title: 'R', repeat: 'daily', due_time: '2026-01-01T00:00:00Z', status: 'pending' } } },
     })
     expect(plan?.ops[0]?.method).toBe('PUT')
     expect(plan?.ops[0]?.url).toBe('/todos/5')
@@ -174,7 +174,7 @@ describe('todo patch actions', () => {
   it('status restores the previous status', () => {
     const { plan } = planFor('PATCH', '/todos/5/status', {
       data: { status: 'done' },
-      fixture: { ...noFixture, entities: { 5: { id: 5, status: 'pending' } } },
+      fixture: { ...noFixture, entities: { 5: { id: '5', status: 'pending' } } },
     })
     expect(plan?.ops[0]?.data).toEqual({ status: 'pending' })
     expect(planFor('PATCH', '/todos/5/status', { data: { status: 'done' } }).plan).toBeNull()
@@ -183,32 +183,32 @@ describe('todo patch actions', () => {
   it('progress clears when it was unset', () => {
     const { plan } = planFor('PATCH', '/todos/5/progress', {
       data: { progress: 50 },
-      fixture: { ...noFixture, entities: { 5: { id: 5, progress: null } } },
+      fixture: { ...noFixture, entities: { 5: { id: '5', progress: null } } },
     })
     expect(plan?.ops[0]?.data).toEqual({ clear: true })
   })
 
   it('reorder moves back after the previous sibling', () => {
     const { plan } = planFor('PATCH', '/todos/5/reorder', {
-      data: { after_id: 1 },
-      fixture: { ...noFixture, prev: { 5: 2 } },
+      data: { after_id: '1' },
+      fixture: { ...noFixture, prev: { 5: '2' } },
     })
-    expect(plan?.ops[0]?.data).toEqual({ after_id: 2 })
-    expect(planFor('PATCH', '/todos/5/reorder', { data: { after_id: 1 }, fixture: noFixture }).plan).toBeNull()
+    expect(plan?.ops[0]?.data).toEqual({ after_id: '2' })
+    expect(planFor('PATCH', '/todos/5/reorder', { data: { after_id: '1' }, fixture: noFixture }).plan).toBeNull()
   })
 
   it('move restores parent and position', () => {
     const { plan } = planFor('PATCH', '/todos/5/move', {
-      data: { parent_id: 8, after_id: null },
-      fixture: { ...noFixture, entities: { 5: { id: 5, parent_id: 3 } }, prev: { 5: null } },
+      data: { parent_id: '8', after_id: null },
+      fixture: { ...noFixture, entities: { 5: { id: '5', parent_id: '3' } }, prev: { 5: null } },
     })
-    expect(plan?.ops[0]?.data).toEqual({ parent_id: 3, after_id: null })
+    expect(plan?.ops[0]?.data).toEqual({ parent_id: '3', after_id: null })
   })
 })
 
 describe('todo bulk', () => {
   it('bulk delete restores each row', () => {
-    const { plan } = planFor('POST', '/todos/bulk', { data: { ids: [1, 2], action: 'delete' } })
+    const { plan } = planFor('POST', '/todos/bulk', { data: { ids: ['1', '2'], action: 'delete' } })
     expect(plan?.ops).toEqual([
       { method: 'POST', url: '/todos/1/restore' },
       { method: 'POST', url: '/todos/2/restore' },
@@ -216,22 +216,22 @@ describe('todo bulk', () => {
   })
 
   it('bulk complete restores each pre-state, skipping undo if any is missing', () => {
-    const fixture: Fixture = { ...noFixture, entities: { 1: { id: 1, title: 'A', status: 'done' }, 2: { id: 2, title: 'B', status: 'pending' } } }
-    const { plan } = planFor('POST', '/todos/bulk', { data: { ids: [1, 2], action: 'complete' }, fixture })
+    const fixture: Fixture = { ...noFixture, entities: { 1: { id: '1', title: 'A', status: 'done' }, 2: { id: '2', title: 'B', status: 'pending' } } }
+    const { plan } = planFor('POST', '/todos/bulk', { data: { ids: ['1', '2'], action: 'complete' }, fixture })
     expect(plan?.ops.map((op) => op.method)).toEqual(['PUT', 'PUT'])
     expect((plan?.ops[0]?.data as Entity).status).toBe('done')
 
-    const partial: Fixture = { ...noFixture, entities: { 1: { id: 1, title: 'A' } } }
-    expect(planFor('POST', '/todos/bulk', { data: { ids: [1, 2], action: 'complete' }, fixture: partial }).plan).toBeNull()
+    const partial: Fixture = { ...noFixture, entities: { 1: { id: '1', title: 'A' } } }
+    expect(planFor('POST', '/todos/bulk', { data: { ids: ['1', '2'], action: 'complete' }, fixture: partial }).plan).toBeNull()
   })
 })
 
 describe('todo checklist items', () => {
-  const items: Entity[] = [{ id: 1, content: 'a', due_time: null }, { id: 2, content: 'b' }]
+  const items: Entity[] = [{ id: '1', content: 'a', due_time: null }, { id: '2', content: 'b' }]
   const fixture: Fixture = { ...noFixture, subLists: { 'items:5': items } }
 
   it('create deletes the new item', () => {
-    const { plan } = planFor('POST', '/todos/5/items', { result: { id: 3 }, fixture })
+    const { plan } = planFor('POST', '/todos/5/items', { result: { id: '3' }, fixture })
     expect(plan?.ops).toEqual([{ method: 'DELETE', url: '/todos/5/items/3' }])
   })
 
@@ -252,11 +252,11 @@ describe('todo checklist items', () => {
 
   it('reorder returns to the previous slot', () => {
     const { plan } = planFor('PATCH', '/todos/5/items/2/reorder', { data: { after_id: null }, fixture })
-    expect(plan?.ops[0]?.data).toEqual({ after_id: 1 })
+    expect(plan?.ops[0]?.data).toEqual({ after_id: '1' })
   })
 
   it('promote removes the new todo and re-creates the item', () => {
-    const { plan } = planFor('POST', '/todos/5/items/2/promote', { result: { id: 40 }, fixture })
+    const { plan } = planFor('POST', '/todos/5/items/2/promote', { result: { id: '40' }, fixture })
     expect(plan?.ops).toEqual([
       { method: 'DELETE', url: '/todos/40' },
       { method: 'POST', url: '/todos/5/items', data: { content: 'b', due_time: '', clear_due_time: true } },
@@ -267,14 +267,14 @@ describe('todo checklist items', () => {
 describe('workouts', () => {
   it('workout toggle and reorder', () => {
     expect(planFor('PATCH', '/workouts/5/toggle').plan?.ops).toEqual([{ method: 'PATCH', url: '/workouts/5/toggle' }])
-    const { plan } = planFor('PATCH', '/workouts/5/reorder', { data: { after_id: 1 }, fixture: { ...noFixture, prev: { 5: 3 } } })
-    expect(plan?.ops[0]?.data).toEqual({ after_id: 3 })
+    const { plan } = planFor('PATCH', '/workouts/5/reorder', { data: { after_id: '1' }, fixture: { ...noFixture, prev: { 5: '3' } } })
+    expect(plan?.ops[0]?.data).toEqual({ after_id: '3' })
   })
 
   it('exercise delete recreates it under the workout', () => {
     const fixture: Fixture = {
       ...noFixture,
-      subLists: { 'exercises:5': [{ id: 9, name: 'Squat', sets: 3, reps: 8, done: false, sort_order: 1 }] },
+      subLists: { 'exercises:5': [{ id: '9', name: 'Squat', sets: 3, reps: 8, done: false, sort_order: 1 }] },
     }
     const { plan } = planFor('DELETE', '/workouts/5/exercises/9', { fixture })
     expect(plan?.ops[0]).toMatchObject({ method: 'POST', url: '/workouts/5/exercises' })
@@ -282,7 +282,7 @@ describe('workouts', () => {
   })
 
   it('set update restores its fields', () => {
-    const fixture: Fixture = { ...noFixture, subLists: { 'sets:5/9': [{ id: 3, set_index: 1, reps: 5, weight: 100, done: true }] } }
+    const fixture: Fixture = { ...noFixture, subLists: { 'sets:5/9': [{ id: '3', set_index: 1, reps: 5, weight: 100, done: true }] } }
     const { plan } = planFor('PUT', '/workouts/5/exercises/9/sets/3', { data: { reps: 6 }, fixture })
     expect(plan?.ops[0]?.data).toEqual({ set_index: 1, reps: 5, weight: 100, done: true })
   })
@@ -296,16 +296,16 @@ describe('habits & whiteboards', () => {
   })
 
   it('whiteboard node delete recreates it', () => {
-    const fixture: Fixture = { ...noFixture, boards: { 1: { nodes: [{ id: 7, ref_type: 'note', label: 'L', x: 1, y: 2 }], edges: [] } } }
+    const fixture: Fixture = { ...noFixture, boards: { 1: { nodes: [{ id: '7', ref_type: 'note', label: 'L', x: 1, y: 2 }], edges: [] } } }
     const { plan } = planFor('DELETE', '/whiteboards/1/nodes/7', { fixture })
     expect(plan?.ops[0]).toMatchObject({ method: 'POST', url: '/whiteboards/1/nodes' })
     expect(plan?.ops[0]?.data).toEqual({ ref_type: 'note', label: 'L', x: 1, y: 2 })
   })
 
   it('whiteboard edge delete recreates it', () => {
-    const fixture: Fixture = { ...noFixture, boards: { 1: { nodes: [], edges: [{ id: 3, from_node_id: 1, to_node_id: 2, label: '' }] } } }
+    const fixture: Fixture = { ...noFixture, boards: { 1: { nodes: [], edges: [{ id: '3', from_node_id: '1', to_node_id: '2', label: '' }] } } }
     const { plan } = planFor('DELETE', '/whiteboards/1/edges/3', { fixture })
-    expect(plan?.ops[0]?.data).toEqual({ from_node_id: 1, to_node_id: 2, label: '' })
+    expect(plan?.ops[0]?.data).toEqual({ from_node_id: '1', to_node_id: '2', label: '' })
   })
 })
 

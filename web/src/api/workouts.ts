@@ -44,60 +44,60 @@ export const workoutsApi = {
   create: (data: Partial<Workout>) =>
     request.post<Workout>('/workouts', data).then((d) => ({ data: d })),
 
-  update: (id: number, data: WorkoutUpdateInput) =>
+  update: (id: string, data: WorkoutUpdateInput) =>
     request.put<Workout>(`/workouts/${id}`, data).then((d) => ({ data: d })),
 
-  toggle: (id: number) =>
+  toggle: (id: string) =>
     request.patch<Workout>(`/workouts/${id}/toggle`).then((data) => ({ data })),
 
-  reorder: (id: number, afterId: number | null) =>
+  reorder: (id: string, afterId: string | null) =>
     request.patch<void>(`/workouts/${id}/reorder`, { after_id: afterId }).then(() => {}),
 
-  delete: (id: number) =>
+  delete: (id: string) =>
     request.delete<void>(`/workouts/${id}`).then(() => {}),
 
   // --- Exercise checklist ---
 
-  listExercises: (workoutId: number, signal?: AbortSignal) =>
+  listExercises: (workoutId: string, signal?: AbortSignal) =>
     request.get<WorkoutExercise[]>(`/workouts/${workoutId}/exercises`, { signal }).then((data) => ({ data })),
 
-  createExercise: (workoutId: number, data: WorkoutExerciseInput) =>
+  createExercise: (workoutId: string, data: WorkoutExerciseInput) =>
     request.post<WorkoutExercise>(`/workouts/${workoutId}/exercises`, data).then((d) => ({ data: d })),
 
-  updateExercise: (workoutId: number, exerciseId: number, data: WorkoutExerciseInput) =>
+  updateExercise: (workoutId: string, exerciseId: string, data: WorkoutExerciseInput) =>
     request.put<WorkoutExercise>(`/workouts/${workoutId}/exercises/${exerciseId}`, data).then((d) => ({ data: d })),
 
-  toggleExercise: (workoutId: number, exerciseId: number) =>
+  toggleExercise: (workoutId: string, exerciseId: string) =>
     request.patch<WorkoutExercise>(`/workouts/${workoutId}/exercises/${exerciseId}/toggle`).then((data) => ({ data })),
 
-  deleteExercise: (workoutId: number, exerciseId: number) =>
+  deleteExercise: (workoutId: string, exerciseId: string) =>
     request.delete<void>(`/workouts/${workoutId}/exercises/${exerciseId}`).then(() => {}),
 
   // --- Set logs (per-exercise, PRs derive from these) ---
 
-  listSets: (workoutId: number, exerciseId: number, signal?: AbortSignal) =>
+  listSets: (workoutId: string, exerciseId: string, signal?: AbortSignal) =>
     request
       .get<SetLog[]>(`/workouts/${workoutId}/exercises/${exerciseId}/sets`, { signal })
       .then((data) => ({ data })),
 
-  createSet: (workoutId: number, exerciseId: number, data: SetLogInput) =>
+  createSet: (workoutId: string, exerciseId: string, data: SetLogInput) =>
     request
       .post<SetLog>(`/workouts/${workoutId}/exercises/${exerciseId}/sets`, data)
       .then((d) => ({ data: d })),
 
-  updateSet: (workoutId: number, exerciseId: number, setId: number, data: SetLogInput) =>
+  updateSet: (workoutId: string, exerciseId: string, setId: string, data: SetLogInput) =>
     request
       .put<SetLog>(`/workouts/${workoutId}/exercises/${exerciseId}/sets/${setId}`, data)
       .then((d) => ({ data: d })),
 
-  deleteSet: (workoutId: number, exerciseId: number, setId: number) =>
+  deleteSet: (workoutId: string, exerciseId: string, setId: string) =>
     request.delete<void>(`/workouts/${workoutId}/exercises/${exerciseId}/sets/${setId}`).then(() => {}),
 
   // --- Workspace labels ---
 
-  getTags: (id: number) =>
+  getTags: (id: string) =>
     request.get<Tag[]>(`/workouts/${id}/tags`).then((data) => ({ data })),
 
-  replaceTags: (id: number, tagIds: number[]) =>
+  replaceTags: (id: string, tagIds: string[]) =>
     request.put<void>(`/workouts/${id}/tags`, { tag_ids: tagIds }).then(() => {}),
 }

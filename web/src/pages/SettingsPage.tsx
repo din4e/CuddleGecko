@@ -101,7 +101,7 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState('')
   const [modelName, setModelName] = useState('')
   const [customBaseUrl, setCustomBaseUrl] = useState('')
-  const [testingId, setTestingId] = useState<number | null>(null)
+  const [testingId, setTestingId] = useState<string | null>(null)
   const [envAI, setEnvAI] = useState<{ configured: boolean; provider_type: string; model: string; base_url: string } | null>(null)
   const [mcpCopied, setMcpCopied] = useState(false)
   const [captchaCfg, setCaptchaCfg] = useState<CaptchaConfig | null>(null)
@@ -353,7 +353,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleActivateAI = async (id: number) => {
+  const handleActivateAI = async (id: string) => {
     if (!adapters?.ai) return
     try {
       await adapters.ai.activateProvider(id)
@@ -363,7 +363,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleTestAI = async (id: number) => {
+  const handleTestAI = async (id: string) => {
     if (!adapters?.ai) return
     setTestingId(id)
     try {

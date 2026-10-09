@@ -37,7 +37,7 @@ export function useCreateEvent() {
 export function useUpdateEvent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Event> }) => eventsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<Event> }) => eventsApi.update(id, data),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -46,7 +46,7 @@ export function useUpdateEvent() {
 export function useDeleteEvent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => eventsApi.delete(id),
+    mutationFn: (id: string) => eventsApi.delete(id),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -55,7 +55,7 @@ export function useDeleteEvent() {
 export function useReplaceEventTags() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => eventsApi.replaceTags(id, tagIds),
+    mutationFn: ({ id, tagIds }: { id: string; tagIds: string[] }) => eventsApi.replaceTags(id, tagIds),
     onSuccess: () => invalidateScope(qc, scope),
   })
 }

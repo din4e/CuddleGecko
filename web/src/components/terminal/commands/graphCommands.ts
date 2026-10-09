@@ -89,7 +89,7 @@ export async function executeDeleteRelation(
   adapters: AppAdapters,
 ): Promise<string> {
   try {
-    const id = Number(args.id)
+    const id = args.id as string | undefined
     if (!id) return formatError('Usage: delete relation <id>')
 
     await adapters.graph.deleteRelation(id)

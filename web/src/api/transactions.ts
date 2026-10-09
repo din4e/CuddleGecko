@@ -11,7 +11,7 @@ import type {
 
 export const transactionsApi = {
   list: (
-    params?: { page?: number; page_size?: number; type?: string; contact_id?: number; q?: string; from?: string; to?: string },
+    params?: { page?: number; page_size?: number; type?: string; contact_id?: string; q?: string; from?: string; to?: string },
     signal?: AbortSignal,
   ) => request.get<PaginatedData<Transaction>>('/transactions', { params, signal }).then((data) => ({ data })),
 
@@ -31,17 +31,17 @@ export const transactionsApi = {
   create: (data: Partial<Transaction>) =>
     request.post<Transaction>('/transactions', data).then((d) => ({ data: d })),
 
-  update: (id: number, data: Partial<Transaction>) =>
+  update: (id: string, data: Partial<Transaction>) =>
     request.put<Transaction>(`/transactions/${id}`, data).then((d) => ({ data: d })),
 
-  delete: (id: number) =>
+  delete: (id: string) =>
     request.delete<void>(`/transactions/${id}`).then(() => {}),
 
   // --- Workspace labels ---
 
-  getTags: (id: number) =>
+  getTags: (id: string) =>
     request.get<Tag[]>(`/transactions/${id}/tags`).then((data) => ({ data })),
 
-  replaceTags: (id: number, tagIds: number[]) =>
+  replaceTags: (id: string, tagIds: string[]) =>
     request.put<void>(`/transactions/${id}/tags`, { tag_ids: tagIds }).then(() => {}),
 }

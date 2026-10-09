@@ -11,10 +11,10 @@ function makeClient() {
   })
 }
 
-type Item = { id: number; title: string }
+type Item = { id: string; title: string }
 
 function msg(partial: Partial<DataChangedMessage>): DataChangedMessage {
-  return { workspaceId: 1, resource: 'todos', kind: 'updated', id: 0, ...partial }
+  return { workspaceId: '7', resource: 'todos', kind: 'updated', id: '0', ...partial }
 }
 
 // querySync reads localStorage (workspace segment) at call time; pin it to a
@@ -35,14 +35,14 @@ describe('applyDataChanged', () => {
 
   it('patches an updated entity into paginated and infinite caches without refetching', async () => {
     const qc = makeClient()
-    const fetcher = vi.fn(() => Promise.resolve({ items: [{ id: 1, title: 'old' }], total: 1, page: 1, page_size: 50 }))
+    const fetcher = vi.fn(() => Promise.resolve({ items: [{ id: '1', title: 'old' }], total: 1, page: 1, page_size: 50 }))
     await qc.prefetchQuery({ queryKey: ['todos', '7', 'list', {}], queryFn: fetcher })
     await qc.prefetchQuery({
       queryKey: ['todos', '7', 'list', { page_size: 50 }],
-      queryFn: () => Promise.resolve({ pages: [{ items: [{ id: 1, title: 'old' }], total: 1, page: 1, page_size: 50 }] }),
+      queryFn: () => Promise.resolve({ pages: [{ items: [{ id: '1', title: 'old' }], total: 1, page: 1, page_size: 50 }] }),
     })
 
-    applyDataChanged(qc, msg({ entity: { id: 1, title: 'new' } }))
+    applyDataChanged(qc, msg({ entity: { id: '1', title: 'new' } }))
 
     const page = qc.getQueryData(['todos', '7', 'list', {}]) as { items: Item[] }
     const inf = qc.getQueryData(['todos', '7', 'list', { page_size: 50 }]) as { pages: Array<{ items: Item[] }> }
@@ -54,17 +54,17 @@ describe('applyDataChanged', () => {
 
   it('removes a deleted entity from cached arrays in place', async () => {
     const qc = makeClient()
-    await qc.prefetchQuery({ queryKey: ['habits', '7', 'list'], queryFn: () => Promise.resolve([{ id: 1 }, { id: 2 }]) })
+    await qc.prefetchQuery({ queryKey: ['habits', '7', 'list'], queryFn: () => Promise.resolve([{ id: '1' }, { id: '2' }]) })
 
-    applyDataChanged(qc, msg({ resource: 'habits', kind: 'deleted', id: 1 }))
+    applyDataChanged(qc, msg({ resource: 'habits', kind: 'deleted', id: '1' }))
 
-    expect(qc.getQueryData(['habits', '7', 'list'])).toEqual([{ id: 2 }])
+    expect(qc.getQueryData(['habits', '7', 'list'])).toEqual([{ id: '2' }])
   })
 
   it('invalidates the scope list subtree on created frames', () => {
     const qc = makeClient()
     const spy = vi.spyOn(qc, 'invalidateQueries').mockResolvedValue(undefined as never)
-    applyDataChanged(qc, msg({ kind: 'created', id: 9 }))
+    applyDataChanged(qc, msg({ kind: 'created', id: '9' }))
     expect(spy).toHaveBeenCalledTimes(1)
     expect(spy).toHaveBeenCalledWith({ queryKey: ['todos', '7', 'list'] })
   })
@@ -84,7 +84,7 @@ describe('applyDataChanged', () => {
     expect(spy).toHaveBeenCalledTimes(1)
 
     applyDataChanged(qc, msg({ kind: 'bulk' }))
-    applyDataChanged(qc, msg({ kind: 'created', id: 5 }))
+    applyDataChanged(qc, msg({ kind: 'created', id: '5' }))
     expect(spy).toHaveBeenCalledTimes(1)
   })
 
@@ -108,11 +108,11 @@ describe('cache patch helpers', () => {
     const qc = makeClient()
     await qc.prefetchQuery({
       queryKey: ['contacts', '7', 'list', {}],
-      queryFn: () => Promise.resolve({ items: [{ id: 3, title: 'a', notes: 'keep' }], total: 1, page: 1, page_size: 20 }),
+      queryFn: () => Promise.resolve({ items: [{ id: '3', title: 'a', notes: 'keep' }], total: 1, page: 1, page_size: 20 }),
     })
-    patchEntityInScope(qc, 'contacts', { id: 3, title: 'b' } as never)
+    patchEntityInScope(qc, 'contacts', { id: '3', title: 'b' } as never)
     expect(qc.getQueryData(['contacts', '7', 'list', {}])).toMatchObject({
-      items: [{ id: 3, title: 'b', notes: 'keep' }],
+      items: [{ id: '3', title: 'b', notes: 'keep' }],
     })
   })
 
@@ -122,7 +122,7 @@ describe('cache patch helpers', () => {
       queryKey: ['tags', '7', 'stats'],
       queryFn: () => Promise.resolve({ count: 5 }),
     })
-    removeEntityFromScope(qc, 'tags', 1)
+    removeEntityFromScope(qc, 'tags', '1')
     expect(qc.getQueryData(['tags', '7', 'stats'])).toEqual({ count: 5 })
   })
 })

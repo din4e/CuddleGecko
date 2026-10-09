@@ -154,7 +154,7 @@ describe('TodosPage', () => {
 
   it('empties the trash after confirmation', async () => {
     localStorage.setItem('todoSmartList', 'trash')
-    const trashed = { id: 9, title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const trashed = { id: '9', title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: null, completed_at: null, created_at: '', updated_at: '' } as Todo
     mockedTrash.mockResolvedValue({ data: [trashed] })
     mockedEmptyTrash.mockResolvedValue({ data: { purged: 1 } })
     const user = userEvent.setup()
@@ -199,7 +199,7 @@ describe('TodosPage', () => {
 
   it('renders todo items from API', async () => {
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 1, title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      { id: '1', title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
     ]))
     renderPage()
     await waitFor(() => {
@@ -213,7 +213,7 @@ describe('TodosPage', () => {
     localStorage.setItem('todoView', 'grouped')
     localStorage.setItem('todoSmartList', 'all')
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 2, title: 'Done task', status: 'done', priority: 'low', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+      { id: '2', title: 'Done task', status: 'done', priority: 'low', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: '2026-05-20', created_at: '', updated_at: '' },
     ]))
     renderPage()
     await waitFor(() => {
@@ -226,7 +226,7 @@ describe('TodosPage', () => {
     localStorage.setItem('todoView', 'grouped')
     localStorage.setItem('todoSmartList', 'all')
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 12, title: 'Grouped done task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+      { id: '12', title: 'Grouped done task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: '2026-05-20', created_at: '', updated_at: '' },
     ]))
     const user = userEvent.setup()
     renderPage()
@@ -243,7 +243,7 @@ describe('TodosPage', () => {
     localStorage.setItem('todoView', 'grouped')
     localStorage.setItem('todoSmartList', 'all')
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 13, title: 'Manual done task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+      { id: '13', title: 'Manual done task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: '2026-05-20', created_at: '', updated_at: '' },
     ]))
     const user = userEvent.setup()
     renderPage()
@@ -258,9 +258,9 @@ describe('TodosPage', () => {
     localStorage.setItem('todoView', 'grouped')
     localStorage.setItem('todoSmartList', 'all')
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 1, title: 'Active task', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
-      { id: 2, title: 'Finished task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
-      { id: 3, title: 'Dropped task', status: 'abandoned', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      { id: '1', title: 'Active task', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
+      { id: '2', title: 'Finished task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: '2026-05-20', created_at: '', updated_at: '' },
+      { id: '3', title: 'Dropped task', status: 'abandoned', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
     ]))
     const user = userEvent.setup()
     renderPage()
@@ -296,10 +296,10 @@ describe('TodosPage', () => {
     // card instead of burying it (buildTodoTree's orphan rule).
     localStorage.setItem('todoView', 'grouped')
     localStorage.setItem('todoSmartList', 'all')
-    const parent = { id: 1, title: 'Done parent', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' } as Todo
-    const child = { id: 2, title: 'Kept child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const parent = { id: '1', title: 'Done parent', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: null, child_count: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' } as Todo
+    const child = { id: '2', title: 'Kept child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: '1', child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
     mockedList.mockImplementation(async (params?: TodoListParams) =>
-      params?.parent_id === 1
+      params?.parent_id === '1'
         ? mockPage<Todo>([child])
         : mockPage<Todo>([parent, child]),
     )
@@ -319,11 +319,11 @@ describe('TodosPage', () => {
   it('hides completed subtask rows inside cards with the hide-completed toggle', async () => {
     localStorage.setItem('todoView', 'grouped')
     localStorage.setItem('todoSmartList', 'all')
-    const parent = { id: 1, title: 'Working parent', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 2, completed_at: null, created_at: '', updated_at: '' } as Todo
-    const doneSub = { id: 2, title: 'Done subtask', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, child_count: 0, completed_at: '2026-05-20', created_at: '', updated_at: '' } as Todo
-    const openSub = { id: 3, title: 'Open subtask', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const parent = { id: '1', title: 'Working parent', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: null, child_count: 2, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const doneSub = { id: '2', title: 'Done subtask', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: '1', child_count: 0, completed_at: '2026-05-20', created_at: '', updated_at: '' } as Todo
+    const openSub = { id: '3', title: 'Open subtask', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: '1', child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
     mockedList.mockImplementation(async (params?: TodoListParams) =>
-      params?.parent_id === 1
+      params?.parent_id === '1'
         ? mockPage<Todo>([doneSub, openSub])
         : mockPage<Todo>([parent, doneSub, openSub]),
     )
@@ -349,7 +349,7 @@ describe('TodosPage', () => {
     localStorage.setItem('todoView', 'grouped')
     localStorage.setItem('todoSmartList', 'completed')
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 2, title: 'Done task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+      { id: '2', title: 'Done task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: '2026-05-20', created_at: '', updated_at: '' },
     ]))
     renderPage()
     await waitFor(() => expect(screen.getByText('Done task')).toBeInTheDocument())
@@ -363,7 +363,7 @@ describe('TodosPage', () => {
     localStorage.setItem('todoView', 'grouped')
     localStorage.setItem('todoSmartList', 'abandoned')
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 3, title: 'Dropped task', status: 'abandoned', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      { id: '3', title: 'Dropped task', status: 'abandoned', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
     ]))
     renderPage()
     await waitFor(() => expect(screen.getByText('Dropped task')).toBeInTheDocument())
@@ -373,7 +373,7 @@ describe('TodosPage', () => {
 
   it('renders todo with amount and priority', async () => {
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 3, title: 'Team lunch', status: 'pending', priority: 'high', due_time: '2026-05-22T14:00:00+08:00', amount: 200, amount_type: 'expense', contact_ids: [], color: '#ff0000', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      { id: '3', title: 'Team lunch', status: 'pending', priority: 'high', due_time: '2026-05-22T14:00:00+08:00', amount: 200, amount_type: 'expense', contact_ids: [], color: '#ff0000', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
     ]))
     renderPage()
     await waitFor(() => {
@@ -401,8 +401,8 @@ describe('TodosPage', () => {
 
   it('switches to kanban view showing columns', async () => {
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 1, title: 'Task A', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
-      { id: 2, title: 'Task B', status: 'done', priority: 'low', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-05-20', created_at: '', updated_at: '' },
+      { id: '1', title: 'Task A', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
+      { id: '2', title: 'Task B', status: 'done', priority: 'low', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: '2026-05-20', created_at: '', updated_at: '' },
     ]))
     const user = userEvent.setup()
     renderPage()
@@ -421,12 +421,12 @@ describe('TodosPage', () => {
 
   it('tree view lazily loads children on expand', async () => {
     localStorage.setItem('todoView', 'tree')
-    const root = { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
-    const child = { id: 2, title: 'Child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const root = { id: '1', title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: null, child_count: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const child = { id: '2', title: 'Child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: '1', sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
     // Param-aware mock: roots_only returns just the root; a parent_id query
     // returns that parent's children (lazy expand).
     mockedList.mockImplementation(async (params?: TodoListParams) =>
-      params?.parent_id === 1
+      params?.parent_id === '1'
         ? mockPage<Todo>([child])
         : mockPage<Todo>([root]),
     )
@@ -443,10 +443,10 @@ describe('TodosPage', () => {
 
   it('arrow keys navigate the tree: select, expand, dive, collapse', async () => {
     localStorage.setItem('todoView', 'tree')
-    const root = { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
-    const child = { id: 2, title: 'Child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const root = { id: '1', title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: null, child_count: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const child = { id: '2', title: 'Child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: '1', sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
     mockedList.mockImplementation(async (params?: TodoListParams) =>
-      params?.parent_id === 1
+      params?.parent_id === '1'
         ? mockPage<Todo>([child])
         : mockPage<Todo>([root]),
     )
@@ -470,11 +470,11 @@ describe('TodosPage', () => {
 
   it('arrow keys switch the selected card and fold its subtask section (flat views)', async () => {
     useTodoCollapseStore.setState({ collapsed: new Set() })
-    const solo = { id: 1, title: 'Solo card', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
-    const parent = { id: 2, title: 'Parent card', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, sort_order: 1, completed_at: null, created_at: '', updated_at: '' } as Todo
-    const child = { id: 3, title: 'Sub card', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 2, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const solo = { id: '1', title: 'Solo card', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: null, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const parent = { id: '2', title: 'Parent card', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: null, child_count: 1, sort_order: 1, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const child = { id: '3', title: 'Sub card', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: '2', sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
     mockedList.mockImplementation(async (params?: TodoListParams) =>
-      params?.parent_id === 2
+      params?.parent_id === '2'
         ? mockPage<Todo>([child])
         : mockPage<Todo>([solo, parent]),
     )
@@ -490,14 +490,14 @@ describe('TodosPage', () => {
     // selection were still on the childless solo card, ← would not touch the
     // parent's fold key.)
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
-    expect(useTodoCollapseStore.getState().collapsed.has(collapseKey('grouped', 2))).toBe(true)
+    expect(useTodoCollapseStore.getState().collapsed.has(collapseKey('grouped', '2'))).toBe(true)
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    expect(useTodoCollapseStore.getState().collapsed.has(collapseKey('grouped', 2))).toBe(false)
+    expect(useTodoCollapseStore.getState().collapsed.has(collapseKey('grouped', '2'))).toBe(false)
   })
 
   it('tree view pins manual sort and hides the sort picker', async () => {
     localStorage.setItem('todoView', 'tree')
-    const root = { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 0, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const root = { id: '1', title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: null, child_count: 0, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
     mockedList.mockImplementation(async () => mockPage<Todo>([root]))
     renderPage()
     await waitFor(() => expect(screen.getByText('Root')).toBeInTheDocument())
@@ -518,15 +518,15 @@ describe('TodosPage', () => {
     localStorage.setItem('todoView', 'tree')
     // Regression: tree-view children live in per-parent slices, not in the
     // roots-only list — rename must still find them and persist the edit.
-    const root = { id: 1, title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
-    const child = { id: 2, title: 'Child task', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const root = { id: '1', title: 'Root', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: null, child_count: 1, sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const child = { id: '2', title: 'Child task', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: '1', sort_order: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
     mockedList.mockImplementation(async (params?: TodoListParams) =>
-      params?.parent_id === 1
+      params?.parent_id === '1'
         ? mockPage<Todo>([child])
         : mockPage<Todo>([root]),
     )
     mockedUpdate.mockResolvedValue({ data: child })
-    localStorage.setItem('todoTreeExpanded', JSON.stringify([1]))
+    localStorage.setItem('todoTreeExpanded', JSON.stringify(['1']))
     const user = userEvent.setup()
     renderPage()
     await waitFor(() => expect(screen.getByText('Child task')).toBeInTheDocument())
@@ -537,13 +537,13 @@ describe('TodosPage', () => {
     await user.type(input, 'Renamed child{Enter}')
 
     await waitFor(() => {
-      expect(mockedUpdate).toHaveBeenCalledWith(2, expect.objectContaining({ title: 'Renamed child' }))
+      expect(mockedUpdate).toHaveBeenCalledWith('2', expect.objectContaining({ title: 'Renamed child' }))
     })
   })
 
   it('opens the detail drawer on single title click (double-click still renames)', async () => {
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 1, title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      { id: '1', title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
     ]))
     const user = userEvent.setup()
     renderPage()
@@ -572,7 +572,7 @@ describe('TodosPage', () => {
       params?.parent_id != null
         ? mockPage<Todo>([])
         : mockPage<Todo>([
-          { id: 1, title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+          { id: '1', title: 'Buy milk', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
         ]))
     mockedDelete.mockResolvedValue(undefined)
     const user = userEvent.setup()
@@ -596,7 +596,7 @@ describe('TodosPage', () => {
     // …then the confirmed delete closes the drawer along with the todo.
     await user.click(screen.getByText('common.confirm'))
     await waitFor(() => {
-      expect(mockedDelete).toHaveBeenCalledWith(1)
+      expect(mockedDelete).toHaveBeenCalledWith('1')
     })
     await waitFor(() => {
       // The row text stays (the mock list still returns the todo), so the
@@ -643,10 +643,10 @@ describe('TodosPage', () => {
   it('assigns an existing #tag from the quick-add bar', async () => {
     const user = userEvent.setup()
     mockedTagsList.mockResolvedValue(mockAxios<PaginatedData<Tag>>({
-      items: [{ id: 5, user_id: 1, name: 'work', color: '', created_at: '' }],
+      items: [{ id: '5', user_id: '1', name: 'work', color: '', created_at: '' }],
       total: 1, page: 1, page_size: 200,
     }))
-    mockedCreate.mockResolvedValue({ data: { id: 42, title: 'task' } as Todo })
+    mockedCreate.mockResolvedValue({ data: { id: '42', title: 'task' } as Todo })
 
     renderPage()
     await waitFor(() => {
@@ -658,7 +658,7 @@ describe('TodosPage', () => {
 
     await waitFor(() => {
       expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ title: 'Email her' }))
-      expect(mockedReplaceTags).toHaveBeenCalledWith(42, [5])
+      expect(mockedReplaceTags).toHaveBeenCalledWith('42', ['5'])
     })
   })
 
@@ -695,7 +695,7 @@ describe('TodosPage', () => {
 
   it('bulk-postpones the selected todos (+1 day)', async () => {
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 1, title: 'Postpone me', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      { id: '1', title: 'Postpone me', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
     ]))
     mockedBulk.mockResolvedValue({ data: { affected: 1 } })
     const user = userEvent.setup()
@@ -709,13 +709,13 @@ describe('TodosPage', () => {
     await user.click(screen.getByRole('button', { name: /todos\.bulkPostpone/ }))
 
     await waitFor(() => {
-      expect(mockedBulk).toHaveBeenCalledWith([1], 'postpone', undefined)
+      expect(mockedBulk).toHaveBeenCalledWith(['1'], 'postpone', undefined)
     })
   })
 
   it('bulk-sets the priority of the selected todos', async () => {
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 2, title: 'Rank me', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      { id: '2', title: 'Rank me', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
     ]))
     mockedBulk.mockResolvedValue({ data: { affected: 1 } })
     const user = userEvent.setup()
@@ -731,7 +731,7 @@ describe('TodosPage', () => {
     await user.click(await screen.findByRole('menuitem', { name: '高' }))
 
     await waitFor(() => {
-      expect(mockedBulk).toHaveBeenCalledWith([2], 'priority', 'high')
+      expect(mockedBulk).toHaveBeenCalledWith(['2'], 'priority', 'high')
     })
   })
 
@@ -759,8 +759,8 @@ describe('TodosPage', () => {
     localStorage.setItem('todoView', 'grouped')
     localStorage.setItem('todoGroupBy', 'priority')
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 1, title: 'Urgent thing', status: 'pending', priority: 'high', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
-      { id: 2, title: 'Chill thing', status: 'pending', priority: 'none', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+      { id: '1', title: 'Urgent thing', status: 'pending', priority: 'high', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
+      { id: '2', title: 'Chill thing', status: 'pending', priority: 'none', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
     ]))
     renderPage()
     await waitFor(() => {
@@ -783,12 +783,12 @@ describe('TodosPage', () => {
       // The month-range query feeds the grid; the inbox query feeds the strip.
       if (params?.no_due) {
         return mockPage<Todo>([
-          { id: 2, title: 'Inbox capture', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+          { id: '2', title: 'Inbox capture', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
         ])
       }
       return mockPage<Todo>([
-        { id: 1, title: 'Dated task', status: 'pending', priority: 'high', due_time: dueToday, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
-        { id: 3, title: 'Next month task', status: 'pending', priority: 'normal', due_time: undatedDue, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: null, created_at: '', updated_at: '' },
+        { id: '1', title: 'Dated task', status: 'pending', priority: 'high', due_time: dueToday, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
+        { id: '3', title: 'Next month task', status: 'pending', priority: 'normal', due_time: undatedDue, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: null, created_at: '', updated_at: '' },
       ])
     })
     renderPage()
@@ -878,8 +878,8 @@ describe('TodosPage', () => {
   it('filters by multiple tags with any-of semantics', async () => {
     mockedTagsList.mockResolvedValue(mockAxios<PaginatedData<Tag>>({
       items: [
-        { id: 5, user_id: 1, name: 'work', color: '', created_at: '' },
-        { id: 7, user_id: 1, name: 'home', color: '', created_at: '' },
+        { id: '5', user_id: '1', name: 'work', color: '', created_at: '' },
+        { id: '7', user_id: '1', name: 'home', color: '', created_at: '' },
       ],
       total: 2, page: 1, page_size: 200,
     }))
@@ -897,7 +897,7 @@ describe('TodosPage', () => {
 
     await waitFor(() => {
       expect(mockedList).toHaveBeenCalledWith(
-        expect.objectContaining({ tag_id: [5, 7] }),
+        expect.objectContaining({ tag_id: ['5', '7'] }),
         expect.any(AbortSignal),
       )
     })
@@ -916,7 +916,7 @@ describe('TodosPage', () => {
     localStorage.setItem('todoView', 'grouped')
     localStorage.setItem('todoSmartList', 'doneToday')
     mockedList.mockResolvedValue(mockPage<Todo>([
-      { id: 4, title: 'Done today task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, completed_at: '2026-09-01', created_at: '', updated_at: '' },
+      { id: '4', title: 'Done today task', status: 'done', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', completed_at: '2026-09-01', created_at: '', updated_at: '' },
     ]))
     renderPage()
     await waitFor(() => expect(screen.getByText('Done today task')).toBeInTheDocument())
@@ -930,10 +930,10 @@ describe('TodosPage', () => {
     // section rendered empty. Like the tree/drawer, children must come from
     // per-parent queries without the smart-list filters.
     localStorage.setItem('todoView', 'grouped')
-    const parent = { id: 1, title: 'Dated parent', status: 'pending', priority: 'normal', due_time: '2026-05-20T10:00:00+08:00', amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 1, completed_at: null, created_at: '', updated_at: '' } as Todo
-    const child = { id: 2, title: 'Undated child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const parent = { id: '1', title: 'Dated parent', status: 'pending', priority: 'normal', due_time: '2026-05-20T10:00:00+08:00', amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: null, child_count: 1, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const child = { id: '2', title: 'Undated child', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: '1', child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
     mockedList.mockImplementation(async (params?: TodoListParams) =>
-      params?.parent_id === 1
+      params?.parent_id === '1'
         ? mockPage<Todo>([child])
         : mockPage<Todo>([parent]),
     )
@@ -945,7 +945,7 @@ describe('TodosPage', () => {
 
     // The children query carries ONLY sort/order + parent_id — no smart-list
     // filters — so every subtask shows under its parent.
-    const childCall = mockedList.mock.calls.find(([p]) => p?.parent_id === 1)
+    const childCall = mockedList.mock.calls.find(([p]) => p?.parent_id === '1')
     expect(childCall).toBeDefined()
     expect(childCall?.[0]).not.toHaveProperty('status')
     expect(childCall?.[0]).not.toHaveProperty('due_before')
@@ -956,17 +956,17 @@ describe('TodosPage', () => {
     // list looked broken — the child was created server-side but never
     // appeared, because the refetched list filtered it out.
     localStorage.setItem('todoView', 'grouped')
-    const parent = { id: 1, title: 'Today parent', status: 'pending', priority: 'normal', due_time: '2026-05-20T10:00:00+08:00', amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: null, child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
+    const parent = { id: '1', title: 'Today parent', status: 'pending', priority: 'normal', due_time: '2026-05-20T10:00:00+08:00', amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: null, child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo
     // Server-side state the create mutation grows, mirrored into both mock
     // branches (children slice + the parent's child_count).
     let children: Todo[] = []
     mockedList.mockImplementation(async (params?: TodoListParams) =>
-      params?.parent_id === 1
+      params?.parent_id === '1'
         ? mockPage<Todo>(children)
         : mockPage<Todo>([{ ...parent, child_count: children.length }]),
     )
     mockedCreate.mockImplementation(async () => {
-      children = [{ id: 2, title: 'Fresh subtask', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1, parent_id: 1, child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo]
+      children = [{ id: '2', title: 'Fresh subtask', status: 'pending', priority: 'normal', due_time: null, amount: null, amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1', parent_id: '1', child_count: 0, completed_at: null, created_at: '', updated_at: '' } as Todo]
       return { data: children[0] }
     })
     const user = userEvent.setup()
@@ -982,7 +982,7 @@ describe('TodosPage', () => {
 
     // handleCreateChild awaits the mutation, so the call lands a tick later.
     await waitFor(() => {
-      expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ title: 'Fresh subtask', parent_id: 1 }))
+      expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ title: 'Fresh subtask', parent_id: '1' }))
     })
     await waitFor(() => expect(screen.getByText('Fresh subtask')).toBeInTheDocument())
   })

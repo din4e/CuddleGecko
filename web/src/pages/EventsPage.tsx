@@ -110,8 +110,8 @@ interface EventFormData {
   end_time: string
   location: string
   color: string
-  contact_ids: number[]
-  label_ids: number[]
+  contact_ids: string[]
+  label_ids: string[]
 }
 
 const emptyForm: EventFormData = {
@@ -148,8 +148,8 @@ export default function EventsPage() {
   const [page, setPage] = useState(1)
   const pageSize = 50
   const [analysisResult, setAnalysisResult] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
-  const [analyzingId, setAnalyzingId] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null)
   const [aiAvailable, setAiAvailable] = useState(false)
 
   const range = getDateRange(filter)
@@ -174,7 +174,7 @@ export default function EventsPage() {
   const events = data?.items ?? []
   const total = data?.total ?? 0
 
-  const handleAnalyzeEvent = async (eventId: number) => {
+  const handleAnalyzeEvent = async (eventId: string) => {
     if (!adapters?.ai) return
     setAnalyzingId(eventId)
     setAnalysisResult(null)

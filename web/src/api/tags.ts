@@ -6,7 +6,7 @@ export const tagsApi = {
     request.get<PaginatedData<Tag>>('/tags', { params: { page, page_size: pageSize, ...(query ? { q: query } : {}) }, signal }).then((data) => ({ data })),
   create: (data: { name: string; color: string }) =>
     request.post<Tag>('/tags', data).then((d) => ({ data: d })),
-  update: (id: number, data: Partial<Tag>) =>
+  update: (id: string, data: Partial<Tag>) =>
     request.put<Tag>(`/tags/${id}`, data).then((d) => ({ data: d })),
-  delete: (id: number) => request.delete<void>(`/tags/${id}`).then(() => {}),
+  delete: (id: string) => request.delete<void>(`/tags/${id}`).then(() => {}),
 }

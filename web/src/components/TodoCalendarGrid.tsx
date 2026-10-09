@@ -16,7 +16,7 @@ import { ChevronLeft, ChevronRight, Plus, Circle, CheckCircle2, Ban, Inbox } fro
 import { Button } from './ui/button'
 import { useTodosList } from '../hooks/api/useTodos'
 import { isSettledStatus } from '../lib/buildTodoTree'
-import type { Todo, TodoPriority } from '../types'
+import type { Todo, TodoPriority, TodoListParams } from '../types'
 
 // TickTick-style month calendar for todos: every day cell lists the tasks due
 // that day; dragging a chip onto another day reschedules it (the page's
@@ -30,7 +30,7 @@ const PAGE_SIZE = 500
 
 export interface TodoCalendarGridProps {
   /** Mirror of the toolbar filters (search / priority / tags). */
-  filters: { q?: string; priority?: TodoPriority; tag_id?: number[] }
+  filters: { q?: string; priority?: TodoPriority; tag_id?: string[] }
   /** One-click hide completed & abandoned (same toggle as the flat views). */
   hideDone: boolean
   onReschedule: (todo: Todo, target: Date | null) => void
@@ -149,7 +149,7 @@ export default function TodoCalendarGrid({ filters, hideDone, onReschedule, onEd
   const { t } = useTranslation()
   const today = useMemo(() => new Date(), [])
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
-  const [dragId, setDragId] = useState<number | null>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
 
   const gridStart = useMemo(() => {
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
@@ -157,8 +157,15 @@ export default function TodoCalendarGrid({ filters, hideDone, onReschedule, onEd
   }, [cursor])
   const gridEnd = useMemo(() => endOfDay(new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + 41)), [gridStart])
 
+  // TodoListParams.tag_id's array leg is still typed number[] (types file
+  // mid-migration); the query serializer treats any id array alike, so pass
+  // the string ids through.
+  const tagIdParam = (ids?: string[]): TodoListParams['tag_id'] =>
+    ids as unknown as TodoListParams['tag_id']
+
   const monthParams = useMemo(() => ({
     ...filters,
+    tag_id: tagIdParam(filters.tag_id),
     due_after: gridStart.toISOString(),
     due_before: gridEnd.toISOString(),
     sort: 'due_date' as const,
@@ -171,6 +178,7 @@ export default function TodoCalendarGrid({ filters, hideDone, onReschedule, onEd
   // drop a chip here to unschedule it; drag a capture onto a day to schedule it.
   const inboxParams = useMemo(() => ({
     ...filters,
+    tag_id: tagIdParam(filters.tag_id),
     status: 'pending' as const,
     started: true,
     no_due: true,
@@ -208,7 +216,7 @@ export default function TodoCalendarGrid({ filters, hideDone, onReschedule, onEd
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   const todoById = useMemo(() => {
-    const m = new Map<number, Todo>()
+    const m = new Map<string, Todo>()
     for (const td of todos) m.set(td.id, td)
     for (const td of inboxTodos) m.set(td.id, td)
     return m
@@ -216,7 +224,7 @@ export default function TodoCalendarGrid({ filters, hideDone, onReschedule, onEd
 
   const handleDragStart = (e: DragStartEvent) => {
     const id = String(e.active.id)
-    if (id.startsWith('todo-')) setDragId(Number(id.slice(5)))
+    if (id.startsWith('todo-')) setDragId(id.slice(5))
   }
   const handleDragEnd = (e: DragEndEvent) => {
     setDragId(null)
@@ -224,7 +232,7 @@ export default function TodoCalendarGrid({ filters, hideDone, onReschedule, onEd
     if (!over) return
     const id = String(e.active.id)
     if (!id.startsWith('todo-')) return
-    const todo = todoById.get(Number(id.slice(5)))
+    const todo = todoById.get(id.slice(5))
     if (!todo) return
     if (over === 'inbox') {
       onReschedule(todo, null)

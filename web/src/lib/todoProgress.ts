@@ -23,13 +23,13 @@ export function todoProgressPercent(todo: Pick<Todo, 'progress'>): number | null
 /** Progress over a todo's descendants via a children map (flat views /
  *  drawer). Cycle-safe; grandchildren count through nested recursion. */
 export function subtreeProgressFromMap(
-  childrenByParent: Map<number, Todo[]>,
-  rootId: number,
-  seen: Set<number> = new Set(),
+  childrenByParent: Map<string, Todo[]>,
+  rootId: string,
+  seen: Set<string> = new Set(),
 ): SubtreeProgress {
   let done = 0
   let total = 0
-  const walk = (parentId: number) => {
+  const walk = (parentId: string) => {
     if (seen.has(parentId)) return
     seen.add(parentId)
     for (const child of childrenByParent.get(parentId) ?? []) {

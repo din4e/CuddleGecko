@@ -11,7 +11,7 @@ import { useTodosList } from '../hooks/api/useTodos'
 type Mode = 'focus' | 'break'
 const WORK_KEY = 'pomo_work_min'
 const BREAK_KEY = 'pomo_break_min'
-const EMPTY_TODOS: { id: number; title: string }[] = []
+const EMPTY_TODOS: { id: string; title: string }[] = []
 
 function fmt(sec: number) {
   const m = Math.floor(sec / 60)
@@ -26,7 +26,7 @@ export default function PomodoroPage() {
   const [mode, setMode] = useState<Mode>('focus')
   const [secondsLeft, setSecondsLeft] = useState(workMin * 60)
   const [running, setRunning] = useState(false)
-  const [todoId, setTodoId] = useState<number | ''>('')
+  const [todoId, setTodoId] = useState<string | ''>('')
   const record = useRecordPomodoro()
   const { data: summary } = usePomodoroSummary()
   const { data: todosData } = useTodosList({ status: 'pending', page: 1, page_size: 30 })
@@ -198,7 +198,7 @@ export default function PomodoroPage() {
               <label className="flex items-center gap-2 text-sm">
                 <Link2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                 <span className="sr-only">{t('pomo.linkTodo')}</span>
-                <select value={todoId} onChange={(e) => setTodoId(e.target.value ? Number(e.target.value) : '')}
+                <select value={todoId} onChange={(e) => setTodoId(e.target.value)}
                   className="flex-1 h-9 rounded-md border border-border bg-transparent px-2 text-sm transition-colors hover:border-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-ring">
                   <option value="">{t('pomo.noLink')}</option>
                   {todos.map((td) => (<option key={td.id} value={td.id}>{td.title}</option>))}

@@ -8,9 +8,9 @@ export const exerciseLibraryApi = {
   create: (data: ExerciseLibraryInput) =>
     request.post<ExerciseLibraryItem>('/exercise-library', data).then((d) => ({ data: d })),
 
-  update: (id: number, data: ExerciseLibraryInput) =>
+  update: (id: string, data: ExerciseLibraryInput) =>
     request.put<ExerciseLibraryItem>(`/exercise-library/${id}`, data).then((d) => ({ data: d })),
 
-  delete: (id: number) =>
+  delete: (id: string) =>
     request.delete<void>(`/exercise-library/${id}`).then(() => {}),
 }

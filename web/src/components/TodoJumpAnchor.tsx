@@ -4,7 +4,7 @@ import { useTodoJump } from '../lib/todoJump'
 /** Anchor rendering a `[text](todo:<id>)` markdown link. With a jump context
  *  mounted (the todos page) it jumps in-app; without one it degrades to
  *  styled text — never a navigation to a nonexistent URL. */
-export function TodoJumpAnchor({ id, children }: { id: number; children: ReactNode }) {
+export function TodoJumpAnchor({ id, children }: { id: string; children: ReactNode }) {
   const jump = useTodoJump()
   if (!jump) return <span className="text-primary underline underline-offset-2">{children}</span>
   return (

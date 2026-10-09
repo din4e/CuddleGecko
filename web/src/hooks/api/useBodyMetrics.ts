@@ -35,7 +35,7 @@ export function useCreateBodyMetric() {
 export function useUpdateBodyMetric() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: BodyMetricInput }) => bodyMetricsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: BodyMetricInput }) => bodyMetricsApi.update(id, data),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })
@@ -44,7 +44,7 @@ export function useUpdateBodyMetric() {
 export function useDeleteBodyMetric() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => bodyMetricsApi.delete(id),
+    mutationFn: (id: string) => bodyMetricsApi.delete(id),
     onSuccess: () => invalidateScope(qc, scope),
     onError: mutationErrorToast,
   })

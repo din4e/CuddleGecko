@@ -6,7 +6,7 @@ import type { Todo } from '../../types'
 
 function makeTodo(partial: Partial<Todo>): Todo {
   return {
-    id: 1,
+    id: '1',
     title: 'task',
     description: '',
     status: 'pending',
@@ -17,8 +17,8 @@ function makeTodo(partial: Partial<Todo>): Todo {
 }
 
 const groups = [
-  { key: 'today', label: <h3>Today</h3>, items: [makeTodo({ id: 1, title: 'Buy milk' })] },
-  { key: 'later', label: <h3>Later</h3>, items: [makeTodo({ id: 2, title: 'Ship release' })] },
+  { key: 'today', label: <h3>Today</h3>, items: [makeTodo({ id: '1', title: 'Buy milk' })] },
+  { key: 'later', label: <h3>Later</h3>, items: [makeTodo({ id: '2', title: 'Ship release' })] },
 ]
 
 function renderGroups(props = {}) {
@@ -45,7 +45,7 @@ describe('TodoSortableGroups', () => {
   it('renders without a header when the group has no label (flat lists)', () => {
     render(
       <TodoSortableGroups
-        groups={[{ key: 'manual', items: [makeTodo({ id: 1, title: 'Solo' })] }]}
+        groups={[{ key: 'manual', items: [makeTodo({ id: '1', title: 'Solo' })] }]}
         renderCard={(todo) => <div>{todo.title}</div>}
       />,
     )

@@ -18,12 +18,12 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../hooks/api/useTodos', () => ({
   useTodosList: (params: Record<string, unknown>, options?: { enabled?: boolean }) => mocks.list(params, options),
-  useTodo: (id: number | null) => mocks.get(id),
+  useTodo: (id: string | null) => mocks.get(id),
 }))
 
 function todo(over: Partial<Todo> = {}): Todo {
   return {
-    id: 1, user_id: 1, workspace_id: 1, title: 'Task', description: '',
+    id: '1', user_id: '1', workspace_id: '1', title: 'Task', description: '',
     status: 'pending', priority: 'normal', due_time: null, amount: null,
     amount_type: '', contact_ids: [], color: '', completed_at: null,
     created_at: '', updated_at: '', ...over,
@@ -41,16 +41,16 @@ describe('TodoParentPicker', () => {
   it('shows the parent title fetched by id when it is not among loaded candidates', async () => {
     // The regression this guards: a parent outside the current view used to
     // render as a bare "#id" with no name.
-    mocks.get.mockReturnValue({ data: todo({ id: 42, title: 'Unloaded parent' }) })
+    mocks.get.mockReturnValue({ data: todo({ id: '42', title: 'Unloaded parent' }) })
 
-    render(<TodoParentPicker value={42} onChange={vi.fn()} candidates={[]} blocked={new Set()} />)
+    render(<TodoParentPicker value={'42'} onChange={vi.fn()} candidates={[]} blocked={new Set()} />)
 
-    expect(mocks.get).toHaveBeenCalledWith(42)
+    expect(mocks.get).toHaveBeenCalledWith('42')
     expect(await screen.findByText('Unloaded parent')).toBeInTheDocument()
   })
 
   it('falls back to the bare id only while the parent is unresolved', () => {
-    render(<TodoParentPicker value={42} onChange={vi.fn()} candidates={[]} blocked={new Set()} />)
+    render(<TodoParentPicker value={'42'} onChange={vi.fn()} candidates={[]} blocked={new Set()} />)
 
     expect(screen.getByRole('button', { name: 'todos.parent' })).toHaveTextContent('#42')
   })
@@ -58,9 +58,9 @@ describe('TodoParentPicker', () => {
   it('does not fetch a parent that is already in the candidates', () => {
     render(
       <TodoParentPicker
-        value={5}
+        value={'5'}
         onChange={vi.fn()}
-        candidates={[todo({ id: 5, title: 'Local parent' })]}
+        candidates={[todo({ id: '5', title: 'Local parent' })]}
         blocked={new Set()}
       />,
     )

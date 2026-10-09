@@ -22,7 +22,7 @@ const components: Components = {
   // todo:<id> 是应用内跳转(见 lib/todoJump),其余走外部浏览器。
   a: ({ children, href }) => {
     const m = href != null ? TODO_LINK_RE.exec(href) : null
-    if (m) return <TodoJumpAnchor id={Number(m[1])}>{children}</TodoJumpAnchor>
+    if (m) return <TodoJumpAnchor id={m[1]}>{children}</TodoJumpAnchor>
     return (
       <a
         href={href}

@@ -17,14 +17,14 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }))
 
-const base = (id: number, title: string, parent_id: number | null = null): Todo => ({
+const base = (id: string, title: string, parent_id: string | null = null): Todo => ({
   id, title, parent_id, status: 'pending', priority: 'normal', due_time: null, amount: null,
-  amount_type: '', contact_ids: [], color: '', description: '', user_id: 1, workspace_id: 1,
+  amount_type: '', contact_ids: [], color: '', description: '', user_id: '1', workspace_id: '1',
   completed_at: null, created_at: '', updated_at: '',
 } as Todo)
 
 // tree: 1 (root) ─ 2 (child) ─ 3 (grandchild);  4 (root)
-const todos = [base(1, 'Root A'), base(2, 'Child A1', 1), base(3, 'Grandchild', 2), base(4, 'Root B')]
+const todos = [base('1', 'Root A'), base('2', 'Child A1', '1'), base('3', 'Grandchild', '2'), base('4', 'Root B')]
 const nodes: TodoNode[] = buildTodoTree(todos)
 
 // Card body stub: the drag tests only need the title text to target rows.
@@ -32,17 +32,17 @@ const renderCardStub = (todo: Todo) => <div>{todo.title}</div>
 
 const handlers = {
   // All nodes expanded so the nested rows are visible for drop targeting.
-  expanded: new Set<number>(todos.map((t) => t.id)),
+  expanded: new Set<string>(todos.map((t) => t.id)),
   onToggleExpand: vi.fn(),
   onMove: vi.fn(),
   renderCard: renderCardStub,
 }
 
-function renderTree(expanded?: Set<number>) {
+function renderTree(expanded?: Set<string>) {
   const onDragIdChange = vi.fn()
   function Harness() {
-    const [dragId, setDragId] = useState<number | null>(null)
-    onDragIdChange.mockImplementation((id: number | null) => setDragId(id))
+    const [dragId, setDragId] = useState<string | null>(null)
+    onDragIdChange.mockImplementation((id: string | null) => setDragId(id))
     return (
       <TodoTree
         nodes={nodes}
@@ -83,16 +83,16 @@ describe('TodoTree drag & drop reparenting', () => {
     // The row delegates "last child" to the server (afterId='last'), so the
     // position holds even for collapsed/partially loaded parents.
     fireEvent.dragStart(rootB, { dataTransfer: { setData: vi.fn(), effectAllowed: 'move' } })
-    expect(onDragIdChange).toHaveBeenCalledWith(4)
+    expect(onDragIdChange).toHaveBeenCalledWith('4')
     fireDrag(rootA, 'dragover', zoneOf(rootA, 0.5))
     fireDrag(rootA, 'drop', zoneOf(rootA, 0.5))
 
-    expect(handlers.onMove).toHaveBeenCalledWith(4, 1, 'last')
+    expect(handlers.onMove).toHaveBeenCalledWith('4', '1', 'last')
   })
 
   it('middle drop on a collapsed row appends last and expands it so the drop is visible', () => {
     // Only Root A expanded: Child A1 is visible but its own child is not.
-    renderTree(new Set([1]))
+    renderTree(new Set(['1']))
     const rootB = screen.getByText('Root B').closest('div[tabindex="0"]') as HTMLElement
     const childA1 = screen.getByText('Child A1').closest('div[tabindex="0"]') as HTMLElement
 
@@ -100,8 +100,8 @@ describe('TodoTree drag & drop reparenting', () => {
     fireDrag(childA1, 'dragover', zoneOf(childA1, 0.5))
     fireDrag(childA1, 'drop', zoneOf(childA1, 0.5))
 
-    expect(handlers.onMove).toHaveBeenCalledWith(4, 2, 'last')
-    expect(handlers.onToggleExpand).toHaveBeenCalledWith(2)
+    expect(handlers.onMove).toHaveBeenCalledWith('4', '2', 'last')
+    expect(handlers.onToggleExpand).toHaveBeenCalledWith('2')
   })
 
   it('drop near the top edge inserts as previous sibling', () => {
@@ -114,7 +114,7 @@ describe('TodoTree drag & drop reparenting', () => {
     fireDrag(childA1, 'dragover', zoneOf(childA1, 0.1))
     fireDrag(childA1, 'drop', zoneOf(childA1, 0.1))
 
-    expect(handlers.onMove).toHaveBeenCalledWith(4, 1, null)
+    expect(handlers.onMove).toHaveBeenCalledWith('4', '1', null)
   })
 
   it('refuses drops onto the dragged node itself', () => {

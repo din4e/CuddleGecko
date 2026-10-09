@@ -17,7 +17,7 @@ export function usePomodoroSummary() {
 export function useRecordPomodoro() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { duration_seconds: number; kind?: string; todo_id?: number | null; completed?: boolean }) =>
+    mutationFn: (data: { duration_seconds: number; kind?: string; todo_id?: string | null; completed?: boolean }) =>
       pomodorosApi.create(data),
     onSuccess: () => invalidateScope(qc, scope),
   })

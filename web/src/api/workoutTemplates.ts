@@ -8,14 +8,14 @@ export const workoutTemplatesApi = {
   create: (data: WorkoutTemplateInput) =>
     request.post<WorkoutTemplate>('/workout-templates', data).then((d) => ({ data: d })),
 
-  update: (id: number, data: WorkoutTemplateInput) =>
+  update: (id: string, data: WorkoutTemplateInput) =>
     request.put<WorkoutTemplate>(`/workout-templates/${id}`, data).then((d) => ({ data: d })),
 
-  delete: (id: number) =>
+  delete: (id: string) =>
     request.delete<void>(`/workout-templates/${id}`).then(() => {}),
 
   /** Create a Workout from this template; optionally scheduled_at. */
-  instantiate: (id: number, scheduledAt?: string) =>
+  instantiate: (id: string, scheduledAt?: string) =>
     request
       .post<Workout>(`/workout-templates/${id}/instantiate`, scheduledAt ? { scheduled_at: scheduledAt } : {})
       .then((d) => ({ data: d })),
