@@ -13,12 +13,12 @@ import (
 
 // session stores a session ID with its last activity time.
 type session struct {
-	id        string
-	lastSeen  time.Time
+	id       string
+	lastSeen time.Time
 }
 
 var (
-	sessions   sync.Map // map[string]*session
+	sessions sync.Map // map[string]*session
 )
 
 func init() {
@@ -71,7 +71,7 @@ func (s *MCPServer) HandlePost(c *gin.Context) {
 		})
 		return
 	}
-	userID := userIDVal.(uint)
+	userID := userIDVal.(string)
 
 	workspaceIDVal, exists := c.Get("workspace_id")
 	if !exists {
@@ -81,7 +81,7 @@ func (s *MCPServer) HandlePost(c *gin.Context) {
 		})
 		return
 	}
-	workspaceID := workspaceIDVal.(uint)
+	workspaceID := workspaceIDVal.(string)
 
 	var req JSONRPCRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -126,7 +126,7 @@ func (s *MCPServer) HandlePostNoWorkspace(c *gin.Context) {
 		})
 		return
 	}
-	userID := userIDVal.(uint)
+	userID := userIDVal.(string)
 
 	var req JSONRPCRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -147,7 +147,7 @@ func (s *MCPServer) HandlePostNoWorkspace(c *gin.Context) {
 	}
 
 	// Use workspaceID=0 for workspace-independent operations
-	resp := s.HandleMethod(req.Method, req.Params, userID, 0)
+	resp := s.HandleMethod(req.Method, req.Params, userID, "")
 	resp.ID = req.ID
 
 	if req.ID == nil {

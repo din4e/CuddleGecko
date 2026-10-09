@@ -12,16 +12,16 @@ import (
 type fakeChecker struct {
 	memberCalls int
 	member      bool
-	defaultID   uint
+	defaultID   string
 	defaultErr  error
 }
 
-func (f *fakeChecker) IsMember(_ context.Context, _, _ uint) bool {
+func (f *fakeChecker) IsMember(_ context.Context, _, _ string) bool {
 	f.memberCalls++
 	return f.member
 }
 
-func (f *fakeChecker) GetDefaultWorkspaceID(_ context.Context, _ uint) (uint, error) {
+func (f *fakeChecker) GetDefaultWorkspaceID(_ context.Context, _ string) (string, error) {
 	return f.defaultID, f.defaultErr
 }
 
@@ -29,19 +29,19 @@ func TestCachingWorkspaceChecker_IsMember(t *testing.T) {
 	fake := &fakeChecker{member: true}
 	c := NewCachingWorkspaceChecker(fake, time.Minute)
 
-	assert.True(t, c.IsMember(context.Background(), 1, 2))
-	assert.True(t, c.IsMember(context.Background(), 1, 2)) // served from cache
+	assert.True(t, c.IsMember(context.Background(), "1", "2"))
+	assert.True(t, c.IsMember(context.Background(), "1", "2")) // served from cache
 	assert.Equal(t, 1, fake.memberCalls, "repeat call must not hit the inner checker")
 
 	// A different (workspace, user) key misses the cache.
-	assert.True(t, c.IsMember(context.Background(), 3, 4))
+	assert.True(t, c.IsMember(context.Background(), "3", "4"))
 	assert.Equal(t, 2, fake.memberCalls, "different key hits the inner checker")
 
 	// GetDefaultWorkspaceID is passed straight through.
-	fake.defaultID = 7
-	id, err := c.GetDefaultWorkspaceID(context.Background(), 2)
+	fake.defaultID = "7"
+	id, err := c.GetDefaultWorkspaceID(context.Background(), "2")
 	require.NoError(t, err)
-	assert.Equal(t, uint(7), id)
+	assert.Equal(t, "7", id)
 }
 
 // A false membership result is cached too, so a non-member doesn't trigger a
@@ -50,8 +50,8 @@ func TestCachingWorkspaceChecker_CachesDenial(t *testing.T) {
 	fake := &fakeChecker{member: false}
 	c := NewCachingWorkspaceChecker(fake, time.Minute)
 
-	assert.False(t, c.IsMember(context.Background(), 1, 2))
-	assert.False(t, c.IsMember(context.Background(), 1, 2))
+	assert.False(t, c.IsMember(context.Background(), "1", "2"))
+	assert.False(t, c.IsMember(context.Background(), "1", "2"))
 	assert.Equal(t, 1, fake.memberCalls)
 }
 
@@ -60,8 +60,8 @@ func TestCachingWorkspaceChecker_Expiry(t *testing.T) {
 	fake := &fakeChecker{member: true}
 	c := NewCachingWorkspaceChecker(fake, 2*time.Millisecond)
 
-	assert.True(t, c.IsMember(context.Background(), 1, 2))
+	assert.True(t, c.IsMember(context.Background(), "1", "2"))
 	time.Sleep(15 * time.Millisecond)
-	assert.True(t, c.IsMember(context.Background(), 1, 2))
+	assert.True(t, c.IsMember(context.Background(), "1", "2"))
 	assert.Equal(t, 2, fake.memberCalls, "expired entry must re-query")
 }

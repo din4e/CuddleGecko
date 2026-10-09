@@ -25,23 +25,23 @@ const (
 // API returns it, so clients can patch it into cached query results verbatim.
 type Frame struct {
 	Type        string          `json:"type"` // always "data.changed"
-	WorkspaceID uint            `json:"workspace_id"`
+	WorkspaceID string          `json:"workspace_id"`
 	Resource    string          `json:"resource"` // todos|contacts|transactions|…
 	Kind        string          `json:"kind"`     // created|updated|deleted|items_changed|bulk
-	ID          uint            `json:"id,omitempty"`
+	ID          string          `json:"id,omitempty"`
 	Entity      json.RawMessage `json:"entity,omitempty"`
 }
 
 // client is one WebSocket connection scoped to a single workspace.
 type client struct {
 	conn        *websocket.Conn
-	workspaceID uint
+	workspaceID string
 	send        chan []byte
 	stop        chan struct{}
 	stopOnce    sync.Once
 }
 
-func newClient(conn *websocket.Conn, workspaceID uint) *client {
+func newClient(conn *websocket.Conn, workspaceID string) *client {
 	return &client{
 		conn:        conn,
 		workspaceID: workspaceID,
@@ -59,7 +59,7 @@ func (c *client) evict() {
 // connection closes (peer disconnect, eviction, or context cancellation), then
 // unregisters. It blocks the caller — the HTTP handler stays alive for the
 // socket's lifetime, exactly like a streaming/SSE handler.
-func ServeWS(ctx context.Context, hub *Hub, conn *websocket.Conn, workspaceID uint) {
+func ServeWS(ctx context.Context, hub *Hub, conn *websocket.Conn, workspaceID string) {
 	c := newClient(conn, workspaceID)
 	hub.Register(c)
 	defer hub.Unregister(c)

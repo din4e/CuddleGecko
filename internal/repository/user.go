@@ -37,9 +37,9 @@ func (r *UserRepo) GetUserByUsername(ctx context.Context, username string) (*mod
 	return &user, nil
 }
 
-func (r *UserRepo) GetUserByID(ctx context.Context, id uint) (*model.User, error) {
+func (r *UserRepo) GetUserByID(ctx context.Context, id string) (*model.User, error) {
 	var user model.User
-	if err := r.db.WithContext(ctx).First(&user, id).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -55,7 +55,7 @@ func (r *UserRepo) CreateRefreshToken(ctx context.Context, token *model.RefreshT
 // DeleteExpiredRefreshTokens drops rows past their own expiry — by then they are
 // unusable whether revoked or not, so keeping them only grows the table. Called
 // opportunistically on rotation; long-lived sessions mint a row every refresh.
-func (r *UserRepo) DeleteExpiredRefreshTokens(ctx context.Context, userID uint) error {
+func (r *UserRepo) DeleteExpiredRefreshTokens(ctx context.Context, userID string) error {
 	if err := r.db.WithContext(ctx).
 		Where("user_id = ? AND expires_at < ?", userID, time.Now()).
 		Delete(&model.RefreshToken{}).Error; err != nil {
@@ -94,7 +94,7 @@ func (r *UserRepo) RevokeRefreshToken(ctx context.Context, token string) error {
 
 // RevokeAllUserRefreshTokens invalidates every refresh token for a user —
 // token-family revocation on detected replay.
-func (r *UserRepo) RevokeAllUserRefreshTokens(ctx context.Context, userID uint) error {
+func (r *UserRepo) RevokeAllUserRefreshTokens(ctx context.Context, userID string) error {
 	if err := r.db.WithContext(ctx).Model(&model.RefreshToken{}).
 		Where("user_id = ? AND revoked = ?", userID, false).
 		Updates(map[string]interface{}{"revoked": true, "revoked_at": time.Now()}).Error; err != nil {

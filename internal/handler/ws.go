@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"strconv"
 
 	"github.com/coder/websocket"
 
@@ -65,21 +64,16 @@ func (h *WSHandler) Connect(c *gin.Context) {
 
 // resolveWorkspace mirrors the WorkspaceAuth middleware: an explicit id from the
 // query (verified for membership), else the user's default workspace.
-func (h *WSHandler) resolveWorkspace(ctx context.Context, userID uint, raw string) (uint, error) {
+func (h *WSHandler) resolveWorkspace(ctx context.Context, userID string, raw string) (string, error) {
 	if raw != "" {
-		id, err := strconv.ParseUint(raw, 10, 32)
-		if err != nil {
-			return 0, errors.New("invalid workspace id")
+		if !h.checker.IsMember(ctx, raw, userID) {
+			return "", errors.New("not a member of this workspace")
 		}
-		wsID := uint(id)
-		if !h.checker.IsMember(ctx, wsID, userID) {
-			return 0, errors.New("not a member of this workspace")
-		}
-		return wsID, nil
+		return raw, nil
 	}
 	wsID, err := h.checker.GetDefaultWorkspaceID(ctx, userID)
 	if err != nil {
-		return 0, errors.New("no workspace available")
+		return "", errors.New("no workspace available")
 	}
 	return wsID, nil
 }

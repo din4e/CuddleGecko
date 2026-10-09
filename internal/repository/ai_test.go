@@ -32,19 +32,19 @@ func TestAIRepo_UpdateConversationTitle(t *testing.T) {
 	repo := NewAIRepo(db)
 	ctx := context.Background()
 
-	conv := &model.AIConversation{UserID: 1, Title: ""}
+	conv := &model.AIConversation{UserID: "1", Title: ""}
 	require.NoError(t, repo.CreateConversation(ctx, conv))
 	require.NotZero(t, conv.ID)
 
-	require.NoError(t, repo.UpdateConversationTitle(ctx, 1, conv.ID, "hello world"))
+	require.NoError(t, repo.UpdateConversationTitle(ctx, "1", conv.ID, "hello world"))
 
-	got, err := repo.GetConversationByID(ctx, 1, conv.ID)
+	got, err := repo.GetConversationByID(ctx, "1", conv.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "hello world", got.Title)
 
 	// Ownership scoping: another user cannot rename it.
-	require.NoError(t, repo.UpdateConversationTitle(ctx, 2, conv.ID, "hacked"))
-	got, _ = repo.GetConversationByID(ctx, 1, conv.ID)
+	require.NoError(t, repo.UpdateConversationTitle(ctx, "2", conv.ID, "hacked"))
+	got, _ = repo.GetConversationByID(ctx, "1", conv.ID)
 	assert.Equal(t, "hello world", got.Title, "title unchanged for non-owner")
 }
 
@@ -55,7 +55,7 @@ func TestAIRepo_ListRecentMessagesByConversation(t *testing.T) {
 	db := newAITestDB(t)
 	repo := NewAIRepo(db)
 	ctx := context.Background()
-	conv := &model.AIConversation{UserID: 1, Title: "t"}
+	conv := &model.AIConversation{UserID: "1", Title: "t"}
 	require.NoError(t, repo.CreateConversation(ctx, conv))
 	for _, c := range []string{"m1", "m2", "m3", "m4", "m5"} {
 		require.NoError(t, db.Create(&model.AIMessage{

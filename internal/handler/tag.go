@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"strconv"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"github.com/din4e/cuddlegecko/internal/service"
@@ -69,11 +68,7 @@ func (h *TagHandler) Create(c *gin.Context) {
 func (h *TagHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid tag id")
-		return
-	}
+	id := c.Param("id")
 
 	var req updateTagRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -81,7 +76,7 @@ func (h *TagHandler) Update(c *gin.Context) {
 		return
 	}
 
-	tag, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), &model.Tag{
+	tag, err := h.svc.Update(c.Request.Context(), userID, workspaceID, id, &model.Tag{
 		Name:  req.Name,
 		Color: req.Color,
 	})
@@ -100,13 +95,9 @@ func (h *TagHandler) Update(c *gin.Context) {
 func (h *TagHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid tag id")
-		return
-	}
+	id := c.Param("id")
 
-	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, id); err != nil {
 		response.NotFound(c, "tag not found")
 		return
 	}

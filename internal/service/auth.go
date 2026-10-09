@@ -28,12 +28,12 @@ var (
 type UserRepository interface {
 	CreateUser(ctx context.Context, user *model.User) error
 	GetUserByUsername(ctx context.Context, username string) (*model.User, error)
-	GetUserByID(ctx context.Context, id uint) (*model.User, error)
+	GetUserByID(ctx context.Context, id string) (*model.User, error)
 	CreateRefreshToken(ctx context.Context, token *model.RefreshToken) error
-	DeleteExpiredRefreshTokens(ctx context.Context, userID uint) error
+	DeleteExpiredRefreshTokens(ctx context.Context, userID string) error
 	GetRefreshToken(ctx context.Context, token string) (*model.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, token string) error
-	RevokeAllUserRefreshTokens(ctx context.Context, userID uint) error
+	RevokeAllUserRefreshTokens(ctx context.Context, userID string) error
 }
 
 type AuthResult struct {
@@ -43,9 +43,9 @@ type AuthResult struct {
 }
 
 type AuthService struct {
-	repo      UserRepository
-	jwtCfg    *config.JWTConfig
-	wsSvc     *WorkspaceService
+	repo   UserRepository
+	jwtCfg *config.JWTConfig
+	wsSvc  *WorkspaceService
 	// sessionSettings, when wired (WithAuthSessionSettings), overrides the
 	// configured access-token TTL per user (the 设置页 "登录有效期" knob).
 	sessionSettings UserSettingStore
@@ -82,7 +82,7 @@ const maxSessionTTLHours = 24 * 365
 // SessionTTL returns the access-token lifetime currently in effect for the
 // user: their stored setting when present, else the server config. 0 means
 // tokens never expire.
-func (s *AuthService) SessionTTL(ctx context.Context, userID uint) (time.Duration, error) {
+func (s *AuthService) SessionTTL(ctx context.Context, userID string) (time.Duration, error) {
 	ttl := s.jwtCfg.AccessTTL
 	if s.sessionSettings != nil {
 		val, found, err := s.sessionSettings.Get(ctx, userID, sessionTTLSettingKey)
@@ -102,7 +102,7 @@ func (s *AuthService) SessionTTL(ctx context.Context, userID uint) (time.Duratio
 // SetSessionTTL stores the user's preferred web session lifetime in hours
 // (0 = never expires). Takes effect on the next token issue (login/refresh —
 // the settings page triggers a refresh so it applies immediately).
-func (s *AuthService) SetSessionTTL(ctx context.Context, userID uint, hours int) error {
+func (s *AuthService) SetSessionTTL(ctx context.Context, userID string, hours int) error {
 	if s.sessionSettings == nil {
 		return errors.New("session settings not available")
 	}
@@ -223,7 +223,7 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 // RefreshTTL exposes the configured refresh-token lifetime (cookie Max-Age).
 func (s *AuthService) RefreshTTL() time.Duration { return s.jwtCfg.RefreshTTL }
 
-func (s *AuthService) GetCurrentUser(ctx context.Context, userID uint) (*model.User, error) {
+func (s *AuthService) GetCurrentUser(ctx context.Context, userID string) (*model.User, error) {
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
 		return nil, ErrUserNotFound

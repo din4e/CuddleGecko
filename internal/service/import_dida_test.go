@@ -39,12 +39,12 @@ func TestImportTodosFromPlatform_Dida(t *testing.T) {
 	svc := NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo)
 	ctx := context.Background()
 
-	res, err := svc.ImportTodosFromPlatform(ctx, 2, 3, "dida", didaFixture)
+	res, err := svc.ImportTodosFromPlatform(ctx, "2", "3", "dida", didaFixture)
 	require.NoError(t, err)
 	assert.Equal(t, 5, res.Imported)
 	assert.Equal(t, 0, res.Skipped, "abandoned rows import with the abandoned status")
 
-	todos, _, err := todoRepo.List(ctx, 3, model.TodoListQuery{Page: 1, PageSize: 100})
+	todos, _, err := todoRepo.List(ctx, "3", model.TodoListQuery{Page: 1, PageSize: 100})
 	require.NoError(t, err)
 	require.Len(t, todos, 5)
 	byTitle := make(map[string]model.Todo, len(todos))
@@ -77,7 +77,7 @@ func TestImportTodosFromPlatform_Dida(t *testing.T) {
 	assert.Equal(t, abandoned.ID, *abandonedChild.ParentID, "child links to its abandoned parent now that it imports")
 
 	// Tags: "重要" from the tags column, "工作"/"生活" list names.
-	tags, _, err := tagRepo.List(ctx, 3, 1, 100)
+	tags, _, err := tagRepo.List(ctx, "3", 1, 100)
 	require.NoError(t, err)
 	names := make(map[string]bool, len(tags))
 	for _, tg := range tags {
@@ -92,7 +92,7 @@ func TestImportTodosFromPlatform_Dida(t *testing.T) {
 	assert.Len(t, parentTags, 2, "tags column + list name")
 
 	// Unknown platform is rejected before anything is written.
-	_, err = svc.ImportTodosFromPlatform(ctx, 2, 3, "nope", didaFixture)
+	_, err = svc.ImportTodosFromPlatform(ctx, "2", "3", "nope", didaFixture)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported platform")
 }

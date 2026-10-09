@@ -49,7 +49,7 @@ type ImportStats struct {
 // as the full backup, but only this module's field populated). A module JSON
 // can be re-imported alone — FK references to rows not in the payload resolve
 // against existing workspace rows.
-func (s *ExportService) ExportModuleJSON(ctx context.Context, userID, workspaceID uint, module string) (string, error) {
+func (s *ExportService) ExportModuleJSON(ctx context.Context, userID, workspaceID string, module string) (string, error) {
 	data, err := s.ExportJSON(ctx, userID, workspaceID)
 	if err != nil {
 		return "", err
@@ -106,7 +106,7 @@ func (s *ExportService) ExportModuleJSON(ctx context.Context, userID, workspaceI
 // ImportModuleJSON imports a module JSON (full-backup shape — only the named
 // module's field is read). Everything else in the payload is ignored, so a full
 // backup file can be used to restore a single module.
-func (s *ExportService) ImportModuleJSON(ctx context.Context, userID, workspaceID uint, module, jsonData string) (ImportStats, error) {
+func (s *ExportService) ImportModuleJSON(ctx context.Context, userID, workspaceID string, module, jsonData string) (ImportStats, error) {
 	var data ExportData
 	if err := json.Unmarshal([]byte(jsonData), &data); err != nil {
 		return ImportStats{}, fmt.Errorf("invalid JSON: %w", err)
@@ -181,7 +181,7 @@ func (s *ExportService) ImportModuleJSON(ctx context.Context, userID, workspaceI
 
 // ExportModuleCSV renders one module as CSV, dispatching to the module-specific
 // exporter.
-func (s *ExportService) ExportModuleCSV(ctx context.Context, workspaceID uint, module string) (string, error) {
+func (s *ExportService) ExportModuleCSV(ctx context.Context, workspaceID string, module string) (string, error) {
 	switch strings.ToLower(module) {
 	case ModuleTodos:
 		return s.ExportTodosCSV(ctx, workspaceID)
@@ -218,7 +218,7 @@ func (s *ExportService) ExportModuleCSV(ctx context.Context, workspaceID uint, m
 
 // ImportModuleCSV imports a module CSV with header-name mapping and per-module
 // dedup rules (duplicates are skipped and counted).
-func (s *ExportService) ImportModuleCSV(ctx context.Context, userID, workspaceID uint, module, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportModuleCSV(ctx context.Context, userID, workspaceID string, module, csvString string) (ImportStats, error) {
 	switch strings.ToLower(module) {
 	case ModuleTodos:
 		return s.ImportTodosCSV(ctx, userID, workspaceID, csvString)

@@ -21,29 +21,29 @@ func NewContactHandler(svc *service.ContactService) *ContactHandler {
 }
 
 type createContactRequest struct {
-	Name               string     `json:"name" binding:"required"`
-	Nickname           string     `json:"nickname"`
-	AvatarEmoji        string     `json:"avatar_emoji"`
-	AvatarURL          string     `json:"avatar_url"`
-	Phone              []string   `json:"phones"`
-	Email              []string   `json:"emails"`
-	Birthday           *string    `json:"birthday"` // date-only or RFC3339; Gin's *time.Time rejects "YYYY-MM-DD"
-	BirthdayCalendar   string     `json:"birthday_calendar" binding:"omitempty,oneof=solar lunar"`
-	Notes              string     `json:"notes"`
-	RelationshipLabels []string   `json:"relationship_labels"`
+	Name               string   `json:"name" binding:"required"`
+	Nickname           string   `json:"nickname"`
+	AvatarEmoji        string   `json:"avatar_emoji"`
+	AvatarURL          string   `json:"avatar_url"`
+	Phone              []string `json:"phones"`
+	Email              []string `json:"emails"`
+	Birthday           *string  `json:"birthday"` // date-only or RFC3339; Gin's *time.Time rejects "YYYY-MM-DD"
+	BirthdayCalendar   string   `json:"birthday_calendar" binding:"omitempty,oneof=solar lunar"`
+	Notes              string   `json:"notes"`
+	RelationshipLabels []string `json:"relationship_labels"`
 }
 
 type updateContactRequest struct {
-	Name               string     `json:"name"`
-	Nickname           string     `json:"nickname"`
-	AvatarEmoji        string     `json:"avatar_emoji"`
-	AvatarURL          string     `json:"avatar_url"`
-	Phone              []string   `json:"phones"`
-	Email              []string   `json:"emails"`
-	Birthday           *string    `json:"birthday"`
-	BirthdayCalendar   string     `json:"birthday_calendar" binding:"omitempty,oneof=solar lunar"`
-	Notes              string     `json:"notes"`
-	RelationshipLabels []string   `json:"relationship_labels"`
+	Name               string   `json:"name"`
+	Nickname           string   `json:"nickname"`
+	AvatarEmoji        string   `json:"avatar_emoji"`
+	AvatarURL          string   `json:"avatar_url"`
+	Phone              []string `json:"phones"`
+	Email              []string `json:"emails"`
+	Birthday           *string  `json:"birthday"`
+	BirthdayCalendar   string   `json:"birthday_calendar" binding:"omitempty,oneof=solar lunar"`
+	Notes              string   `json:"notes"`
+	RelationshipLabels []string `json:"relationship_labels"`
 }
 
 // parseBirthdayPtr accepts date-only ("1995-03-15", what <input type="date">
@@ -60,7 +60,7 @@ func parseBirthdayPtr(s *string) (*time.Time, error) {
 }
 
 type replaceTagsRequest struct {
-	TagIDs []uint `json:"tag_ids" binding:"required"`
+	TagIDs []string `json:"tag_ids" binding:"required"`
 }
 
 func (h *ContactHandler) List(c *gin.Context) {
@@ -69,12 +69,7 @@ func (h *ContactHandler) List(c *gin.Context) {
 	page, pageSize := parsePagination(c, 20)
 	search := c.Query("search")
 
-	var tagIDs []uint
-	for _, idStr := range c.QueryArray("tag_ids") {
-		if id, err := strconv.ParseUint(idStr, 10, 32); err == nil {
-			tagIDs = append(tagIDs, uint(id))
-		}
-	}
+	tagIDs := c.QueryArray("tag_ids")
 
 	contacts, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, page, pageSize, search, tagIDs)
 	if err != nil {
@@ -124,13 +119,9 @@ func (h *ContactHandler) Create(c *gin.Context) {
 func (h *ContactHandler) GetByID(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid contact id")
-		return
-	}
+	id := c.Param("id")
 
-	contact, err := h.svc.GetByID(c.Request.Context(), userID, workspaceID, uint(id))
+	contact, err := h.svc.GetByID(c.Request.Context(), userID, workspaceID, id)
 	if err != nil {
 		response.NotFound(c, "contact not found")
 		return
@@ -142,11 +133,7 @@ func (h *ContactHandler) GetByID(c *gin.Context) {
 func (h *ContactHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid contact id")
-		return
-	}
+	id := c.Param("id")
 
 	var req updateContactRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -172,7 +159,7 @@ func (h *ContactHandler) Update(c *gin.Context) {
 		RelationshipLabels: req.RelationshipLabels,
 	}
 
-	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), contact)
+	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, id, contact)
 	if err != nil {
 		if err == service.ErrContactNotFound {
 			response.NotFound(c, "contact not found")
@@ -188,13 +175,9 @@ func (h *ContactHandler) Update(c *gin.Context) {
 func (h *ContactHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid contact id")
-		return
-	}
+	id := c.Param("id")
 
-	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, id); err != nil {
 		response.NotFound(c, "contact not found")
 		return
 	}
@@ -226,13 +209,9 @@ func (h *ContactHandler) Birthdays(c *gin.Context) {
 func (h *ContactHandler) CreateBirthdayReminder(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid contact id")
-		return
-	}
+	id := c.Param("id")
 
-	reminder, err := h.svc.CreateBirthdayReminder(c.Request.Context(), userID, workspaceID, uint(id), time.Now())
+	reminder, err := h.svc.CreateBirthdayReminder(c.Request.Context(), userID, workspaceID, id, time.Now())
 	if err != nil {
 		if err == service.ErrContactNotFound {
 			response.NotFound(c, "contact not found")
@@ -252,13 +231,9 @@ func (h *ContactHandler) CreateBirthdayReminder(c *gin.Context) {
 func (h *ContactHandler) GetTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid contact id")
-		return
-	}
+	id := c.Param("id")
 
-	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, uint(id))
+	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, id)
 	if err != nil {
 		response.NotFound(c, "contact not found")
 		return
@@ -270,11 +245,7 @@ func (h *ContactHandler) GetTags(c *gin.Context) {
 func (h *ContactHandler) ReplaceTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid contact id")
-		return
-	}
+	id := c.Param("id")
 
 	var req replaceTagsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -282,7 +253,7 @@ func (h *ContactHandler) ReplaceTags(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
+	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, id, req.TagIDs); err != nil {
 		if errors.Is(err, model.ErrInvalidTagIDs) {
 			response.BadRequest(c, err.Error())
 			return

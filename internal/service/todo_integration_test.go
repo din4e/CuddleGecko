@@ -35,7 +35,7 @@ func newTodoServiceWithDB(t *testing.T) (*TodoService, *gorm.DB) {
 
 func intCreateTodo(t *testing.T, svc *TodoService, title string) *model.Todo {
 	t.Helper()
-	todo, err := svc.Create(context.Background(), 1, 1, &model.Todo{Title: title})
+	todo, err := svc.Create(context.Background(), "1", "1", &model.Todo{Title: title})
 	require.NoError(t, err)
 	return todo
 }
@@ -52,7 +52,7 @@ func TestServiceIntegration_ToggleStatus_Recurring(t *testing.T) {
 	todo.DueTime = &past
 	require.NoError(t, ctxUpdate(svc, ctx, todo))
 
-	result, err := svc.ToggleStatus(ctx, 1, 1, todo.ID)
+	result, err := svc.ToggleStatus(ctx, "1", "1", todo.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "pending", result.Status, "recurring task stays pending")
 	assert.NotNil(t, result.DueTime)
@@ -60,14 +60,14 @@ func TestServiceIntegration_ToggleStatus_Recurring(t *testing.T) {
 	assert.Nil(t, result.CompletedAt)
 
 	// The advanced due time actually persisted.
-	loaded, err := svc.GetByID(ctx, 1, 1, todo.ID)
+	loaded, err := svc.GetByID(ctx, "1", "1", todo.ID)
 	require.NoError(t, err)
 	assert.True(t, loaded.DueTime.After(past))
 }
 
 // ctxUpdate is a tiny helper to persist field changes via the service Update.
 func ctxUpdate(svc *TodoService, ctx context.Context, todo *model.Todo) error {
-	_, err := svc.Update(ctx, 1, 1, todo.ID, &model.Todo{
+	_, err := svc.Update(ctx, "1", "1", todo.ID, &model.Todo{
 		Title: todo.Title, Repeat: todo.Repeat, DueTime: todo.DueTime,
 	}, TodoClear{})
 	return err
@@ -80,12 +80,12 @@ func TestServiceIntegration_ToggleStatus_Normal(t *testing.T) {
 	ctx := context.Background()
 	todo := intCreateTodo(t, svc, "one-off")
 
-	done, err := svc.ToggleStatus(ctx, 1, 1, todo.ID)
+	done, err := svc.ToggleStatus(ctx, "1", "1", todo.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "done", done.Status)
 	assert.NotNil(t, done.CompletedAt)
 
-	again, err := svc.ToggleStatus(ctx, 1, 1, todo.ID)
+	again, err := svc.ToggleStatus(ctx, "1", "1", todo.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "pending", again.Status)
 	assert.Nil(t, again.CompletedAt)
@@ -99,30 +99,30 @@ func TestServiceIntegration_Items(t *testing.T) {
 	todo := intCreateTodo(t, svc, "parent")
 
 	// Wrong workspace is rejected before touching items.
-	_, err := svc.CreateItem(ctx, 1, 99, todo.ID, "x")
+	_, err := svc.CreateItem(ctx, "1", "99", todo.ID, "x")
 	assert.ErrorIs(t, err, ErrTodoNotFound)
 
-	a, err := svc.CreateItem(ctx, 1, 1, todo.ID, "a")
+	a, err := svc.CreateItem(ctx, "1", "1", todo.ID, "a")
 	require.NoError(t, err)
-	b, err := svc.CreateItem(ctx, 1, 1, todo.ID, "b")
+	b, err := svc.CreateItem(ctx, "1", "1", todo.ID, "b")
 	require.NoError(t, err)
 
-	loaded, err := svc.GetByID(ctx, 1, 1, todo.ID)
+	loaded, err := svc.GetByID(ctx, "1", "1", todo.ID)
 	require.NoError(t, err)
 	assert.Equal(t, 2, loaded.ItemTotal)
 	assert.Equal(t, 0, loaded.ItemDone)
 
 	// Toggle both done → counts follow.
-	_, err = svc.ToggleItem(ctx, 1, 1, todo.ID, a.ID)
+	_, err = svc.ToggleItem(ctx, "1", "1", todo.ID, a.ID)
 	require.NoError(t, err)
-	_, err = svc.ToggleItem(ctx, 1, 1, todo.ID, b.ID)
+	_, err = svc.ToggleItem(ctx, "1", "1", todo.ID, b.ID)
 	require.NoError(t, err)
-	loaded, _ = svc.GetByID(ctx, 1, 1, todo.ID)
+	loaded, _ = svc.GetByID(ctx, "1", "1", todo.ID)
 	assert.Equal(t, 2, loaded.ItemDone)
 
 	// Delete a done item → done count drops.
-	require.NoError(t, svc.DeleteItem(ctx, 1, 1, todo.ID, a.ID))
-	loaded, _ = svc.GetByID(ctx, 1, 1, todo.ID)
+	require.NoError(t, svc.DeleteItem(ctx, "1", "1", todo.ID, a.ID))
+	loaded, _ = svc.GetByID(ctx, "1", "1", todo.ID)
 	assert.Equal(t, 1, loaded.ItemTotal)
 	assert.Equal(t, 1, loaded.ItemDone)
 }
@@ -133,17 +133,17 @@ func TestServiceIntegration_PromoteItem(t *testing.T) {
 	svc, _ := newTodoServiceWithDB(t)
 	ctx := context.Background()
 	todo := intCreateTodo(t, svc, "parent")
-	item, err := svc.CreateItem(ctx, 1, 1, todo.ID, "becomes-a-task")
+	item, err := svc.CreateItem(ctx, "1", "1", todo.ID, "becomes-a-task")
 	require.NoError(t, err)
 
-	promoted, err := svc.PromoteItem(ctx, 1, 1, todo.ID, item.ID)
+	promoted, err := svc.PromoteItem(ctx, "1", "1", todo.ID, item.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "becomes-a-task", promoted.Title)
 
 	// Parent lost the item; promoted todo is now top-level.
-	parent, _ := svc.GetByID(ctx, 1, 1, todo.ID)
+	parent, _ := svc.GetByID(ctx, "1", "1", todo.ID)
 	assert.Equal(t, 0, parent.ItemTotal)
-	todos, total, err := svc.List(ctx, 1, 1, model.TodoListQuery{Sort: model.TodoSortCreated})
+	todos, total, err := svc.List(ctx, "1", "1", model.TodoListQuery{Sort: model.TodoSortCreated})
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), total)
 	// created-asc order: parent first, promoted last.
@@ -156,17 +156,17 @@ func TestServiceIntegration_Duplicate(t *testing.T) {
 	svc, _ := newTodoServiceWithDB(t)
 	ctx := context.Background()
 	todo := intCreateTodo(t, svc, "original")
-	_, err := svc.CreateItem(ctx, 1, 1, todo.ID, "a")
+	_, err := svc.CreateItem(ctx, "1", "1", todo.ID, "a")
 	require.NoError(t, err)
-	_, err = svc.CreateItem(ctx, 1, 1, todo.ID, "b")
+	_, err = svc.CreateItem(ctx, "1", "1", todo.ID, "b")
 	require.NoError(t, err)
 
-	clone, err := svc.Duplicate(ctx, 1, 1, todo.ID)
+	clone, err := svc.Duplicate(ctx, "1", "1", todo.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "pending", clone.Status)
 	assert.Equal(t, 2, clone.ItemTotal)
 
-	items, err := svc.ListItems(ctx, 1, 1, clone.ID)
+	items, err := svc.ListItems(ctx, "1", "1", clone.ID)
 	require.NoError(t, err)
 	assert.Len(t, items, 2)
 }
@@ -180,12 +180,12 @@ func TestServiceIntegration_Reorder(t *testing.T) {
 	b := intCreateTodo(t, svc, "b")
 	c := intCreateTodo(t, svc, "c")
 
-	require.NoError(t, svc.Reorder(ctx, 1, 1, c.ID, &a.ID)) // → a, c, b
+	require.NoError(t, svc.Reorder(ctx, "1", "1", c.ID, &a.ID)) // → a, c, b
 
-	todos, _, err := svc.List(ctx, 1, 1, model.TodoListQuery{Sort: model.TodoSortManual})
+	todos, _, err := svc.List(ctx, "1", "1", model.TodoListQuery{Sort: model.TodoSortManual})
 	require.NoError(t, err)
 	require.Len(t, todos, 3)
-	assert.Equal(t, []uint{a.ID, c.ID, b.ID}, []uint{todos[0].ID, todos[1].ID, todos[2].ID})
+	assert.Equal(t, []string{a.ID, c.ID, b.ID}, []string{todos[0].ID, todos[1].ID, todos[2].ID})
 }
 
 // --- TogglePin persists and Duplicate is ownership-scoped ---
@@ -195,11 +195,11 @@ func TestServiceIntegration_TogglePin(t *testing.T) {
 	ctx := context.Background()
 	todo := intCreateTodo(t, svc, "star me")
 
-	pinned, err := svc.TogglePin(ctx, 1, 1, todo.ID)
+	pinned, err := svc.TogglePin(ctx, "1", "1", todo.ID)
 	require.NoError(t, err)
 	assert.True(t, pinned.Pinned)
 
-	loaded, _ := svc.GetByID(ctx, 1, 1, todo.ID)
+	loaded, _ := svc.GetByID(ctx, "1", "1", todo.ID)
 	assert.True(t, loaded.Pinned, "pin persisted")
 }
 
@@ -207,11 +207,11 @@ func TestServiceIntegration_OwnershipNotFound(t *testing.T) {
 	svc, _ := newTodoServiceWithDB(t)
 	ctx := context.Background()
 
-	_, err := svc.Update(ctx, 1, 1, 999, &model.Todo{Title: "x"}, TodoClear{})
+	_, err := svc.Update(ctx, "1", "1", "999", &model.Todo{Title: "x"}, TodoClear{})
 	assert.ErrorIs(t, err, ErrTodoNotFound)
-	_, err = svc.Duplicate(ctx, 1, 1, 999)
+	_, err = svc.Duplicate(ctx, "1", "1", "999")
 	assert.ErrorIs(t, err, ErrTodoNotFound)
-	_, err = svc.TogglePin(ctx, 1, 1, 999)
+	_, err = svc.TogglePin(ctx, "1", "1", "999")
 	assert.ErrorIs(t, err, ErrTodoNotFound)
 }
 
@@ -221,38 +221,38 @@ func TestServiceIntegration_ToggleParentCascadesSubtree(t *testing.T) {
 	svc, _ := newTodoServiceWithDB(t)
 	ctx := context.Background()
 
-	parent, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "parent"})
+	parent, err := svc.Create(ctx, "1", "1", &model.Todo{Title: "parent"})
 	require.NoError(t, err)
-	pendingChild, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "pending-child", ParentID: &parent.ID})
+	pendingChild, err := svc.Create(ctx, "1", "1", &model.Todo{Title: "pending-child", ParentID: &parent.ID})
 	require.NoError(t, err)
-	abandonedChild, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "abandoned-child", ParentID: &parent.ID, Status: "abandoned"})
+	abandonedChild, err := svc.Create(ctx, "1", "1", &model.Todo{Title: "abandoned-child", ParentID: &parent.ID, Status: "abandoned"})
 	require.NoError(t, err)
 
 	// Completing the parent sweep-completes both children, remembering the
 	// statuses they held.
-	_, err = svc.ToggleStatus(ctx, 1, 1, parent.ID)
+	_, err = svc.ToggleStatus(ctx, "1", "1", parent.ID)
 	require.NoError(t, err)
 
-	child, _ := svc.GetByID(ctx, 1, 1, pendingChild.ID)
+	child, _ := svc.GetByID(ctx, "1", "1", pendingChild.ID)
 	assert.Equal(t, "done", child.Status)
 	require.NotNil(t, child.StatusBeforeCascade)
 	assert.Equal(t, "pending", *child.StatusBeforeCascade)
 
-	abandoned, _ := svc.GetByID(ctx, 1, 1, abandonedChild.ID)
+	abandoned, _ := svc.GetByID(ctx, "1", "1", abandonedChild.ID)
 	assert.Equal(t, "done", abandoned.Status)
 	require.NotNil(t, abandoned.StatusBeforeCascade)
 	assert.Equal(t, "abandoned", *abandoned.StatusBeforeCascade)
 
 	// Reopening the parent puts each child back exactly where it was.
-	_, err = svc.ToggleStatus(ctx, 1, 1, parent.ID)
+	_, err = svc.ToggleStatus(ctx, "1", "1", parent.ID)
 	require.NoError(t, err)
 
-	child, _ = svc.GetByID(ctx, 1, 1, pendingChild.ID)
+	child, _ = svc.GetByID(ctx, "1", "1", pendingChild.ID)
 	assert.Equal(t, "pending", child.Status)
 	assert.Nil(t, child.StatusBeforeCascade)
 	assert.Nil(t, child.CompletedAt)
 
-	abandoned, _ = svc.GetByID(ctx, 1, 1, abandonedChild.ID)
+	abandoned, _ = svc.GetByID(ctx, "1", "1", abandonedChild.ID)
 	assert.Equal(t, "abandoned", abandoned.Status)
 	assert.Nil(t, abandoned.StatusBeforeCascade)
 }
@@ -263,19 +263,19 @@ func TestServiceIntegration_SetStatusParentDoneToAbandonedRestoresSubtree(t *tes
 	svc, _ := newTodoServiceWithDB(t)
 	ctx := context.Background()
 
-	parent, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "parent"})
+	parent, err := svc.Create(ctx, "1", "1", &model.Todo{Title: "parent"})
 	require.NoError(t, err)
-	child, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "child", ParentID: &parent.ID})
+	child, err := svc.Create(ctx, "1", "1", &model.Todo{Title: "child", ParentID: &parent.ID})
 	require.NoError(t, err)
 
-	_, err = svc.SetStatus(ctx, 1, 1, parent.ID, "done")
+	_, err = svc.SetStatus(ctx, "1", "1", parent.ID, "done")
 	require.NoError(t, err)
-	child, _ = svc.GetByID(ctx, 1, 1, child.ID)
+	child, _ = svc.GetByID(ctx, "1", "1", child.ID)
 	assert.Equal(t, "done", child.Status)
 
-	_, err = svc.SetStatus(ctx, 1, 1, parent.ID, "abandoned")
+	_, err = svc.SetStatus(ctx, "1", "1", parent.ID, "abandoned")
 	require.NoError(t, err)
-	child, _ = svc.GetByID(ctx, 1, 1, child.ID)
+	child, _ = svc.GetByID(ctx, "1", "1", child.ID)
 	assert.Equal(t, "pending", child.Status, "child returns to its pre-cascade status")
 	assert.Nil(t, child.StatusBeforeCascade)
 }

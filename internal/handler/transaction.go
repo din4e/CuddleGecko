@@ -21,23 +21,23 @@ func NewTransactionHandler(svc *service.TransactionService) *TransactionHandler 
 }
 
 type createTransactionRequest struct {
-	Title      string  `json:"title" binding:"required"`
-	Amount     float64 `json:"amount" binding:"required,gt=0"`
-	Type       string  `json:"type" binding:"required,oneof=income expense"`
-	Category   string  `json:"category"`
-	ContactIDs []uint  `json:"contact_ids"`
-	Date       string  `json:"date" binding:"required"`
-	Notes      string  `json:"notes"`
+	Title      string   `json:"title" binding:"required"`
+	Amount     float64  `json:"amount" binding:"required,gt=0"`
+	Type       string   `json:"type" binding:"required,oneof=income expense"`
+	Category   string   `json:"category"`
+	ContactIDs []string `json:"contact_ids"`
+	Date       string   `json:"date" binding:"required"`
+	Notes      string   `json:"notes"`
 }
 
 type updateTransactionRequest struct {
-	Title      string  `json:"title"`
-	Amount     float64 `json:"amount" binding:"omitempty,gt=0"`
-	Type       string  `json:"type" binding:"omitempty,oneof=income expense"`
-	Category   string  `json:"category"`
-	ContactIDs []uint  `json:"contact_ids"`
-	Date       string  `json:"date"`
-	Notes      string  `json:"notes"`
+	Title      string   `json:"title"`
+	Amount     float64  `json:"amount" binding:"omitempty,gt=0"`
+	Type       string   `json:"type" binding:"omitempty,oneof=income expense"`
+	Category   string   `json:"category"`
+	ContactIDs []string `json:"contact_ids"`
+	Date       string   `json:"date"`
+	Notes      string   `json:"notes"`
 }
 
 // parseDateRange reads the optional ?from=&to= query params (YYYY-MM-DD,
@@ -79,11 +79,9 @@ func (h *TransactionHandler) List(c *gin.Context) {
 	if v := c.Query("type"); v != "" {
 		txType = &v
 	}
-	var contactID *uint
+	var contactID *string
 	if v := c.Query("contact_id"); v != "" {
-		id, _ := strconv.ParseUint(v, 10, 32)
-		uid := uint(id)
-		contactID = &uid
+		contactID = &v
 	}
 
 	search := c.Query("q")
@@ -106,13 +104,9 @@ func (h *TransactionHandler) List(c *gin.Context) {
 func (h *TransactionHandler) GetTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid transaction id")
-		return
-	}
+	id := c.Param("id")
 
-	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, uint(id))
+	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, id)
 	if err != nil {
 		response.NotFound(c, "transaction not found")
 		return
@@ -123,11 +117,7 @@ func (h *TransactionHandler) GetTags(c *gin.Context) {
 func (h *TransactionHandler) ReplaceTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid transaction id")
-		return
-	}
+	id := c.Param("id")
 
 	var req replaceTagsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -135,7 +125,7 @@ func (h *TransactionHandler) ReplaceTags(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
+	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, id, req.TagIDs); err != nil {
 		if errors.Is(err, model.ErrInvalidTagIDs) {
 			response.BadRequest(c, err.Error())
 			return
@@ -258,11 +248,7 @@ func (h *TransactionHandler) Create(c *gin.Context) {
 func (h *TransactionHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid transaction id")
-		return
-	}
+	id := c.Param("id")
 
 	var req updateTransactionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -288,7 +274,7 @@ func (h *TransactionHandler) Update(c *gin.Context) {
 		tx.Date = date
 	}
 
-	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), tx)
+	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, id, tx)
 	if err != nil {
 		if err == service.ErrTransactionNotFound {
 			response.NotFound(c, "transaction not found")
@@ -308,13 +294,9 @@ func (h *TransactionHandler) Update(c *gin.Context) {
 func (h *TransactionHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid transaction id")
-		return
-	}
+	id := c.Param("id")
 
-	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, id); err != nil {
 		response.NotFound(c, "transaction not found")
 		return
 	}

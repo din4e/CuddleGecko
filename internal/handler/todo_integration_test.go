@@ -91,7 +91,7 @@ func TestTodoHTTP_CreateListToggle(t *testing.T) {
 	assert.Equal(t, created.ID, page.Items[0].ID)
 
 	// Toggle -> done
-	env, code = doReq(t, router, "PATCH", fmt.Sprintf("/api/todos/%d/toggle", created.ID), nil)
+	env, code = doReq(t, router, "PATCH", fmt.Sprintf("/api/todos/%s/toggle", created.ID), nil)
 	require.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "done", decodeTodo(t, env.Data).Status)
 }
@@ -118,7 +118,7 @@ func TestTodoHTTP_ImportanceUrgency(t *testing.T) {
 	assert.Equal(t, "normal", classified.Urgency)
 
 	// Update moves it to quadrant 2 by clearing urgency.
-	env, code = doReq(t, router, "PUT", fmt.Sprintf("/api/todos/%d", classified.ID), map[string]interface{}{
+	env, code = doReq(t, router, "PUT", fmt.Sprintf("/api/todos/%s", classified.ID), map[string]interface{}{
 		"title": "quarterly report", "urgency": "none",
 	})
 	require.Equal(t, http.StatusOK, code)
@@ -147,14 +147,14 @@ func TestTodoHTTP_Subitems(t *testing.T) {
 	parent := decodeTodo(t, env.Data)
 
 	// Add a subtask
-	env, code := doReq(t, router, "POST", fmt.Sprintf("/api/todos/%d/items", parent.ID), map[string]interface{}{"content": "step"})
+	env, code := doReq(t, router, "POST", fmt.Sprintf("/api/todos/%s/items", parent.ID), map[string]interface{}{"content": "step"})
 	require.Equal(t, http.StatusCreated, code)
 	var item model.TodoItem
 	require.NoError(t, json.Unmarshal(env.Data, &item))
 	assert.Equal(t, "step", item.Content)
 
 	// List subtasks
-	env, code = doReq(t, router, "GET", fmt.Sprintf("/api/todos/%d/items", parent.ID), nil)
+	env, code = doReq(t, router, "GET", fmt.Sprintf("/api/todos/%s/items", parent.ID), nil)
 	require.Equal(t, http.StatusOK, code)
 	var items []model.TodoItem
 	require.NoError(t, json.Unmarshal(env.Data, &items))
@@ -175,12 +175,12 @@ func TestTodoHTTP_PinAndDuplicate(t *testing.T) {
 	created := decodeTodo(t, env.Data)
 
 	// Pin
-	env, code := doReq(t, router, "PATCH", fmt.Sprintf("/api/todos/%d/pin", created.ID), nil)
+	env, code := doReq(t, router, "PATCH", fmt.Sprintf("/api/todos/%s/pin", created.ID), nil)
 	require.Equal(t, http.StatusOK, code)
 	assert.True(t, decodeTodo(t, env.Data).Pinned)
 
 	// Duplicate
-	env, code = doReq(t, router, "POST", fmt.Sprintf("/api/todos/%d/duplicate", created.ID), nil)
+	env, code = doReq(t, router, "POST", fmt.Sprintf("/api/todos/%s/duplicate", created.ID), nil)
 	require.Equal(t, http.StatusCreated, code)
 	clone := decodeTodo(t, env.Data)
 	assert.Equal(t, "original", clone.Title)
@@ -194,7 +194,7 @@ func TestTodoHTTP_TrashRestore(t *testing.T) {
 	created := decodeTodo(t, env.Data)
 
 	// Delete (soft)
-	_, code := doReq(t, router, "DELETE", fmt.Sprintf("/api/todos/%d", created.ID), nil)
+	_, code := doReq(t, router, "DELETE", fmt.Sprintf("/api/todos/%s", created.ID), nil)
 	require.Equal(t, http.StatusOK, code)
 
 	// Trash lists it
@@ -206,7 +206,7 @@ func TestTodoHTTP_TrashRestore(t *testing.T) {
 	assert.Equal(t, created.ID, trash[0].ID)
 
 	// Restore
-	_, code = doReq(t, router, "POST", fmt.Sprintf("/api/todos/%d/restore", created.ID), nil)
+	_, code = doReq(t, router, "POST", fmt.Sprintf("/api/todos/%s/restore", created.ID), nil)
 	require.Equal(t, http.StatusOK, code)
 
 	// Back in the normal list
@@ -233,7 +233,7 @@ func TestTodoHTTP_BulkComplete_RecurringAdvances(t *testing.T) {
 
 	// Bulk complete both over HTTP.
 	env, code := doReq(t, router, "POST", "/api/todos/bulk",
-		map[string]interface{}{"ids": []uint{rec.ID, plain.ID}, "action": "complete"})
+		map[string]interface{}{"ids": []string{rec.ID, plain.ID}, "action": "complete"})
 	require.Equal(t, http.StatusOK, code)
 	var res struct {
 		Affected int64 `json:"affected"`
@@ -247,7 +247,7 @@ func TestTodoHTTP_BulkComplete_RecurringAdvances(t *testing.T) {
 		Items []model.Todo `json:"items"`
 	}
 	require.NoError(t, json.Unmarshal(env.Data, &page))
-	byID := map[uint]model.Todo{}
+	byID := map[string]model.Todo{}
 	for _, it := range page.Items {
 		byID[it.ID] = it
 	}
@@ -266,7 +266,7 @@ func TestTodoHTTP_RecurringToggleAdvances(t *testing.T) {
 	})
 	created := decodeTodo(t, env.Data)
 
-	env, code := doReq(t, router, "PATCH", fmt.Sprintf("/api/todos/%d/toggle", created.ID), nil)
+	env, code := doReq(t, router, "PATCH", fmt.Sprintf("/api/todos/%s/toggle", created.ID), nil)
 	require.Equal(t, http.StatusOK, code)
 	result := decodeTodo(t, env.Data)
 	assert.Equal(t, "pending", result.Status, "recurring task stays pending over HTTP")

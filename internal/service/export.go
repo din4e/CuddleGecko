@@ -20,55 +20,55 @@ type ExportData struct {
 }
 
 type ExportPayload struct {
-	Contacts     []model.Contact        `json:"contacts"`
-	Tags         []model.Tag            `json:"tags"`
-	Interactions []model.Interaction    `json:"interactions"`
-	Reminders    []model.Reminder       `json:"reminders"`
+	Contacts     []model.Contact         `json:"contacts"`
+	Tags         []model.Tag             `json:"tags"`
+	Interactions []model.Interaction     `json:"interactions"`
+	Reminders    []model.Reminder        `json:"reminders"`
 	Relations    []model.ContactRelation `json:"relations"`
-	Todos        []todoExport           `json:"todos"`
-	Transactions []model.Transaction    `json:"transactions"`
-	Events       []model.Event          `json:"events"`
-	Workouts     []workoutExport        `json:"workouts"`
-	BodyMetrics  []model.BodyMetric     `json:"body_metrics"`
+	Todos        []todoExport            `json:"todos"`
+	Transactions []model.Transaction     `json:"transactions"`
+	Events       []model.Event           `json:"events"`
+	Workouts     []workoutExport         `json:"workouts"`
+	BodyMetrics  []model.BodyMetric      `json:"body_metrics"`
 
 	// v2.0 additions.
-	Habits            []habitExport              `json:"habits"`
-	Pomodoros         []model.PomodoroSession    `json:"pomodoros"`
-	ExerciseLibrary   []model.ExerciseLibraryItem `json:"exercise_library"`
-	WorkoutTemplates  []templateExport           `json:"workout_templates"`
-	SetLogs           []setLogExport             `json:"set_logs"`
-	FitnessGoals      []model.FitnessGoal        `json:"fitness_goals"`
-	AIConversations   []aiConversationExport     `json:"ai_conversations"`
+	Habits           []habitExport               `json:"habits"`
+	Pomodoros        []model.PomodoroSession     `json:"pomodoros"`
+	ExerciseLibrary  []model.ExerciseLibraryItem `json:"exercise_library"`
+	WorkoutTemplates []templateExport            `json:"workout_templates"`
+	SetLogs          []setLogExport              `json:"set_logs"`
+	FitnessGoals     []model.FitnessGoal         `json:"fitness_goals"`
+	AIConversations  []aiConversationExport      `json:"ai_conversations"`
 }
 
 // habitExport captures a habit plus its check-in dates so the heatmap history
 // survives the round-trip (dates travel as YYYY-MM-DD strings).
 type habitExport struct {
-	ID         uint     `json:"id"`
-	Name       string   `json:"name"`
-	Color      string   `json:"color"`
-	Emoji      string   `json:"emoji"`
-	Frequency  string   `json:"frequency"`
-	Archived   bool     `json:"archived"`
-	SortOrder  int      `json:"sort_order"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Color        string   `json:"color"`
+	Emoji        string   `json:"emoji"`
+	Frequency    string   `json:"frequency"`
+	Archived     bool     `json:"archived"`
+	SortOrder    int      `json:"sort_order"`
 	CheckinDates []string `json:"checkin_dates"`
 }
 
 // templateExport captures a workout template with its planned movements inline.
 type templateExport struct {
-	ID     uint                       `json:"id"`
-	Name   string                     `json:"name"`
-	Type   string                     `json:"type"`
-	Notes  string                     `json:"notes"`
-	Items  []model.WorkoutTemplateItem `json:"items"`
+	ID    string                      `json:"id"`
+	Name  string                      `json:"name"`
+	Type  string                      `json:"type"`
+	Notes string                      `json:"notes"`
+	Items []model.WorkoutTemplateItem `json:"items"`
 }
 
 // setLogExport references its workout/exercise by source id; import remaps both
 // via the old→new id maps (identity-seeded with existing rows so module-level
 // imports pointing at existing workouts also work).
 type setLogExport struct {
-	WorkoutID   uint     `json:"workout_id"`
-	ExerciseID  uint     `json:"exercise_id"`
+	WorkoutID   string   `json:"workout_id"`
+	ExerciseID  string   `json:"exercise_id"`
 	SetIndex    int      `json:"set_index"`
 	Reps        *int     `json:"reps"`
 	Weight      *float64 `json:"weight"`
@@ -81,9 +81,9 @@ type setLogExport struct {
 // aiConversationExport captures a chat conversation with inline messages
 // (user-scoped, included in the account backup for completeness).
 type aiConversationExport struct {
-	ID       uint                  `json:"id"`
-	Title    string                `json:"title"`
-	Messages []aiMessageExport     `json:"messages"`
+	ID       string            `json:"id"`
+	Title    string            `json:"title"`
+	Messages []aiMessageExport `json:"messages"`
 }
 
 type aiMessageExport struct {
@@ -94,8 +94,8 @@ type aiMessageExport struct {
 // todoExport captures a todo's portable state for export/import. Tags travel as
 // names (re-associated on import); contacts are remapped via the contact ID map.
 type todoExport struct {
-	ID             uint         `json:"id"`
-	ParentID       *uint        `json:"parent_id"`
+	ID             string       `json:"id"`
+	ParentID       *string      `json:"parent_id"`
 	SortOrder      int          `json:"sort_order"`
 	Title          string       `json:"title"`
 	Description    string       `json:"description"`
@@ -108,8 +108,8 @@ type todoExport struct {
 	Amount         *float64     `json:"amount"`
 	AmountType     string       `json:"amount_type"`
 	Progress       *int         `json:"progress"`
-	ContactIDs     []uint       `json:"contact_ids"`
-	TodoIDs        []uint       `json:"todo_ids"`
+	ContactIDs     []string     `json:"contact_ids"`
+	TodoIDs        []string     `json:"todo_ids"`
 	Color          string       `json:"color"`
 	Repeat         string       `json:"repeat"`
 	RepeatInterval int          `json:"repeat_interval"`
@@ -128,24 +128,24 @@ type itemExport struct {
 // workoutExport captures a workout's portable state for export/import. Exercises
 // travel inline and are re-attached to the freshly-created workout on import.
 type workoutExport struct {
-	ID          uint           `json:"id"`
-	Name        string         `json:"name"`
-	Type        string         `json:"type"`
-	Status      string         `json:"status"`
-	Intensity   string         `json:"intensity"`
-	ScheduledAt *time.Time     `json:"scheduled_at"`
-	DurationMin *int           `json:"duration_min"`
-	Calories    *float64       `json:"calories"`
-	Color       string         `json:"color"`
-	Location    string         `json:"location"`
-	Notes       string         `json:"notes"`
-	SortOrder   int            `json:"sort_order"`
-	CompletedAt *time.Time     `json:"completed_at"`
+	ID          string           `json:"id"`
+	Name        string           `json:"name"`
+	Type        string           `json:"type"`
+	Status      string           `json:"status"`
+	Intensity   string           `json:"intensity"`
+	ScheduledAt *time.Time       `json:"scheduled_at"`
+	DurationMin *int             `json:"duration_min"`
+	Calories    *float64         `json:"calories"`
+	Color       string           `json:"color"`
+	Location    string           `json:"location"`
+	Notes       string           `json:"notes"`
+	SortOrder   int              `json:"sort_order"`
+	CompletedAt *time.Time       `json:"completed_at"`
 	Exercises   []exerciseExport `json:"exercises"`
 }
 
 type exerciseExport struct {
-	ID          uint     `json:"id"`
+	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Category    string   `json:"category"`
 	Sets        *int     `json:"sets"`
@@ -314,7 +314,7 @@ func NewExportService(
 // notifyImported fans out a workspace-wide refresh so other devices see the
 // imported todos (the import path creates rows directly, bypassing the todo
 // service's per-mutation notifications).
-func (s *ExportService) notifyImported(ctx context.Context, workspaceID uint) {
+func (s *ExportService) notifyImported(ctx context.Context, workspaceID string) {
 	if s.notifier == nil {
 		return
 	}
@@ -325,11 +325,11 @@ func (s *ExportService) notifyImported(ctx context.Context, workspaceID uint) {
 		ResourceReminder, ResourceRelation, ResourceTransaction,
 		ResourceWorkout, ResourceHabit,
 	} {
-		s.notifier.NotifyChange(ctx, workspaceID, resource, ChangeBulk, 0, nil)
+		s.notifier.NotifyChange(ctx, workspaceID, resource, ChangeBulk, "", nil)
 	}
 }
 
-func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint) (string, error) {
+func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID string) (string, error) {
 	contacts, _, err := s.contactRepo.List(ctx, workspaceID, 1, 10000, "", nil)
 	if err != nil {
 		return "", fmt.Errorf("export contacts: %w", err)
@@ -371,7 +371,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 		return "", fmt.Errorf("export todos: %w", err)
 	}
 	// Bulk-fetch checklist items for all todos in one query, grouped by todo ID.
-	todoIDs := make([]uint, 0, len(todos))
+	todoIDs := make([]string, 0, len(todos))
 	for _, td := range todos {
 		todoIDs = append(todoIDs, td.ID)
 	}
@@ -379,7 +379,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 	if err != nil {
 		return "", fmt.Errorf("export todo items: %w", err)
 	}
-	itemsByTodo := make(map[uint][]itemExport, len(todos))
+	itemsByTodo := make(map[string][]itemExport, len(todos))
 	for _, it := range allItems {
 		itemsByTodo[it.TodoID] = append(itemsByTodo[it.TodoID], itemExport{
 			Content: it.Content, Done: it.Done, SortOrder: it.SortOrder,
@@ -433,9 +433,9 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 			return "", fmt.Errorf("export workouts: %w", werr)
 		}
 		// Bulk-fetch exercises for all workouts in one query, grouped by workout ID.
-		var exercisesByWorkout map[uint][]exerciseExport
+		var exercisesByWorkout map[string][]exerciseExport
 		if s.workoutExRepo != nil {
-			workoutIDs := make([]uint, 0, len(workouts))
+			workoutIDs := make([]string, 0, len(workouts))
 			for _, w := range workouts {
 				workoutIDs = append(workoutIDs, w.ID)
 			}
@@ -443,10 +443,10 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 			if eerr != nil {
 				return "", fmt.Errorf("export exercises: %w", eerr)
 			}
-			exercisesByWorkout = make(map[uint][]exerciseExport, len(workouts))
-				for _, e := range allExs {
-					exercisesByWorkout[e.WorkoutID] = append(exercisesByWorkout[e.WorkoutID], exerciseExport{
-						ID: e.ID, Name: e.Name, Category: e.Category, Sets: e.Sets, Reps: e.Reps,
+			exercisesByWorkout = make(map[string][]exerciseExport, len(workouts))
+			for _, e := range allExs {
+				exercisesByWorkout[e.WorkoutID] = append(exercisesByWorkout[e.WorkoutID], exerciseExport{
+					ID: e.ID, Name: e.Name, Category: e.Category, Sets: e.Sets, Reps: e.Reps,
 					Weight: e.Weight, Distance: e.Distance, DurationSec: e.DurationSec,
 					RestSec: e.RestSec, Done: e.Done, SortOrder: e.SortOrder, Notes: e.Notes,
 				})
@@ -483,7 +483,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 		if herr != nil {
 			return "", fmt.Errorf("export habits: %w", herr)
 		}
-		logsByHabit := make(map[uint][]string)
+		logsByHabit := make(map[string][]string)
 		if s.habitLogRepo != nil {
 			allLogs, lerr := s.habitLogRepo.ListAllByWorkspace(ctx, workspaceID)
 			if lerr != nil {
@@ -545,7 +545,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 		if werr != nil {
 			return "", fmt.Errorf("export set logs: %w", werr)
 		}
-		wIDs := make([]uint, 0, len(ws))
+		wIDs := make([]string, 0, len(ws))
 		for _, w := range ws {
 			wIDs = append(wIDs, w.ID)
 		}
@@ -602,23 +602,23 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 		Version:    "2.0",
 		ExportedAt: time.Now(),
 		Data: ExportPayload{
-			Contacts:     contacts,
-			Tags:         tags,
-			Interactions: allInteractions,
-			Reminders:    reminders,
-			Relations:    relations,
-			Todos:        todoExports,
-			Transactions: transactions,
-			Events:       events,
-			Workouts:     workoutExports,
-			BodyMetrics:  bodyMetrics,
-			Habits:            habits,
-			Pomodoros:         pomodoros,
-			ExerciseLibrary:   exLibrary,
-			WorkoutTemplates:  templates,
-			SetLogs:           setLogs,
-			FitnessGoals:      fitnessGoals,
-			AIConversations:   aiConversations,
+			Contacts:         contacts,
+			Tags:             tags,
+			Interactions:     allInteractions,
+			Reminders:        reminders,
+			Relations:        relations,
+			Todos:            todoExports,
+			Transactions:     transactions,
+			Events:           events,
+			Workouts:         workoutExports,
+			BodyMetrics:      bodyMetrics,
+			Habits:           habits,
+			Pomodoros:        pomodoros,
+			ExerciseLibrary:  exLibrary,
+			WorkoutTemplates: templates,
+			SetLogs:          setLogs,
+			FitnessGoals:     fitnessGoals,
+			AIConversations:  aiConversations,
 		},
 	}
 
@@ -629,7 +629,7 @@ func (s *ExportService) ExportJSON(ctx context.Context, userID, workspaceID uint
 	return string(bytes), nil
 }
 
-func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint, jsonData string) error {
+func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID string, jsonData string) error {
 	var data ExportData
 	if err := json.Unmarshal([]byte(jsonData), &data); err != nil {
 		return fmt.Errorf("invalid JSON: %w", err)
@@ -642,20 +642,20 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	// Existing workspace rows seed identity FK maps so a module-level import
 	// (e.g. todos only) referencing existing contacts/todos/workouts keeps those
 	// references intact instead of dropping them.
-	contactIDMap := make(map[uint]uint)
+	contactIDMap := make(map[string]string)
 	if existingContacts, _, err := s.contactRepo.List(ctx, workspaceID, 1, 100000, "", nil); err == nil {
 		for _, c := range existingContacts {
 			contactIDMap[c.ID] = c.ID
 		}
 	}
-	todoIDMap := make(map[uint]uint)
+	todoIDMap := make(map[string]string)
 	if existingTodos, _, err := s.todoRepo.List(ctx, workspaceID, model.TodoListQuery{Page: 1, PageSize: 100000}); err == nil {
 		for _, td := range existingTodos {
 			todoIDMap[td.ID] = td.ID
 		}
 	}
 	wsTags, _, _ := s.tagRepo.List(ctx, workspaceID, 1, 100000)
-	tagNameToID := make(map[string]uint)
+	tagNameToID := make(map[string]string)
 	for _, tg := range wsTags {
 		tagNameToID[tg.Name] = tg.ID
 	}
@@ -676,7 +676,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	// Contacts
 	rawContacts, _ := json.Marshal(data.Data.Contacts)
 	var contacts []struct {
-		ID                 uint     `json:"id"`
+		ID                 string   `json:"id"`
 		Name               string   `json:"name"`
 		Nickname           string   `json:"nickname"`
 		AvatarURL          string   `json:"avatar_url"`
@@ -737,7 +737,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	// Interactions
 	rawInteractions, _ := json.Marshal(data.Data.Interactions)
 	var interactions []struct {
-		ContactID  uint   `json:"contact_id"`
+		ContactID  string `json:"contact_id"`
 		Type       string `json:"type"`
 		Title      string `json:"title"`
 		Content    string `json:"content"`
@@ -769,7 +769,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	// Reminders
 	rawReminders, _ := json.Marshal(data.Data.Reminders)
 	var reminders []struct {
-		ContactID   uint   `json:"contact_id"`
+		ContactID   string `json:"contact_id"`
 		Title       string `json:"title"`
 		Description string `json:"description"`
 		RemindAt    string `json:"remind_at"`
@@ -801,8 +801,8 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	// Relations
 	rawRelations, _ := json.Marshal(data.Data.Relations)
 	var relations []struct {
-		ContactIDA   uint   `json:"contact_id_a"`
-		ContactIDB   uint   `json:"contact_id_b"`
+		ContactIDA   string `json:"contact_id_a"`
+		ContactIDB   string `json:"contact_id_b"`
 		RelationType string `json:"relation_type"`
 	}
 	if err := json.Unmarshal(rawRelations, &relations); err != nil {
@@ -830,7 +830,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	// transaction repo is wired (e.g. legacy tests).
 	if s.txRepo != nil {
 		for _, tx := range data.Data.Transactions {
-			remappedContacts := make([]uint, 0, len(tx.ContactIDs))
+			remappedContacts := make([]string, 0, len(tx.ContactIDs))
 			for _, cid := range tx.ContactIDs {
 				if nc, ok := contactIDMap[cid]; ok {
 					remappedContacts = append(remappedContacts, nc)
@@ -856,7 +856,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	// Events (calendar) — contact IDs remapped. Skipped when no event repo.
 	if s.eventRepo != nil {
 		for _, ev := range data.Data.Events {
-			remappedContacts := make([]uint, 0, len(ev.ContactIDs))
+			remappedContacts := make([]string, 0, len(ev.ContactIDs))
 			for _, cid := range ev.ContactIDs {
 				if nc, ok := contactIDMap[cid]; ok {
 					remappedContacts = append(remappedContacts, nc)
@@ -889,9 +889,9 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	oldToNew := todoIDMap
 	// Links can target todos created later in this batch, so raw ids are
 	// collected here and remapped once the whole set exists (below).
-	linksByNewID := make(map[uint][]uint)
+	linksByNewID := make(map[string][]string)
 	for _, te := range ordered {
-		remappedContacts := make([]uint, 0, len(te.ContactIDs))
+		remappedContacts := make([]string, 0, len(te.ContactIDs))
 		for _, cid := range te.ContactIDs {
 			if nc, ok := contactIDMap[cid]; ok {
 				remappedContacts = append(remappedContacts, nc)
@@ -906,27 +906,27 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 			priority = "normal"
 		}
 		newTodo := &model.Todo{
-			UserID:      userID,
-			WorkspaceID: workspaceID,
-			Title:       te.Title,
-			Description: te.Description,
-			Status:      status,
-			Priority:    priority,
-			Importance:  tierOrDefault(te.Importance, "none"),
-			Urgency:     tierOrDefault(te.Urgency, "none"),
-			DueTime:     te.DueTime,
-			StartTime:   te.StartTime,
-			Amount:      te.Amount,
-			AmountType:  te.AmountType,
-			Progress:    te.Progress,
-			ContactIDs:  remappedContacts,
-			Color:       te.Color,
-			Repeat:      te.Repeat,
+			UserID:         userID,
+			WorkspaceID:    workspaceID,
+			Title:          te.Title,
+			Description:    te.Description,
+			Status:         status,
+			Priority:       priority,
+			Importance:     tierOrDefault(te.Importance, "none"),
+			Urgency:        tierOrDefault(te.Urgency, "none"),
+			DueTime:        te.DueTime,
+			StartTime:      te.StartTime,
+			Amount:         te.Amount,
+			AmountType:     te.AmountType,
+			Progress:       te.Progress,
+			ContactIDs:     remappedContacts,
+			Color:          te.Color,
+			Repeat:         te.Repeat,
 			RepeatInterval: te.RepeatInterval,
-			Pinned:      te.Pinned,
-			CompletedAt: te.CompletedAt,
-			ParentID:   remapParent(te.ParentID, oldToNew),
-			SortOrder:  te.SortOrder,
+			Pinned:         te.Pinned,
+			CompletedAt:    te.CompletedAt,
+			ParentID:       remapParent(te.ParentID, oldToNew),
+			SortOrder:      te.SortOrder,
 		}
 		if err := s.todoRepo.Create(ctx, newTodo); err != nil {
 			continue
@@ -940,7 +940,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 				TodoID: newTodo.ID, Content: ie.Content, Done: ie.Done, SortOrder: ie.SortOrder,
 			})
 		}
-		tagIDs := make([]uint, 0, len(te.TagNames))
+		tagIDs := make([]string, 0, len(te.TagNames))
 		for _, name := range te.TagNames {
 			if id, ok := tagNameToID[name]; ok {
 				tagIDs = append(tagIDs, id)
@@ -959,7 +959,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	// targets (not in the file, not pre-existing) are dropped like dangling
 	// contact references above.
 	for newID, oldLinks := range linksByNewID {
-		remappedLinks := make([]uint, 0, len(oldLinks))
+		remappedLinks := make([]string, 0, len(oldLinks))
 		for _, lid := range oldLinks {
 			if nl, ok := oldToNew[lid]; ok && nl != newID {
 				remappedLinks = append(remappedLinks, nl)
@@ -974,15 +974,15 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	// freshly-created workout via an old→new id map. Maps are identity-seeded
 	// with existing rows so set logs referencing pre-existing workouts keep
 	// working on a partial import. Skipped without repos.
-	workoutOldToNew := make(map[uint]uint)
-	exOldToNew := make(map[uint]uint)
+	workoutOldToNew := make(map[string]string)
+	exOldToNew := make(map[string]string)
 	if s.workoutRepo != nil {
 		if existing, _, err := s.workoutRepo.List(ctx, workspaceID, model.WorkoutListQuery{Page: 1, PageSize: 100000}); err == nil {
 			for _, w := range existing {
 				workoutOldToNew[w.ID] = w.ID
 			}
 			if s.workoutExRepo != nil {
-				wIDs := make([]uint, 0, len(existing))
+				wIDs := make([]string, 0, len(existing))
 				for _, w := range existing {
 					wIDs = append(wIDs, w.ID)
 				}
@@ -1080,7 +1080,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	if s.pomodoroRepo != nil {
 		for _, p := range data.Data.Pomodoros {
 			newP := p
-			newP.ID = 0
+			newP.ID = ""
 			newP.UserID = userID
 			newP.WorkspaceID = workspaceID
 			if p.TodoID != nil {
@@ -1098,7 +1098,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	if s.exLibRepo != nil {
 		for _, item := range data.Data.ExerciseLibrary {
 			newItem := item
-			newItem.ID = 0
+			newItem.ID = ""
 			newItem.UserID = userID
 			newItem.WorkspaceID = workspaceID
 			_ = s.exLibRepo.Create(ctx, &newItem)
@@ -1108,8 +1108,8 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 		for _, te := range data.Data.WorkoutTemplates {
 			items := make([]model.WorkoutTemplateItem, 0, len(te.Items))
 			for _, it := range te.Items {
-				it.ID = 0
-				it.TemplateID = 0
+				it.ID = ""
+				it.TemplateID = ""
 				items = append(items, it)
 			}
 			newT := &model.WorkoutTemplate{
@@ -1122,7 +1122,7 @@ func (s *ExportService) ImportJSON(ctx context.Context, userID, workspaceID uint
 	if s.goalRepo != nil {
 		for _, g := range data.Data.FitnessGoals {
 			newG := g
-			newG.ID = 0
+			newG.ID = ""
 			newG.UserID = userID
 			newG.WorkspaceID = workspaceID
 			_ = s.goalRepo.Create(ctx, &newG)
@@ -1184,11 +1184,11 @@ func topoSortTodos(todos []todoExport) []todoExport {
 	if len(todos) == 0 {
 		return todos
 	}
-	present := make(map[uint]bool, len(todos))
+	present := make(map[string]bool, len(todos))
 	for _, te := range todos {
 		present[te.ID] = true
 	}
-	children := make(map[uint][]todoExport)
+	children := make(map[string][]todoExport)
 	var roots []todoExport
 	for _, te := range todos {
 		if te.ParentID != nil && present[*te.ParentID] {
@@ -1209,7 +1209,7 @@ func topoSortTodos(todos []todoExport) []todoExport {
 		walk(r)
 	}
 	// Defensive: append anything not reached (cyclic / malformed).
-	reached := make(map[uint]bool, len(out))
+	reached := make(map[string]bool, len(out))
 	for _, te := range out {
 		reached[te.ID] = true
 	}
@@ -1224,7 +1224,7 @@ func topoSortTodos(todos []todoExport) []todoExport {
 // remapParent translates a source parent_id into the freshly-imported id, or
 // nil if the parent wasn't imported (so the child becomes a root instead of
 // holding a dangling reference).
-func remapParent(pid *uint, oldToNew map[uint]uint) *uint {
+func remapParent(pid *string, oldToNew map[string]string) *string {
 	if pid == nil {
 		return nil
 	}
@@ -1296,7 +1296,7 @@ func tierOrDefault(v, fallback string) string {
 	}
 }
 
-func (s *ExportService) ExportTodosCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportTodosCSV(ctx context.Context, workspaceID string) (string, error) {
 	todos, _, err := s.todoRepo.List(ctx, workspaceID, model.TodoListQuery{Page: 1, PageSize: 100000})
 	if err != nil {
 		return "", fmt.Errorf("export todos csv: %w", err)
@@ -1314,7 +1314,7 @@ func (s *ExportService) ExportTodosCSV(ctx context.Context, workspaceID uint) (s
 			tagNames = append(tagNames, tg.Name)
 		}
 		csvWriteRow(w, []string{
-			strconv.FormatUint(uint64(t.ID), 10),
+			t.ID,
 			t.Title,
 			t.Description,
 			t.Status,
@@ -1349,11 +1349,11 @@ func timeToStr(t *time.Time) string {
 	return t.Format(time.RFC3339)
 }
 
-func uintPtrToStr(u *uint) string {
+func uintPtrToStr(u *string) string {
 	if u == nil {
 		return ""
 	}
-	return strconv.FormatUint(uint64(*u), 10)
+	return *u
 }
 
 func floatPtrToStr(f *float64) string {
@@ -1366,7 +1366,7 @@ func floatPtrToStr(f *float64) string {
 // ExportContactsCSV renders the workspace's contacts as a CSV (spreadsheet-
 // friendly) — one row per contact, multi-value fields (emails/phones/tags) joined
 // by "; ". Handy for mail-merge or migrating to another tool.
-func (s *ExportService) ExportContactsCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportContactsCSV(ctx context.Context, workspaceID string) (string, error) {
 	contacts, _, err := s.contactRepo.List(ctx, workspaceID, 1, 10000, "", nil)
 	if err != nil {
 		return "", fmt.Errorf("export contacts csv: %w", err)
@@ -1380,7 +1380,7 @@ func (s *ExportService) ExportContactsCSV(ctx context.Context, workspaceID uint)
 			tagNames = append(tagNames, tg.Name)
 		}
 		csvWriteRow(w, []string{
-			strconv.FormatUint(uint64(c.ID), 10),
+			c.ID,
 			c.Name,
 			c.Nickname,
 			strings.Join(c.Email, "; "),
@@ -1398,7 +1398,7 @@ func (s *ExportService) ExportContactsCSV(ctx context.Context, workspaceID uint)
 
 // ExportTransactionsCSV renders the workspace's transactions as a CSV
 // (spreadsheet-friendly for accounting). Requires a transaction repo.
-func (s *ExportService) ExportTransactionsCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportTransactionsCSV(ctx context.Context, workspaceID string) (string, error) {
 	if s.txRepo == nil {
 		return "", fmt.Errorf("transaction export not available")
 	}
@@ -1412,10 +1412,10 @@ func (s *ExportService) ExportTransactionsCSV(ctx context.Context, workspaceID u
 	for _, tx := range txs {
 		ids := make([]string, 0, len(tx.ContactIDs))
 		for _, id := range tx.ContactIDs {
-			ids = append(ids, strconv.FormatUint(uint64(id), 10))
+			ids = append(ids, id)
 		}
 		csvWriteRow(w, []string{
-			strconv.FormatUint(uint64(tx.ID), 10),
+			tx.ID,
 			tx.Date.Format(time.RFC3339),
 			tx.Title,
 			tx.Type,
@@ -1431,7 +1431,7 @@ func (s *ExportService) ExportTransactionsCSV(ctx context.Context, workspaceID u
 
 // ExportEventsCSV renders the workspace's calendar events as a CSV. Requires an
 // event repo.
-func (s *ExportService) ExportEventsCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportEventsCSV(ctx context.Context, workspaceID string) (string, error) {
 	if s.eventRepo == nil {
 		return "", fmt.Errorf("event export not available")
 	}
@@ -1445,10 +1445,10 @@ func (s *ExportService) ExportEventsCSV(ctx context.Context, workspaceID uint) (
 	for _, ev := range events {
 		ids := make([]string, 0, len(ev.ContactIDs))
 		for _, id := range ev.ContactIDs {
-			ids = append(ids, strconv.FormatUint(uint64(id), 10))
+			ids = append(ids, id)
 		}
 		csvWriteRow(w, []string{
-			strconv.FormatUint(uint64(ev.ID), 10),
+			ev.ID,
 			ev.Title,
 			ev.Description,
 			ev.StartTime.Format(time.RFC3339),
@@ -1466,7 +1466,7 @@ func (s *ExportService) ExportEventsCSV(ctx context.Context, workspaceID uint) (
 // required; type validated income/expense; date defaults to now; contacts
 // referenced by name, "; "-joined). Rows whose date+title+amount already exist
 // are skipped and counted. Requires a transaction repo.
-func (s *ExportService) ImportTransactionsCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportTransactionsCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	if s.txRepo == nil {
 		return ImportStats{}, fmt.Errorf("transaction import not available")
 	}
@@ -1543,7 +1543,7 @@ func (s *ExportService) ImportTransactionsCSV(ctx context.Context, userID, works
 // name, case-insensitive). Multi-value fields (emails/phones/relationships) are
 // split on ";". Contacts with the same name+email are skipped and counted.
 // Tags are not associated on CSV import (add them in the UI).
-func (s *ExportService) ImportContactsCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportContactsCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	existing, _, err := s.contactRepo.List(ctx, workspaceID, 1, 100000, "", nil)
 	if err != nil {
 		return ImportStats{}, err
@@ -1622,7 +1622,7 @@ func splitSemi(s string) []string {
 // name, case-insensitive). parent_id is ignored on import — CSV is a flat
 // spreadsheet format; nesting round-trips through the JSON export/import.
 // Todos with the same title+due_time are skipped and counted.
-func (s *ExportService) ImportTodosCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportTodosCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	existing, _, err := s.todoRepo.List(ctx, workspaceID, model.TodoListQuery{Page: 1, PageSize: 100000})
 	if err != nil {
 		return ImportStats{}, err

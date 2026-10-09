@@ -14,7 +14,7 @@ func (s *MCPServer) registerFitnessTools() {
 		"properties": map[string]interface{}{
 			"q": map[string]interface{}{"type": "string", "description": "Optional name search"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		return s.fitnessSvc.ListLibrary(ctx, userID, workspaceID, toString(getArg(args, "q")))
 	})
 
@@ -28,7 +28,7 @@ func (s *MCPServer) registerFitnessTools() {
 			"notes":         map[string]interface{}{"type": "string"},
 		},
 		"required": []string{"name"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		return s.fitnessSvc.CreateLibraryItem(ctx, userID, workspaceID, &model.ExerciseLibraryItem{
 			Name:         toString(getArg(args, "name")),
 			Category:     toString(getArg(args, "category")),
@@ -40,7 +40,7 @@ func (s *MCPServer) registerFitnessTools() {
 
 	s.registerTool("list_workout_templates", "List reusable workout templates (routines).", map[string]interface{}{
 		"type": "object",
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		return s.fitnessSvc.ListTemplates(ctx, userID, workspaceID)
 	})
 
@@ -51,20 +51,20 @@ func (s *MCPServer) registerFitnessTools() {
 			"scheduled_at": map[string]interface{}{"type": "string", "description": "RFC3339 schedule time (optional)"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		return s.fitnessSvc.InstantiateTemplate(ctx, userID, workspaceID, id, toTimePtr(getArg(args, "scheduled_at")))
 	})
 
 	s.registerTool("workout_prs", "List personal records (best weight and estimated 1RM) per exercise.", map[string]interface{}{
 		"type": "object",
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		return s.fitnessSvc.PRs(ctx, userID, workspaceID)
 	})
 
 	s.registerTool("list_fitness_goals", "List fitness goals with computed current progress.", map[string]interface{}{
 		"type": "object",
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		return s.fitnessSvc.ListGoals(ctx, userID, workspaceID)
 	})
 
@@ -74,7 +74,7 @@ func (s *MCPServer) registerFitnessTools() {
 			"bucket": map[string]interface{}{"type": "string", "description": "week (default) or month"},
 			"limit":  map[string]interface{}{"type": "integer", "description": "Number of buckets (default 12)"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		bucket := toString(getArg(args, "bucket"))
 		if bucket == "" {
 			bucket = "week"

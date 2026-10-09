@@ -23,7 +23,7 @@ func NewExerciseLibraryRepo(db *gorm.DB) *ExerciseLibraryRepo {
 	return &ExerciseLibraryRepo{db: db}
 }
 
-func (r *ExerciseLibraryRepo) List(ctx context.Context, workspaceID uint, search string) ([]model.ExerciseLibraryItem, error) {
+func (r *ExerciseLibraryRepo) List(ctx context.Context, workspaceID string, search string) ([]model.ExerciseLibraryItem, error) {
 	query := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID)
 	if search != "" {
 		query = query.Where("LOWER(name) LIKE ?", "%"+strings.ToLower(search)+"%")
@@ -35,7 +35,7 @@ func (r *ExerciseLibraryRepo) List(ctx context.Context, workspaceID uint, search
 	return items, nil
 }
 
-func (r *ExerciseLibraryRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.ExerciseLibraryItem, error) {
+func (r *ExerciseLibraryRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.ExerciseLibraryItem, error) {
 	var item model.ExerciseLibraryItem
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&item).Error; err != nil {
 		return nil, err
@@ -44,11 +44,11 @@ func (r *ExerciseLibraryRepo) GetByID(ctx context.Context, workspaceID, id uint)
 }
 
 // NameExists checks for a duplicate (non-deleted) name in the workspace.
-func (r *ExerciseLibraryRepo) NameExists(ctx context.Context, workspaceID uint, name string, excludeID uint) (bool, error) {
+func (r *ExerciseLibraryRepo) NameExists(ctx context.Context, workspaceID string, name string, excludeID string) (bool, error) {
 	var count int64
 	query := r.db.WithContext(ctx).Model(&model.ExerciseLibraryItem{}).
 		Where("workspace_id = ? AND LOWER(name) = ?", workspaceID, strings.ToLower(name))
-	if excludeID != 0 {
+	if excludeID != "" {
 		query = query.Where("id <> ?", excludeID)
 	}
 	if err := query.Count(&count).Error; err != nil {
@@ -79,7 +79,7 @@ func (r *ExerciseLibraryRepo) Update(ctx context.Context, item *model.ExerciseLi
 	return nil
 }
 
-func (r *ExerciseLibraryRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *ExerciseLibraryRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	res := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.ExerciseLibraryItem{})
 	if res.Error != nil {
 		return fmt.Errorf("delete exercise library item: %w", res.Error)
@@ -103,7 +103,7 @@ func NewWorkoutTemplateRepo(db *gorm.DB) *WorkoutTemplateRepo {
 }
 
 // List returns templates with their items (bulk fetch, no N+1).
-func (r *WorkoutTemplateRepo) List(ctx context.Context, workspaceID uint) ([]model.WorkoutTemplate, error) {
+func (r *WorkoutTemplateRepo) List(ctx context.Context, workspaceID string) ([]model.WorkoutTemplate, error) {
 	var templates []model.WorkoutTemplate
 	if err := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID).
 		Order("name ASC").Find(&templates).Error; err != nil {
@@ -112,13 +112,13 @@ func (r *WorkoutTemplateRepo) List(ctx context.Context, workspaceID uint) ([]mod
 	if len(templates) == 0 {
 		return templates, nil
 	}
-	ids := make([]uint, len(templates))
+	ids := make([]string, len(templates))
 	for i := range templates {
 		ids[i] = templates[i].ID
 	}
 	var items []model.WorkoutTemplateItem
 	if err := r.db.WithContext(ctx).Where("template_id IN ?", ids).
-		Order("template_id ASC, sort_order ASC, id ASC").Find(&items).Error; err != nil {
+		Order("template_id ASC, sort_order ASC, created_at ASC, id ASC").Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("list workout template items: %w", err)
 	}
 	for i := range templates {
@@ -133,14 +133,14 @@ func (r *WorkoutTemplateRepo) List(ctx context.Context, workspaceID uint) ([]mod
 	return templates, nil
 }
 
-func (r *WorkoutTemplateRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.WorkoutTemplate, error) {
+func (r *WorkoutTemplateRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.WorkoutTemplate, error) {
 	var t model.WorkoutTemplate
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&t).Error; err != nil {
 		return nil, err
 	}
 	var items []model.WorkoutTemplateItem
 	if err := r.db.WithContext(ctx).Where("template_id = ?", t.ID).
-		Order("sort_order ASC, id ASC").Find(&items).Error; err != nil {
+		Order("sort_order ASC, created_at ASC, id ASC").Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("load template items: %w", err)
 	}
 	t.Items = items
@@ -155,7 +155,7 @@ func (r *WorkoutTemplateRepo) Create(ctx context.Context, t *model.WorkoutTempla
 			return fmt.Errorf("create template: %w", err)
 		}
 		for i := range t.Items {
-			t.Items[i].ID = 0
+			t.Items[i].ID = ""
 			t.Items[i].TemplateID = t.ID
 			if err := tx.Create(&t.Items[i]).Error; err != nil {
 				return fmt.Errorf("create template item: %w", err)
@@ -181,7 +181,7 @@ func (r *WorkoutTemplateRepo) Update(ctx context.Context, t *model.WorkoutTempla
 			}
 			items := normalizeTemplateItems(t.Items)
 			for i := range items {
-				items[i].ID = 0
+				items[i].ID = ""
 				items[i].TemplateID = t.ID
 				if err := tx.Create(&items[i]).Error; err != nil {
 					return fmt.Errorf("create template item: %w", err)
@@ -193,7 +193,7 @@ func (r *WorkoutTemplateRepo) Update(ctx context.Context, t *model.WorkoutTempla
 	})
 }
 
-func (r *WorkoutTemplateRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *WorkoutTemplateRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("template_id = ?", id).Delete(&model.WorkoutTemplateItem{}).Error; err != nil {
 			return fmt.Errorf("delete template items: %w", err)
@@ -238,16 +238,16 @@ func NewWorkoutSetLogRepo(db *gorm.DB) *WorkoutSetLogRepo {
 	return &WorkoutSetLogRepo{db: db}
 }
 
-func (r *WorkoutSetLogRepo) ListByExercise(ctx context.Context, workoutID, exerciseID uint) ([]model.WorkoutSetLog, error) {
+func (r *WorkoutSetLogRepo) ListByExercise(ctx context.Context, workoutID, exerciseID string) ([]model.WorkoutSetLog, error) {
 	var logs []model.WorkoutSetLog
 	if err := r.db.WithContext(ctx).Where("workout_id = ? AND exercise_id = ?", workoutID, exerciseID).
-		Order("set_index ASC, id ASC").Find(&logs).Error; err != nil {
+		Order("set_index ASC, created_at ASC, id ASC").Find(&logs).Error; err != nil {
 		return nil, fmt.Errorf("list set logs: %w", err)
 	}
 	return logs, nil
 }
 
-func (r *WorkoutSetLogRepo) GetByID(ctx context.Context, workoutID, exerciseID, id uint) (*model.WorkoutSetLog, error) {
+func (r *WorkoutSetLogRepo) GetByID(ctx context.Context, workoutID, exerciseID, id string) (*model.WorkoutSetLog, error) {
 	var log model.WorkoutSetLog
 	if err := r.db.WithContext(ctx).
 		Where("id = ? AND workout_id = ? AND exercise_id = ?", id, workoutID, exerciseID).
@@ -274,19 +274,19 @@ func (r *WorkoutSetLogRepo) Create(ctx context.Context, log *model.WorkoutSetLog
 func (r *WorkoutSetLogRepo) Update(ctx context.Context, log *model.WorkoutSetLog) error {
 	if err := r.db.WithContext(ctx).Model(&model.WorkoutSetLog{}).Where("id = ?", log.ID).
 		Updates(map[string]interface{}{
-			"reps":          log.Reps,
-			"weight":        log.Weight,
-			"distance":      log.Distance,
-			"duration_sec":  log.DurationSec,
-			"done":          log.Done,
-			"notes":         log.Notes,
+			"reps":         log.Reps,
+			"weight":       log.Weight,
+			"distance":     log.Distance,
+			"duration_sec": log.DurationSec,
+			"done":         log.Done,
+			"notes":        log.Notes,
 		}).Error; err != nil {
 		return fmt.Errorf("update set log: %w", err)
 	}
 	return nil
 }
 
-func (r *WorkoutSetLogRepo) Delete(ctx context.Context, workoutID, exerciseID, id uint) error {
+func (r *WorkoutSetLogRepo) Delete(ctx context.Context, workoutID, exerciseID, id string) error {
 	res := r.db.WithContext(ctx).
 		Where("id = ? AND workout_id = ? AND exercise_id = ?", id, workoutID, exerciseID).
 		Delete(&model.WorkoutSetLog{})
@@ -302,12 +302,12 @@ func (r *WorkoutSetLogRepo) Delete(ctx context.Context, workoutID, exerciseID, i
 // PRs derives per-exercise personal records (best weight and best Epley
 // estimated 1RM) from set logs. One joined query; the max-math is in Go so no
 // dialect-specific SQL is needed.
-func (r *WorkoutSetLogRepo) PRs(ctx context.Context, workspaceID uint) ([]model.ExercisePR, error) {
+func (r *WorkoutSetLogRepo) PRs(ctx context.Context, workspaceID string) ([]model.ExercisePR, error) {
 	var rows []struct {
-		Exercise string     `gorm:"column:exercise"`
-		Weight   *float64   `gorm:"column:weight"`
-		Reps     *int       `gorm:"column:reps"`
-		LoggedAt time.Time  `gorm:"column:logged_at"`
+		Exercise string    `gorm:"column:exercise"`
+		Weight   *float64  `gorm:"column:weight"`
+		Reps     *int      `gorm:"column:reps"`
+		LoggedAt time.Time `gorm:"column:logged_at"`
 	}
 	if err := r.db.WithContext(ctx).Table("workout_set_logs l").
 		Select("e.name AS exercise, l.weight AS weight, l.reps AS reps, l.created_at AS logged_at").
@@ -382,7 +382,7 @@ func NewFitnessGoalRepo(db *gorm.DB) *FitnessGoalRepo {
 	return &FitnessGoalRepo{db: db}
 }
 
-func (r *FitnessGoalRepo) List(ctx context.Context, workspaceID uint) ([]model.FitnessGoal, error) {
+func (r *FitnessGoalRepo) List(ctx context.Context, workspaceID string) ([]model.FitnessGoal, error) {
 	var goals []model.FitnessGoal
 	if err := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID).
 		Order("created_at DESC").Find(&goals).Error; err != nil {
@@ -391,7 +391,7 @@ func (r *FitnessGoalRepo) List(ctx context.Context, workspaceID uint) ([]model.F
 	return goals, nil
 }
 
-func (r *FitnessGoalRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.FitnessGoal, error) {
+func (r *FitnessGoalRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.FitnessGoal, error) {
 	var g model.FitnessGoal
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&g).Error; err != nil {
 		return nil, err
@@ -423,7 +423,7 @@ func (r *FitnessGoalRepo) Update(ctx context.Context, g *model.FitnessGoal) erro
 
 // SetStartValue persists a goal's weight baseline (create snapshot / legacy
 // backfill) without touching any other column.
-func (r *FitnessGoalRepo) SetStartValue(ctx context.Context, id uint, v float64) error {
+func (r *FitnessGoalRepo) SetStartValue(ctx context.Context, id string, v float64) error {
 	if err := r.db.WithContext(ctx).Model(&model.FitnessGoal{}).Where("id = ?", id).
 		Update("start_value", v).Error; err != nil {
 		return fmt.Errorf("set fitness goal start value: %w", err)
@@ -431,7 +431,7 @@ func (r *FitnessGoalRepo) SetStartValue(ctx context.Context, id uint, v float64)
 	return nil
 }
 
-func (r *FitnessGoalRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *FitnessGoalRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	res := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.FitnessGoal{})
 	if res.Error != nil {
 		return fmt.Errorf("delete fitness goal: %w", res.Error)

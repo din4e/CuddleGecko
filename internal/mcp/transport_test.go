@@ -18,7 +18,7 @@ func TestGenerateSessionID_UniqueAndVaried(t *testing.T) {
 	for i := 0; i < n; i++ {
 		id := generateSessionID()
 		_, dup := seen[id]
-		assert.False(t, dup, "session IDs must be unique, got duplicate %q (i=%d)", id, i)
+		assert.False(t, dup, "session IDs must be unique, got duplicate %q (i=%s)", id, i)
 		seen[id] = struct{}{}
 		parts := strings.SplitN(id, "-", 2)
 		if len(parts) == 2 {

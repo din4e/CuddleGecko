@@ -28,7 +28,7 @@ func NewSearchRepo(db *gorm.DB) *SearchRepo {
 // merged and sorted by updated_at desc. Child-table matches (todo subtasks,
 // workout exercises, whiteboard nodes) are folded into their parent's hit and
 // only fill gaps — a parent that matched directly keeps its richer field info.
-func (r *SearchRepo) Search(ctx context.Context, workspaceID uint, pattern string, types []string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) Search(ctx context.Context, workspaceID string, pattern string, types []string, limit int) ([]model.SearchHit, error) {
 	enabled := make(map[string]bool, len(model.AllSearchTypes))
 	if len(types) == 0 {
 		for _, t := range model.AllSearchTypes {
@@ -120,7 +120,7 @@ func sortHitsByUpdatedDesc(hits []model.SearchHit) {
 	}
 }
 
-func (r *SearchRepo) searchContacts(ctx context.Context, workspaceID uint, query string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) searchContacts(ctx context.Context, workspaceID string, query string, limit int) ([]model.SearchHit, error) {
 	pat := "%" + query + "%"
 	var rows []model.Contact
 	err := r.db.WithContext(ctx).
@@ -179,7 +179,7 @@ func (r *SearchRepo) searchContacts(ctx context.Context, workspaceID uint, query
 	return hits, nil
 }
 
-func (r *SearchRepo) searchInteractions(ctx context.Context, workspaceID uint, query string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) searchInteractions(ctx context.Context, workspaceID string, query string, limit int) ([]model.SearchHit, error) {
 	pat := "%" + query + "%"
 	var rows []model.Interaction
 	err := r.db.WithContext(ctx).
@@ -215,7 +215,7 @@ func (r *SearchRepo) searchInteractions(ctx context.Context, workspaceID uint, q
 	return hits, nil
 }
 
-func (r *SearchRepo) searchReminders(ctx context.Context, workspaceID uint, query string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) searchReminders(ctx context.Context, workspaceID string, query string, limit int) ([]model.SearchHit, error) {
 	pat := "%" + query + "%"
 	var rows []model.Reminder
 	err := r.db.WithContext(ctx).
@@ -251,7 +251,7 @@ func (r *SearchRepo) searchReminders(ctx context.Context, workspaceID uint, quer
 	return hits, nil
 }
 
-func (r *SearchRepo) searchEvents(ctx context.Context, workspaceID uint, query string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) searchEvents(ctx context.Context, workspaceID string, query string, limit int) ([]model.SearchHit, error) {
 	pat := "%" + query + "%"
 	var rows []model.Event
 	err := r.db.WithContext(ctx).
@@ -290,7 +290,7 @@ func (r *SearchRepo) searchEvents(ctx context.Context, workspaceID uint, query s
 	return hits, nil
 }
 
-func (r *SearchRepo) searchTodos(ctx context.Context, workspaceID uint, query string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) searchTodos(ctx context.Context, workspaceID string, query string, limit int) ([]model.SearchHit, error) {
 	pat := "%" + query + "%"
 	var rows []model.Todo
 	err := r.db.WithContext(ctx).
@@ -304,7 +304,7 @@ func (r *SearchRepo) searchTodos(ctx context.Context, workspaceID uint, query st
 	}
 
 	hits := make([]model.SearchHit, 0, len(rows))
-	seen := make(map[uint]bool, len(rows))
+	seen := make(map[string]bool, len(rows))
 	for i := range rows {
 		td := &rows[i]
 		seen[td.ID] = true
@@ -329,7 +329,7 @@ func (r *SearchRepo) searchTodos(ctx context.Context, workspaceID uint, query st
 	// surfaces the todo (the navigable unit) with the matched line as snippet.
 	// Raw join because todo_items has no workspace column of its own.
 	type itemRow struct {
-		TodoID    uint
+		TodoID    string
 		TodoTitle string
 		Content   string
 		UpdatedAt time.Time
@@ -364,7 +364,7 @@ func (r *SearchRepo) searchTodos(ctx context.Context, workspaceID uint, query st
 	return hits, nil
 }
 
-func (r *SearchRepo) searchWorkouts(ctx context.Context, workspaceID uint, query string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) searchWorkouts(ctx context.Context, workspaceID string, query string, limit int) ([]model.SearchHit, error) {
 	pat := "%" + query + "%"
 	var rows []model.Workout
 	err := r.db.WithContext(ctx).
@@ -378,7 +378,7 @@ func (r *SearchRepo) searchWorkouts(ctx context.Context, workspaceID uint, query
 	}
 
 	hits := make([]model.SearchHit, 0, len(rows))
-	seen := make(map[uint]bool, len(rows))
+	seen := make(map[string]bool, len(rows))
 	for i := range rows {
 		w := &rows[i]
 		seen[w.ID] = true
@@ -404,7 +404,7 @@ func (r *SearchRepo) searchWorkouts(ctx context.Context, workspaceID uint, query
 	}
 
 	type exerciseRow struct {
-		WorkoutID   uint
+		WorkoutID   string
 		WorkoutName string
 		Name        string
 		Notes       string
@@ -440,7 +440,7 @@ func (r *SearchRepo) searchWorkouts(ctx context.Context, workspaceID uint, query
 	return hits, nil
 }
 
-func (r *SearchRepo) searchTransactions(ctx context.Context, workspaceID uint, query string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) searchTransactions(ctx context.Context, workspaceID string, query string, limit int) ([]model.SearchHit, error) {
 	pat := "%" + query + "%"
 	var rows []model.Transaction
 	err := r.db.WithContext(ctx).
@@ -479,7 +479,7 @@ func (r *SearchRepo) searchTransactions(ctx context.Context, workspaceID uint, q
 	return hits, nil
 }
 
-func (r *SearchRepo) searchHabits(ctx context.Context, workspaceID uint, query string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) searchHabits(ctx context.Context, workspaceID string, query string, limit int) ([]model.SearchHit, error) {
 	pat := "%" + query + "%"
 	var rows []model.Habit
 	err := r.db.WithContext(ctx).
@@ -505,7 +505,7 @@ func (r *SearchRepo) searchHabits(ctx context.Context, workspaceID uint, query s
 	return hits, nil
 }
 
-func (r *SearchRepo) searchTags(ctx context.Context, workspaceID uint, query string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) searchTags(ctx context.Context, workspaceID string, query string, limit int) ([]model.SearchHit, error) {
 	pat := "%" + query + "%"
 	var rows []model.Tag
 	// Tags carry no UpdatedAt — order and report by CreatedAt.
@@ -532,7 +532,7 @@ func (r *SearchRepo) searchTags(ctx context.Context, workspaceID uint, query str
 	return hits, nil
 }
 
-func (r *SearchRepo) searchBodyMetrics(ctx context.Context, workspaceID uint, query string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) searchBodyMetrics(ctx context.Context, workspaceID string, query string, limit int) ([]model.SearchHit, error) {
 	pat := "%" + query + "%"
 	var rows []model.BodyMetric
 	err := r.db.WithContext(ctx).
@@ -559,7 +559,7 @@ func (r *SearchRepo) searchBodyMetrics(ctx context.Context, workspaceID uint, qu
 	return hits, nil
 }
 
-func (r *SearchRepo) searchWhiteboards(ctx context.Context, workspaceID uint, query string, limit int) ([]model.SearchHit, error) {
+func (r *SearchRepo) searchWhiteboards(ctx context.Context, workspaceID string, query string, limit int) ([]model.SearchHit, error) {
 	pat := "%" + query + "%"
 	var rows []model.Whiteboard
 	err := r.db.WithContext(ctx).
@@ -572,7 +572,7 @@ func (r *SearchRepo) searchWhiteboards(ctx context.Context, workspaceID uint, qu
 	}
 
 	hits := make([]model.SearchHit, 0, len(rows))
-	seen := make(map[uint]bool, len(rows))
+	seen := make(map[string]bool, len(rows))
 	for i := range rows {
 		wb := &rows[i]
 		seen[wb.ID] = true
@@ -586,7 +586,7 @@ func (r *SearchRepo) searchWhiteboards(ctx context.Context, workspaceID uint, qu
 	}
 
 	type nodeRow struct {
-		BoardID   uint
+		BoardID   string
 		BoardName string
 		Label     string
 		Note      string

@@ -36,7 +36,7 @@ func (s *MCPServer) registerWorkoutTools() {
 			"sort":   map[string]interface{}{"type": "string", "description": "Sort key: scheduled (default), created or manual"},
 			"order":  map[string]interface{}{"type": "string", "description": "Sort order: asc (default) or desc"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		q := model.WorkoutListQuery{
 			Status: toString(getArg(args, "status")),
 			Type:   toString(getArg(args, "type")),
@@ -64,7 +64,7 @@ func (s *MCPServer) registerWorkoutTools() {
 			"notes":        map[string]interface{}{"type": "string", "description": "Notes"},
 		},
 		"required": []string{"name"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		w := &model.Workout{
 			Name:        toString(getArg(args, "name")),
 			Type:        toString(getArg(args, "type")),
@@ -99,8 +99,8 @@ func (s *MCPServer) registerWorkoutTools() {
 			"notes":              map[string]interface{}{"type": "string", "description": "Notes"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		updates := &model.Workout{
 			Name:        toString(getArg(args, "name")),
 			Type:        toString(getArg(args, "type")),
@@ -122,32 +122,32 @@ func (s *MCPServer) registerWorkoutTools() {
 	})
 
 	s.registerTool("toggle_workout", "Toggle a workout between completed and not-completed.", map[string]interface{}{
-		"type":     "object",
+		"type": "object",
 		"properties": map[string]interface{}{
 			"id": map[string]interface{}{"type": "integer", "description": "Workout ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		return s.workoutSvc.ToggleStatus(ctx, userID, workspaceID, toUint(getArg(args, "id")))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		return s.workoutSvc.ToggleStatus(ctx, userID, workspaceID, toString(getArg(args, "id")))
 	})
 
 	s.registerTool("delete_workout", "Delete a workout (and its exercises).", map[string]interface{}{
-		"type":     "object",
+		"type": "object",
 		"properties": map[string]interface{}{
 			"id": map[string]interface{}{"type": "integer", "description": "Workout ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		return nil, s.workoutSvc.Delete(ctx, userID, workspaceID, toUint(getArg(args, "id")))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		return nil, s.workoutSvc.Delete(ctx, userID, workspaceID, toString(getArg(args, "id")))
 	})
 
 	s.registerTool("list_body_metrics", "List body / health records (newest first).", map[string]interface{}{
-		"type":     "object",
+		"type": "object",
 		"properties": map[string]interface{}{
 			"page":      map[string]interface{}{"type": "integer", "description": "Page number (default 1)"},
 			"page_size": map[string]interface{}{"type": "integer", "description": "Page size (default 100)"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		metrics, _, err := s.workoutSvc.ListMetrics(ctx, userID, workspaceID, model.BodyMetricListQuery{Page: getArgInt(args, "page", 1), PageSize: getArgInt(args, "page_size", 100)})
 		return metrics, err
 	})
@@ -169,7 +169,7 @@ func (s *MCPServer) registerWorkoutTools() {
 			"mood":        map[string]interface{}{"type": "integer", "description": "Mood 1-5"},
 			"notes":       map[string]interface{}{"type": "string", "description": "Notes"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		m := &model.BodyMetric{
 			Weight:     toFloat64Ptr(getArg(args, "weight")),
 			Height:     toFloat64Ptr(getArg(args, "height")),
@@ -191,9 +191,9 @@ func (s *MCPServer) registerWorkoutTools() {
 	})
 
 	s.registerTool("body_summary", "Get an overview of the latest body / health records (latest snapshot, weight trend, count).", map[string]interface{}{
-		"type":     "object",
+		"type":       "object",
 		"properties": map[string]interface{}{},
-	}, func(ctx context.Context, userID, workspaceID uint, _ map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, _ map[string]interface{}) (interface{}, error) {
 		return s.workoutSvc.BodySummary(ctx, userID, workspaceID)
 	})
 }

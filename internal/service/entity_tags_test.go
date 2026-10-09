@@ -28,36 +28,36 @@ func TestEventService_TagsLifecycle(t *testing.T) {
 	tagSvc := NewTagService(repository.NewTagRepo(db))
 	ctx := context.Background()
 
-	work, err := tagSvc.Create(ctx, 1, 1, &model.Tag{Name: "work", Color: "#22c55e"})
+	work, err := tagSvc.Create(ctx, "1", "1", &model.Tag{Name: "work", Color: "#22c55e"})
 	require.NoError(t, err)
-	foreign, err := tagSvc.Create(ctx, 2, 2, &model.Tag{Name: "other-ws"})
+	foreign, err := tagSvc.Create(ctx, "2", "2", &model.Tag{Name: "other-ws"})
 	require.NoError(t, err)
 
-	event, err := svc.Create(ctx, 1, 1, &model.Event{Title: "sync", StartTime: time.Now()})
+	event, err := svc.Create(ctx, "1", "1", &model.Event{Title: "sync", StartTime: time.Now()})
 	require.NoError(t, err)
 
 	// Foreign and missing tag ids are rejected (400 material), not silently kept.
-	require.ErrorIs(t, svc.ReplaceTags(ctx, 1, 1, event.ID, []uint{foreign.ID}), model.ErrInvalidTagIDs)
-	require.ErrorIs(t, svc.ReplaceTags(ctx, 1, 1, event.ID, []uint{999}), model.ErrInvalidTagIDs)
+	require.ErrorIs(t, svc.ReplaceTags(ctx, "1", "1", event.ID, []string{foreign.ID}), model.ErrInvalidTagIDs)
+	require.ErrorIs(t, svc.ReplaceTags(ctx, "1", "1", event.ID, []string{"999"}), model.ErrInvalidTagIDs)
 
-	require.NoError(t, svc.ReplaceTags(ctx, 1, 1, event.ID, []uint{work.ID, work.ID}))
-	tags, err := svc.GetTags(ctx, 1, 1, event.ID)
+	require.NoError(t, svc.ReplaceTags(ctx, "1", "1", event.ID, []string{work.ID, work.ID}))
+	tags, err := svc.GetTags(ctx, "1", "1", event.ID)
 	require.NoError(t, err)
 	require.Len(t, tags, 1)
 	assert.Equal(t, work.ID, tags[0].ID)
 
 	// List enriches rows and filters by tag; the other workspace sees nothing.
-	other, err := svc.Create(ctx, 1, 1, &model.Event{Title: "no tags", StartTime: time.Now()})
+	other, err := svc.Create(ctx, "1", "1", &model.Event{Title: "no tags", StartTime: time.Now()})
 	require.NoError(t, err)
 
-	untagged, total, err := svc.List(ctx, 1, 1, 1, 20, nil, nil, "", []uint{work.ID})
+	untagged, total, err := svc.List(ctx, "1", "1", 1, 20, nil, nil, "", []string{work.ID})
 	require.NoError(t, err)
 	require.EqualValues(t, 1, total)
 	require.Len(t, untagged, 1)
 	assert.Equal(t, event.ID, untagged[0].ID)
 	require.Len(t, untagged[0].Tags, 1)
 
-	all, _, err := svc.List(ctx, 1, 1, 1, 20, nil, nil, "", nil)
+	all, _, err := svc.List(ctx, "1", "1", 1, 20, nil, nil, "", nil)
 	require.NoError(t, err)
 	for _, e := range all {
 		if e.ID == event.ID {
@@ -69,12 +69,12 @@ func TestEventService_TagsLifecycle(t *testing.T) {
 	_ = other
 
 	// Deleting the event drops its taggings.
-	require.NoError(t, svc.Delete(ctx, 1, 1, event.ID))
+	require.NoError(t, svc.Delete(ctx, "1", "1", event.ID))
 	var count int64
 	require.NoError(t, db.Model(&model.Tagging{}).Where("target_type = ? AND target_id = ?", model.TagTargetEvent, event.ID).Count(&count).Error)
 	assert.Zero(t, count)
 
 	// Tags on a deleted target are gone from GetTags too.
-	_, err = svc.GetTags(ctx, 1, 1, event.ID)
+	_, err = svc.GetTags(ctx, "1", "1", event.ID)
 	assert.ErrorIs(t, err, ErrEventNotFound)
 }

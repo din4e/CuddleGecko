@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"github.com/din4e/cuddlegecko/internal/model"
 	"github.com/din4e/cuddlegecko/internal/service"
 	"github.com/din4e/cuddlegecko/pkg/middleware"
@@ -19,7 +17,7 @@ func NewGraphHandler(relationSvc *service.RelationService) *GraphHandler {
 }
 
 type createRelationRequest struct {
-	ContactIDB   uint   `json:"contact_id_b" binding:"required"`
+	ContactIDB   string `json:"contact_id_b" binding:"required"`
 	RelationType string `json:"relation_type"`
 }
 
@@ -37,13 +35,9 @@ func (h *GraphHandler) GetGraph(c *gin.Context) {
 func (h *GraphHandler) GetRelations(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	contactID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid contact id")
-		return
-	}
+	contactID := c.Param("id")
 
-	relations, err := h.relationSvc.ListByContact(c.Request.Context(), userID, workspaceID, uint(contactID))
+	relations, err := h.relationSvc.ListByContact(c.Request.Context(), userID, workspaceID, contactID)
 	if err != nil {
 		response.InternalError(c, "failed to list relations")
 		return
@@ -55,11 +49,7 @@ func (h *GraphHandler) GetRelations(c *gin.Context) {
 func (h *GraphHandler) CreateRelation(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	contactIDA, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid contact id")
-		return
-	}
+	contactIDA := c.Param("id")
 
 	var req createRelationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -72,7 +62,7 @@ func (h *GraphHandler) CreateRelation(c *gin.Context) {
 		RelationType: req.RelationType,
 	}
 
-	result, err := h.relationSvc.Create(c.Request.Context(), userID, workspaceID, uint(contactIDA), relation)
+	result, err := h.relationSvc.Create(c.Request.Context(), userID, workspaceID, contactIDA, relation)
 	if err != nil {
 		response.InternalError(c, "failed to create relation")
 		return
@@ -84,13 +74,9 @@ func (h *GraphHandler) CreateRelation(c *gin.Context) {
 func (h *GraphHandler) DeleteRelation(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid relation id")
-		return
-	}
+	id := c.Param("id")
 
-	if err := h.relationSvc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
+	if err := h.relationSvc.Delete(c.Request.Context(), userID, workspaceID, id); err != nil {
 		response.NotFound(c, "relation not found")
 		return
 	}

@@ -23,55 +23,55 @@ var (
 
 // ExerciseLibraryRepository handles reusable movement definitions.
 type ExerciseLibraryRepository interface {
-	List(ctx context.Context, workspaceID uint, search string) ([]model.ExerciseLibraryItem, error)
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.ExerciseLibraryItem, error)
-	NameExists(ctx context.Context, workspaceID uint, name string, excludeID uint) (bool, error)
+	List(ctx context.Context, workspaceID string, search string) ([]model.ExerciseLibraryItem, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.ExerciseLibraryItem, error)
+	NameExists(ctx context.Context, workspaceID string, name string, excludeID string) (bool, error)
 	Create(ctx context.Context, item *model.ExerciseLibraryItem) error
 	Update(ctx context.Context, item *model.ExerciseLibraryItem) error
-	Delete(ctx context.Context, workspaceID, id uint) error
+	Delete(ctx context.Context, workspaceID, id string) error
 }
 
 // WorkoutTemplateRepository handles reusable routines.
 type WorkoutTemplateRepository interface {
-	List(ctx context.Context, workspaceID uint) ([]model.WorkoutTemplate, error)
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.WorkoutTemplate, error)
+	List(ctx context.Context, workspaceID string) ([]model.WorkoutTemplate, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.WorkoutTemplate, error)
 	Create(ctx context.Context, t *model.WorkoutTemplate) error
 	Update(ctx context.Context, t *model.WorkoutTemplate) error
-	Delete(ctx context.Context, workspaceID, id uint) error
+	Delete(ctx context.Context, workspaceID, id string) error
 }
 
 // WorkoutSetLogRepository handles per-set training logs.
 type WorkoutSetLogRepository interface {
-	ListByExercise(ctx context.Context, workoutID, exerciseID uint) ([]model.WorkoutSetLog, error)
-	GetByID(ctx context.Context, workoutID, exerciseID, id uint) (*model.WorkoutSetLog, error)
+	ListByExercise(ctx context.Context, workoutID, exerciseID string) ([]model.WorkoutSetLog, error)
+	GetByID(ctx context.Context, workoutID, exerciseID, id string) (*model.WorkoutSetLog, error)
 	Create(ctx context.Context, log *model.WorkoutSetLog) error
 	Update(ctx context.Context, log *model.WorkoutSetLog) error
-	Delete(ctx context.Context, workoutID, exerciseID, id uint) error
-	PRs(ctx context.Context, workspaceID uint) ([]model.ExercisePR, error)
+	Delete(ctx context.Context, workoutID, exerciseID, id string) error
+	PRs(ctx context.Context, workspaceID string) ([]model.ExercisePR, error)
 }
 
 // FitnessGoalRepository handles fitness goals.
 type FitnessGoalRepository interface {
-	List(ctx context.Context, workspaceID uint) ([]model.FitnessGoal, error)
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.FitnessGoal, error)
+	List(ctx context.Context, workspaceID string) ([]model.FitnessGoal, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.FitnessGoal, error)
 	Create(ctx context.Context, g *model.FitnessGoal) error
 	Update(ctx context.Context, g *model.FitnessGoal) error
-	SetStartValue(ctx context.Context, id uint, v float64) error
-	Delete(ctx context.Context, workspaceID, id uint) error
+	SetStartValue(ctx context.Context, id string, v float64) error
+	Delete(ctx context.Context, workspaceID, id string) error
 }
 
 // FitnessService covers the extended fitness features: exercise library,
 // workout templates, per-set logs / PRs and goals.
 type FitnessService struct {
-	libRepo    ExerciseLibraryRepository
-	tplRepo    WorkoutTemplateRepository
-	setRepo    WorkoutSetLogRepository
-	goalRepo   FitnessGoalRepository
-	workoutSvc *WorkoutService
+	libRepo     ExerciseLibraryRepository
+	tplRepo     WorkoutTemplateRepository
+	setRepo     WorkoutSetLogRepository
+	goalRepo    FitnessGoalRepository
+	workoutSvc  *WorkoutService
 	workoutRepo WorkoutRepository
-	exRepo     WorkoutExerciseRepository
-	bodyRepo   BodyMetricRepository
-	notifier   ChangeNotifier
+	exRepo      WorkoutExerciseRepository
+	bodyRepo    BodyMetricRepository
+	notifier    ChangeNotifier
 }
 
 func NewFitnessService(
@@ -83,32 +83,32 @@ func NewFitnessService(
 	notifier ...ChangeNotifier,
 ) *FitnessService {
 	return &FitnessService{
-		libRepo:    libRepo,
-		tplRepo:    tplRepo,
-		setRepo:    setRepo,
-		goalRepo:   goalRepo,
-		workoutSvc: workoutSvc,
+		libRepo:     libRepo,
+		tplRepo:     tplRepo,
+		setRepo:     setRepo,
+		goalRepo:    goalRepo,
+		workoutSvc:  workoutSvc,
 		workoutRepo: workoutSvc.repo,
-		exRepo:     workoutSvc.exRepo,
-		bodyRepo:   workoutSvc.bodyRepo,
-		notifier:   firstNotifier(notifier),
+		exRepo:      workoutSvc.exRepo,
+		bodyRepo:    workoutSvc.bodyRepo,
+		notifier:    firstNotifier(notifier),
 	}
 }
 
 // --- Exercise library ---
 
-func (s *FitnessService) ListLibrary(ctx context.Context, userID, workspaceID uint, search string) ([]model.ExerciseLibraryItem, error) {
+func (s *FitnessService) ListLibrary(ctx context.Context, userID, workspaceID string, search string) ([]model.ExerciseLibraryItem, error) {
 	return s.libRepo.List(ctx, workspaceID, strings.TrimSpace(search))
 }
 
-func (s *FitnessService) CreateLibraryItem(ctx context.Context, userID, workspaceID uint, item *model.ExerciseLibraryItem) (*model.ExerciseLibraryItem, error) {
+func (s *FitnessService) CreateLibraryItem(ctx context.Context, userID, workspaceID string, item *model.ExerciseLibraryItem) (*model.ExerciseLibraryItem, error) {
 	item.UserID = userID
 	item.WorkspaceID = workspaceID
 	item.Name = strings.TrimSpace(item.Name)
 	if item.Name == "" {
 		return nil, ErrLibraryItemEmpty
 	}
-	if dup, err := s.libRepo.NameExists(ctx, workspaceID, item.Name, 0); err != nil {
+	if dup, err := s.libRepo.NameExists(ctx, workspaceID, item.Name, ""); err != nil {
 		return nil, err
 	} else if dup {
 		return nil, ErrLibraryDuplicate
@@ -120,7 +120,7 @@ func (s *FitnessService) CreateLibraryItem(ctx context.Context, userID, workspac
 	return item, nil
 }
 
-func (s *FitnessService) UpdateLibraryItem(ctx context.Context, userID, workspaceID, id uint, item *model.ExerciseLibraryItem) (*model.ExerciseLibraryItem, error) {
+func (s *FitnessService) UpdateLibraryItem(ctx context.Context, userID, workspaceID, id string, item *model.ExerciseLibraryItem) (*model.ExerciseLibraryItem, error) {
 	existing, err := s.libRepo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrLibraryItemNotFound
@@ -144,7 +144,7 @@ func (s *FitnessService) UpdateLibraryItem(ctx context.Context, userID, workspac
 	return item, nil
 }
 
-func (s *FitnessService) DeleteLibraryItem(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *FitnessService) DeleteLibraryItem(ctx context.Context, userID, workspaceID, id string) error {
 	err := s.libRepo.Delete(ctx, workspaceID, id)
 	if err == nil {
 		notifyChange(ctx, s.notifier, workspaceID, ResourceExerciseLibrary, ChangeDeleted, id, nil)
@@ -158,11 +158,11 @@ func (s *FitnessService) DeleteLibraryItem(ctx context.Context, userID, workspac
 
 // --- Workout templates ---
 
-func (s *FitnessService) ListTemplates(ctx context.Context, userID, workspaceID uint) ([]model.WorkoutTemplate, error) {
+func (s *FitnessService) ListTemplates(ctx context.Context, userID, workspaceID string) ([]model.WorkoutTemplate, error) {
 	return s.tplRepo.List(ctx, workspaceID)
 }
 
-func (s *FitnessService) GetTemplate(ctx context.Context, userID, workspaceID, id uint) (*model.WorkoutTemplate, error) {
+func (s *FitnessService) GetTemplate(ctx context.Context, userID, workspaceID, id string) (*model.WorkoutTemplate, error) {
 	t, err := s.tplRepo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrTemplateNotFound
@@ -170,7 +170,7 @@ func (s *FitnessService) GetTemplate(ctx context.Context, userID, workspaceID, i
 	return t, nil
 }
 
-func (s *FitnessService) validateTemplate(ctx context.Context, workspaceID uint, t *model.WorkoutTemplate) error {
+func (s *FitnessService) validateTemplate(ctx context.Context, workspaceID string, t *model.WorkoutTemplate) error {
 	t.Name = strings.TrimSpace(t.Name)
 	if t.Name == "" {
 		return ErrTemplateEmpty
@@ -181,7 +181,7 @@ func (s *FitnessService) validateTemplate(ctx context.Context, workspaceID uint,
 	return nil
 }
 
-func (s *FitnessService) CreateTemplate(ctx context.Context, userID, workspaceID uint, t *model.WorkoutTemplate) (*model.WorkoutTemplate, error) {
+func (s *FitnessService) CreateTemplate(ctx context.Context, userID, workspaceID string, t *model.WorkoutTemplate) (*model.WorkoutTemplate, error) {
 	if err := s.validateTemplate(ctx, workspaceID, t); err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func (s *FitnessService) CreateTemplate(ctx context.Context, userID, workspaceID
 	return t, nil
 }
 
-func (s *FitnessService) UpdateTemplate(ctx context.Context, userID, workspaceID, id uint, t *model.WorkoutTemplate) (*model.WorkoutTemplate, error) {
+func (s *FitnessService) UpdateTemplate(ctx context.Context, userID, workspaceID, id string, t *model.WorkoutTemplate) (*model.WorkoutTemplate, error) {
 	existing, err := s.tplRepo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrTemplateNotFound
@@ -216,7 +216,7 @@ func (s *FitnessService) UpdateTemplate(ctx context.Context, userID, workspaceID
 	return updated, nil
 }
 
-func (s *FitnessService) DeleteTemplate(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *FitnessService) DeleteTemplate(ctx context.Context, userID, workspaceID, id string) error {
 	err := s.tplRepo.Delete(ctx, workspaceID, id)
 	if err == nil {
 		notifyChange(ctx, s.notifier, workspaceID, ResourceWorkoutTemplate, ChangeDeleted, id, nil)
@@ -230,7 +230,7 @@ func (s *FitnessService) DeleteTemplate(ctx context.Context, userID, workspaceID
 
 // Instantiate creates a planned workout from a template (with its exercises)
 // in a single transaction.
-func (s *FitnessService) InstantiateTemplate(ctx context.Context, userID, workspaceID, id uint, scheduledAt *time.Time) (*model.Workout, error) {
+func (s *FitnessService) InstantiateTemplate(ctx context.Context, userID, workspaceID, id string, scheduledAt *time.Time) (*model.Workout, error) {
 	tpl, err := s.tplRepo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrTemplateNotFound
@@ -268,7 +268,7 @@ func (s *FitnessService) InstantiateTemplate(ctx context.Context, userID, worksp
 
 // --- Set logs / PRs ---
 
-func (s *FitnessService) ListSetLogs(ctx context.Context, userID, workspaceID, workoutID, exerciseID uint) ([]model.WorkoutSetLog, error) {
+func (s *FitnessService) ListSetLogs(ctx context.Context, userID, workspaceID, workoutID, exerciseID string) ([]model.WorkoutSetLog, error) {
 	if err := s.workoutSvc.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return nil, err
 	}
@@ -278,14 +278,14 @@ func (s *FitnessService) ListSetLogs(ctx context.Context, userID, workspaceID, w
 	return s.setRepo.ListByExercise(ctx, workoutID, exerciseID)
 }
 
-func (s *FitnessService) CreateSetLog(ctx context.Context, userID, workspaceID, workoutID, exerciseID uint, log *model.WorkoutSetLog) (*model.WorkoutSetLog, error) {
+func (s *FitnessService) CreateSetLog(ctx context.Context, userID, workspaceID, workoutID, exerciseID string, log *model.WorkoutSetLog) (*model.WorkoutSetLog, error) {
 	if err := s.workoutSvc.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return nil, err
 	}
 	if _, err := s.exRepo.GetExercise(ctx, workoutID, exerciseID); err != nil {
 		return nil, ErrExerciseNotFound
 	}
-	log.ID = 0
+	log.ID = ""
 	log.WorkoutID = workoutID
 	log.ExerciseID = exerciseID
 	if err := s.setRepo.Create(ctx, log); err != nil {
@@ -295,7 +295,7 @@ func (s *FitnessService) CreateSetLog(ctx context.Context, userID, workspaceID, 
 	return log, nil
 }
 
-func (s *FitnessService) UpdateSetLog(ctx context.Context, userID, workspaceID, workoutID, exerciseID, id uint, log *model.WorkoutSetLog) (*model.WorkoutSetLog, error) {
+func (s *FitnessService) UpdateSetLog(ctx context.Context, userID, workspaceID, workoutID, exerciseID, id string, log *model.WorkoutSetLog) (*model.WorkoutSetLog, error) {
 	if err := s.workoutSvc.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func (s *FitnessService) UpdateSetLog(ctx context.Context, userID, workspaceID, 
 	return log, nil
 }
 
-func (s *FitnessService) DeleteSetLog(ctx context.Context, userID, workspaceID, workoutID, exerciseID, id uint) error {
+func (s *FitnessService) DeleteSetLog(ctx context.Context, userID, workspaceID, workoutID, exerciseID, id string) error {
 	if err := s.workoutSvc.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return err
 	}
@@ -331,7 +331,7 @@ func (s *FitnessService) DeleteSetLog(ctx context.Context, userID, workspaceID, 
 	return err
 }
 
-func (s *FitnessService) PRs(ctx context.Context, userID, workspaceID uint) ([]model.ExercisePR, error) {
+func (s *FitnessService) PRs(ctx context.Context, userID, workspaceID string) ([]model.ExercisePR, error) {
 	return s.setRepo.PRs(ctx, workspaceID)
 }
 
@@ -352,7 +352,7 @@ func (s *FitnessService) validateGoal(g *model.FitnessGoal) error {
 	return nil
 }
 
-func (s *FitnessService) ListGoals(ctx context.Context, userID, workspaceID uint) ([]model.FitnessGoalWithProgress, error) {
+func (s *FitnessService) ListGoals(ctx context.Context, userID, workspaceID string) ([]model.FitnessGoalWithProgress, error) {
 	goals, err := s.goalRepo.List(ctx, workspaceID)
 	if err != nil {
 		return nil, err
@@ -367,7 +367,7 @@ func (s *FitnessService) ListGoals(ctx context.Context, userID, workspaceID uint
 	return out, nil
 }
 
-func (s *FitnessService) CreateGoal(ctx context.Context, userID, workspaceID uint, g *model.FitnessGoal) (*model.FitnessGoalWithProgress, error) {
+func (s *FitnessService) CreateGoal(ctx context.Context, userID, workspaceID string, g *model.FitnessGoal) (*model.FitnessGoalWithProgress, error) {
 	if err := s.validateGoal(g); err != nil {
 		return nil, err
 	}
@@ -394,7 +394,7 @@ func (s *FitnessService) CreateGoal(ctx context.Context, userID, workspaceID uin
 	return &out[0], nil
 }
 
-func (s *FitnessService) UpdateGoal(ctx context.Context, userID, workspaceID, id uint, g *model.FitnessGoal) (*model.FitnessGoalWithProgress, error) {
+func (s *FitnessService) UpdateGoal(ctx context.Context, userID, workspaceID, id string, g *model.FitnessGoal) (*model.FitnessGoalWithProgress, error) {
 	existing, err := s.goalRepo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrGoalNotFound
@@ -422,7 +422,7 @@ func (s *FitnessService) UpdateGoal(ctx context.Context, userID, workspaceID, id
 	return &out[0], nil
 }
 
-func (s *FitnessService) DeleteGoal(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *FitnessService) DeleteGoal(ctx context.Context, userID, workspaceID, id string) error {
 	err := s.goalRepo.Delete(ctx, workspaceID, id)
 	if err == nil {
 		notifyChange(ctx, s.notifier, workspaceID, ResourceFitnessGoal, ChangeDeleted, id, nil)
@@ -439,7 +439,7 @@ func (s *FitnessService) DeleteGoal(ctx context.Context, userID, workspaceID, id
 // latest recorded weight. Weight goals opened before the start-value baseline
 // existed (or before any weight was recorded) get their baseline backfilled
 // once, on first read, from the latest weight.
-func (s *FitnessService) fillGoalProgress(ctx context.Context, workspaceID uint, goals []model.FitnessGoalWithProgress) error {
+func (s *FitnessService) fillGoalProgress(ctx context.Context, workspaceID string, goals []model.FitnessGoalWithProgress) error {
 	var stats *model.WorkoutStats
 	var body *model.BodyMetricSummary
 	for i := range goals {

@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"strconv"
 	"testing"
 
 	"github.com/din4e/cuddlegecko/internal/model"
@@ -30,8 +29,8 @@ func setupWorkoutIntegrationRouter(t *testing.T) *gin.Engine {
 	r := gin.New()
 	api := r.Group("/api")
 	api.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(1))
-		c.Set("workspace_id", uint(1))
+		c.Set("user_id", "1")
+		c.Set("workspace_id", "1")
 		c.Next()
 	})
 	{
@@ -54,8 +53,8 @@ func setupWorkoutIntegrationRouter(t *testing.T) *gin.Engine {
 	return r
 }
 
-// utoa formats a uint id for path building.
-func utoa(id uint) string { return strconv.FormatUint(uint64(id), 10) }
+// utoa formats an id for path building.
+func utoa(id string) string { return id }
 
 func decodeWorkout(t *testing.T, data json.RawMessage) model.Workout {
 	t.Helper()

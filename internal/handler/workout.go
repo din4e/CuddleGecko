@@ -54,7 +54,7 @@ type updateWorkoutRequest struct {
 }
 
 type reorderWorkoutRequest struct {
-	AfterID *uint `json:"after_id"`
+	AfterID *string `json:"after_id"`
 }
 
 // --- Exercise request types ---
@@ -71,7 +71,7 @@ type exerciseRequest struct {
 	Notes       string   `json:"notes"`
 }
 
-func (r exerciseRequest) toModel(workoutID, id uint) *model.WorkoutExercise {
+func (r exerciseRequest) toModel(workoutID, id string) *model.WorkoutExercise {
 	return &model.WorkoutExercise{
 		ID:          id,
 		WorkoutID:   workoutID,
@@ -108,22 +108,22 @@ type bodyMetricRequest struct {
 	Notes      string   `json:"notes"`
 }
 
-func (r bodyMetricRequest) toModel(id uint) (*model.BodyMetric, error) {
+func (r bodyMetricRequest) toModel(id string) (*model.BodyMetric, error) {
 	m := &model.BodyMetric{
-		ID:          id,
-		Weight:      r.Weight,
-		Height:      r.Height,
-		BodyFat:     r.BodyFat,
-		MuscleMass:  r.MuscleMass,
-		RestingHR:   r.RestingHR,
-		Systolic:    r.Systolic,
-		Diastolic:   r.Diastolic,
-		SleepHours:  r.SleepHours,
-		SleepScore:  r.SleepScore,
-		Steps:       r.Steps,
-		Energy:      r.Energy,
-		Mood:        r.Mood,
-		Notes:       r.Notes,
+		ID:         id,
+		Weight:     r.Weight,
+		Height:     r.Height,
+		BodyFat:    r.BodyFat,
+		MuscleMass: r.MuscleMass,
+		RestingHR:  r.RestingHR,
+		Systolic:   r.Systolic,
+		Diastolic:  r.Diastolic,
+		SleepHours: r.SleepHours,
+		SleepScore: r.SleepScore,
+		Steps:      r.Steps,
+		Energy:     r.Energy,
+		Mood:       r.Mood,
+		Notes:      r.Notes,
 	}
 	if r.RecordedAt != "" {
 		t, err := time.Parse(time.RFC3339, r.RecordedAt)
@@ -159,31 +159,31 @@ func (invalidTimeError) Error() string { return "invalid time format" }
 
 // --- ID parsers ---
 
-func (h *WorkoutHandler) parseWorkoutID(c *gin.Context) (uint, bool) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
+func (h *WorkoutHandler) parseWorkoutID(c *gin.Context) (string, bool) {
+	id := c.Param("id")
+	if id == "" {
 		response.BadRequest(c, "invalid workout id")
-		return 0, false
+		return "", false
 	}
-	return uint(id), true
+	return id, true
 }
 
-func (h *WorkoutHandler) parseExerciseID(c *gin.Context) (uint, bool) {
-	id, err := strconv.ParseUint(c.Param("exerciseId"), 10, 32)
-	if err != nil {
+func (h *WorkoutHandler) parseExerciseID(c *gin.Context) (string, bool) {
+	id := c.Param("exerciseId")
+	if id == "" {
 		response.BadRequest(c, "invalid exercise id")
-		return 0, false
+		return "", false
 	}
-	return uint(id), true
+	return id, true
 }
 
-func (h *WorkoutHandler) parseBodyMetricID(c *gin.Context) (uint, bool) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
+func (h *WorkoutHandler) parseBodyMetricID(c *gin.Context) (string, bool) {
+	id := c.Param("id")
+	if id == "" {
 		response.BadRequest(c, "invalid body metric id")
-		return 0, false
+		return "", false
 	}
-	return uint(id), true
+	return id, true
 }
 
 // --- Workout endpoints ---
@@ -228,13 +228,9 @@ func (h *WorkoutHandler) List(c *gin.Context) {
 func (h *WorkoutHandler) GetTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid workout id")
-		return
-	}
+	id := c.Param("id")
 
-	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, uint(id))
+	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, id)
 	if err != nil {
 		response.NotFound(c, "workout not found")
 		return
@@ -245,11 +241,7 @@ func (h *WorkoutHandler) GetTags(c *gin.Context) {
 func (h *WorkoutHandler) ReplaceTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid workout id")
-		return
-	}
+	id := c.Param("id")
 
 	var req replaceTagsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -257,7 +249,7 @@ func (h *WorkoutHandler) ReplaceTags(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
+	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, id, req.TagIDs); err != nil {
 		if errors.Is(err, model.ErrInvalidTagIDs) {
 			response.BadRequest(c, err.Error())
 			return
@@ -291,15 +283,15 @@ func (h *WorkoutHandler) Create(c *gin.Context) {
 	}
 
 	w := &model.Workout{
-		Name:       req.Name,
-		Type:       req.Type,
-		Status:     req.Status,
-		Intensity:  req.Intensity,
+		Name:        req.Name,
+		Type:        req.Type,
+		Status:      req.Status,
+		Intensity:   req.Intensity,
 		DurationMin: req.DurationMin,
-		Calories:   req.Calories,
-		Color:      req.Color,
-		Location:   req.Location,
-		Notes:      req.Notes,
+		Calories:    req.Calories,
+		Color:       req.Color,
+		Location:    req.Location,
+		Notes:       req.Notes,
 	}
 	if req.ScheduledAt != "" {
 		t, err := time.Parse(time.RFC3339, req.ScheduledAt)
@@ -333,15 +325,15 @@ func (h *WorkoutHandler) Update(c *gin.Context) {
 	}
 
 	updates := &model.Workout{
-		Name:       req.Name,
-		Type:       req.Type,
-		Status:     req.Status,
-		Intensity:  req.Intensity,
+		Name:        req.Name,
+		Type:        req.Type,
+		Status:      req.Status,
+		Intensity:   req.Intensity,
 		DurationMin: req.DurationMin,
-		Calories:   req.Calories,
-		Color:      req.Color,
-		Location:   req.Location,
-		Notes:      req.Notes,
+		Calories:    req.Calories,
+		Color:       req.Color,
+		Location:    req.Location,
+		Notes:       req.Notes,
 	}
 	clear := service.WorkoutClear{
 		ScheduledAt: req.ClearScheduledAt,
@@ -465,7 +457,7 @@ func (h *WorkoutHandler) CreateExercise(c *gin.Context) {
 		return
 	}
 
-	ex, err := h.svc.CreateExercise(c.Request.Context(), userID, workspaceID, workoutID, req.toModel(workoutID, 0))
+	ex, err := h.svc.CreateExercise(c.Request.Context(), userID, workspaceID, workoutID, req.toModel(workoutID, ""))
 	if err != nil {
 		switch err {
 		case service.ErrWorkoutNotFound:
@@ -665,7 +657,7 @@ func (h *WorkoutHandler) CreateMetric(c *gin.Context) {
 		return
 	}
 
-	m, err := req.toModel(0)
+	m, err := req.toModel("")
 	if err != nil {
 		response.BadRequest(c, "invalid recorded_at format")
 		return

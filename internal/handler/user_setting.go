@@ -80,7 +80,7 @@ type kanbanConfigRequest struct {
 type kanbanColumn struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
-	Kind  string `json:"kind"`  // status | priority | tag
+	Kind  string `json:"kind"` // status | priority | tag
 	Value string `json:"value"`
 }
 
@@ -268,7 +268,7 @@ func clampGraphConfig(cfg *graphConfig) {
 
 // storedGraphConfig loads and merges the persisted config onto defaults.
 // Missing/corrupt storage yields the defaults.
-func (h *UserSettingHandler) storedGraphConfig(ctx context.Context, userID uint) graphConfig {
+func (h *UserSettingHandler) storedGraphConfig(ctx context.Context, userID string) graphConfig {
 	out := defaultGraphConfig()
 	val, found, err := h.svc.Get(ctx, userID, graphSettingKey)
 	if err != nil || !found {

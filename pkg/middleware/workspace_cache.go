@@ -13,7 +13,7 @@ import (
 const memberTTL = 30 * time.Second
 
 type memberKey struct {
-	workspaceID, userID uint
+	workspaceID, userID string
 }
 
 type memberEntry struct {
@@ -60,7 +60,7 @@ func (c *cachingChecker) cleanup() {
 	}
 }
 
-func (c *cachingChecker) IsMember(ctx context.Context, workspaceID, userID uint) bool {
+func (c *cachingChecker) IsMember(ctx context.Context, workspaceID, userID string) bool {
 	key := memberKey{workspaceID, userID}
 	c.mu.Lock()
 	if e, ok := c.cache[key]; ok && time.Since(e.at) < c.ttl {
@@ -77,6 +77,6 @@ func (c *cachingChecker) IsMember(ctx context.Context, workspaceID, userID uint)
 	return member
 }
 
-func (c *cachingChecker) GetDefaultWorkspaceID(ctx context.Context, userID uint) (uint, error) {
+func (c *cachingChecker) GetDefaultWorkspaceID(ctx context.Context, userID string) (string, error) {
 	return c.inner.GetDefaultWorkspaceID(ctx, userID)
 }

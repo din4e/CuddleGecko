@@ -24,7 +24,7 @@ func (r *PomodoroRepo) Create(ctx context.Context, p *model.PomodoroSession) err
 	return nil
 }
 
-func (r *PomodoroRepo) List(ctx context.Context, workspaceID uint, from, to time.Time) ([]model.PomodoroSession, error) {
+func (r *PomodoroRepo) List(ctx context.Context, workspaceID string, from, to time.Time) ([]model.PomodoroSession, error) {
 	var sessions []model.PomodoroSession
 	q := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID)
 	if !from.IsZero() {
@@ -40,7 +40,7 @@ func (r *PomodoroRepo) List(ctx context.Context, workspaceID uint, from, to time
 }
 
 // Summary aggregates focus sessions: today's and all-time count + seconds.
-func (r *PomodoroRepo) Summary(ctx context.Context, workspaceID uint) (model.PomodoroSummary, error) {
+func (r *PomodoroRepo) Summary(ctx context.Context, workspaceID string) (model.PomodoroSummary, error) {
 	var s model.PomodoroSummary
 	now := time.Now()
 	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())

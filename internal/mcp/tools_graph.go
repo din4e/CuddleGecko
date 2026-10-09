@@ -8,9 +8,9 @@ import (
 
 func (s *MCPServer) registerGraphTools() {
 	s.registerTool("get_graph", "Get the full relationship graph data (nodes and edges).", map[string]interface{}{
-		"type": "object",
+		"type":       "object",
 		"properties": map[string]interface{}{},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		return s.relationSvc.GetGraphData(ctx, userID, workspaceID)
 	})
 
@@ -20,23 +20,23 @@ func (s *MCPServer) registerGraphTools() {
 			"contact_id": map[string]interface{}{"type": "integer", "description": "Contact ID"},
 		},
 		"required": []string{"contact_id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		contactID := toUint(getArg(args, "contact_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		contactID := toString(getArg(args, "contact_id"))
 		return s.relationSvc.ListByContact(ctx, userID, workspaceID, contactID)
 	})
 
 	s.registerTool("create_relation", "Create a relation between two contacts.", map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
-			"contact_id_a": map[string]interface{}{"type": "integer", "description": "First contact ID"},
-			"contact_id_b": map[string]interface{}{"type": "integer", "description": "Second contact ID"},
+			"contact_id_a":  map[string]interface{}{"type": "integer", "description": "First contact ID"},
+			"contact_id_b":  map[string]interface{}{"type": "integer", "description": "Second contact ID"},
 			"relation_type": map[string]interface{}{"type": "string", "description": "Type of relation (e.g. friend, colleague, family)"},
 		},
 		"required": []string{"contact_id_a", "contact_id_b"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		contactIDA := toUint(getArg(args, "contact_id_a"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		contactIDA := toString(getArg(args, "contact_id_a"))
 		relation := &model.ContactRelation{
-			ContactIDB:  toUint(getArg(args, "contact_id_b")),
+			ContactIDB:   toString(getArg(args, "contact_id_b")),
 			RelationType: toString(getArg(args, "relation_type")),
 		}
 		return s.relationSvc.Create(ctx, userID, workspaceID, contactIDA, relation)
@@ -48,8 +48,8 @@ func (s *MCPServer) registerGraphTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Relation ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		err := s.relationSvc.Delete(ctx, userID, workspaceID, id)
 		if err != nil {
 			return nil, err

@@ -1,14 +1,18 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // PomodoroSession records one completed (or stopped) focus/break block
 // (滴答清单的"番茄专注").
 type PomodoroSession struct {
-	ID              uint      `gorm:"primaryKey" json:"id"`
-	UserID          uint      `gorm:"index;not null" json:"user_id"`
-	WorkspaceID     uint      `gorm:"index;not null;default:0;index:idx_pomodoros_workspace_started,priority:1;index:idx_pomodoros_workspace_kind_started,priority:1" json:"workspace_id"`
-	TodoID          *uint     `gorm:"index" json:"todo_id"`
+	ID              string    `gorm:"primaryKey;type:char(36)" json:"id"`
+	UserID          string    `gorm:"size:36;index;not null" json:"user_id"`
+	WorkspaceID     string    `gorm:"size:36;index;not null;default:0;index:idx_pomodoros_workspace_started,priority:1;index:idx_pomodoros_workspace_kind_started,priority:1" json:"workspace_id"`
+	TodoID          *string   `gorm:"size:36;index" json:"todo_id"`
 	DurationSeconds int       `gorm:"not null" json:"duration_seconds"`
 	Kind            string    `gorm:"size:10;not null;default:'focus';index:idx_pomodoros_workspace_kind_started,priority:2" json:"kind"` // focus | break
 	Completed       bool      `gorm:"default:true" json:"completed"`
@@ -24,3 +28,6 @@ type PomodoroSummary struct {
 	TotalCount   int64 `json:"total_count"`
 	TotalSeconds int64 `json:"total_seconds"`
 }
+
+// BeforeCreate assigns the UUID primary key on first insert.
+func (p *PomodoroSession) BeforeCreate(tx *gorm.DB) error { return ensureID(&p.ID, tx) }

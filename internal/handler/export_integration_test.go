@@ -39,8 +39,8 @@ func setupExportTestRouter(t *testing.T) *gin.Engine {
 	h := NewExportHandler(svc)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		c.Set("user_id", uint(1))
-		c.Set("workspace_id", uint(1))
+		c.Set("user_id", "1")
+		c.Set("workspace_id", "1")
 		c.Next()
 	})
 	r.POST("/export", h.Export)

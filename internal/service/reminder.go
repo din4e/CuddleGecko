@@ -12,10 +12,10 @@ var ErrReminderNotFound = errors.New("reminder not found")
 
 type ReminderRepository interface {
 	Create(ctx context.Context, reminder *model.Reminder) error
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.Reminder, error)
-	List(ctx context.Context, workspaceID uint, status model.ReminderStatus, contactID *uint, page, pageSize int, tagIDs []uint) ([]model.Reminder, int64, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.Reminder, error)
+	List(ctx context.Context, workspaceID string, status model.ReminderStatus, contactID *string, page, pageSize int, tagIDs []string) ([]model.Reminder, int64, error)
 	Update(ctx context.Context, reminder *model.Reminder) error
-	Delete(ctx context.Context, workspaceID, id uint) error
+	Delete(ctx context.Context, workspaceID, id string) error
 }
 
 type ReminderService struct {
@@ -28,7 +28,7 @@ func NewReminderService(repo ReminderRepository, taggingRepo TaggingRepository, 
 	return &ReminderService{repo: repo, taggingRepo: taggingRepo, notifier: firstNotifier(notifier)}
 }
 
-func (s *ReminderService) Create(ctx context.Context, userID, workspaceID, contactID uint, reminder *model.Reminder) (*model.Reminder, error) {
+func (s *ReminderService) Create(ctx context.Context, userID, workspaceID, contactID string, reminder *model.Reminder) (*model.Reminder, error) {
 	if reminder.RemindAt.IsZero() {
 		return nil, fmt.Errorf("%w: remind_at is required", ErrInvalidReminder)
 	}
@@ -43,7 +43,7 @@ func (s *ReminderService) Create(ctx context.Context, userID, workspaceID, conta
 	return reminder, nil
 }
 
-func (s *ReminderService) List(ctx context.Context, userID, workspaceID uint, status model.ReminderStatus, contactID *uint, page, pageSize int, tagIDs []uint) ([]model.Reminder, int64, error) {
+func (s *ReminderService) List(ctx context.Context, userID, workspaceID string, status model.ReminderStatus, contactID *string, page, pageSize int, tagIDs []string) ([]model.Reminder, int64, error) {
 	reminders, total, err := s.repo.List(ctx, workspaceID, status, contactID, page, pageSize, tagIDs)
 	if err != nil {
 		return nil, 0, err
@@ -52,7 +52,7 @@ func (s *ReminderService) List(ctx context.Context, userID, workspaceID uint, st
 	return reminders, total, nil
 }
 
-func (s *ReminderService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Reminder) (*model.Reminder, error) {
+func (s *ReminderService) Update(ctx context.Context, userID, workspaceID, id string, updates *model.Reminder) (*model.Reminder, error) {
 	reminder, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrReminderNotFound
@@ -79,7 +79,7 @@ func (s *ReminderService) Update(ctx context.Context, userID, workspaceID, id ui
 	return reminder, nil
 }
 
-func (s *ReminderService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *ReminderService) Delete(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (s *ReminderService) Delete(ctx context.Context, userID, workspaceID, id ui
 	return nil
 }
 
-func (s *ReminderService) ReplaceTags(ctx context.Context, userID, workspaceID, reminderID uint, tagIDs []uint) error {
+func (s *ReminderService) ReplaceTags(ctx context.Context, userID, workspaceID, reminderID string, tagIDs []string) error {
 	if _, err := s.repo.GetByID(ctx, workspaceID, reminderID); err != nil {
 		return ErrReminderNotFound
 	}
@@ -100,7 +100,7 @@ func (s *ReminderService) ReplaceTags(ctx context.Context, userID, workspaceID, 
 	return nil
 }
 
-func (s *ReminderService) GetTags(ctx context.Context, userID, workspaceID, reminderID uint) ([]model.Tag, error) {
+func (s *ReminderService) GetTags(ctx context.Context, userID, workspaceID, reminderID string) ([]model.Tag, error) {
 	if _, err := s.repo.GetByID(ctx, workspaceID, reminderID); err != nil {
 		return nil, ErrReminderNotFound
 	}
@@ -108,11 +108,11 @@ func (s *ReminderService) GetTags(ctx context.Context, userID, workspaceID, remi
 }
 
 // populateTags fills the virtual Tags field for a batch of reminders.
-func (s *ReminderService) populateTags(ctx context.Context, workspaceID uint, reminders []model.Reminder) {
+func (s *ReminderService) populateTags(ctx context.Context, workspaceID string, reminders []model.Reminder) {
 	if s.taggingRepo == nil || len(reminders) == 0 {
 		return
 	}
-	ids := make([]uint, len(reminders))
+	ids := make([]string, len(reminders))
 	for i, r := range reminders {
 		ids[i] = r.ID
 	}

@@ -24,7 +24,7 @@ func (r *EventRepo) Create(ctx context.Context, event *model.Event) error {
 	return nil
 }
 
-func (r *EventRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Event, error) {
+func (r *EventRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.Event, error) {
 	var event model.Event
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&event).Error; err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func (r *EventRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.E
 	return &event, nil
 }
 
-func (r *EventRepo) GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Event, error) {
+func (r *EventRepo) GetByIDs(ctx context.Context, workspaceID string, ids []string) ([]model.Event, error) {
 	var events []model.Event
 	if err := r.db.WithContext(ctx).
 		Where("id IN ? AND workspace_id = ?", ids, workspaceID).
@@ -42,7 +42,7 @@ func (r *EventRepo) GetByIDs(ctx context.Context, workspaceID uint, ids []uint) 
 	return events, nil
 }
 
-func (r *EventRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, startAfter, endBefore *string, search string, tagIDs []uint) ([]model.Event, int64, error) {
+func (r *EventRepo) List(ctx context.Context, workspaceID string, page, pageSize int, startAfter, endBefore *string, search string, tagIDs []string) ([]model.Event, int64, error) {
 	var events []model.Event
 	var total int64
 
@@ -90,7 +90,7 @@ func (r *EventRepo) Update(ctx context.Context, event *model.Event) error {
 	return nil
 }
 
-func (r *EventRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *EventRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Event{}).Error; err != nil {
 		return fmt.Errorf("delete event: %w", err)
 	}

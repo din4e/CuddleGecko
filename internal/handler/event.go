@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"strconv"
 	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
@@ -21,28 +20,28 @@ func NewEventHandler(svc *service.EventService) *EventHandler {
 }
 
 type createEventRequest struct {
-	Title       string `json:"title" binding:"required"`
-	Description string `json:"description"`
-	StartTime   string `json:"start_time" binding:"required"`
-	EndTime     string `json:"end_time"`
-	Location    string `json:"location"`
-	ContactIDs  []uint `json:"contact_ids"`
-	Color       string `json:"color"`
+	Title       string   `json:"title" binding:"required"`
+	Description string   `json:"description"`
+	StartTime   string   `json:"start_time" binding:"required"`
+	EndTime     string   `json:"end_time"`
+	Location    string   `json:"location"`
+	ContactIDs  []string `json:"contact_ids"`
+	Color       string   `json:"color"`
 }
 
 type updateEventRequest struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	StartTime   string `json:"start_time"`
-	EndTime     string `json:"end_time"`
-	Location    string `json:"location"`
-	ContactIDs  []uint `json:"contact_ids"`
-	Color       string `json:"color"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	StartTime   string   `json:"start_time"`
+	EndTime     string   `json:"end_time"`
+	Location    string   `json:"location"`
+	ContactIDs  []string `json:"contact_ids"`
+	Color       string   `json:"color"`
 }
 
 func parseEventFromReq(req interface{}) (*model.Event, error) {
 	var title, desc, start, end, loc, color string
-	var contactIDs []uint
+	var contactIDs []string
 
 	switch r := req.(type) {
 	case *createEventRequest:
@@ -112,13 +111,9 @@ func (h *EventHandler) List(c *gin.Context) {
 func (h *EventHandler) GetTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid event id")
-		return
-	}
+	id := c.Param("id")
 
-	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, uint(id))
+	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, id)
 	if err != nil {
 		response.NotFound(c, "event not found")
 		return
@@ -129,11 +124,7 @@ func (h *EventHandler) GetTags(c *gin.Context) {
 func (h *EventHandler) ReplaceTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid event id")
-		return
-	}
+	id := c.Param("id")
 
 	var req replaceTagsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -141,7 +132,7 @@ func (h *EventHandler) ReplaceTags(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
+	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, id, req.TagIDs); err != nil {
 		if errors.Is(err, model.ErrInvalidTagIDs) {
 			response.BadRequest(c, err.Error())
 			return
@@ -184,11 +175,7 @@ func (h *EventHandler) Create(c *gin.Context) {
 func (h *EventHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid event id")
-		return
-	}
+	id := c.Param("id")
 
 	var req updateEventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -202,7 +189,7 @@ func (h *EventHandler) Update(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), event)
+	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, id, event)
 	if err != nil {
 		if err == service.ErrEventNotFound {
 			response.NotFound(c, "event not found")
@@ -222,13 +209,9 @@ func (h *EventHandler) Update(c *gin.Context) {
 func (h *EventHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid event id")
-		return
-	}
+	id := c.Param("id")
 
-	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, id); err != nil {
 		response.NotFound(c, "event not found")
 		return
 	}

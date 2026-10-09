@@ -80,7 +80,7 @@ func main() {
 		}
 	}
 	db.Model(&user).Update("password_hash", hashedPassword)
-	fmt.Printf("User: %s (id=%d)\n", user.Username, user.ID)
+	fmt.Printf("User: %s (id=%s)\n", user.Username, user.ID)
 
 	// Ensure workspace exists
 	var ws model.Workspace
@@ -99,7 +99,7 @@ func main() {
 	}).Error; err != nil {
 		log.Fatalf("Failed to create workspace member: %v", err)
 	}
-	fmt.Printf("Workspace: %s (id=%d)\n", ws.Name, ws.ID)
+	fmt.Printf("Workspace: %s (id=%s)\n", ws.Name, ws.ID)
 
 	// Create tags
 	tags := []model.Tag{
@@ -144,7 +144,7 @@ func main() {
 		log.Fatalf("Failed to create contacts: %v", err)
 	}
 	// Reload IDs
-	var contactIDs []uint
+	var contactIDs []string
 	db.Model(&model.Contact{}).Where("user_id = ? AND workspace_id = ?", user.ID, ws.ID).Pluck("id", &contactIDs)
 	fmt.Printf("Created %d contacts (%.1fs)\n", len(contactIDs), time.Since(start).Seconds())
 
@@ -296,7 +296,7 @@ func main() {
 	fmt.Printf("\nGenerating %d relations...\n", numRelations)
 	relationTypes := []string{"同学", "同事", "邻居", "师生", "合作伙伴", "室友", "老乡", "球友", "校友", "旅伴"}
 	relations := make([]model.ContactRelation, 0, numRelations)
-	usedPairs := make(map[uint64]bool, numRelations)
+	usedPairs := make(map[string]bool, numRelations)
 	for i := 0; i < numRelations; i++ {
 		a := contactIDs[r.Intn(len(contactIDs))]
 		b := contactIDs[r.Intn(len(contactIDs))]
@@ -307,7 +307,7 @@ func main() {
 		if lo > hi {
 			lo, hi = hi, lo
 		}
-		key := uint64(lo)<<32 | uint64(hi)
+		key := lo + "|" + hi
 		if usedPairs[key] {
 			continue
 		}
@@ -389,12 +389,12 @@ func randomTime(r *rand.Rand, base time.Time, minDays, maxDays int) time.Time {
 	return base.AddDate(0, 0, days).Add(time.Duration(hours)*time.Hour + time.Duration(minutes)*time.Minute)
 }
 
-func randomContactIDs(r *rand.Rand, all []uint, max int) []uint {
+func randomContactIDs(r *rand.Rand, all []string, max int) []string {
 	n := r.Intn(max + 1) // 0 to max
 	if n == 0 {
 		return nil
 	}
-	ids := make([]uint, n)
+	ids := make([]string, n)
 	for i := 0; i < n; i++ {
 		ids[i] = all[r.Intn(len(all))]
 	}

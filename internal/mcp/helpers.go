@@ -97,17 +97,17 @@ func toStringSlice(v interface{}) []string {
 	}
 }
 
-func toUintSlice(v interface{}) []uint {
+func toUintSlice(v interface{}) []string {
 	if v == nil {
 		return nil
 	}
 	switch val := v.(type) {
-	case []uint:
+	case []string:
 		return val
 	case []interface{}:
-		result := make([]uint, len(val))
+		result := make([]string, len(val))
 		for i, item := range val {
-			result[i] = toUint(item)
+			result[i] = toString(item)
 		}
 		return result
 	default:

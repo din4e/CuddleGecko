@@ -20,12 +20,12 @@ func NewTaggingRepo(db *gorm.DB) *TaggingRepo {
 // SetTags replaces the full set of tags attached to a target. Duplicates and
 // zero IDs are ignored. Every remaining ID must reference a tag in the same
 // workspace — foreign or deleted IDs are rejected and nothing is written.
-func (r *TaggingRepo) SetTags(ctx context.Context, workspaceID uint, targetType string, targetID uint, tagIDs []uint) error {
+func (r *TaggingRepo) SetTags(ctx context.Context, workspaceID string, targetType string, targetID string, tagIDs []string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		seen := make(map[uint]bool, len(tagIDs))
-		ids := make([]uint, 0, len(tagIDs))
+		seen := make(map[string]bool, len(tagIDs))
+		ids := make([]string, 0, len(tagIDs))
 		for _, id := range tagIDs {
-			if id == 0 || seen[id] {
+			if id == "" || seen[id] {
 				continue
 			}
 			seen[id] = true
@@ -66,12 +66,12 @@ func (r *TaggingRepo) SetTags(ctx context.Context, workspaceID uint, targetType 
 }
 
 // GetTags returns the tags attached to a single target.
-func (r *TaggingRepo) GetTags(ctx context.Context, workspaceID uint, targetType string, targetID uint) ([]model.Tag, error) {
+func (r *TaggingRepo) GetTags(ctx context.Context, workspaceID string, targetType string, targetID string) ([]model.Tag, error) {
 	var tags []model.Tag
 	err := r.db.WithContext(ctx).
 		Joins("JOIN taggings ON taggings.tag_id = tags.id").
 		Where("taggings.workspace_id = ? AND taggings.target_type = ? AND taggings.target_id = ?", workspaceID, targetType, targetID).
-		Order("tags.id ASC").
+		Order("tags.created_at ASC, tags.id ASC").
 		Find(&tags).Error
 	if err != nil {
 		return nil, fmt.Errorf("get tags: %w", err)
@@ -80,8 +80,8 @@ func (r *TaggingRepo) GetTags(ctx context.Context, workspaceID uint, targetType 
 }
 
 // GetTagsByTargets batch-loads tags for many targets, returning targetID -> tags.
-func (r *TaggingRepo) GetTagsByTargets(ctx context.Context, workspaceID uint, targetType string, targetIDs []uint) (map[uint][]model.Tag, error) {
-	result := make(map[uint][]model.Tag, len(targetIDs))
+func (r *TaggingRepo) GetTagsByTargets(ctx context.Context, workspaceID string, targetType string, targetIDs []string) (map[string][]model.Tag, error) {
+	result := make(map[string][]model.Tag, len(targetIDs))
 	if len(targetIDs) == 0 {
 		return result, nil
 	}
@@ -97,20 +97,20 @@ func (r *TaggingRepo) GetTagsByTargets(ctx context.Context, workspaceID uint, ta
 		return result, nil
 	}
 
-	tagIDSet := make(map[uint]bool, len(tgs))
+	tagIDSet := make(map[string]bool, len(tgs))
 	for _, t := range tgs {
 		tagIDSet[t.TagID] = true
 	}
-	tagIDs := make([]uint, 0, len(tagIDSet))
+	tagIDs := make([]string, 0, len(tagIDSet))
 	for id := range tagIDSet {
 		tagIDs = append(tagIDs, id)
 	}
 
 	var tags []model.Tag
-	if err := r.db.WithContext(ctx).Where("id IN ?", tagIDs).Order("id ASC").Find(&tags).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id IN ?", tagIDs).Order("created_at ASC, id ASC").Find(&tags).Error; err != nil {
 		return nil, fmt.Errorf("get tags by ids: %w", err)
 	}
-	tagMap := make(map[uint]model.Tag, len(tags))
+	tagMap := make(map[string]model.Tag, len(tags))
 	for _, t := range tags {
 		tagMap[t.ID] = t
 	}
@@ -123,11 +123,11 @@ func (r *TaggingRepo) GetTagsByTargets(ctx context.Context, workspaceID uint, ta
 }
 
 // FilterTargetIDs returns the distinct target IDs that carry any of the given tags.
-func (r *TaggingRepo) FilterTargetIDs(ctx context.Context, workspaceID uint, targetType string, tagIDs []uint) ([]uint, error) {
+func (r *TaggingRepo) FilterTargetIDs(ctx context.Context, workspaceID string, targetType string, tagIDs []string) ([]string, error) {
 	if len(tagIDs) == 0 {
 		return nil, nil
 	}
-	var ids []uint
+	var ids []string
 	err := r.db.WithContext(ctx).Model(&model.Tagging{}).
 		Where("workspace_id = ? AND target_type = ? AND tag_id IN ?", workspaceID, targetType, tagIDs).
 		Distinct("target_id").
@@ -139,7 +139,7 @@ func (r *TaggingRepo) FilterTargetIDs(ctx context.Context, workspaceID uint, tar
 }
 
 // RemoveAll deletes every tagging for a target (call when the target is deleted).
-func (r *TaggingRepo) RemoveAll(ctx context.Context, workspaceID uint, targetType string, targetID uint) error {
+func (r *TaggingRepo) RemoveAll(ctx context.Context, workspaceID string, targetType string, targetID string) error {
 	if err := r.db.WithContext(ctx).
 		Where("workspace_id = ? AND target_type = ? AND target_id = ?", workspaceID, targetType, targetID).
 		Delete(&model.Tagging{}).Error; err != nil {

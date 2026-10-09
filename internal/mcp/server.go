@@ -9,7 +9,7 @@ import (
 )
 
 // ToolHandler is a function that handles an MCP tool call.
-type ToolHandler func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error)
+type ToolHandler func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error)
 
 type toolDef struct {
 	name        string
@@ -108,7 +108,7 @@ func (s *MCPServer) registerTool(name, description string, inputSchema map[strin
 }
 
 // HandleMethod dispatches a JSON-RPC method to the appropriate handler.
-func (s *MCPServer) HandleMethod(method string, params json.RawMessage, userID, workspaceID uint) JSONRPCResponse {
+func (s *MCPServer) HandleMethod(method string, params json.RawMessage, userID, workspaceID string) JSONRPCResponse {
 	switch method {
 	case "initialize":
 		return JSONRPCResponse{

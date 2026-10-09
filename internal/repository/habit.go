@@ -23,7 +23,7 @@ func (r *HabitRepo) Create(ctx context.Context, h *model.Habit) error {
 	return nil
 }
 
-func (r *HabitRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Habit, error) {
+func (r *HabitRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.Habit, error) {
 	var h model.Habit
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&h).Error; err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func (r *HabitRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.H
 	return &h, nil
 }
 
-func (r *HabitRepo) List(ctx context.Context, workspaceID uint, includeArchived bool, tagIDs []uint) ([]model.Habit, error) {
+func (r *HabitRepo) List(ctx context.Context, workspaceID string, includeArchived bool, tagIDs []string) ([]model.Habit, error) {
 	var habits []model.Habit
 	q := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID)
 	if !includeArchived {
@@ -44,7 +44,7 @@ func (r *HabitRepo) List(ctx context.Context, workspaceID uint, includeArchived 
 			workspaceID, model.TagTargetHabit, tagIDs,
 		)
 	}
-	if err := q.Order("archived ASC, sort_order ASC, id ASC").Find(&habits).Error; err != nil {
+	if err := q.Order("archived ASC, sort_order ASC, created_at ASC, id ASC").Find(&habits).Error; err != nil {
 		return nil, fmt.Errorf("list habits: %w", err)
 	}
 	return habits, nil
@@ -59,7 +59,7 @@ func (r *HabitRepo) Update(ctx context.Context, h *model.Habit) error {
 	return nil
 }
 
-func (r *HabitRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *HabitRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Habit{}).Error; err != nil {
 		return fmt.Errorf("delete habit: %w", err)
 	}

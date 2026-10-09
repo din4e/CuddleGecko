@@ -31,12 +31,12 @@ func TestWorkoutService_UpdateClearFlags(t *testing.T) {
 	ctx := context.Background()
 
 	at, _ := time.Parse(time.RFC3339, "2026-08-04T19:00:00Z")
-	w, err := svc.Create(ctx, 1, 1, &model.Workout{Name: "run", ScheduledAt: &at, Calories: floatPtr(300)})
+	w, err := svc.Create(ctx, "1", "1", &model.Workout{Name: "run", ScheduledAt: &at, Calories: floatPtr(300)})
 	require.NoError(t, err)
 	require.NotNil(t, w.ScheduledAt)
 
 	// Clear scheduled_at via flag; leave calories untouched (no value, no flag).
-	updated, err := svc.Update(ctx, 1, 1, w.ID, &model.Workout{Name: "morning run"}, WorkoutClear{ScheduledAt: true})
+	updated, err := svc.Update(ctx, "1", "1", w.ID, &model.Workout{Name: "morning run"}, WorkoutClear{ScheduledAt: true})
 	require.NoError(t, err)
 	assert.Equal(t, "morning run", updated.Name)
 	assert.Nil(t, updated.ScheduledAt, "scheduled_at cleared by flag")
@@ -48,15 +48,15 @@ func TestWorkoutService_UpdateClearFlags(t *testing.T) {
 func TestWorkoutService_ToggleStatus(t *testing.T) {
 	svc, _ := newWorkoutSvcTestDB(t)
 	ctx := context.Background()
-	w, err := svc.Create(ctx, 1, 1, &model.Workout{Name: "lift"})
+	w, err := svc.Create(ctx, "1", "1", &model.Workout{Name: "lift"})
 	require.NoError(t, err)
 
-	done, err := svc.ToggleStatus(ctx, 1, 1, w.ID)
+	done, err := svc.ToggleStatus(ctx, "1", "1", w.ID)
 	require.NoError(t, err)
 	assert.Equal(t, model.WorkoutStatusCompleted, done.Status)
 	require.NotNil(t, done.CompletedAt)
 
-	undone, err := svc.ToggleStatus(ctx, 1, 1, w.ID)
+	undone, err := svc.ToggleStatus(ctx, "1", "1", w.ID)
 	require.NoError(t, err)
 	assert.Equal(t, model.WorkoutStatusPlanned, undone.Status)
 	assert.Nil(t, undone.CompletedAt)
@@ -66,26 +66,26 @@ func TestWorkoutService_ToggleStatus(t *testing.T) {
 func TestWorkoutService_ExerciseLifecycle(t *testing.T) {
 	svc, _ := newWorkoutSvcTestDB(t)
 	ctx := context.Background()
-	w, err := svc.Create(ctx, 1, 1, &model.Workout{Name: "push"})
+	w, err := svc.Create(ctx, "1", "1", &model.Workout{Name: "push"})
 	require.NoError(t, err)
 
 	// Empty name is rejected.
-	_, err = svc.CreateExercise(ctx, 1, 1, w.ID, &model.WorkoutExercise{Name: "  "})
+	_, err = svc.CreateExercise(ctx, "1", "1", w.ID, &model.WorkoutExercise{Name: "  "})
 	assert.ErrorIs(t, err, ErrExerciseEmpty)
 
-	ex, err := svc.CreateExercise(ctx, 1, 1, w.ID, &model.WorkoutExercise{Name: "bench"})
+	ex, err := svc.CreateExercise(ctx, "1", "1", w.ID, &model.WorkoutExercise{Name: "bench"})
 	require.NoError(t, err)
 
-	toggled, err := svc.ToggleExercise(ctx, 1, 1, w.ID, ex.ID)
+	toggled, err := svc.ToggleExercise(ctx, "1", "1", w.ID, ex.ID)
 	require.NoError(t, err)
 	assert.True(t, toggled.Done)
 
 	// Exercise under a missing workout is NotFound.
-	_, err = svc.CreateExercise(ctx, 1, 1, 9999, &model.WorkoutExercise{Name: "x"})
+	_, err = svc.CreateExercise(ctx, "1", "1", "9999", &model.WorkoutExercise{Name: "x"})
 	assert.ErrorIs(t, err, ErrWorkoutNotFound)
 
-	require.NoError(t, svc.DeleteExercise(ctx, 1, 1, w.ID, ex.ID))
-	_, err = svc.ToggleExercise(ctx, 1, 1, w.ID, ex.ID)
+	require.NoError(t, svc.DeleteExercise(ctx, "1", "1", w.ID, ex.ID))
+	_, err = svc.ToggleExercise(ctx, "1", "1", w.ID, ex.ID)
 	assert.ErrorIs(t, err, ErrExerciseNotFound)
 }
 
@@ -96,18 +96,18 @@ func TestWorkoutService_BodyMetricFlow(t *testing.T) {
 
 	t0, _ := time.Parse(time.RFC3339, "2026-07-01T08:00:00Z")
 	t1, _ := time.Parse(time.RFC3339, "2026-07-08T08:00:00Z")
-	_, err := svc.CreateMetric(ctx, 1, 1, &model.BodyMetric{RecordedAt: t0, Weight: floatPtr(70.0), Height: floatPtr(175)})
+	_, err := svc.CreateMetric(ctx, "1", "1", &model.BodyMetric{RecordedAt: t0, Weight: floatPtr(70.0), Height: floatPtr(175)})
 	require.NoError(t, err)
-	_, err = svc.CreateMetric(ctx, 1, 1, &model.BodyMetric{RecordedAt: t1, Weight: floatPtr(69.0), Height: floatPtr(175)})
+	_, err = svc.CreateMetric(ctx, "1", "1", &model.BodyMetric{RecordedAt: t1, Weight: floatPtr(69.0), Height: floatPtr(175)})
 	require.NoError(t, err)
 
-	metrics, total, err := svc.ListMetrics(ctx, 1, 1, model.BodyMetricListQuery{Page: 1, PageSize: 50})
+	metrics, total, err := svc.ListMetrics(ctx, "1", "1", model.BodyMetricListQuery{Page: 1, PageSize: 50})
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), total)
 	assert.Len(t, metrics, 2)
 	assert.True(t, metrics[0].RecordedAt.After(metrics[1].RecordedAt), "newest first")
 
-	sum, err := svc.BodySummary(ctx, 1, 1)
+	sum, err := svc.BodySummary(ctx, "1", "1")
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), sum.Count)
 	assert.Equal(t, "down", sum.WeightTrend)
@@ -117,7 +117,7 @@ func TestWorkoutService_BodyMetricFlow(t *testing.T) {
 func TestWorkoutService_CreateMetricDefaultsTime(t *testing.T) {
 	svc, _ := newWorkoutSvcTestDB(t)
 	ctx := context.Background()
-	m, err := svc.CreateMetric(ctx, 1, 1, &model.BodyMetric{Weight: floatPtr(70)})
+	m, err := svc.CreateMetric(ctx, "1", "1", &model.BodyMetric{Weight: floatPtr(70)})
 	require.NoError(t, err)
 	assert.False(t, m.RecordedAt.IsZero())
 }
@@ -137,7 +137,7 @@ func TestWorkoutService_ImportMetrics(t *testing.T) {
 	day2, _ := time.Parse(time.RFC3339, "2026-09-08T07:30:00+08:00")
 	highScore := 99 // Garmin-style 0-100 score mapped by the handler, clamped here
 
-	res, err := svc.ImportMetrics(ctx, 1, 1, "garmin", []BodyMetricImport{
+	res, err := svc.ImportMetrics(ctx, "1", "1", "garmin", []BodyMetricImport{
 		{RecordedAt: day1, Bedtime: &bed1, WakeTime: &wake1, SleepHours: floatPtr(8.17), SleepScore: &highScore, Steps: intPtr(8500), RestingHR: intPtr(52)},
 		{RecordedAt: day2, SleepHours: floatPtr(6.5)},
 	})
@@ -145,7 +145,7 @@ func TestWorkoutService_ImportMetrics(t *testing.T) {
 	assert.Equal(t, 2, res.Created)
 	assert.Equal(t, 0, res.Skipped)
 
-	metrics, total, err := svc.ListMetrics(ctx, 1, 1, model.BodyMetricListQuery{Page: 1, PageSize: 50})
+	metrics, total, err := svc.ListMetrics(ctx, "1", "1", model.BodyMetricListQuery{Page: 1, PageSize: 50})
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), total)
 	// Newest first: metrics[0] is day2 (no score), metrics[1] is the scored day1 row.
@@ -157,7 +157,7 @@ func TestWorkoutService_ImportMetrics(t *testing.T) {
 	assert.True(t, metrics[1].Bedtime.Equal(bed1))
 
 	// Re-importing the same timestamps is a no-op.
-	res, err = svc.ImportMetrics(ctx, 1, 1, "garmin", []BodyMetricImport{
+	res, err = svc.ImportMetrics(ctx, "1", "1", "garmin", []BodyMetricImport{
 		{RecordedAt: day1, SleepHours: floatPtr(1)},
 	})
 	require.NoError(t, err)
@@ -165,7 +165,7 @@ func TestWorkoutService_ImportMetrics(t *testing.T) {
 	assert.Equal(t, 1, res.Skipped)
 
 	// A zero recorded_at is rejected before anything is written.
-	_, err = svc.ImportMetrics(ctx, 1, 1, "garmin", []BodyMetricImport{{SleepHours: floatPtr(7)}})
+	_, err = svc.ImportMetrics(ctx, "1", "1", "garmin", []BodyMetricImport{{SleepHours: floatPtr(7)}})
 	assert.Error(t, err)
 
 	// Oversized batches are rejected.
@@ -173,6 +173,6 @@ func TestWorkoutService_ImportMetrics(t *testing.T) {
 	for i := 0; i < maxMetricImportRecords+1; i++ {
 		big = append(big, BodyMetricImport{RecordedAt: day1.Add(time.Duration(i) * time.Hour)})
 	}
-	_, err = svc.ImportMetrics(ctx, 1, 1, "garmin", big)
+	_, err = svc.ImportMetrics(ctx, "1", "1", "garmin", big)
 	assert.Error(t, err)
 }

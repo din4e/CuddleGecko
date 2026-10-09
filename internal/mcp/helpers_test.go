@@ -53,8 +53,8 @@ func TestToStringSlice_JSONArray(t *testing.T) {
 
 func TestToUintSlice_JSONArray(t *testing.T) {
 	// JSON arrays of numbers arrive as []interface{}{float64,...}.
-	got := toUintSlice([]interface{}{float64(1), float64(2), float64(3)})
-	assert.Equal(t, []uint{1, 2, 3}, got)
+	got := toUintSlice([]interface{}{"1", "2", "3"})
+	assert.Equal(t, []string{"1", "2", "3"}, got)
 	assert.Nil(t, toUintSlice(nil))
 }
 

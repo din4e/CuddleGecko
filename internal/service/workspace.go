@@ -8,22 +8,22 @@ import (
 )
 
 var (
-	ErrWorkspaceNotFound = errors.New("workspace not found")
-	ErrNotWorkspaceOwner = errors.New("only workspace owner can perform this action")
+	ErrWorkspaceNotFound  = errors.New("workspace not found")
+	ErrNotWorkspaceOwner  = errors.New("only workspace owner can perform this action")
 	ErrNotWorkspaceMember = errors.New("not a member of this workspace")
 )
 
 type WorkspaceRepository interface {
 	Create(ctx context.Context, ws *model.Workspace) error
-	GetByID(ctx context.Context, id uint) (*model.Workspace, error)
-	ListByUserID(ctx context.Context, userID uint) ([]model.Workspace, error)
+	GetByID(ctx context.Context, id string) (*model.Workspace, error)
+	ListByUserID(ctx context.Context, userID string) ([]model.Workspace, error)
 	Update(ctx context.Context, ws *model.Workspace) error
-	Delete(ctx context.Context, id uint) error
+	Delete(ctx context.Context, id string) error
 	AddMember(ctx context.Context, member *model.WorkspaceMember) error
-	RemoveMember(ctx context.Context, workspaceID, userID uint) error
-	IsMember(ctx context.Context, workspaceID, userID uint) bool
-	GetMemberRole(ctx context.Context, workspaceID, userID uint) (string, error)
-	GetDefaultWorkspace(ctx context.Context, userID uint) (*model.Workspace, error)
+	RemoveMember(ctx context.Context, workspaceID, userID string) error
+	IsMember(ctx context.Context, workspaceID, userID string) bool
+	GetMemberRole(ctx context.Context, workspaceID, userID string) (string, error)
+	GetDefaultWorkspace(ctx context.Context, userID string) (*model.Workspace, error)
 }
 
 type WorkspaceService struct {
@@ -34,7 +34,7 @@ func NewWorkspaceService(repo WorkspaceRepository) *WorkspaceService {
 	return &WorkspaceService{repo: repo}
 }
 
-func (s *WorkspaceService) Create(ctx context.Context, userID uint, name, description, icon string) (*model.Workspace, error) {
+func (s *WorkspaceService) Create(ctx context.Context, userID string, name, description, icon string) (*model.Workspace, error) {
 	ws := &model.Workspace{
 		Name:        name,
 		Description: description,
@@ -57,11 +57,11 @@ func (s *WorkspaceService) Create(ctx context.Context, userID uint, name, descri
 	return ws, nil
 }
 
-func (s *WorkspaceService) List(ctx context.Context, userID uint) ([]model.Workspace, error) {
+func (s *WorkspaceService) List(ctx context.Context, userID string) ([]model.Workspace, error) {
 	return s.repo.ListByUserID(ctx, userID)
 }
 
-func (s *WorkspaceService) GetByID(ctx context.Context, userID, id uint) (*model.Workspace, error) {
+func (s *WorkspaceService) GetByID(ctx context.Context, userID, id string) (*model.Workspace, error) {
 	if !s.repo.IsMember(ctx, id, userID) {
 		return nil, ErrNotWorkspaceMember
 	}
@@ -72,7 +72,7 @@ func (s *WorkspaceService) GetByID(ctx context.Context, userID, id uint) (*model
 	return ws, nil
 }
 
-func (s *WorkspaceService) Update(ctx context.Context, userID, id uint, name, description, icon string) (*model.Workspace, error) {
+func (s *WorkspaceService) Update(ctx context.Context, userID, id string, name, description, icon string) (*model.Workspace, error) {
 	ws, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, ErrWorkspaceNotFound
@@ -93,7 +93,7 @@ func (s *WorkspaceService) Update(ctx context.Context, userID, id uint, name, de
 	return ws, nil
 }
 
-func (s *WorkspaceService) Delete(ctx context.Context, userID, id uint) error {
+func (s *WorkspaceService) Delete(ctx context.Context, userID, id string) error {
 	ws, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return ErrWorkspaceNotFound
@@ -104,7 +104,7 @@ func (s *WorkspaceService) Delete(ctx context.Context, userID, id uint) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *WorkspaceService) Switch(ctx context.Context, userID, workspaceID uint) (*model.Workspace, error) {
+func (s *WorkspaceService) Switch(ctx context.Context, userID, workspaceID string) (*model.Workspace, error) {
 	if !s.repo.IsMember(ctx, workspaceID, userID) {
 		return nil, ErrNotWorkspaceMember
 	}
@@ -115,22 +115,22 @@ func (s *WorkspaceService) Switch(ctx context.Context, userID, workspaceID uint)
 	return ws, nil
 }
 
-func (s *WorkspaceService) CreateDefaultWorkspace(ctx context.Context, userID uint) (*model.Workspace, error) {
+func (s *WorkspaceService) CreateDefaultWorkspace(ctx context.Context, userID string) (*model.Workspace, error) {
 	return s.Create(ctx, userID, "默认空间", "", "🏠")
 }
 
-func (s *WorkspaceService) IsMember(ctx context.Context, workspaceID, userID uint) bool {
+func (s *WorkspaceService) IsMember(ctx context.Context, workspaceID, userID string) bool {
 	return s.repo.IsMember(ctx, workspaceID, userID)
 }
 
-func (s *WorkspaceService) GetDefaultWorkspace(ctx context.Context, userID uint) (*model.Workspace, error) {
+func (s *WorkspaceService) GetDefaultWorkspace(ctx context.Context, userID string) (*model.Workspace, error) {
 	return s.repo.GetDefaultWorkspace(ctx, userID)
 }
 
-func (s *WorkspaceService) GetDefaultWorkspaceID(ctx context.Context, userID uint) (uint, error) {
+func (s *WorkspaceService) GetDefaultWorkspaceID(ctx context.Context, userID string) (string, error) {
 	ws, err := s.repo.GetDefaultWorkspace(ctx, userID)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	return ws.ID, nil
 }

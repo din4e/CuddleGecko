@@ -28,7 +28,7 @@ const (
 
 // SearchRepository is the data access surface for global search.
 type SearchRepository interface {
-	Search(ctx context.Context, workspaceID uint, pattern string, types []string, limit int) ([]model.SearchHit, error)
+	Search(ctx context.Context, workspaceID string, pattern string, types []string, limit int) ([]model.SearchHit, error)
 }
 
 // SearchService fans a single query out over every workspace-scoped entity
@@ -45,7 +45,7 @@ func NewSearchService(repo SearchRepository) *SearchService {
 // Search runs the global search. types filters the entity kinds searched
 // (empty = all); limit is the per-type hit cap, clamped to
 // [1, MaxSearchLimit] with DefaultSearchLimit when unset.
-func (s *SearchService) Search(ctx context.Context, userID, workspaceID uint, query string, types []string, limit int) (*model.SearchResults, error) {
+func (s *SearchService) Search(ctx context.Context, userID, workspaceID string, query string, types []string, limit int) (*model.SearchResults, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, ErrInvalidSearchQuery

@@ -7,21 +7,21 @@ import (
 )
 
 type Transaction struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	UserID      uint           `gorm:"index;not null" json:"user_id"`
-	WorkspaceID uint           `gorm:"index;not null;default:0;index:idx_tx_ws_type_date" json:"workspace_id"`
-	Title       string         `gorm:"size:200;not null" json:"title"`
-	Amount      float64        `gorm:"not null" json:"amount"`
-	Type        string         `gorm:"size:20;not null;index:idx_tx_ws_type_date" json:"type"`   // income / expense
-	Category    string         `gorm:"size:50" json:"category"`
-	ContactIDs  []uint         `gorm:"type:longtext;serializer:json" json:"contact_ids"`
-	Date        time.Time      `gorm:"not null;index:idx_tx_ws_type_date" json:"date"`
-	Notes       string         `gorm:"type:longtext" json:"notes"`
+	ID          string    `gorm:"primaryKey;type:char(36)" json:"id"`
+	UserID      string    `gorm:"size:36;index;not null" json:"user_id"`
+	WorkspaceID string    `gorm:"size:36;index;not null;default:0;index:idx_tx_ws_type_date" json:"workspace_id"`
+	Title       string    `gorm:"size:200;not null" json:"title"`
+	Amount      float64   `gorm:"not null" json:"amount"`
+	Type        string    `gorm:"size:20;not null;index:idx_tx_ws_type_date" json:"type"` // income / expense
+	Category    string    `gorm:"size:50" json:"category"`
+	ContactIDs  []string  `gorm:"type:longtext;serializer:json" json:"contact_ids"`
+	Date        time.Time `gorm:"not null;index:idx_tx_ws_type_date" json:"date"`
+	Notes       string    `gorm:"type:longtext" json:"notes"`
 	// Virtual (not DB) — populated from the polymorphic taggings table.
-	Tags        []Tag          `gorm:"-" json:"tags"`
-	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	Tags      []Tag          `gorm:"-" json:"tags"`
+	CreatedAt time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // TransactionMonthly is one month's income/expense totals (keyed "YYYY-MM"),
@@ -48,3 +48,6 @@ type TransactionCategoryTotal struct {
 	Income   float64 `json:"income"`
 	Expense  float64 `json:"expense"`
 }
+
+// BeforeCreate assigns the UUID primary key on first insert.
+func (t *Transaction) BeforeCreate(tx *gorm.DB) error { return ensureID(&t.ID, tx) }

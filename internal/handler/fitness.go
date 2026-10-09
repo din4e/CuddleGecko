@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/din4e/cuddlegecko/internal/model"
@@ -19,13 +18,13 @@ func NewFitnessHandler(svc *service.FitnessService) *FitnessHandler {
 	return &FitnessHandler{svc: svc}
 }
 
-func (h *FitnessHandler) parseUintParam(c *gin.Context, name, what string) (uint, bool) {
-	id, err := strconv.ParseUint(c.Param(name), 10, 32)
-	if err != nil {
+func (h *FitnessHandler) parseUintParam(c *gin.Context, name, what string) (string, bool) {
+	id := c.Param(name)
+	if id == "" {
 		response.BadRequest(c, "invalid "+what+" id")
-		return 0, false
+		return "", false
 	}
-	return uint(id), true
+	return id, true
 }
 
 // --- Exercise library ---
@@ -139,13 +138,13 @@ type templateItemRequest struct {
 }
 
 type workoutTemplateRequest struct {
-	Name  string               `json:"name" binding:"required"`
-	Type  string               `json:"type"`
-	Notes string               `json:"notes"`
+	Name  string                `json:"name" binding:"required"`
+	Type  string                `json:"type"`
+	Notes string                `json:"notes"`
 	Items []templateItemRequest `json:"items"`
 }
 
-func (r workoutTemplateRequest) toModel(id uint) *model.WorkoutTemplate {
+func (r workoutTemplateRequest) toModel(id string) *model.WorkoutTemplate {
 	t := &model.WorkoutTemplate{ID: id, Name: r.Name, Type: r.Type, Notes: r.Notes}
 	for _, it := range r.Items {
 		t.Items = append(t.Items, model.WorkoutTemplateItem{
@@ -176,7 +175,7 @@ func (h *FitnessHandler) CreateTemplate(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	result, err := h.svc.CreateTemplate(c.Request.Context(), userID, workspaceID, req.toModel(0))
+	result, err := h.svc.CreateTemplate(c.Request.Context(), userID, workspaceID, req.toModel(""))
 	if err != nil {
 		if err == service.ErrTemplateEmpty {
 			response.BadRequest(c, "template name is required")
@@ -282,7 +281,7 @@ type setLogRequest struct {
 	Notes       string   `json:"notes"`
 }
 
-func (r setLogRequest) toModel(id, workoutID, exerciseID uint) *model.WorkoutSetLog {
+func (r setLogRequest) toModel(id, workoutID, exerciseID string) *model.WorkoutSetLog {
 	log := &model.WorkoutSetLog{
 		ID: id, WorkoutID: workoutID, ExerciseID: exerciseID,
 		Reps: r.Reps, Weight: r.Weight, Distance: r.Distance,
@@ -329,7 +328,7 @@ func (h *FitnessHandler) CreateSetLog(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	log, err := h.svc.CreateSetLog(c.Request.Context(), userID, workspaceID, workoutID, exerciseID, req.toModel(0, workoutID, exerciseID))
+	log, err := h.svc.CreateSetLog(c.Request.Context(), userID, workspaceID, workoutID, exerciseID, req.toModel("", workoutID, exerciseID))
 	if err != nil {
 		h.mapSetLogError(c, err, "create")
 		return
@@ -414,14 +413,14 @@ func (h *FitnessHandler) PRs(c *gin.Context) {
 // --- Goals ---
 
 type fitnessGoalRequest struct {
-	Type        string   `json:"type" binding:"required"`
-	TargetValue float64  `json:"target_value" binding:"required"`
-	Deadline    string   `json:"deadline"`
-	Status      string   `json:"status"`
-	Notes       string   `json:"notes"`
+	Type        string  `json:"type" binding:"required"`
+	TargetValue float64 `json:"target_value" binding:"required"`
+	Deadline    string  `json:"deadline"`
+	Status      string  `json:"status"`
+	Notes       string  `json:"notes"`
 }
 
-func (r fitnessGoalRequest) toModel(id uint) (*model.FitnessGoal, error) {
+func (r fitnessGoalRequest) toModel(id string) (*model.FitnessGoal, error) {
 	g := &model.FitnessGoal{
 		ID: id, Type: r.Type, TargetValue: r.TargetValue,
 		Status: r.Status, Notes: r.Notes,
@@ -455,7 +454,7 @@ func (h *FitnessHandler) CreateGoal(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	g, err := req.toModel(0)
+	g, err := req.toModel("")
 	if err != nil {
 		response.BadRequest(c, "invalid deadline format")
 		return

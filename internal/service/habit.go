@@ -15,16 +15,16 @@ const habitDateFormat = "2006-01-02"
 
 type HabitRepository interface {
 	Create(ctx context.Context, h *model.Habit) error
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.Habit, error)
-	List(ctx context.Context, workspaceID uint, includeArchived bool, tagIDs []uint) ([]model.Habit, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.Habit, error)
+	List(ctx context.Context, workspaceID string, includeArchived bool, tagIDs []string) ([]model.Habit, error)
 	Update(ctx context.Context, h *model.Habit) error
-	Delete(ctx context.Context, workspaceID, id uint) error
+	Delete(ctx context.Context, workspaceID, id string) error
 }
 
 type HabitLogRepository interface {
-	Toggle(ctx context.Context, userID, workspaceID, habitID uint, date string) (bool, error)
-	ListAllByWorkspace(ctx context.Context, workspaceID uint) ([]model.HabitLog, error)
-	DeleteByHabit(ctx context.Context, workspaceID, habitID uint) error
+	Toggle(ctx context.Context, userID, workspaceID, habitID string, date string) (bool, error)
+	ListAllByWorkspace(ctx context.Context, workspaceID string) ([]model.HabitLog, error)
+	DeleteByHabit(ctx context.Context, workspaceID, habitID string) error
 }
 
 type HabitService struct {
@@ -38,10 +38,10 @@ func NewHabitService(repo HabitRepository, logRepo HabitLogRepository, taggingRe
 	return &HabitService{repo: repo, logRepo: logRepo, taggingRepo: taggingRepo, notifier: firstNotifier(notifier)}
 }
 
-func (s *HabitService) Create(ctx context.Context, userID, workspaceID uint, h *model.Habit) (*model.Habit, error) {
+func (s *HabitService) Create(ctx context.Context, userID, workspaceID string, h *model.Habit) (*model.Habit, error) {
 	h.UserID = userID
 	h.WorkspaceID = workspaceID
-	h.ID = 0
+	h.ID = ""
 	if h.Frequency == "" {
 		h.Frequency = "daily"
 	}
@@ -52,7 +52,7 @@ func (s *HabitService) Create(ctx context.Context, userID, workspaceID uint, h *
 	return h, nil
 }
 
-func (s *HabitService) List(ctx context.Context, userID, workspaceID uint, includeArchived bool, tagIDs []uint) ([]model.Habit, error) {
+func (s *HabitService) List(ctx context.Context, userID, workspaceID string, includeArchived bool, tagIDs []string) ([]model.Habit, error) {
 	habits, err := s.repo.List(ctx, workspaceID, includeArchived, tagIDs)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (s *HabitService) List(ctx context.Context, userID, workspaceID uint, inclu
 	return habits, nil
 }
 
-func (s *HabitService) GetByID(ctx context.Context, userID, workspaceID, id uint) (*model.Habit, error) {
+func (s *HabitService) GetByID(ctx context.Context, userID, workspaceID, id string) (*model.Habit, error) {
 	h, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrHabitNotFound
@@ -74,7 +74,7 @@ func (s *HabitService) GetByID(ctx context.Context, userID, workspaceID, id uint
 	return h, nil
 }
 
-func (s *HabitService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Habit) (*model.Habit, error) {
+func (s *HabitService) Update(ctx context.Context, userID, workspaceID, id string, updates *model.Habit) (*model.Habit, error) {
 	h, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrHabitNotFound
@@ -98,7 +98,7 @@ func (s *HabitService) Update(ctx context.Context, userID, workspaceID, id uint,
 	return h, nil
 }
 
-func (s *HabitService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *HabitService) Delete(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func (s *HabitService) Delete(ctx context.Context, userID, workspaceID, id uint)
 	return nil
 }
 
-func (s *HabitService) ReplaceTags(ctx context.Context, userID, workspaceID, habitID uint, tagIDs []uint) error {
+func (s *HabitService) ReplaceTags(ctx context.Context, userID, workspaceID, habitID string, tagIDs []string) error {
 	if _, err := s.repo.GetByID(ctx, workspaceID, habitID); err != nil {
 		return ErrHabitNotFound
 	}
@@ -120,7 +120,7 @@ func (s *HabitService) ReplaceTags(ctx context.Context, userID, workspaceID, hab
 	return nil
 }
 
-func (s *HabitService) GetTags(ctx context.Context, userID, workspaceID, habitID uint) ([]model.Tag, error) {
+func (s *HabitService) GetTags(ctx context.Context, userID, workspaceID, habitID string) ([]model.Tag, error) {
 	if _, err := s.repo.GetByID(ctx, workspaceID, habitID); err != nil {
 		return nil, ErrHabitNotFound
 	}
@@ -128,7 +128,7 @@ func (s *HabitService) GetTags(ctx context.Context, userID, workspaceID, habitID
 }
 
 // Toggle checks in / un-checks a habit for a date (defaults to today).
-func (s *HabitService) Toggle(ctx context.Context, userID, workspaceID, id uint, date string) (bool, error) {
+func (s *HabitService) Toggle(ctx context.Context, userID, workspaceID, id string, date string) (bool, error) {
 	if _, err := s.repo.GetByID(ctx, workspaceID, id); err != nil {
 		return false, ErrHabitNotFound
 	}
@@ -143,12 +143,12 @@ func (s *HabitService) Toggle(ctx context.Context, userID, workspaceID, id uint,
 }
 
 // enrich fills the virtual stats fields for a batch of habits from one query.
-func (s *HabitService) enrich(ctx context.Context, workspaceID uint, habits []*model.Habit) {
+func (s *HabitService) enrich(ctx context.Context, workspaceID string, habits []*model.Habit) {
 	if len(habits) == 0 {
 		return
 	}
 	if s.taggingRepo != nil {
-		ids := make([]uint, len(habits))
+		ids := make([]string, len(habits))
 		for i, h := range habits {
 			ids[i] = h.ID
 		}
@@ -162,7 +162,7 @@ func (s *HabitService) enrich(ctx context.Context, workspaceID uint, habits []*m
 	if err != nil {
 		return
 	}
-	byHabit := make(map[uint][]string)
+	byHabit := make(map[string][]string)
 	for _, l := range logs {
 		byHabit[l.HabitID] = append(byHabit[l.HabitID], l.Date)
 	}

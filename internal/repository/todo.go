@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -36,7 +35,7 @@ func (r *TodoRepo) Create(ctx context.Context, todo *model.Todo) error {
 	return nil
 }
 
-func (r *TodoRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Todo, error) {
+func (r *TodoRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.Todo, error) {
 	var todo model.Todo
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&todo).Error; err != nil {
 		return nil, err
@@ -46,11 +45,11 @@ func (r *TodoRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.To
 
 // ExistingIDs returns which of the requested ids exist (live, same workspace) —
 // one query for link validation instead of N GetByID round-trips.
-func (r *TodoRepo) ExistingIDs(ctx context.Context, workspaceID uint, ids []uint) ([]uint, error) {
+func (r *TodoRepo) ExistingIDs(ctx context.Context, workspaceID string, ids []string) ([]string, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	var found []uint
+	var found []string
 	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
 		Where("workspace_id = ? AND id IN ?", workspaceID, ids).
 		Pluck("id", &found).Error; err != nil {
@@ -63,9 +62,9 @@ func (r *TodoRepo) ExistingIDs(ctx context.Context, workspaceID uint, ids []uint
 // rows exist, since a link may target a todo created later in the same batch).
 // The column uses GORM's json serializer, but map-style UpdateColumn bypasses
 // it — marshal here so the stored bytes match what struct updates write.
-func (r *TodoRepo) SetTodoIDs(ctx context.Context, workspaceID, id uint, ids []uint) error {
+func (r *TodoRepo) SetTodoIDs(ctx context.Context, workspaceID, id string, ids []string) error {
 	if ids == nil {
-		ids = []uint{}
+		ids = []string{}
 	}
 	arr, err := json.Marshal(ids)
 	if err != nil {
@@ -79,7 +78,7 @@ func (r *TodoRepo) SetTodoIDs(ctx context.Context, workspaceID, id uint, ids []u
 	return nil
 }
 
-func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQuery) ([]model.Todo, int64, error) {
+func (r *TodoRepo) List(ctx context.Context, workspaceID string, q model.TodoListQuery) ([]model.Todo, int64, error) {
 	q.Page, q.PageSize = clampPage(q.Page, q.PageSize)
 
 	query := r.db.WithContext(ctx).Model(&model.Todo{}).Where("workspace_id = ?", workspaceID)
@@ -156,7 +155,7 @@ func (r *TodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQ
 		case "sqlite":
 			query = query.Where("EXISTS (SELECT 1 FROM json_each(todo_ids) WHERE value = ?)", *q.LinkingTo)
 		default:
-			query = query.Where("JSON_CONTAINS(todo_ids, ?)", strconv.FormatUint(uint64(*q.LinkingTo), 10))
+			query = query.Where("JSON_CONTAINS(todo_ids, ?)", fmt.Sprintf("%q", *q.LinkingTo))
 		}
 	}
 
@@ -192,17 +191,17 @@ func todoOrderClause(sort, order string) string {
 	}
 
 	const (
-		pendingFirst  = "CASE WHEN status = 'pending' THEN 0 ELSE 1 END"
-		pinnedFirst   = "CASE WHEN pinned THEN 0 ELSE 1 END"
-		priorityRank  = "CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 WHEN 'low' THEN 2 WHEN 'none' THEN 3 ELSE 4 END"
-		dueNullsLast  = "due_time IS NULL"
-		createdTie    = "created_at DESC"
+		pendingFirst = "CASE WHEN status = 'pending' THEN 0 ELSE 1 END"
+		pinnedFirst  = "CASE WHEN pinned THEN 0 ELSE 1 END"
+		priorityRank = "CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 WHEN 'low' THEN 2 WHEN 'none' THEN 3 ELSE 4 END"
+		dueNullsLast = "due_time IS NULL"
+		createdTie   = "created_at DESC"
 	)
 
 	switch sort {
 	case model.TodoSortManual:
 		// Manual ordering respects the user's explicit sort_order exactly.
-		return pinnedFirst + ", sort_order ASC, id ASC"
+		return pinnedFirst + ", sort_order ASC, created_at ASC, id ASC"
 	case model.TodoSortPriority:
 		return pinnedFirst + ", " + pendingFirst + ", " + priorityRank + " ASC, " + dueNullsLast + ", due_time ASC, " + createdTie
 	case model.TodoSortTitle:
@@ -226,9 +225,9 @@ func (r *TodoRepo) Update(ctx context.Context, todo *model.Todo) error {
 // Delete soft-deletes a todo AND all of its descendants (BFS along parent_id),
 // so removing a parent doesn't leave orphaned children. Everything lands in the
 // trash together and can be restored from there.
-func (r *TodoRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *TodoRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		ids, err := r.subtreeIDs(tx, workspaceID, []uint{id}, false)
+		ids, err := r.subtreeIDs(tx, workspaceID, []string{id}, false)
 		if err != nil {
 			return err
 		}
@@ -243,11 +242,11 @@ func (r *TodoRepo) Delete(ctx context.Context, workspaceID, id uint) error {
 // Reorder moves the todo to appear immediately after afterID (or to the top when
 // afterID is nil) within the workspace's manual order. The whole list is
 // renumbered inside a transaction so the order stays consistent.
-func (r *TodoRepo) Reorder(ctx context.Context, workspaceID, id uint, afterID *uint) error {
+func (r *TodoRepo) Reorder(ctx context.Context, workspaceID, id string, afterID *string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var all []model.Todo
 		if err := tx.Where("workspace_id = ?", workspaceID).
-			Order("sort_order ASC, id ASC").Find(&all).Error; err != nil {
+			Order("sort_order ASC, created_at ASC, id ASC").Find(&all).Error; err != nil {
 			return fmt.Errorf("load todos for reorder: %w", err)
 		}
 
@@ -281,7 +280,7 @@ func (r *TodoRepo) Reorder(ctx context.Context, workspaceID, id uint, afterID *u
 		ordered = append(ordered, all[movedIdx])
 		ordered = append(ordered, rest[insertAt:]...)
 
-		ids := make([]uint, len(ordered))
+		ids := make([]string, len(ordered))
 		for i, t := range ordered {
 			ids[i] = t.ID
 		}
@@ -298,7 +297,7 @@ func (r *TodoRepo) Reorder(ctx context.Context, workspaceID, id uint, afterID *u
 // transaction; sibling sort_order is renumbered per parent group. Position:
 // after afterID when set, else "last" appends at the end of the sibling group,
 // anything else lands at the top.
-func (r *TodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint, position string) error {
+func (r *TodoRepo) Move(ctx context.Context, workspaceID, id string, parentID, afterID *string, position string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 1. The moved todo must exist in the workspace.
 		var moved model.Todo
@@ -341,7 +340,7 @@ func (r *TodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, aft
 			sib = sib.Where("parent_id = ?", *parentID)
 		}
 		var siblings []model.Todo
-		if err := sib.Order("sort_order ASC, id ASC").Find(&siblings).Error; err != nil {
+		if err := sib.Order("sort_order ASC, created_at ASC, id ASC").Find(&siblings).Error; err != nil {
 			return fmt.Errorf("load siblings for move: %w", err)
 		}
 
@@ -360,7 +359,7 @@ func (r *TodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, aft
 		ordered = append(ordered, siblings[:insertAt]...)
 		ordered = append(ordered, model.Todo{ID: id})
 		ordered = append(ordered, siblings[insertAt:]...)
-		ids := make([]uint, len(ordered))
+		ids := make([]string, len(ordered))
 		for i, t := range ordered {
 			ids[i] = t.ID
 		}
@@ -373,7 +372,7 @@ func (r *TodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, aft
 
 // Stats computes a productivity overview in a single pass over the workspace's
 // todos via conditional aggregation, instead of six sequential COUNT queries.
-func (r *TodoRepo) Stats(ctx context.Context, workspaceID uint) (model.TodoStats, error) {
+func (r *TodoRepo) Stats(ctx context.Context, workspaceID string) (model.TodoStats, error) {
 	now := time.Now()
 	startToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	daysSinceMonday := int(now.Weekday()) - int(time.Monday)
@@ -419,14 +418,14 @@ func (r *TodoRepo) Stats(ctx context.Context, workspaceID uint) (model.TodoStats
 
 // --- Tag associations ---
 
-func (r *TodoRepo) ReplaceTags(ctx context.Context, todoID uint, tags []model.Tag) error {
+func (r *TodoRepo) ReplaceTags(ctx context.Context, todoID string, tags []model.Tag) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var todo model.Todo
-		if err := tx.Select("id", "workspace_id").First(&todo, todoID).Error; err != nil {
+		if err := tx.Select("id", "workspace_id").Where("id = ?", todoID).First(&todo).Error; err != nil {
 			return err
 		}
-		ids := make([]uint, 0, len(tags))
-		seen := make(map[uint]bool, len(tags))
+		ids := make([]string, 0, len(tags))
+		seen := make(map[string]bool, len(tags))
 		for _, tag := range tags {
 			if !seen[tag.ID] {
 				ids = append(ids, tag.ID)
@@ -450,7 +449,7 @@ func (r *TodoRepo) ReplaceTags(ctx context.Context, todoID uint, tags []model.Ta
 	})
 }
 
-func (r *TodoRepo) GetTags(ctx context.Context, todoID uint) ([]model.Tag, error) {
+func (r *TodoRepo) GetTags(ctx context.Context, todoID string) ([]model.Tag, error) {
 	var tags []model.Tag
 	todo := model.Todo{ID: todoID}
 	if err := r.db.WithContext(ctx).Model(&todo).Association("Tags").Find(&tags); err != nil {
@@ -461,10 +460,10 @@ func (r *TodoRepo) GetTags(ctx context.Context, todoID uint) ([]model.Tag, error
 
 // --- Checklist (subtask) operations ---
 
-func (r *TodoRepo) ListItems(ctx context.Context, todoID uint) ([]model.TodoItem, error) {
+func (r *TodoRepo) ListItems(ctx context.Context, todoID string) ([]model.TodoItem, error) {
 	var items []model.TodoItem
 	if err := r.db.WithContext(ctx).Where("todo_id = ?", todoID).
-		Order("sort_order ASC, id ASC").Find(&items).Error; err != nil {
+		Order("sort_order ASC, created_at ASC, id ASC").Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("list todo items: %w", err)
 	}
 	return items, nil
@@ -473,19 +472,19 @@ func (r *TodoRepo) ListItems(ctx context.Context, todoID uint) ([]model.TodoItem
 // ListItemsByTodoIDs is the bulk counterpart to ListItems: it fetches checklist
 // items for many todos in a single query (ordered so per-todo grouping stays
 // stable), used by export to avoid an N+1 of one query per todo.
-func (r *TodoRepo) ListItemsByTodoIDs(ctx context.Context, todoIDs []uint) ([]model.TodoItem, error) {
+func (r *TodoRepo) ListItemsByTodoIDs(ctx context.Context, todoIDs []string) ([]model.TodoItem, error) {
 	if len(todoIDs) == 0 {
 		return nil, nil
 	}
 	var items []model.TodoItem
 	if err := r.db.WithContext(ctx).Where("todo_id IN ?", todoIDs).
-		Order("todo_id ASC, sort_order ASC, id ASC").Find(&items).Error; err != nil {
+		Order("todo_id ASC, sort_order ASC, created_at ASC, id ASC").Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("list todo items by ids: %w", err)
 	}
 	return items, nil
 }
 
-func (r *TodoRepo) GetItem(ctx context.Context, todoID, itemID uint) (*model.TodoItem, error) {
+func (r *TodoRepo) GetItem(ctx context.Context, todoID, itemID string) (*model.TodoItem, error) {
 	var item model.TodoItem
 	if err := r.db.WithContext(ctx).Where("id = ? AND todo_id = ?", itemID, todoID).First(&item).Error; err != nil {
 		return nil, err
@@ -513,7 +512,7 @@ func (r *TodoRepo) CreateItem(ctx context.Context, item *model.TodoItem) error {
 	})
 }
 
-func (r *TodoRepo) UpdateItem(ctx context.Context, todoID uint, item *model.TodoItem) error {
+func (r *TodoRepo) UpdateItem(ctx context.Context, todoID string, item *model.TodoItem) error {
 	if err := r.db.WithContext(ctx).Model(&model.TodoItem{}).
 		Where("id = ? AND todo_id = ?", item.ID, todoID).
 		Updates(map[string]interface{}{"content": item.Content, "due_time": item.DueTime}).Error; err != nil {
@@ -524,7 +523,7 @@ func (r *TodoRepo) UpdateItem(ctx context.Context, todoID uint, item *model.Todo
 
 // SetItemDone flips an item's done flag and adjusts the parent todo's item_done
 // counter inside a single transaction so progress never drifts.
-func (r *TodoRepo) SetItemDone(ctx context.Context, todoID, itemID uint, done bool) error {
+func (r *TodoRepo) SetItemDone(ctx context.Context, todoID, itemID string, done bool) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var prev model.TodoItem
 		if err := tx.Where("id = ? AND todo_id = ?", itemID, todoID).First(&prev).Error; err != nil {
@@ -549,7 +548,7 @@ func (r *TodoRepo) SetItemDone(ctx context.Context, todoID, itemID uint, done bo
 	})
 }
 
-func (r *TodoRepo) DeleteItem(ctx context.Context, todoID, itemID uint) error {
+func (r *TodoRepo) DeleteItem(ctx context.Context, todoID, itemID string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var item model.TodoItem
 		if err := tx.Where("id = ? AND todo_id = ?", itemID, todoID).First(&item).Error; err != nil {
@@ -571,11 +570,11 @@ func (r *TodoRepo) DeleteItem(ctx context.Context, todoID, itemID uint) error {
 
 // ReorderItem moves a checklist item within its todo to appear right after
 // afterItemID (or to the top when nil), renumbering sort_order in a transaction.
-func (r *TodoRepo) ReorderItem(ctx context.Context, todoID, itemID uint, afterItemID *uint) error {
+func (r *TodoRepo) ReorderItem(ctx context.Context, todoID, itemID string, afterItemID *string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var all []model.TodoItem
 		if err := tx.Where("todo_id = ?", todoID).
-			Order("sort_order ASC, id ASC").Find(&all).Error; err != nil {
+			Order("sort_order ASC, created_at ASC, id ASC").Find(&all).Error; err != nil {
 			return fmt.Errorf("load todo items for reorder: %w", err)
 		}
 
@@ -607,7 +606,7 @@ func (r *TodoRepo) ReorderItem(ctx context.Context, todoID, itemID uint, afterIt
 		ordered = append(ordered, all[movedIdx])
 		ordered = append(ordered, rest[insertAt:]...)
 
-		ids := make([]uint, len(ordered))
+		ids := make([]string, len(ordered))
 		for i, it := range ordered {
 			ids[i] = it.ID
 		}
@@ -621,7 +620,7 @@ func (r *TodoRepo) ReorderItem(ctx context.Context, todoID, itemID uint, afterIt
 // PromoteItem turns a checklist item into a standalone todo, inheriting the
 // parent's color and tags, then removes the item (adjusting parent counts).
 // Everything runs in one transaction so counts never drift.
-func (r *TodoRepo) PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID uint) (*model.Todo, error) {
+func (r *TodoRepo) PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID string) (*model.Todo, error) {
 	var promoted *model.Todo
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var item model.TodoItem
@@ -680,7 +679,7 @@ func (r *TodoRepo) PromoteItem(ctx context.Context, userID, workspaceID, todoID,
 
 // Duplicate clones a todo into a new pending todo, copying its fields, tags and
 // checklist items (completion state is reset on the parent).
-func (r *TodoRepo) Duplicate(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error) {
+func (r *TodoRepo) Duplicate(ctx context.Context, userID, workspaceID, id string) (*model.Todo, error) {
 	var src model.Todo
 	if err := r.db.WithContext(ctx).Preload("Tags").
 		Where("id = ? AND workspace_id = ?", id, workspaceID).First(&src).Error; err != nil {
@@ -688,7 +687,7 @@ func (r *TodoRepo) Duplicate(ctx context.Context, userID, workspaceID, id uint) 
 	}
 	var items []model.TodoItem
 	if err := r.db.WithContext(ctx).Where("todo_id = ?", id).
-		Order("sort_order ASC, id ASC").Find(&items).Error; err != nil {
+		Order("sort_order ASC, created_at ASC, id ASC").Find(&items).Error; err != nil {
 		return nil, err
 	}
 
@@ -739,7 +738,7 @@ func (r *TodoRepo) Duplicate(ctx context.Context, userID, workspaceID, id uint) 
 }
 
 // SetPinned sets the pinned (starred) flag on a single todo.
-func (r *TodoRepo) SetPinned(ctx context.Context, workspaceID, id uint, pinned bool) error {
+func (r *TodoRepo) SetPinned(ctx context.Context, workspaceID, id string, pinned bool) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
 		Where("id = ? AND workspace_id = ?", id, workspaceID).
 		UpdateColumn("pinned", pinned).Error; err != nil {
@@ -750,7 +749,7 @@ func (r *TodoRepo) SetPinned(ctx context.Context, workspaceID, id uint, pinned b
 
 // SetParent re-parents a todo in a single UPDATE (external imports link
 // children after all rows exist). parentID nil promotes to top level.
-func (r *TodoRepo) SetParent(ctx context.Context, workspaceID, id uint, parentID *uint) error {
+func (r *TodoRepo) SetParent(ctx context.Context, workspaceID, id string, parentID *string) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
 		Where("id = ? AND workspace_id = ?", id, workspaceID).
 		UpdateColumn("parent_id", parentID).Error; err != nil {
@@ -761,7 +760,7 @@ func (r *TodoRepo) SetParent(ctx context.Context, workspaceID, id uint, parentID
 
 // UpdateCreatedAt restores a todo's original creation timestamp in a single
 // UPDATE (imports keep the source platform's created time).
-func (r *TodoRepo) UpdateCreatedAt(ctx context.Context, id uint, at time.Time) error {
+func (r *TodoRepo) UpdateCreatedAt(ctx context.Context, id string, at time.Time) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
 		Where("id = ?", id).
 		UpdateColumn("created_at", at).Error; err != nil {
@@ -771,7 +770,7 @@ func (r *TodoRepo) UpdateCreatedAt(ctx context.Context, id uint, at time.Time) e
 }
 
 // IncrementPomodoro atomically bumps a todo's completed-pomodoro count by one.
-func (r *TodoRepo) IncrementPomodoro(ctx context.Context, workspaceID, id uint) error {
+func (r *TodoRepo) IncrementPomodoro(ctx context.Context, workspaceID, id string) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
 		Where("id = ? AND workspace_id = ?", id, workspaceID).
 		UpdateColumn("pomodoro_count", gorm.Expr("pomodoro_count + 1")).Error; err != nil {
@@ -782,7 +781,7 @@ func (r *TodoRepo) IncrementPomodoro(ctx context.Context, workspaceID, id uint) 
 
 // SetProgress writes just the manual percent column (nil clears it). Used by
 // the row-bar drag control, which must not replay the full Update payload.
-func (r *TodoRepo) SetProgress(ctx context.Context, workspaceID, id uint, progress *int) error {
+func (r *TodoRepo) SetProgress(ctx context.Context, workspaceID, id string, progress *int) error {
 	if err := r.db.WithContext(ctx).Model(&model.Todo{}).
 		Where("id = ? AND workspace_id = ?", id, workspaceID).
 		UpdateColumn("progress", progress).Error; err != nil {
@@ -792,7 +791,7 @@ func (r *TodoRepo) SetProgress(ctx context.Context, workspaceID, id uint, progre
 }
 
 // ListTrash returns soft-deleted todos for a workspace, newest-deleted first.
-func (r *TodoRepo) ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error) {
+func (r *TodoRepo) ListTrash(ctx context.Context, workspaceID string) ([]model.Todo, error) {
 	var todos []model.Todo
 	if err := r.db.Unscoped().WithContext(ctx).
 		Where("workspace_id = ? AND deleted_at IS NOT NULL", workspaceID).
@@ -808,7 +807,7 @@ func (r *TodoRepo) ListTrash(ctx context.Context, workspaceID uint) ([]model.Tod
 // Restore un-deletes a todo AND its descendants (the mirror of cascade Delete),
 // so restoring a parent brings its whole subtree back from the trash together.
 // Returns gorm.ErrRecordNotFound when the todo isn't a deleted member.
-func (r *TodoRepo) Restore(ctx context.Context, workspaceID, id uint) error {
+func (r *TodoRepo) Restore(ctx context.Context, workspaceID, id string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// The parent must currently be a soft-deleted member of the workspace.
 		var parent model.Todo
@@ -818,7 +817,7 @@ func (r *TodoRepo) Restore(ctx context.Context, workspaceID, id uint) error {
 		}
 		// Gather the full descendant subtree (including soft-deleted rows) so a
 		// cascade-deleted tree restores together.
-		ids, err := r.subtreeIDs(tx, workspaceID, []uint{id}, true)
+		ids, err := r.subtreeIDs(tx, workspaceID, []string{id}, true)
 		if err != nil {
 			return err
 		}
@@ -835,10 +834,10 @@ func (r *TodoRepo) Restore(ctx context.Context, workspaceID, id uint) error {
 // together with the checklist items, tag associations and activity log of the
 // purged rows, and returns how many todos were removed. Descendants cascade-
 // deleted with a parent are already soft-deleted rows, so they are covered.
-func (r *TodoRepo) EmptyTrash(ctx context.Context, workspaceID uint) (int64, error) {
+func (r *TodoRepo) EmptyTrash(ctx context.Context, workspaceID string) (int64, error) {
 	var purged int64
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var ids []uint
+		var ids []string
 		if err := tx.Unscoped().Model(&model.Todo{}).
 			Where("workspace_id = ? AND deleted_at IS NOT NULL", workspaceID).
 			Pluck("id", &ids).Error; err != nil {
@@ -870,7 +869,7 @@ func (r *TodoRepo) EmptyTrash(ctx context.Context, workspaceID uint) (int64, err
 // BulkAction applies a batch action to a set of todos, returning the number of
 // rows affected. `priority` is only read by the "priority" action (the service
 // layer validates the catalogue and the value).
-func (r *TodoRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint, action, priority string) (int64, error) {
+func (r *TodoRepo) BulkAction(ctx context.Context, workspaceID string, ids []string, action, priority string) (int64, error) {
 	if len(ids) == 0 {
 		return 0, nil
 	}
@@ -903,7 +902,7 @@ func (r *TodoRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint,
 // card's single postpone action. Dated rows each need their own new value, so
 // they are written with one CASE-id UPDATE (the renumberSortOrder shape) instead
 // of a per-row round-trip; the undated rows share one constant value.
-func (r *TodoRepo) bulkPostpone(ctx context.Context, workspaceID uint, ids []uint) (int64, error) {
+func (r *TodoRepo) bulkPostpone(ctx context.Context, workspaceID string, ids []string) (int64, error) {
 	affected := int64(0)
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var todos []model.Todo
@@ -911,10 +910,10 @@ func (r *TodoRepo) bulkPostpone(ctx context.Context, workspaceID uint, ids []uin
 			return fmt.Errorf("load todos for bulk postpone: %w", err)
 		}
 		now := time.Now()
-		var datedIDs []uint
+		var datedIDs []string
 		caseExpr := "CASE id"
 		args := make([]any, 0, len(todos)*2)
-		var undatedIDs []uint
+		var undatedIDs []string
 		for _, t := range todos {
 			if t.DueTime != nil {
 				next := t.DueTime.AddDate(0, 0, 1)
@@ -951,7 +950,7 @@ func (r *TodoRepo) bulkPostpone(ctx context.Context, workspaceID uint, ids []uin
 // descendantIDsInclusive returns the given ids together with all of their
 // (transitive) non-deleted descendants in the workspace, so a cascade delete
 // covers the full subtree. Read-only; delegates to subtreeIDs.
-func (r *TodoRepo) descendantIDsInclusive(ctx context.Context, workspaceID uint, ids []uint) ([]uint, error) {
+func (r *TodoRepo) descendantIDsInclusive(ctx context.Context, workspaceID string, ids []string) ([]string, error) {
 	return r.subtreeIDs(r.db.WithContext(ctx), workspaceID, ids, false)
 }
 
@@ -969,7 +968,7 @@ func (r *TodoRepo) descendantIDsInclusive(ctx context.Context, workspaceID uint,
 // recursive CTE instead of Move's former one-query-per-ancestor walk, and stops
 // naturally at a dangling parent_id (the old loop's break-on-not-found). The
 // depth cap guards against corrupt cycles. Used by Move's cycle check.
-func (r *TodoRepo) ancestorChainContains(tx *gorm.DB, workspaceID, startID, targetID uint) (bool, error) {
+func (r *TodoRepo) ancestorChainContains(tx *gorm.DB, workspaceID, startID, targetID string) (bool, error) {
 	var count int64
 	err := tx.Raw(`WITH RECURSIVE chain(id, depth) AS (
 		SELECT id, 0 FROM todos WHERE id = ? AND workspace_id = ?
@@ -984,7 +983,7 @@ func (r *TodoRepo) ancestorChainContains(tx *gorm.DB, workspaceID, startID, targ
 	return count > 0, nil
 }
 
-func (r *TodoRepo) subtreeIDs(tx *gorm.DB, workspaceID uint, roots []uint, includeDeleted bool) ([]uint, error) {
+func (r *TodoRepo) subtreeIDs(tx *gorm.DB, workspaceID string, roots []string, includeDeleted bool) ([]string, error) {
 	if len(roots) == 0 {
 		return nil, nil
 	}
@@ -992,7 +991,7 @@ func (r *TodoRepo) subtreeIDs(tx *gorm.DB, workspaceID uint, roots []uint, inclu
 	if includeDeleted {
 		deletedFilter = ""
 	}
-	var ids []uint
+	var ids []string
 	err := tx.Raw(`WITH RECURSIVE subtree(id, depth) AS (
 		SELECT id, 0 FROM todos WHERE id IN ? AND workspace_id = ?`+deletedFilter+`
 		UNION ALL
@@ -1009,7 +1008,7 @@ func (r *TodoRepo) subtreeIDs(tx *gorm.DB, workspaceID uint, roots []uint, inclu
 // bulkComplete mirrors single-toggle semantics: recurring tasks with a due date
 // advance to their next occurrence (staying pending) instead of being marked
 // done. Everything runs in one transaction so the batch is all-or-nothing.
-func (r *TodoRepo) bulkComplete(ctx context.Context, workspaceID uint, ids []uint) (int64, error) {
+func (r *TodoRepo) bulkComplete(ctx context.Context, workspaceID string, ids []string) (int64, error) {
 	affected := int64(0)
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var pending []model.Todo
@@ -1018,7 +1017,7 @@ func (r *TodoRepo) bulkComplete(ctx context.Context, workspaceID uint, ids []uin
 			return fmt.Errorf("load todos for bulk complete: %w", err)
 		}
 		now := time.Now()
-		var doneIDs []uint
+		var doneIDs []string
 		for _, t := range pending {
 			if t.Repeat != "" && t.DueTime != nil {
 				if next, ok := model.NextDueTime(t.Repeat, t.RepeatInterval, *t.DueTime, now); ok {
@@ -1064,16 +1063,16 @@ func wrapIfErr(err error, msg string) error {
 // cascade delete/restore uses. The query runs on the given handle so it can
 // join a caller's transaction (required on the single-conn SQLite pool — a
 // pool query inside an open tx would deadlock).
-func (r *TodoRepo) descendantIDs(tx *gorm.DB, workspaceID uint, roots []uint) ([]uint, error) {
+func (r *TodoRepo) descendantIDs(tx *gorm.DB, workspaceID string, roots []string) ([]string, error) {
 	all, err := r.subtreeIDs(tx, workspaceID, roots, false)
 	if err != nil {
 		return nil, err
 	}
-	rootSet := make(map[uint]bool, len(roots))
+	rootSet := make(map[string]bool, len(roots))
 	for _, id := range roots {
 		rootSet[id] = true
 	}
-	out := make([]uint, 0, len(all))
+	out := make([]string, 0, len(all))
 	for _, id := range all {
 		if !rootSet[id] {
 			out = append(out, id)
@@ -1088,14 +1087,14 @@ func (r *TodoRepo) descendantIDs(tx *gorm.DB, workspaceID uint, roots []uint) ([
 // already done are untouched (nothing to remember); recurring descendants keep
 // advancing on their own schedule instead of being force-completed. Best-effort
 // callers still get the affected count for change notification.
-func (r *TodoRepo) CascadeComplete(ctx context.Context, workspaceID uint, parentIDs []uint, now time.Time) (int64, error) {
+func (r *TodoRepo) CascadeComplete(ctx context.Context, workspaceID string, parentIDs []string, now time.Time) (int64, error) {
 	if len(parentIDs) == 0 {
 		return 0, nil
 	}
 	return r.cascadeCompleteTx(ctx, r.db.WithContext(ctx), workspaceID, parentIDs, now)
 }
 
-func (r *TodoRepo) cascadeCompleteTx(ctx context.Context, tx *gorm.DB, workspaceID uint, parentIDs []uint, now time.Time) (int64, error) {
+func (r *TodoRepo) cascadeCompleteTx(ctx context.Context, tx *gorm.DB, workspaceID string, parentIDs []string, now time.Time) (int64, error) {
 	ids, err := r.descendantIDs(tx, workspaceID, parentIDs)
 	if err != nil {
 		return 0, err
@@ -1132,7 +1131,7 @@ func (r *TodoRepo) cascadeCompleteTx(ctx context.Context, tx *gorm.DB, workspace
 // abandoned), dropping its completion timestamp. Descendants whose status was
 // changed directly by the user in the meantime carry no snapshot and keep the
 // manual status.
-func (r *TodoRepo) CascadeRestore(ctx context.Context, workspaceID uint, parentIDs []uint) (int64, error) {
+func (r *TodoRepo) CascadeRestore(ctx context.Context, workspaceID string, parentIDs []string) (int64, error) {
 	if len(parentIDs) == 0 {
 		return 0, nil
 	}

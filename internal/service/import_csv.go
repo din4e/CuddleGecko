@@ -89,19 +89,19 @@ func csvBool(s string, def bool) bool {
 }
 
 // contactNameToID maps lowercased contact name → id for name-referencing rows.
-func (s *ExportService) contactNameToID(ctx context.Context, workspaceID uint) (map[string]uint, error) {
+func (s *ExportService) contactNameToID(ctx context.Context, workspaceID string) (map[string]string, error) {
 	contacts, _, err := s.contactRepo.List(ctx, workspaceID, 1, 100000, "", nil)
 	if err != nil {
 		return nil, err
 	}
-	m := make(map[string]uint, len(contacts))
+	m := make(map[string]string, len(contacts))
 	for _, c := range contacts {
 		m[strings.ToLower(c.Name)] = c.ID
 	}
 	return m, nil
 }
 
-func (s *ExportService) ImportTagsCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportTagsCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	t, err := parseCSVTable(csvString)
 	if err != nil || t == nil {
 		return ImportStats{}, err
@@ -131,7 +131,7 @@ func (s *ExportService) ImportTagsCSV(ctx context.Context, userID, workspaceID u
 	return stats, nil
 }
 
-func (s *ExportService) ImportInteractionsCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportInteractionsCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	t, err := parseCSVTable(csvString)
 	if err != nil || t == nil {
 		return ImportStats{}, err
@@ -181,7 +181,7 @@ func (s *ExportService) ImportInteractionsCSV(ctx context.Context, userID, works
 	return stats, nil
 }
 
-func (s *ExportService) ImportRelationsCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportRelationsCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	t, err := parseCSVTable(csvString)
 	if err != nil || t == nil {
 		return ImportStats{}, err
@@ -226,15 +226,15 @@ func (s *ExportService) ImportRelationsCSV(ctx context.Context, userID, workspac
 	return stats, nil
 }
 
-func relationKey(a, b uint, relType string) string {
+func relationKey(a, b string, relType string) string {
 	lo, hi := a, b
 	if lo > hi {
 		lo, hi = hi, lo
 	}
-	return fmt.Sprintf("%d-%d-%s", lo, hi, relType)
+	return fmt.Sprintf("%s-%s-%s", lo, hi, relType)
 }
 
-func (s *ExportService) ImportRemindersCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportRemindersCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	t, err := parseCSVTable(csvString)
 	if err != nil || t == nil {
 		return ImportStats{}, err
@@ -285,7 +285,7 @@ func (s *ExportService) ImportRemindersCSV(ctx context.Context, userID, workspac
 	return stats, nil
 }
 
-func (s *ExportService) ImportEventsCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportEventsCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	if s.eventRepo == nil {
 		return ImportStats{}, fmt.Errorf("event import not available")
 	}
@@ -339,7 +339,7 @@ func (s *ExportService) ImportEventsCSV(ctx context.Context, userID, workspaceID
 	return stats, nil
 }
 
-func (s *ExportService) ImportWorkoutsCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportWorkoutsCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	if s.workoutRepo == nil {
 		return ImportStats{}, fmt.Errorf("workout import not available")
 	}
@@ -431,7 +431,7 @@ func parseExerciseCell(cell string) *model.WorkoutExercise {
 	}
 }
 
-func (s *ExportService) ImportBodyMetricsCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportBodyMetricsCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	if s.bodyMetricRepo == nil {
 		return ImportStats{}, fmt.Errorf("body metric import not available")
 	}
@@ -456,18 +456,18 @@ func (s *ExportService) ImportBodyMetricsCSV(ctx context.Context, userID, worksp
 		}
 		m := &model.BodyMetric{
 			UserID: userID, WorkspaceID: workspaceID, RecordedAt: *recorded,
-			Weight: csvFloatPtr(t.field(row, "weight")),
-			Height: csvFloatPtr(t.field(row, "height")),
-			BodyFat: csvFloatPtr(t.field(row, "body_fat")),
+			Weight:     csvFloatPtr(t.field(row, "weight")),
+			Height:     csvFloatPtr(t.field(row, "height")),
+			BodyFat:    csvFloatPtr(t.field(row, "body_fat")),
 			MuscleMass: csvFloatPtr(t.field(row, "muscle_mass")),
-			RestingHR: csvIntPtr(t.field(row, "resting_hr")),
-			Systolic: csvIntPtr(t.field(row, "systolic")),
-			Diastolic: csvIntPtr(t.field(row, "diastolic")),
+			RestingHR:  csvIntPtr(t.field(row, "resting_hr")),
+			Systolic:   csvIntPtr(t.field(row, "systolic")),
+			Diastolic:  csvIntPtr(t.field(row, "diastolic")),
 			SleepHours: csvFloatPtr(t.field(row, "sleep_hours")),
-			Steps: csvIntPtr(t.field(row, "steps")),
-			Energy: csvIntPtr(t.field(row, "energy")),
-			Mood: csvIntPtr(t.field(row, "mood")),
-			Notes: t.field(row, "notes"),
+			Steps:      csvIntPtr(t.field(row, "steps")),
+			Energy:     csvIntPtr(t.field(row, "energy")),
+			Mood:       csvIntPtr(t.field(row, "mood")),
+			Notes:      t.field(row, "notes"),
 		}
 		if err := s.bodyMetricRepo.Create(ctx, m); err != nil {
 			stats.Skipped++
@@ -479,7 +479,7 @@ func (s *ExportService) ImportBodyMetricsCSV(ctx context.Context, userID, worksp
 	return stats, nil
 }
 
-func (s *ExportService) ImportHabitsCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportHabitsCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	if s.habitRepo == nil {
 		return ImportStats{}, fmt.Errorf("habit import not available")
 	}
@@ -528,7 +528,7 @@ func (s *ExportService) ImportHabitsCSV(ctx context.Context, userID, workspaceID
 	return stats, nil
 }
 
-func (s *ExportService) ImportPomodorosCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportPomodorosCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	if s.pomodoroRepo == nil {
 		return ImportStats{}, fmt.Errorf("pomodoro import not available")
 	}
@@ -544,7 +544,7 @@ func (s *ExportService) ImportPomodorosCSV(ctx context.Context, userID, workspac
 	for _, p := range existing {
 		seen[pomodoroKey(p)] = true
 	}
-	todoIDByTitle := make(map[string]uint)
+	todoIDByTitle := make(map[string]string)
 	if todos, _, terr := s.todoRepo.List(ctx, workspaceID, model.TodoListQuery{Page: 1, PageSize: 100000}); terr == nil {
 		for _, td := range todos {
 			todoIDByTitle[strings.ToLower(td.Title)] = td.ID
@@ -599,7 +599,7 @@ func pomodoroKey(p model.PomodoroSession) string {
 	return fmt.Sprintf("%s-%d-%s", p.Kind, p.DurationSeconds, p.StartedAt.Format(time.RFC3339))
 }
 
-func (s *ExportService) ImportFitnessCSV(ctx context.Context, userID, workspaceID uint, csvString string) (ImportStats, error) {
+func (s *ExportService) ImportFitnessCSV(ctx context.Context, userID, workspaceID string, csvString string) (ImportStats, error) {
 	if s.exLibRepo == nil {
 		return ImportStats{}, fmt.Errorf("fitness import not available")
 	}
@@ -616,7 +616,7 @@ func (s *ExportService) ImportFitnessCSV(ctx context.Context, userID, workspaceI
 		}
 		// Library names are unique per workspace (NameExists is the authoritative
 		// check — soft-deleted rows also block the unique index).
-		if exists, err := s.exLibRepo.NameExists(ctx, workspaceID, name, 0); err == nil && exists {
+		if exists, err := s.exLibRepo.NameExists(ctx, workspaceID, name, ""); err == nil && exists {
 			stats.Skipped++
 			continue
 		}
@@ -624,7 +624,7 @@ func (s *ExportService) ImportFitnessCSV(ctx context.Context, userID, workspaceI
 			UserID: userID, WorkspaceID: workspaceID,
 			Name: name, Category: t.field(row, "category"),
 			MuscleGroups: splitSemi(t.field(row, "muscle_groups")),
-			Equipment: t.field(row, "equipment"), Notes: t.field(row, "notes"),
+			Equipment:    t.field(row, "equipment"), Notes: t.field(row, "notes"),
 		}
 		if err := s.exLibRepo.Create(ctx, item); err != nil {
 			stats.Skipped++

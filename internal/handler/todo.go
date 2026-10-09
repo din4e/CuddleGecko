@@ -22,49 +22,49 @@ func NewTodoHandler(svc *service.TodoService) *TodoHandler {
 }
 
 type createTodoRequest struct {
-	Title       string   `json:"title" binding:"required"`
-	Description string   `json:"description"`
-	Status      string   `json:"status"`
-	Priority    string   `json:"priority"`
-	Importance  string   `json:"importance"`
-	Urgency     string   `json:"urgency"`
-	DueTime     string   `json:"due_time"`
-	StartTime   string   `json:"start_time"`
-	Duration    int      `json:"duration"`
-	Amount      *float64 `json:"amount"`
-	AmountType  string   `json:"amount_type"`
-	Progress    *int     `json:"progress"`
-	ContactIDs  []uint   `json:"contact_ids"`
-	TodoIDs     []uint   `json:"todo_ids"`
-	Color       string   `json:"color"`
-	Repeat      string   `json:"repeat"`
-	RepeatInterval int   `json:"repeat_interval"`
-	ParentID    *uint    `json:"parent_id"`
+	Title          string   `json:"title" binding:"required"`
+	Description    string   `json:"description"`
+	Status         string   `json:"status"`
+	Priority       string   `json:"priority"`
+	Importance     string   `json:"importance"`
+	Urgency        string   `json:"urgency"`
+	DueTime        string   `json:"due_time"`
+	StartTime      string   `json:"start_time"`
+	Duration       int      `json:"duration"`
+	Amount         *float64 `json:"amount"`
+	AmountType     string   `json:"amount_type"`
+	Progress       *int     `json:"progress"`
+	ContactIDs     []string `json:"contact_ids"`
+	TodoIDs        []string `json:"todo_ids"`
+	Color          string   `json:"color"`
+	Repeat         string   `json:"repeat"`
+	RepeatInterval int      `json:"repeat_interval"`
+	ParentID       *string  `json:"parent_id"`
 }
 
 type updateTodoRequest struct {
-	Title        string   `json:"title"`
-	Description  string   `json:"description"`
-	Status       string   `json:"status"`
-	Priority     string   `json:"priority"`
-	Importance   string   `json:"importance"`
-	Urgency      string   `json:"urgency"`
-	DueTime      string   `json:"due_time"`
-	ClearDueTime bool     `json:"clear_due_time"`
-	StartTime    string   `json:"start_time"`
-	ClearStartTime bool   `json:"clear_start_time"`
-	Duration     int      `json:"duration"`
-	ClearDuration bool    `json:"clear_duration"`
-	Amount       *float64 `json:"amount"`
-	ClearAmount  bool     `json:"clear_amount"`
-	AmountType   string   `json:"amount_type"`
-	Progress     *int     `json:"progress"`
-	ClearProgress bool    `json:"clear_progress"`
-	ContactIDs   []uint   `json:"contact_ids"`
-	TodoIDs      []uint   `json:"todo_ids"`
-	Color        string   `json:"color"`
-	Repeat       string   `json:"repeat"`
-	RepeatInterval int    `json:"repeat_interval"`
+	Title          string   `json:"title"`
+	Description    string   `json:"description"`
+	Status         string   `json:"status"`
+	Priority       string   `json:"priority"`
+	Importance     string   `json:"importance"`
+	Urgency        string   `json:"urgency"`
+	DueTime        string   `json:"due_time"`
+	ClearDueTime   bool     `json:"clear_due_time"`
+	StartTime      string   `json:"start_time"`
+	ClearStartTime bool     `json:"clear_start_time"`
+	Duration       int      `json:"duration"`
+	ClearDuration  bool     `json:"clear_duration"`
+	Amount         *float64 `json:"amount"`
+	ClearAmount    bool     `json:"clear_amount"`
+	AmountType     string   `json:"amount_type"`
+	Progress       *int     `json:"progress"`
+	ClearProgress  bool     `json:"clear_progress"`
+	ContactIDs     []string `json:"contact_ids"`
+	TodoIDs        []string `json:"todo_ids"`
+	Color          string   `json:"color"`
+	Repeat         string   `json:"repeat"`
+	RepeatInterval int      `json:"repeat_interval"`
 }
 
 // parseDueQuery parses an optional RFC3339 due-time query parameter.
@@ -93,10 +93,10 @@ func (h *TodoHandler) List(c *gin.Context) {
 		Importance: c.Query("importance"),
 		Urgency:    c.Query("urgency"),
 		Search:     c.Query("q"),
-		Sort:     c.DefaultQuery("sort", model.TodoSortDueDate),
-		Order:    c.DefaultQuery("order", "asc"),
-		Page:     page,
-		PageSize: pageSize,
+		Sort:       c.DefaultQuery("sort", model.TodoSortDueDate),
+		Order:      c.DefaultQuery("order", "asc"),
+		Page:       page,
+		PageSize:   pageSize,
 	}
 	if v := c.Query("overdue"); v == "1" || v == "true" {
 		q.Overdue = true
@@ -114,23 +114,13 @@ func (h *TodoHandler) List(c *gin.Context) {
 		q.RootsOnly = true
 	}
 	if raw := c.Query("parent_id"); raw != "" {
-		if id, err := strconv.ParseUint(raw, 10, 32); err == nil {
-			parentID := uint(id)
-			q.ParentID = &parentID
-		}
+		q.ParentID = &raw
 	}
 	// Backlinks: todos whose todo_ids contain this id.
 	if raw := c.Query("linking_to"); raw != "" {
-		if id, err := strconv.ParseUint(raw, 10, 32); err == nil {
-			linkingTo := uint(id)
-			q.LinkingTo = &linkingTo
-		}
+		q.LinkingTo = &raw
 	}
-	for _, raw := range c.QueryArray("tag_id") {
-		if id, err := strconv.ParseUint(raw, 10, 32); err == nil {
-			q.TagIDs = append(q.TagIDs, uint(id))
-		}
-	}
+	q.TagIDs = c.QueryArray("tag_id")
 	if dueAfter, ok := parseTimeQuery(c, "due_after"); !ok {
 		response.BadRequest(c, "invalid due_after format")
 		return
@@ -164,13 +154,9 @@ func (h *TodoHandler) List(c *gin.Context) {
 func (h *TodoHandler) Get(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid todo id")
-		return
-	}
+	id := c.Param("id")
 
-	todo, err := h.svc.GetByID(c.Request.Context(), userID, workspaceID, uint(id))
+	todo, err := h.svc.GetByID(c.Request.Context(), userID, workspaceID, id)
 	if errors.Is(err, service.ErrTodoNotFound) {
 		response.NotFound(c, "todo not found")
 		return
@@ -241,7 +227,7 @@ func (h *TodoHandler) EmptyTrash(c *gin.Context) {
 }
 
 type reorderTodoRequest struct {
-	AfterID *uint `json:"after_id"`
+	AfterID *string `json:"after_id"`
 }
 
 // Reorder moves a todo within the workspace's manual order.
@@ -272,8 +258,8 @@ func (h *TodoHandler) Reorder(c *gin.Context) {
 }
 
 type moveTodoRequest struct {
-	ParentID *uint   `json:"parent_id"`
-	AfterID  *uint   `json:"after_id"`
+	ParentID *string `json:"parent_id"`
+	AfterID  *string `json:"after_id"`
 	Position *string `json:"position"` // "first" (default) | "last"; ignored when after_id is set
 }
 
@@ -382,22 +368,22 @@ func (h *TodoHandler) Create(c *gin.Context) {
 	}
 
 	todo := &model.Todo{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
-		Priority:    req.Priority,
-		Importance:  req.Importance,
-		Urgency:     req.Urgency,
-		Duration:    req.Duration,
-		Amount:      req.Amount,
-		AmountType:  req.AmountType,
-		Progress:    req.Progress,
-		ContactIDs:  req.ContactIDs,
-		TodoIDs:     req.TodoIDs,
-		Color:       req.Color,
-		Repeat:      req.Repeat,
+		Title:          req.Title,
+		Description:    req.Description,
+		Status:         req.Status,
+		Priority:       req.Priority,
+		Importance:     req.Importance,
+		Urgency:        req.Urgency,
+		Duration:       req.Duration,
+		Amount:         req.Amount,
+		AmountType:     req.AmountType,
+		Progress:       req.Progress,
+		ContactIDs:     req.ContactIDs,
+		TodoIDs:        req.TodoIDs,
+		Color:          req.Color,
+		Repeat:         req.Repeat,
 		RepeatInterval: req.RepeatInterval,
-		ParentID:    req.ParentID,
+		ParentID:       req.ParentID,
 	}
 
 	if req.DueTime != "" {
@@ -434,11 +420,7 @@ func (h *TodoHandler) Create(c *gin.Context) {
 func (h *TodoHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid todo id")
-		return
-	}
+	id := c.Param("id")
 
 	var req updateTodoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -447,20 +429,20 @@ func (h *TodoHandler) Update(c *gin.Context) {
 	}
 
 	updates := &model.Todo{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
-		Priority:    req.Priority,
-		Importance:  req.Importance,
-		Urgency:     req.Urgency,
-		Duration:    req.Duration,
-		Amount:      req.Amount,
-		AmountType:  req.AmountType,
-		Progress:    req.Progress,
-		ContactIDs:  req.ContactIDs,
-		TodoIDs:     req.TodoIDs,
-		Color:       req.Color,
-		Repeat:      req.Repeat,
+		Title:          req.Title,
+		Description:    req.Description,
+		Status:         req.Status,
+		Priority:       req.Priority,
+		Importance:     req.Importance,
+		Urgency:        req.Urgency,
+		Duration:       req.Duration,
+		Amount:         req.Amount,
+		AmountType:     req.AmountType,
+		Progress:       req.Progress,
+		ContactIDs:     req.ContactIDs,
+		TodoIDs:        req.TodoIDs,
+		Color:          req.Color,
+		Repeat:         req.Repeat,
 		RepeatInterval: req.RepeatInterval,
 	}
 	clear := service.TodoClear{
@@ -489,7 +471,7 @@ func (h *TodoHandler) Update(c *gin.Context) {
 		updates.StartTime = &t
 	}
 
-	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), updates, clear)
+	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, id, updates, clear)
 	if err != nil {
 		if err == service.ErrTodoNotFound {
 			response.NotFound(c, "todo not found")
@@ -509,13 +491,9 @@ func (h *TodoHandler) Update(c *gin.Context) {
 func (h *TodoHandler) ToggleStatus(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid todo id")
-		return
-	}
+	id := c.Param("id")
 
-	result, err := h.svc.ToggleStatus(c.Request.Context(), userID, workspaceID, uint(id))
+	result, err := h.svc.ToggleStatus(c.Request.Context(), userID, workspaceID, id)
 	if err != nil {
 		if err == service.ErrTodoNotFound {
 			response.NotFound(c, "todo not found")
@@ -536,11 +514,7 @@ type setTodoStatusRequest struct {
 func (h *TodoHandler) SetStatus(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid todo id")
-		return
-	}
+	id := c.Param("id")
 
 	var req setTodoStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -548,7 +522,7 @@ func (h *TodoHandler) SetStatus(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.SetStatus(c.Request.Context(), userID, workspaceID, uint(id), req.Status)
+	result, err := h.svc.SetStatus(c.Request.Context(), userID, workspaceID, id, req.Status)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrTodoNotFound):
@@ -567,13 +541,9 @@ func (h *TodoHandler) SetStatus(c *gin.Context) {
 func (h *TodoHandler) SyncToEvent(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid todo id")
-		return
-	}
+	id := c.Param("id")
 
-	event, err := h.svc.SyncToEvent(c.Request.Context(), userID, workspaceID, uint(id))
+	event, err := h.svc.SyncToEvent(c.Request.Context(), userID, workspaceID, id)
 	if err != nil {
 		if err == service.ErrTodoNotFound {
 			response.NotFound(c, "todo not found")
@@ -589,13 +559,9 @@ func (h *TodoHandler) SyncToEvent(c *gin.Context) {
 func (h *TodoHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid todo id")
-		return
-	}
+	id := c.Param("id")
 
-	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, id); err != nil {
 		response.NotFound(c, "todo not found")
 		return
 	}
@@ -615,22 +581,22 @@ type updateTodoItemRequest struct {
 	ClearDueTime bool   `json:"clear_due_time"`
 }
 
-func (h *TodoHandler) parseTodoID(c *gin.Context) (uint, bool) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
+func (h *TodoHandler) parseTodoID(c *gin.Context) (string, bool) {
+	id := c.Param("id")
+	if id == "" {
 		response.BadRequest(c, "invalid todo id")
-		return 0, false
+		return "", false
 	}
-	return uint(id), true
+	return id, true
 }
 
-func (h *TodoHandler) parseTodoItemID(c *gin.Context) (uint, bool) {
-	id, err := strconv.ParseUint(c.Param("itemId"), 10, 32)
-	if err != nil {
+func (h *TodoHandler) parseTodoItemID(c *gin.Context) (string, bool) {
+	id := c.Param("itemId")
+	if id == "" {
 		response.BadRequest(c, "invalid todo item id")
-		return 0, false
+		return "", false
 	}
-	return uint(id), true
+	return id, true
 }
 
 func (h *TodoHandler) ListItems(c *gin.Context) {
@@ -893,9 +859,9 @@ func (h *TodoHandler) TogglePin(c *gin.Context) {
 }
 
 type bulkTodoRequest struct {
-	IDs      []uint `json:"ids"`
-	Action   string `json:"action"` // "complete" | "delete" | "postpone" | "priority"
-	Priority string `json:"priority"`
+	IDs      []string `json:"ids"`
+	Action   string   `json:"action"` // "complete" | "delete" | "postpone" | "priority"
+	Priority string   `json:"priority"`
 }
 
 // BulkAction applies a batch action (complete / delete / postpone / priority)
@@ -936,7 +902,7 @@ func (h *TodoHandler) BulkAction(c *gin.Context) {
 // --- Tag association endpoints ---
 
 type replaceTodoTagsRequest struct {
-	TagIDs []uint `json:"tag_ids"`
+	TagIDs []string `json:"tag_ids"`
 }
 
 func (h *TodoHandler) GetTags(c *gin.Context) {

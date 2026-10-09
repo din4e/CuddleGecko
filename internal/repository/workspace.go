@@ -23,7 +23,7 @@ func (r *WorkspaceRepo) Create(ctx context.Context, ws *model.Workspace) error {
 	return nil
 }
 
-func (r *WorkspaceRepo) GetByID(ctx context.Context, id uint) (*model.Workspace, error) {
+func (r *WorkspaceRepo) GetByID(ctx context.Context, id string) (*model.Workspace, error) {
 	var ws model.Workspace
 	err := r.db.WithContext(ctx).Where("id = ?", id).First(&ws).Error
 	if err != nil {
@@ -32,7 +32,7 @@ func (r *WorkspaceRepo) GetByID(ctx context.Context, id uint) (*model.Workspace,
 	return &ws, nil
 }
 
-func (r *WorkspaceRepo) ListByUserID(ctx context.Context, userID uint) ([]model.Workspace, error) {
+func (r *WorkspaceRepo) ListByUserID(ctx context.Context, userID string) ([]model.Workspace, error) {
 	var workspaces []model.Workspace
 	err := r.db.WithContext(ctx).
 		Joins("JOIN workspace_members ON workspace_members.workspace_id = workspaces.id").
@@ -54,8 +54,8 @@ func (r *WorkspaceRepo) Update(ctx context.Context, ws *model.Workspace) error {
 	return nil
 }
 
-func (r *WorkspaceRepo) Delete(ctx context.Context, id uint) error {
-	if err := r.db.WithContext(ctx).Delete(&model.Workspace{}, id).Error; err != nil {
+func (r *WorkspaceRepo) Delete(ctx context.Context, id string) error {
+	if err := r.db.WithContext(ctx).Where("id = ?", id).Delete(&model.Workspace{}).Error; err != nil {
 		return fmt.Errorf("delete workspace: %w", err)
 	}
 	return nil
@@ -68,7 +68,7 @@ func (r *WorkspaceRepo) AddMember(ctx context.Context, member *model.WorkspaceMe
 	return nil
 }
 
-func (r *WorkspaceRepo) RemoveMember(ctx context.Context, workspaceID, userID uint) error {
+func (r *WorkspaceRepo) RemoveMember(ctx context.Context, workspaceID, userID string) error {
 	if err := r.db.WithContext(ctx).
 		Where("workspace_id = ? AND user_id = ?", workspaceID, userID).
 		Delete(&model.WorkspaceMember{}).Error; err != nil {
@@ -77,7 +77,7 @@ func (r *WorkspaceRepo) RemoveMember(ctx context.Context, workspaceID, userID ui
 	return nil
 }
 
-func (r *WorkspaceRepo) IsMember(ctx context.Context, workspaceID, userID uint) bool {
+func (r *WorkspaceRepo) IsMember(ctx context.Context, workspaceID, userID string) bool {
 	var count int64
 	r.db.WithContext(ctx).Model(&model.WorkspaceMember{}).
 		Where("workspace_id = ? AND user_id = ?", workspaceID, userID).
@@ -85,7 +85,7 @@ func (r *WorkspaceRepo) IsMember(ctx context.Context, workspaceID, userID uint) 
 	return count > 0
 }
 
-func (r *WorkspaceRepo) GetMemberRole(ctx context.Context, workspaceID, userID uint) (string, error) {
+func (r *WorkspaceRepo) GetMemberRole(ctx context.Context, workspaceID, userID string) (string, error) {
 	var member model.WorkspaceMember
 	err := r.db.WithContext(ctx).
 		Where("workspace_id = ? AND user_id = ?", workspaceID, userID).
@@ -96,7 +96,7 @@ func (r *WorkspaceRepo) GetMemberRole(ctx context.Context, workspaceID, userID u
 	return member.Role, nil
 }
 
-func (r *WorkspaceRepo) GetDefaultWorkspace(ctx context.Context, userID uint) (*model.Workspace, error) {
+func (r *WorkspaceRepo) GetDefaultWorkspace(ctx context.Context, userID string) (*model.Workspace, error) {
 	var ws model.Workspace
 	err := r.db.WithContext(ctx).
 		Joins("JOIN workspace_members ON workspace_members.workspace_id = workspaces.id").

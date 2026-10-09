@@ -22,15 +22,15 @@ import (
 // fakeWSChecker implements middleware.WorkspaceMemberChecker for tests without
 // needing a real workspace service/repo.
 type fakeWSChecker struct {
-	member  map[[2]uint]bool // (workspaceID, userID) -> member?
-	def     uint
+	member map[[2]string]bool // (workspaceID, userID) -> member?
+	def    string
 }
 
-func (f *fakeWSChecker) IsMember(_ context.Context, workspaceID, userID uint) bool {
-	return f.member[[2]uint{workspaceID, userID}]
+func (f *fakeWSChecker) IsMember(_ context.Context, workspaceID, userID string) bool {
+	return f.member[[2]string{workspaceID, userID}]
 }
 
-func (f *fakeWSChecker) GetDefaultWorkspaceID(_ context.Context, _ uint) (uint, error) {
+func (f *fakeWSChecker) GetDefaultWorkspaceID(_ context.Context, _ string) (string, error) {
 	return f.def, nil
 }
 
@@ -40,15 +40,15 @@ func newWSTestHandler(t *testing.T) (*realtime.Hub, *WSHandler) {
 	t.Helper()
 	hub := realtime.NewHub()
 	checker := &fakeWSChecker{
-		member: map[[2]uint]bool{{1, 7}: true},
-		def:    1,
+		member: map[[2]string]bool{{"1", "7"}: true},
+		def:    "1",
 	}
 	return hub, NewWSHandler(hub, &config.JWTConfig{Secret: wsTestSecret}, checker, gin.DebugMode, nil)
 }
 
-func mintWSToken(t *testing.T, userID uint) string {
+func mintWSToken(t *testing.T, userID string) string {
 	t.Helper()
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"user_id": float64(userID)})
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"user_id": userID})
 	s, err := tok.SignedString([]byte(wsTestSecret))
 	require.NoError(t, err)
 	return s
@@ -81,7 +81,7 @@ func TestWS_NonMember_Returns403(t *testing.T) {
 
 	// workspace 999 — user 7 is not a member.
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/ws?token="+mintWSToken(t, 7)+"&workspace_id=999", nil))
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/ws?token="+mintWSToken(t, "7")+"&workspace_id=999", nil))
 	assert.Equal(t, 403, w.Code)
 }
 
@@ -92,7 +92,7 @@ func TestWS_ConnectReceivesBroadcast(t *testing.T) {
 	srv := httptest.NewServer(r)
 	defer srv.Close()
 
-	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/ws?token=" + mintWSToken(t, 7) + "&workspace_id=1"
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/ws?token=" + mintWSToken(t, "7") + "&workspace_id=1"
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -106,7 +106,7 @@ func TestWS_ConnectReceivesBroadcast(t *testing.T) {
 	// Give ServeWS a moment to register the client with the hub after the upgrade.
 	time.Sleep(100 * time.Millisecond)
 
-	hub.NotifyChange(ctx, 1, service.ResourceTodo, service.ChangeUpdated, 42, nil)
+	hub.NotifyChange(ctx, "1", service.ResourceTodo, service.ChangeUpdated, "42", nil)
 
 	rctx, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel2()
@@ -116,7 +116,7 @@ func TestWS_ConnectReceivesBroadcast(t *testing.T) {
 	var f realtime.Frame
 	require.NoError(t, json.Unmarshal(data, &f))
 	assert.Equal(t, realtime.FrameDataChanged, f.Type)
-	assert.Equal(t, uint(1), f.WorkspaceID)
-	assert.Equal(t, uint(42), f.ID)
+	assert.Equal(t, "1", f.WorkspaceID)
+	assert.Equal(t, "42", f.ID)
 	assert.Equal(t, "updated", f.Kind)
 }

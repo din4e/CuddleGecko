@@ -25,7 +25,7 @@ func (r *AIRepo) CreateProvider(ctx context.Context, p *model.AIProvider) error 
 	return nil
 }
 
-func (r *AIRepo) GetProviderByID(ctx context.Context, userID, id uint) (*model.AIProvider, error) {
+func (r *AIRepo) GetProviderByID(ctx context.Context, userID, id string) (*model.AIProvider, error) {
 	var p model.AIProvider
 	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).First(&p).Error; err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func (r *AIRepo) GetProviderByID(ctx context.Context, userID, id uint) (*model.A
 	return &p, nil
 }
 
-func (r *AIRepo) GetActiveProvider(ctx context.Context, userID uint) (*model.AIProvider, error) {
+func (r *AIRepo) GetActiveProvider(ctx context.Context, userID string) (*model.AIProvider, error) {
 	var p model.AIProvider
 	if err := r.db.WithContext(ctx).Where("user_id = ? AND is_active = ?", userID, true).First(&p).Error; err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (r *AIRepo) GetActiveProvider(ctx context.Context, userID uint) (*model.AIP
 	return &p, nil
 }
 
-func (r *AIRepo) ListProviders(ctx context.Context, userID uint) ([]model.AIProvider, error) {
+func (r *AIRepo) ListProviders(ctx context.Context, userID string) ([]model.AIProvider, error) {
 	var providers []model.AIProvider
 	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).Find(&providers).Error; err != nil {
 		return nil, fmt.Errorf("list ai providers: %w", err)
@@ -58,14 +58,14 @@ func (r *AIRepo) UpdateProvider(ctx context.Context, p *model.AIProvider) error 
 	return nil
 }
 
-func (r *AIRepo) DeactivateAllProviders(ctx context.Context, userID uint) error {
+func (r *AIRepo) DeactivateAllProviders(ctx context.Context, userID string) error {
 	if err := r.db.WithContext(ctx).Model(&model.AIProvider{}).Where("user_id = ?", userID).Update("is_active", false).Error; err != nil {
 		return fmt.Errorf("deactivate providers: %w", err)
 	}
 	return nil
 }
 
-func (r *AIRepo) GetProviderByType(ctx context.Context, userID uint, providerType string) (*model.AIProvider, error) {
+func (r *AIRepo) GetProviderByType(ctx context.Context, userID string, providerType string) (*model.AIProvider, error) {
 	var p model.AIProvider
 	if err := r.db.WithContext(ctx).Where("user_id = ? AND provider_type = ?", userID, providerType).First(&p).Error; err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (r *AIRepo) CreateConversation(ctx context.Context, c *model.AIConversation
 // the user. Replaces a previous call that re-inserted the already-persisted
 // row (CreateConversation on a row with an ID), which failed on the primary key
 // and silently dropped the auto-generated title.
-func (r *AIRepo) UpdateConversationTitle(ctx context.Context, userID, id uint, title string) error {
+func (r *AIRepo) UpdateConversationTitle(ctx context.Context, userID, id string, title string) error {
 	if err := r.db.WithContext(ctx).Model(&model.AIConversation{}).
 		Where("id = ? AND user_id = ?", id, userID).
 		Update("title", title).Error; err != nil {
@@ -95,7 +95,7 @@ func (r *AIRepo) UpdateConversationTitle(ctx context.Context, userID, id uint, t
 	return nil
 }
 
-func (r *AIRepo) GetConversationByID(ctx context.Context, userID, id uint) (*model.AIConversation, error) {
+func (r *AIRepo) GetConversationByID(ctx context.Context, userID, id string) (*model.AIConversation, error) {
 	var c model.AIConversation
 	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).First(&c).Error; err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func (r *AIRepo) GetConversationByID(ctx context.Context, userID, id uint) (*mod
 	return &c, nil
 }
 
-func (r *AIRepo) ListConversations(ctx context.Context, userID uint, page, pageSize int) ([]model.AIConversation, int64, error) {
+func (r *AIRepo) ListConversations(ctx context.Context, userID string, page, pageSize int) ([]model.AIConversation, int64, error) {
 	var conversations []model.AIConversation
 	var total int64
 
@@ -122,7 +122,7 @@ func (r *AIRepo) ListConversations(ctx context.Context, userID uint, page, pageS
 	return conversations, total, nil
 }
 
-func (r *AIRepo) DeleteConversation(ctx context.Context, userID, id uint) error {
+func (r *AIRepo) DeleteConversation(ctx context.Context, userID, id string) error {
 	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&model.AIConversation{}).Error; err != nil {
 		return fmt.Errorf("delete conversation: %w", err)
 	}
@@ -138,7 +138,7 @@ func (r *AIRepo) CreateMessage(ctx context.Context, m *model.AIMessage) error {
 	return nil
 }
 
-func (r *AIRepo) ListMessagesByConversation(ctx context.Context, conversationID uint) ([]model.AIMessage, error) {
+func (r *AIRepo) ListMessagesByConversation(ctx context.Context, conversationID string) ([]model.AIMessage, error) {
 	var messages []model.AIMessage
 	if err := r.db.WithContext(ctx).Where("conversation_id = ?", conversationID).Order("created_at ASC").Find(&messages).Error; err != nil {
 		return nil, fmt.Errorf("list messages: %w", err)
@@ -150,7 +150,7 @@ func (r *AIRepo) ListMessagesByConversation(ctx context.Context, conversationID 
 // conversation in chronological order — a SQL-capped fetch so a long
 // conversation (longtext content) doesn't reload every row on every chat turn
 // just to truncate in Go. Served by idx_aimessage_conv_created.
-func (r *AIRepo) ListRecentMessagesByConversation(ctx context.Context, conversationID uint, limit int) ([]model.AIMessage, error) {
+func (r *AIRepo) ListRecentMessagesByConversation(ctx context.Context, conversationID string, limit int) ([]model.AIMessage, error) {
 	var messages []model.AIMessage
 	q := r.db.WithContext(ctx).Where("conversation_id = ?", conversationID).Order("created_at DESC, id DESC")
 	if limit > 0 {

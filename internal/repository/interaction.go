@@ -24,7 +24,7 @@ func (r *InteractionRepo) Create(ctx context.Context, interaction *model.Interac
 	return nil
 }
 
-func (r *InteractionRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Interaction, error) {
+func (r *InteractionRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.Interaction, error) {
 	var interaction model.Interaction
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&interaction).Error; err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func (r *InteractionRepo) GetByID(ctx context.Context, workspaceID, id uint) (*m
 	return &interaction, nil
 }
 
-func (r *InteractionRepo) ListByContact(ctx context.Context, workspaceID, contactID uint, page, pageSize int) ([]model.Interaction, int64, error) {
+func (r *InteractionRepo) ListByContact(ctx context.Context, workspaceID, contactID string, page, pageSize int) ([]model.Interaction, int64, error) {
 	var interactions []model.Interaction
 	var total int64
 
@@ -56,7 +56,7 @@ func (r *InteractionRepo) ListByContact(ctx context.Context, workspaceID, contac
 
 // ListByWorkspace returns every interaction in a workspace in one query, used
 // by export to avoid an N+1 of one query per contact.
-func (r *InteractionRepo) ListByWorkspace(ctx context.Context, workspaceID uint) ([]model.Interaction, error) {
+func (r *InteractionRepo) ListByWorkspace(ctx context.Context, workspaceID string) ([]model.Interaction, error) {
 	var interactions []model.Interaction
 	if err := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID).
 		Order("occurred_at DESC, id DESC").Find(&interactions).Error; err != nil {
@@ -65,7 +65,7 @@ func (r *InteractionRepo) ListByWorkspace(ctx context.Context, workspaceID uint)
 	return interactions, nil
 }
 
-func (r *InteractionRepo) ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Interaction, error) {
+func (r *InteractionRepo) ListByContactIDs(ctx context.Context, workspaceID string, contactIDs []string, limit int) ([]model.Interaction, error) {
 	var interactions []model.Interaction
 	query := r.db.WithContext(ctx).
 		Where("workspace_id = ? AND contact_id IN ?", workspaceID, contactIDs).
@@ -88,7 +88,7 @@ func (r *InteractionRepo) Update(ctx context.Context, interaction *model.Interac
 	return nil
 }
 
-func (r *InteractionRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *InteractionRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Interaction{}).Error; err != nil {
 		return fmt.Errorf("delete interaction: %w", err)
 	}
@@ -97,9 +97,9 @@ func (r *InteractionRepo) Delete(ctx context.Context, workspaceID, id uint) erro
 
 // LastByContact returns a map of contactID → most-recent interaction time (MAX(occurred_at)),
 // used to give graph nodes a temporal dimension. Contacts with no interactions are absent.
-func (r *InteractionRepo) LastByContact(ctx context.Context, workspaceID uint) (map[uint]time.Time, error) {
+func (r *InteractionRepo) LastByContact(ctx context.Context, workspaceID string) (map[string]time.Time, error) {
 	type row struct {
-		ContactID uint      `gorm:"column:contact_id"`
+		ContactID string    `gorm:"column:contact_id"`
 		Last      time.Time `gorm:"column:last_at"`
 	}
 	var rows []row
@@ -111,7 +111,7 @@ func (r *InteractionRepo) LastByContact(ctx context.Context, workspaceID uint) (
 		Scan(&rows).Error; err != nil {
 		return nil, fmt.Errorf("last interaction by contact: %w", err)
 	}
-	out := make(map[uint]time.Time, len(rows))
+	out := make(map[string]time.Time, len(rows))
 	for _, rw := range rows {
 		out[rw.ContactID] = rw.Last
 	}

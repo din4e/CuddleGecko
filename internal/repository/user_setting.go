@@ -17,7 +17,7 @@ func NewUserSettingRepo(db *gorm.DB) *UserSettingRepo {
 }
 
 // Get returns the user's setting value and whether it exists.
-func (r *UserSettingRepo) Get(ctx context.Context, userID uint, name string) (string, bool, error) {
+func (r *UserSettingRepo) Get(ctx context.Context, userID string, name string) (string, bool, error) {
 	var s model.UserSetting
 	err := r.db.WithContext(ctx).
 		Where("user_id = ? AND name = ?", userID, name).First(&s).Error
@@ -31,7 +31,7 @@ func (r *UserSettingRepo) Get(ctx context.Context, userID uint, name string) (st
 }
 
 // Set upserts a user setting by (userID, name).
-func (r *UserSettingRepo) Set(ctx context.Context, userID uint, name, value string) error {
+func (r *UserSettingRepo) Set(ctx context.Context, userID string, name, value string) error {
 	var s model.UserSetting
 	err := r.db.WithContext(ctx).
 		Where("user_id = ? AND name = ?", userID, name).First(&s).Error

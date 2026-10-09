@@ -32,13 +32,13 @@ func TestFinanceSnapshotRepo_ImportBundle_Idempotent(t *testing.T) {
 	db := newFinanceTestDB(t)
 	repo := NewFinanceSnapshotRepo(db)
 	ctx := context.Background()
-	const ws uint = 1
+	const ws = "1"
 
 	day1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	day2 := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
 
 	push := func(assets float64, accName string) {
-		require.NoError(t, repo.ImportBundle(ctx, ws,
+		require.NoError(t, repo.ImportBundle(ctx, "1",
 			[]model.FinanceSnapshot{{Date: day1, Assets: assets, Debt: 100, NetWorth: assets - 100}, {Date: day2, Assets: 1, Debt: 1, NetWorth: 0}},
 			[]model.FinanceSnapshotAccount{{Date: day1, Name: accName, Available: 5, Type: "流通"}},
 			[]model.FinanceMortgage{{Date: day1, Remaining: 900, Monthly: 7}},
@@ -65,7 +65,7 @@ func TestFinanceSnapshotRepo_ImportBundle_Idempotent(t *testing.T) {
 	assert.InDelta(t, 900.0, morts[0].Remaining, 0.0001)
 
 	// Workspace isolation: another workspace sees nothing.
-	other, err := repo.ListSnapshots(ctx, 2)
+	other, err := repo.ListSnapshots(ctx, "2")
 	require.NoError(t, err)
 	assert.Empty(t, other)
 }
@@ -76,11 +76,11 @@ func TestFinanceSnapshotRepo_ListAccounts_DateFilter(t *testing.T) {
 	db := newFinanceTestDB(t)
 	repo := NewFinanceSnapshotRepo(db)
 	ctx := context.Background()
-	const ws uint = 1
+	const ws = "1"
 
 	d1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	d2 := time.Date(2026, 9, 19, 0, 0, 0, 0, time.UTC)
-	require.NoError(t, repo.ImportBundle(ctx, ws,
+	require.NoError(t, repo.ImportBundle(ctx, "1",
 		[]model.FinanceSnapshot{{Date: d1}, {Date: d2}},
 		[]model.FinanceSnapshotAccount{
 			{Date: d1, Name: "旧账户", Type: "流通"},

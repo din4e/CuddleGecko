@@ -15,7 +15,7 @@ import "gorm.io/gorm"
 // its soft-delete scope. All four renumbered tables (todos, todo_items, workouts,
 // workout_exercises) share the `id` primary key and `sort_order` column that the
 // CASE expression references.
-func renumberSortOrder(tx *gorm.DB, model any, order []uint) error {
+func renumberSortOrder(tx *gorm.DB, model any, order []string) error {
 	if len(order) == 0 {
 		return nil
 	}

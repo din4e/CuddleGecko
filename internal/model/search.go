@@ -51,12 +51,12 @@ func IsSearchType(t string) bool {
 // query (e.g. "notes", "items"); clients localize the labels.
 type SearchHit struct {
 	Type          string    `json:"type"`
-	ID            uint      `json:"id"`
+	ID            string    `json:"id"`
 	Title         string    `json:"title"`
 	Subtitle      string    `json:"subtitle,omitempty"`
 	Snippet       string    `json:"snippet,omitempty"`
 	MatchedFields []string  `json:"matched_fields,omitempty"`
-	ContactID     uint      `json:"contact_id,omitempty"`
+	ContactID     string    `json:"contact_id,omitempty"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 

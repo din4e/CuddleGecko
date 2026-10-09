@@ -39,12 +39,9 @@ func (h *ReminderHandler) List(c *gin.Context) {
 	status := model.ReminderStatus(c.Query("status"))
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
-	var contactID *uint
+	var contactID *string
 	if v := c.Query("contact_id"); v != "" {
-		if id, err := strconv.ParseUint(v, 10, 32); err == nil {
-			uid := uint(id)
-			contactID = &uid
-		}
+		contactID = &v
 	}
 
 	reminders, total, err := h.svc.List(c.Request.Context(), userID, workspaceID, status, contactID, page, pageSize, parseTagIDs(c))
@@ -59,13 +56,9 @@ func (h *ReminderHandler) List(c *gin.Context) {
 func (h *ReminderHandler) GetTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid reminder id")
-		return
-	}
+	id := c.Param("id")
 
-	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, uint(id))
+	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, id)
 	if err != nil {
 		response.NotFound(c, "reminder not found")
 		return
@@ -76,11 +69,7 @@ func (h *ReminderHandler) GetTags(c *gin.Context) {
 func (h *ReminderHandler) ReplaceTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid reminder id")
-		return
-	}
+	id := c.Param("id")
 
 	var req replaceTagsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -88,7 +77,7 @@ func (h *ReminderHandler) ReplaceTags(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
+	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, id, req.TagIDs); err != nil {
 		if errors.Is(err, model.ErrInvalidTagIDs) {
 			response.BadRequest(c, err.Error())
 			return
@@ -102,11 +91,7 @@ func (h *ReminderHandler) ReplaceTags(c *gin.Context) {
 func (h *ReminderHandler) Create(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	contactID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid contact id")
-		return
-	}
+	contactID := c.Param("id")
 
 	var req createReminderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -128,7 +113,7 @@ func (h *ReminderHandler) Create(c *gin.Context) {
 		RemindAt:    remindAt,
 	}
 
-	result, err := h.svc.Create(c.Request.Context(), userID, workspaceID, uint(contactID), reminder)
+	result, err := h.svc.Create(c.Request.Context(), userID, workspaceID, contactID, reminder)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidReminder) {
 			response.BadRequest(c, err.Error())
@@ -165,11 +150,7 @@ func parseFlexibleTime(s string) (time.Time, error) {
 func (h *ReminderHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid reminder id")
-		return
-	}
+	id := c.Param("id")
 
 	var req updateReminderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -193,7 +174,7 @@ func (h *ReminderHandler) Update(c *gin.Context) {
 		updates.RemindAt = remindAt
 	}
 
-	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), updates)
+	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, id, updates)
 	if err != nil {
 		if err == service.ErrReminderNotFound {
 			response.NotFound(c, "reminder not found")
@@ -213,13 +194,9 @@ func (h *ReminderHandler) Update(c *gin.Context) {
 func (h *ReminderHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid reminder id")
-		return
-	}
+	id := c.Param("id")
 
-	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, id); err != nil {
 		response.NotFound(c, "reminder not found")
 		return
 	}

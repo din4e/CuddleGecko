@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"gorm.io/gorm"
@@ -28,7 +27,7 @@ func (r *WhiteboardRepo) CreateBoard(ctx context.Context, b *model.Whiteboard) e
 	return nil
 }
 
-func (r *WhiteboardRepo) GetBoard(ctx context.Context, workspaceID, id uint) (*model.Whiteboard, error) {
+func (r *WhiteboardRepo) GetBoard(ctx context.Context, workspaceID, id string) (*model.Whiteboard, error) {
 	var b model.Whiteboard
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&b).Error; err != nil {
 		return nil, err
@@ -36,7 +35,7 @@ func (r *WhiteboardRepo) GetBoard(ctx context.Context, workspaceID, id uint) (*m
 	return &b, nil
 }
 
-func (r *WhiteboardRepo) ListBoards(ctx context.Context, workspaceID uint) ([]model.Whiteboard, error) {
+func (r *WhiteboardRepo) ListBoards(ctx context.Context, workspaceID string) ([]model.Whiteboard, error) {
 	var boards []model.Whiteboard
 	if err := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID).
 		Order("updated_at DESC").Find(&boards).Error; err != nil {
@@ -53,7 +52,7 @@ func (r *WhiteboardRepo) UpdateBoard(ctx context.Context, b *model.Whiteboard) e
 	return nil
 }
 
-func (r *WhiteboardRepo) DeleteBoard(ctx context.Context, workspaceID, id uint) error {
+func (r *WhiteboardRepo) DeleteBoard(ctx context.Context, workspaceID, id string) error {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		res := tx.Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Whiteboard{})
 		if res.Error != nil {
@@ -74,17 +73,17 @@ func (r *WhiteboardRepo) DeleteBoard(ctx context.Context, workspaceID, id uint) 
 }
 
 // TouchBoard bumps updated_at so recently edited boards float to the top.
-func (r *WhiteboardRepo) TouchBoard(ctx context.Context, id uint) error {
+func (r *WhiteboardRepo) TouchBoard(ctx context.Context, id string) error {
 	return r.db.WithContext(ctx).Model(&model.Whiteboard{ID: id}).
 		UpdateColumn("updated_at", gorm.Expr("CURRENT_TIMESTAMP")).Error
 }
 
 // --- Nodes ---
 
-func (r *WhiteboardRepo) ListNodes(ctx context.Context, boardID uint) ([]model.WhiteboardNode, error) {
+func (r *WhiteboardRepo) ListNodes(ctx context.Context, boardID string) ([]model.WhiteboardNode, error) {
 	var nodes []model.WhiteboardNode
 	if err := r.db.WithContext(ctx).Where("whiteboard_id = ?", boardID).
-		Order("id ASC").Find(&nodes).Error; err != nil {
+		Order("created_at ASC, id ASC").Find(&nodes).Error; err != nil {
 		return nil, fmt.Errorf("list whiteboard nodes: %w", err)
 	}
 	return nodes, nil
@@ -97,7 +96,7 @@ func (r *WhiteboardRepo) CreateNode(ctx context.Context, n *model.WhiteboardNode
 	return nil
 }
 
-func (r *WhiteboardRepo) GetNode(ctx context.Context, boardID, id uint) (*model.WhiteboardNode, error) {
+func (r *WhiteboardRepo) GetNode(ctx context.Context, boardID, id string) (*model.WhiteboardNode, error) {
 	var n model.WhiteboardNode
 	if err := r.db.WithContext(ctx).Where("id = ? AND whiteboard_id = ?", id, boardID).First(&n).Error; err != nil {
 		return nil, err
@@ -115,7 +114,7 @@ func (r *WhiteboardRepo) UpdateNode(ctx context.Context, n *model.WhiteboardNode
 }
 
 // DeleteNode removes the node and its edges in one transaction.
-func (r *WhiteboardRepo) DeleteNode(ctx context.Context, boardID, id uint) error {
+func (r *WhiteboardRepo) DeleteNode(ctx context.Context, boardID, id string) error {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		res := tx.Where("id = ? AND whiteboard_id = ?", id, boardID).Delete(&model.WhiteboardNode{})
 		if res.Error != nil {
@@ -135,10 +134,10 @@ func (r *WhiteboardRepo) DeleteNode(ctx context.Context, boardID, id uint) error
 
 // --- Edges ---
 
-func (r *WhiteboardRepo) ListEdges(ctx context.Context, boardID uint) ([]model.WhiteboardEdge, error) {
+func (r *WhiteboardRepo) ListEdges(ctx context.Context, boardID string) ([]model.WhiteboardEdge, error) {
 	var edges []model.WhiteboardEdge
 	if err := r.db.WithContext(ctx).Where("whiteboard_id = ?", boardID).
-		Order("id ASC").Find(&edges).Error; err != nil {
+		Order("created_at ASC, id ASC").Find(&edges).Error; err != nil {
 		return nil, fmt.Errorf("list whiteboard edges: %w", err)
 	}
 	return edges, nil
@@ -151,7 +150,7 @@ func (r *WhiteboardRepo) CreateEdge(ctx context.Context, e *model.WhiteboardEdge
 	return nil
 }
 
-func (r *WhiteboardRepo) DeleteEdge(ctx context.Context, boardID, id uint) error {
+func (r *WhiteboardRepo) DeleteEdge(ctx context.Context, boardID, id string) error {
 	res := r.db.WithContext(ctx).
 		Where("id = ? AND whiteboard_id = ?", id, boardID).Delete(&model.WhiteboardEdge{})
 	if res.Error != nil {
@@ -168,7 +167,7 @@ func (r *WhiteboardRepo) DeleteEdge(ctx context.Context, boardID, id uint) error
 // Related returns candidate related entities for an entity reference — the
 // server-side half of node expansion. Read-only cross-table queries, always
 // workspace-scoped.
-func (r *WhiteboardRepo) Related(ctx context.Context, workspaceID uint, refType string, refID uint) ([]model.WhiteboardRelated, error) {
+func (r *WhiteboardRepo) Related(ctx context.Context, workspaceID string, refType string, refID string) ([]model.WhiteboardRelated, error) {
 	var out []model.WhiteboardRelated
 	db := r.db.WithContext(ctx)
 
@@ -184,12 +183,12 @@ func (r *WhiteboardRepo) Related(ctx context.Context, workspaceID uint, refType 
 			args = append(args, refID)
 		default:
 			contains = "JSON_CONTAINS(contact_ids, ?)"
-			args = append(args, strconv.FormatUint(uint64(refID), 10))
+			args = append(args, fmt.Sprintf("%q", refID))
 		}
 		return db.Table(table).Where("workspace_id = ? AND deleted_at IS NULL AND "+contains, args...)
 	}
 
-	otherContact := func(a, b uint) uint {
+	otherContact := func(a, b string) string {
 		if a == refID {
 			return b
 		}
@@ -212,14 +211,20 @@ func (r *WhiteboardRepo) Related(ctx context.Context, workspaceID uint, refType 
 			out = append(out, model.WhiteboardRelated{RefType: model.NodeRefContact, RefID: c.ID, Label: c.Name, Detail: rel.RelationType})
 		}
 		// todos / events referencing the contact
-		var titles []struct{ ID uint; Title string }
+		var titles []struct {
+			ID    string
+			Title string
+		}
 		if err := contactIDsJSON("todos").Select("id, title").Where("status = ?", "pending").Limit(20).Scan(&titles).Error; err != nil {
 			return nil, err
 		}
 		for _, t := range titles {
 			out = append(out, model.WhiteboardRelated{RefType: model.NodeRefTodo, RefID: t.ID, Label: t.Title})
 		}
-		var events []struct{ ID uint; Title string }
+		var events []struct {
+			ID    string
+			Title string
+		}
 		if err := contactIDsJSON("events").Select("id, title").Limit(20).Scan(&events).Error; err != nil {
 			return nil, err
 		}

@@ -16,7 +16,7 @@ func init() {
 func TestOK(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	OK(c, gin.H{"id": 1})
+	OK(c, gin.H{"id": "1"})
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)
 	}

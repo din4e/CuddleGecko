@@ -30,18 +30,17 @@ func (r *TodoActivityRepo) CreateBatch(ctx context.Context, activities []model.T
 }
 
 // List returns a todo's activity lines, newest first.
-func (r *TodoActivityRepo) List(ctx context.Context, todoID uint, limit int) ([]model.TodoActivity, error) {
+func (r *TodoActivityRepo) List(ctx context.Context, todoID string, limit int) ([]model.TodoActivity, error) {
 	if limit <= 0 || limit > maxPageSize {
 		limit = maxPageSize
 	}
 	var activities []model.TodoActivity
 	if err := r.db.WithContext(ctx).
 		Where("todo_id = ?", todoID).
-		Order("created_at DESC, id DESC").
+		Order("seq DESC").
 		Limit(limit).
 		Find(&activities).Error; err != nil {
 		return nil, fmt.Errorf("list todo activities: %w", err)
 	}
 	return activities, nil
 }
-

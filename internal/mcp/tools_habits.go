@@ -12,7 +12,7 @@ func (s *MCPServer) registerHabitTools() {
 		"properties": map[string]interface{}{
 			"archived": map[string]interface{}{"type": "boolean", "description": "Include archived habits"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		include := toString(getArg(args, "archived")) == "true"
 		return s.habitSvc.List(ctx, userID, workspaceID, include, nil)
 	})
@@ -20,13 +20,13 @@ func (s *MCPServer) registerHabitTools() {
 	s.registerTool("create_habit", "Create a daily habit tracker.", map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
-			"name":      map[string]interface{}{"type": "string", "description": "Habit name"},
-			"color":     map[string]interface{}{"type": "string", "description": "Habit color"},
-			"emoji":     map[string]interface{}{"type": "string", "description": "Habit emoji"},
+			"name":       map[string]interface{}{"type": "string", "description": "Habit name"},
+			"color":      map[string]interface{}{"type": "string", "description": "Habit color"},
+			"emoji":      map[string]interface{}{"type": "string", "description": "Habit emoji"},
 			"sort_order": map[string]interface{}{"type": "integer", "description": "Sort order"},
 		},
 		"required": []string{"name"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		h := &model.Habit{
 			Name:      toString(getArg(args, "name")),
 			Color:     toString(getArg(args, "color")),
@@ -43,8 +43,8 @@ func (s *MCPServer) registerHabitTools() {
 			"date": map[string]interface{}{"type": "string", "description": "Date YYYY-MM-DD (default today)"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		checked, err := s.habitSvc.Toggle(ctx, userID, workspaceID, id, toString(getArg(args, "date")))
 		if err != nil {
 			return nil, err
@@ -58,8 +58,8 @@ func (s *MCPServer) registerHabitTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Habit ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		if err := s.habitSvc.Delete(ctx, userID, workspaceID, id); err != nil {
 			return nil, err
 		}

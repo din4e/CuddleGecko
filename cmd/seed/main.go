@@ -36,7 +36,7 @@ func main() {
 	}
 	// Always update password to ensure it's correct
 	db.Model(&user).Update("password_hash", hashedPassword)
-	fmt.Printf("User: %s (id=%d)\n", user.Username, user.ID)
+	fmt.Printf("User: %s (id=%s)\n", user.Username, user.ID)
 
 	// Resolve the demo user's default workspace so every seeded entity lands in
 	// it — the workspace-scoped API (and export) only sees rows in the user's
@@ -197,7 +197,7 @@ func seedTodos(db *gorm.DB, user model.User, tags []model.Tag, contacts []model.
 		})
 	}
 	wsID := workspace.ID
-	fmt.Printf("Workspace: %s (id=%d)\n", workspace.Name, wsID)
+	fmt.Printf("Workspace: %s (id=%s)\n", workspace.Name, wsID)
 
 	// Timestamp helpers relative to "now" so the smart lists stay meaningful.
 	todayAt := func(hour, min int) *time.Time {
@@ -211,7 +211,7 @@ func seedTodos(db *gorm.DB, user model.User, tags []model.Tag, contacts []model.
 	// ensureTodo creates or refreshes a todo so re-running the seed stays correct
 	// (relative timestamps drift on each run, so we can't rely on FirstOrCreate
 	// leaving the first-run value in place).
-	ensureTodo := func(t model.Todo, tagIDs []uint) model.Todo {
+	ensureTodo := func(t model.Todo, tagIDs []string) model.Todo {
 		t.UserID = user.ID
 		t.WorkspaceID = wsID
 		if t.Status == "" {
@@ -255,7 +255,7 @@ func seedTodos(db *gorm.DB, user model.User, tags []model.Tag, contacts []model.
 		return t
 	}
 
-	ensureItem := func(todoID uint, content string, done bool, order int) {
+	ensureItem := func(todoID string, content string, done bool, order int) {
 		var item model.TodoItem
 		db.Where("todo_id = ? AND content = ?", todoID, content).FirstOrCreate(&item,
 			model.TodoItem{TodoID: todoID, Content: content, Done: done, SortOrder: order})
@@ -264,7 +264,7 @@ func seedTodos(db *gorm.DB, user model.User, tags []model.Tag, contacts []model.
 
 	// syncItemCounts recomputes the denormalized parent progress from the actual
 	// items, so the checklist counters never drift from reality.
-	syncItemCounts := func(todoID uint) {
+	syncItemCounts := func(todoID string) {
 		var total, done int64
 		db.Model(&model.TodoItem{}).Where("todo_id = ?", todoID).Count(&total)
 		db.Model(&model.TodoItem{}).Where("todo_id = ? AND done = ?", todoID, true).Count(&done)
@@ -272,15 +272,15 @@ func seedTodos(db *gorm.DB, user model.User, tags []model.Tag, contacts []model.
 			Updates(map[string]interface{}{"item_total": total, "item_done": done})
 	}
 
-	tagIDs := func(ids ...uint) []uint { return ids }
+	tagIDs := func(ids ...string) []string { return ids }
 	todoDefs := []struct {
 		todo model.Todo
-		tags []uint
+		tags []string
 	}{
 		// Today + pinned, high priority. Matrix Q1 (重要且紧急).
-		{model.Todo{Title: "完成季度汇报", Description: "整理 Q2 数据并提交给管理层", Priority: "high", Importance: "high", Urgency: "high", Pinned: true, DueTime: todayAt(18, 0), Color: "#ef4444", ContactIDs: []uint{contacts[2].ID}}, tagIDs(tags[0].ID)},
+		{model.Todo{Title: "完成季度汇报", Description: "整理 Q2 数据并提交给管理层", Priority: "high", Importance: "high", Urgency: "high", Pinned: true, DueTime: todayAt(18, 0), Color: "#ef4444", ContactIDs: []string{contacts[2].ID}}, tagIDs(tags[0].ID)},
 		// Overdue — urgent but not important (matrix Q3).
-		{model.Todo{Title: "给旺财洗澡", Priority: "normal", Importance: "low", Urgency: "high", DueTime: relAt(-48 * time.Hour), ContactIDs: []uint{contacts[3].ID}}, tagIDs(tags[3].ID)},
+		{model.Todo{Title: "给旺财洗澡", Priority: "normal", Importance: "low", Urgency: "high", DueTime: relAt(-48 * time.Hour), ContactIDs: []string{contacts[3].ID}}, tagIDs(tags[3].ID)},
 		// Next 7 days — urgent, not important (matrix Q3).
 		{model.Todo{Title: "订机票去上海", Priority: "high", Importance: "low", Urgency: "high", DueTime: relAt(72 * time.Hour)}, tagIDs(tags[2].ID)},
 		// Recurring daily.
@@ -294,7 +294,7 @@ func seedTodos(db *gorm.DB, user model.User, tags []model.Tag, contacts []model.
 		// Parent with a partially-done checklist. Matrix Q2.
 		{model.Todo{Title: "读完《设计模式》", Priority: "normal", Importance: "normal", DueTime: relAt(10 * 24 * time.Hour)}, nil},
 		// Parent with an untouched checklist.
-		{model.Todo{Title: "准备小红生日聚会", Priority: "normal", DueTime: relAt(6 * 24 * time.Hour), ContactIDs: []uint{contacts[1].ID}}, tagIDs(tags[0].ID)},
+		{model.Todo{Title: "准备小红生日聚会", Priority: "normal", DueTime: relAt(6 * 24 * time.Hour), ContactIDs: []string{contacts[1].ID}}, tagIDs(tags[0].ID)},
 		// Deferred (future start_time) — hidden from actionable views, counted in stats. Matrix Q4.
 		{model.Todo{Title: "学习 Rust 新语言", Priority: "low", Importance: "low", Urgency: "none", StartTime: relAt(10 * 24 * time.Hour)}, nil},
 		// Done today.
@@ -371,9 +371,9 @@ func seedTransactions(db *gorm.DB, user model.User, contacts []model.Contact) {
 	txs := []model.Transaction{
 		{UserID: user.ID, WorkspaceID: wsID, Title: "工资", Amount: 12000, Type: "income", Category: "工资", Date: rel(2)},
 		{UserID: user.ID, WorkspaceID: wsID, Title: "理财收益", Amount: 450, Type: "income", Category: "理财", Date: rel(10)},
-		{UserID: user.ID, WorkspaceID: wsID, Title: "房租", Amount: 3500, Type: "expense", Category: "住房", Date: rel(3), ContactIDs: []uint{contacts[2].ID}},
-		{UserID: user.ID, WorkspaceID: wsID, Title: "聚餐", Amount: 320, Type: "expense", Category: "餐饮", Date: rel(5), ContactIDs: []uint{contacts[0].ID}},
-		{UserID: user.ID, WorkspaceID: wsID, Title: "宠物打疫苗", Amount: 200, Type: "expense", Category: "宠物", Date: rel(7), ContactIDs: []uint{contacts[3].ID}},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "房租", Amount: 3500, Type: "expense", Category: "住房", Date: rel(3), ContactIDs: []string{contacts[2].ID}},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "聚餐", Amount: 320, Type: "expense", Category: "餐饮", Date: rel(5), ContactIDs: []string{contacts[0].ID}},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "宠物打疫苗", Amount: 200, Type: "expense", Category: "宠物", Date: rel(7), ContactIDs: []string{contacts[3].ID}},
 	}
 	for i := range txs {
 		db.FirstOrCreate(&txs[i], model.Transaction{WorkspaceID: wsID, Title: txs[i].Title})
@@ -399,9 +399,9 @@ func seedEvents(db *gorm.DB, user model.User, contacts []model.Contact) {
 	s2 := at(3, 19)
 	s3 := at(7, 14)
 	events := []model.Event{
-		{UserID: user.ID, WorkspaceID: wsID, Title: "项目评审会", StartTime: s1, EndTime: endPlus(s1, 1), Location: "会议室A", Color: "#3b82f6", ContactIDs: []uint{contacts[2].ID}},
-		{UserID: user.ID, WorkspaceID: wsID, Title: "和小明看电影", StartTime: s2, Location: "万达影城", Color: "#22c55e", ContactIDs: []uint{contacts[0].ID}},
-		{UserID: user.ID, WorkspaceID: wsID, Title: "带旺财体检", StartTime: s3, Location: "宠物医院", Color: "#f59e0b", ContactIDs: []uint{contacts[3].ID}},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "项目评审会", StartTime: s1, EndTime: endPlus(s1, 1), Location: "会议室A", Color: "#3b82f6", ContactIDs: []string{contacts[2].ID}},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "和小明看电影", StartTime: s2, Location: "万达影城", Color: "#22c55e", ContactIDs: []string{contacts[0].ID}},
+		{UserID: user.ID, WorkspaceID: wsID, Title: "带旺财体检", StartTime: s3, Location: "宠物医院", Color: "#f59e0b", ContactIDs: []string{contacts[3].ID}},
 	}
 	for i := range events {
 		db.FirstOrCreate(&events[i], model.Event{WorkspaceID: wsID, Title: events[i].Title})
@@ -489,7 +489,7 @@ func seedWorkouts(db *gorm.DB, user model.User) {
 		})
 		return w
 	}
-	ensureExercise := func(workoutID uint, e exDef, order int) {
+	ensureExercise := func(workoutID string, e exDef, order int) {
 		var ex model.WorkoutExercise
 		db.Where("workout_id = ? AND name = ?", workoutID, e.name).FirstOrCreate(&ex,
 			model.WorkoutExercise{WorkoutID: workoutID, Name: e.name, SortOrder: order})
@@ -498,7 +498,7 @@ func seedWorkouts(db *gorm.DB, user model.User) {
 			"duration_sec": e.duration, "done": e.done, "sort_order": order,
 		})
 	}
-	syncWorkoutCounts := func(workoutID uint) {
+	syncWorkoutCounts := func(workoutID string) {
 		var total, done int64
 		db.Model(&model.WorkoutExercise{}).Where("workout_id = ?", workoutID).Count(&total)
 		db.Model(&model.WorkoutExercise{}).Where("workout_id = ? AND done = ?", workoutID, true).Count(&done)

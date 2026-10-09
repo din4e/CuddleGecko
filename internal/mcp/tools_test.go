@@ -38,7 +38,7 @@ func TestMCP_CreateTodoTool(t *testing.T) {
 	srv, repo := newTodoOnlyServer(t)
 	ctx := context.Background()
 
-	res, err := srv.tools["create_todo"].handler(ctx, 1, 1, map[string]interface{}{
+	res, err := srv.tools["create_todo"].handler(ctx, "1", "1", map[string]interface{}{
 		"title":    "mcp todo",
 		"priority": "high",
 	})
@@ -50,7 +50,7 @@ func TestMCP_CreateTodoTool(t *testing.T) {
 	assert.NotZero(t, todo.ID)
 
 	// Persisted in the workspace.
-	got, err := repo.GetByID(ctx, 1, todo.ID)
+	got, err := repo.GetByID(ctx, "1", todo.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "mcp todo", got.Title)
 }
@@ -60,22 +60,22 @@ func TestMCP_MoveTodoTool(t *testing.T) {
 	srv, repo := newTodoOnlyServer(t)
 	ctx := context.Background()
 
-	parent := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "parent"}
+	parent := &model.Todo{UserID: "1", WorkspaceID: "1", Title: "parent"}
 	require.NoError(t, repo.Create(ctx, parent))
-	child := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "child"}
+	child := &model.Todo{UserID: "1", WorkspaceID: "1", Title: "child"}
 	require.NoError(t, repo.Create(ctx, child))
 
 	// JSON numbers arrive as float64; the tool's toUint must coerce them.
-	res, err := srv.tools["move_todo"].handler(ctx, 1, 1, map[string]interface{}{
-		"id":        float64(child.ID),
-		"parent_id": float64(parent.ID),
+	res, err := srv.tools["move_todo"].handler(ctx, "1", "1", map[string]interface{}{
+		"id":        child.ID,
+		"parent_id": (parent.ID),
 	})
 	require.NoError(t, err)
 	m, ok := res.(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, true, m["success"])
 
-	got, err := repo.GetByID(ctx, 1, child.ID)
+	got, err := repo.GetByID(ctx, "1", child.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got.ParentID, "child nested under parent via the tool")
 	assert.Equal(t, parent.ID, *got.ParentID)

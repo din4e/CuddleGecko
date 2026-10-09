@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	ErrWorkoutNotFound  = errors.New("workout not found")
-	ErrExerciseNotFound = errors.New("exercise not found")
-	ErrExerciseEmpty    = errors.New("exercise name is empty")
+	ErrWorkoutNotFound    = errors.New("workout not found")
+	ErrExerciseNotFound   = errors.New("exercise not found")
+	ErrExerciseEmpty      = errors.New("exercise name is empty")
 	ErrBodyMetricNotFound = errors.New("body metric not found")
 )
 
@@ -21,36 +21,36 @@ var (
 type WorkoutRepository interface {
 	Create(ctx context.Context, w *model.Workout) error
 	CreateWithExercises(ctx context.Context, w *model.Workout, exercises []model.WorkoutExercise) error
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.Workout, error)
-	List(ctx context.Context, workspaceID uint, q model.WorkoutListQuery) ([]model.Workout, int64, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.Workout, error)
+	List(ctx context.Context, workspaceID string, q model.WorkoutListQuery) ([]model.Workout, int64, error)
 	Update(ctx context.Context, w *model.Workout) error
-	Delete(ctx context.Context, workspaceID, id uint) error
-	Reorder(ctx context.Context, workspaceID, id uint, afterID *uint) error
-	Stats(ctx context.Context, workspaceID uint) (model.WorkoutStats, error)
-	History(ctx context.Context, workspaceID uint, bucket string, limit int) ([]model.WorkoutHistoryBucket, error)
+	Delete(ctx context.Context, workspaceID, id string) error
+	Reorder(ctx context.Context, workspaceID, id string, afterID *string) error
+	Stats(ctx context.Context, workspaceID string) (model.WorkoutStats, error)
+	History(ctx context.Context, workspaceID string, bucket string, limit int) ([]model.WorkoutHistoryBucket, error)
 }
 
 // WorkoutExerciseRepository handles the checklist of movements within a workout.
 type WorkoutExerciseRepository interface {
-	ListExercises(ctx context.Context, workoutID uint) ([]model.WorkoutExercise, error)
-	ListExercisesByWorkoutIDs(ctx context.Context, workoutIDs []uint) ([]model.WorkoutExercise, error)
-	GetExercise(ctx context.Context, workoutID, exerciseID uint) (*model.WorkoutExercise, error)
+	ListExercises(ctx context.Context, workoutID string) ([]model.WorkoutExercise, error)
+	ListExercisesByWorkoutIDs(ctx context.Context, workoutIDs []string) ([]model.WorkoutExercise, error)
+	GetExercise(ctx context.Context, workoutID, exerciseID string) (*model.WorkoutExercise, error)
 	CreateExercise(ctx context.Context, ex *model.WorkoutExercise) error
-	UpdateExercise(ctx context.Context, workoutID uint, ex *model.WorkoutExercise) error
-	SetExerciseDone(ctx context.Context, workoutID, exerciseID uint, done bool) error
-	DeleteExercise(ctx context.Context, workoutID, exerciseID uint) error
-	ReorderExercise(ctx context.Context, workoutID, exerciseID uint, afterExerciseID *uint) error
+	UpdateExercise(ctx context.Context, workoutID string, ex *model.WorkoutExercise) error
+	SetExerciseDone(ctx context.Context, workoutID, exerciseID string, done bool) error
+	DeleteExercise(ctx context.Context, workoutID, exerciseID string) error
+	ReorderExercise(ctx context.Context, workoutID, exerciseID string, afterExerciseID *string) error
 }
 
 // BodyMetricRepository handles time-series body / health records.
 type BodyMetricRepository interface {
 	Create(ctx context.Context, m *model.BodyMetric) error
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.BodyMetric, error)
-	List(ctx context.Context, workspaceID uint, q model.BodyMetricListQuery) ([]model.BodyMetric, int64, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.BodyMetric, error)
+	List(ctx context.Context, workspaceID string, q model.BodyMetricListQuery) ([]model.BodyMetric, int64, error)
 	Update(ctx context.Context, m *model.BodyMetric) error
-	Delete(ctx context.Context, workspaceID, id uint) error
-	Summary(ctx context.Context, workspaceID uint) (model.BodyMetricSummary, error)
-	ExistsByRecordedAt(ctx context.Context, workspaceID uint, recordedAt time.Time) (bool, error)
+	Delete(ctx context.Context, workspaceID, id string) error
+	Summary(ctx context.Context, workspaceID string) (model.BodyMetricSummary, error)
+	ExistsByRecordedAt(ctx context.Context, workspaceID string, recordedAt time.Time) (bool, error)
 }
 
 // WorkoutClear flags which nullable workout fields should be explicitly cleared
@@ -75,7 +75,7 @@ func NewWorkoutService(repo WorkoutRepository, exRepo WorkoutExerciseRepository,
 
 // --- Workouts ---
 
-func (s *WorkoutService) Create(ctx context.Context, userID, workspaceID uint, w *model.Workout) (*model.Workout, error) {
+func (s *WorkoutService) Create(ctx context.Context, userID, workspaceID string, w *model.Workout) (*model.Workout, error) {
 	w.UserID = userID
 	w.WorkspaceID = workspaceID
 	if w.Type == "" {
@@ -91,7 +91,7 @@ func (s *WorkoutService) Create(ctx context.Context, userID, workspaceID uint, w
 	return w, nil
 }
 
-func (s *WorkoutService) GetByID(ctx context.Context, userID, workspaceID, id uint) (*model.Workout, error) {
+func (s *WorkoutService) GetByID(ctx context.Context, userID, workspaceID, id string) (*model.Workout, error) {
 	w, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (s *WorkoutService) GetByID(ctx context.Context, userID, workspaceID, id ui
 	return w, nil
 }
 
-func (s *WorkoutService) List(ctx context.Context, userID, workspaceID uint, q model.WorkoutListQuery) ([]model.Workout, int64, error) {
+func (s *WorkoutService) List(ctx context.Context, userID, workspaceID string, q model.WorkoutListQuery) ([]model.Workout, int64, error) {
 	workouts, total, err := s.repo.List(ctx, workspaceID, q)
 	if err != nil {
 		return nil, 0, err
@@ -113,7 +113,7 @@ func (s *WorkoutService) List(ctx context.Context, userID, workspaceID uint, q m
 	return workouts, total, nil
 }
 
-func (s *WorkoutService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Workout, clear WorkoutClear) (*model.Workout, error) {
+func (s *WorkoutService) Update(ctx context.Context, userID, workspaceID, id string, updates *model.Workout, clear WorkoutClear) (*model.Workout, error) {
 	w, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrWorkoutNotFound
@@ -166,7 +166,7 @@ func (s *WorkoutService) Update(ctx context.Context, userID, workspaceID, id uin
 // ToggleStatus flips a workout between completed and not-completed, mirroring the
 // todo toggle semantics. Completing stamps CompletedAt; un-completing clears it
 // and returns the workout to "planned".
-func (s *WorkoutService) ToggleStatus(ctx context.Context, userID, workspaceID, id uint) (*model.Workout, error) {
+func (s *WorkoutService) ToggleStatus(ctx context.Context, userID, workspaceID, id string) (*model.Workout, error) {
 	w, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrWorkoutNotFound
@@ -188,7 +188,7 @@ func (s *WorkoutService) ToggleStatus(ctx context.Context, userID, workspaceID, 
 	return w, nil
 }
 
-func (s *WorkoutService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *WorkoutService) Delete(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (s *WorkoutService) Delete(ctx context.Context, userID, workspaceID, id uin
 
 // --- Tags ---
 
-func (s *WorkoutService) ReplaceTags(ctx context.Context, userID, workspaceID, workoutID uint, tagIDs []uint) error {
+func (s *WorkoutService) ReplaceTags(ctx context.Context, userID, workspaceID, workoutID string, tagIDs []string) error {
 	if err := s.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func (s *WorkoutService) ReplaceTags(ctx context.Context, userID, workspaceID, w
 	return nil
 }
 
-func (s *WorkoutService) GetTags(ctx context.Context, userID, workspaceID, workoutID uint) ([]model.Tag, error) {
+func (s *WorkoutService) GetTags(ctx context.Context, userID, workspaceID, workoutID string) ([]model.Tag, error) {
 	if err := s.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return nil, err
 	}
@@ -219,11 +219,11 @@ func (s *WorkoutService) GetTags(ctx context.Context, userID, workspaceID, worko
 }
 
 // populateTags fills the virtual Tags field for a batch of workouts.
-func (s *WorkoutService) populateTags(ctx context.Context, workspaceID uint, workouts []*model.Workout) {
+func (s *WorkoutService) populateTags(ctx context.Context, workspaceID string, workouts []*model.Workout) {
 	if s.taggingRepo == nil || len(workouts) == 0 {
 		return
 	}
-	ids := make([]uint, len(workouts))
+	ids := make([]string, len(workouts))
 	for i, w := range workouts {
 		ids[i] = w.ID
 	}
@@ -236,18 +236,18 @@ func (s *WorkoutService) populateTags(ctx context.Context, workspaceID uint, wor
 	}
 }
 
-func (s *WorkoutService) Reorder(ctx context.Context, userID, workspaceID, id uint, afterID *uint) error {
+func (s *WorkoutService) Reorder(ctx context.Context, userID, workspaceID, id string, afterID *string) error {
 	if err := s.ensureWorkoutOwned(ctx, workspaceID, id); err != nil {
 		return err
 	}
 	if err := s.repo.Reorder(ctx, workspaceID, id, afterID); err != nil {
 		return err
 	}
-	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeBulk, 0, nil)
+	notifyChange(ctx, s.notifier, workspaceID, ResourceWorkout, ChangeBulk, "", nil)
 	return nil
 }
 
-func (s *WorkoutService) Stats(ctx context.Context, userID, workspaceID uint) (model.WorkoutStats, error) {
+func (s *WorkoutService) Stats(ctx context.Context, userID, workspaceID string) (model.WorkoutStats, error) {
 	return s.repo.Stats(ctx, workspaceID)
 }
 
@@ -255,21 +255,21 @@ func (s *WorkoutService) Stats(ctx context.Context, userID, workspaceID uint) (m
 
 // ensureWorkoutOwned returns ErrWorkoutNotFound when the workout does not belong
 // to the workspace, so exercise endpoints inherit the same ownership scoping.
-func (s *WorkoutService) ensureWorkoutOwned(ctx context.Context, workspaceID, workoutID uint) error {
+func (s *WorkoutService) ensureWorkoutOwned(ctx context.Context, workspaceID, workoutID string) error {
 	if _, err := s.repo.GetByID(ctx, workspaceID, workoutID); err != nil {
 		return ErrWorkoutNotFound
 	}
 	return nil
 }
 
-func (s *WorkoutService) ListExercises(ctx context.Context, userID, workspaceID, workoutID uint) ([]model.WorkoutExercise, error) {
+func (s *WorkoutService) ListExercises(ctx context.Context, userID, workspaceID, workoutID string) ([]model.WorkoutExercise, error) {
 	if err := s.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return nil, err
 	}
 	return s.exRepo.ListExercises(ctx, workoutID)
 }
 
-func (s *WorkoutService) CreateExercise(ctx context.Context, userID, workspaceID, workoutID uint, ex *model.WorkoutExercise) (*model.WorkoutExercise, error) {
+func (s *WorkoutService) CreateExercise(ctx context.Context, userID, workspaceID, workoutID string, ex *model.WorkoutExercise) (*model.WorkoutExercise, error) {
 	if err := s.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return nil, err
 	}
@@ -287,7 +287,7 @@ func (s *WorkoutService) CreateExercise(ctx context.Context, userID, workspaceID
 
 // UpdateExercise writes the descriptive fields of an exercise. The caller supplies
 // the full intended exercise state; Done is toggled separately.
-func (s *WorkoutService) UpdateExercise(ctx context.Context, userID, workspaceID, workoutID, exerciseID uint, ex *model.WorkoutExercise) (*model.WorkoutExercise, error) {
+func (s *WorkoutService) UpdateExercise(ctx context.Context, userID, workspaceID, workoutID, exerciseID string, ex *model.WorkoutExercise) (*model.WorkoutExercise, error) {
 	if err := s.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return nil, err
 	}
@@ -308,7 +308,7 @@ func (s *WorkoutService) UpdateExercise(ctx context.Context, userID, workspaceID
 	return ex, nil
 }
 
-func (s *WorkoutService) ToggleExercise(ctx context.Context, userID, workspaceID, workoutID, exerciseID uint) (*model.WorkoutExercise, error) {
+func (s *WorkoutService) ToggleExercise(ctx context.Context, userID, workspaceID, workoutID, exerciseID string) (*model.WorkoutExercise, error) {
 	if err := s.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return nil, err
 	}
@@ -324,7 +324,7 @@ func (s *WorkoutService) ToggleExercise(ctx context.Context, userID, workspaceID
 	return existing, nil
 }
 
-func (s *WorkoutService) DeleteExercise(ctx context.Context, userID, workspaceID, workoutID, exerciseID uint) error {
+func (s *WorkoutService) DeleteExercise(ctx context.Context, userID, workspaceID, workoutID, exerciseID string) error {
 	if err := s.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return err
 	}
@@ -338,7 +338,7 @@ func (s *WorkoutService) DeleteExercise(ctx context.Context, userID, workspaceID
 	return nil
 }
 
-func (s *WorkoutService) ReorderExercise(ctx context.Context, userID, workspaceID, workoutID, exerciseID uint, afterID *uint) error {
+func (s *WorkoutService) ReorderExercise(ctx context.Context, userID, workspaceID, workoutID, exerciseID string, afterID *string) error {
 	if err := s.ensureWorkoutOwned(ctx, workspaceID, workoutID); err != nil {
 		return err
 	}
@@ -354,7 +354,7 @@ func (s *WorkoutService) ReorderExercise(ctx context.Context, userID, workspaceI
 
 // --- Body metrics ---
 
-func (s *WorkoutService) CreateMetric(ctx context.Context, userID, workspaceID uint, m *model.BodyMetric) (*model.BodyMetric, error) {
+func (s *WorkoutService) CreateMetric(ctx context.Context, userID, workspaceID string, m *model.BodyMetric) (*model.BodyMetric, error) {
 	m.UserID = userID
 	m.WorkspaceID = workspaceID
 	if m.RecordedAt.IsZero() {
@@ -367,19 +367,19 @@ func (s *WorkoutService) CreateMetric(ctx context.Context, userID, workspaceID u
 	return m, nil
 }
 
-func (s *WorkoutService) ListMetrics(ctx context.Context, userID, workspaceID uint, q model.BodyMetricListQuery) ([]model.BodyMetric, int64, error) {
+func (s *WorkoutService) ListMetrics(ctx context.Context, userID, workspaceID string, q model.BodyMetricListQuery) ([]model.BodyMetric, int64, error) {
 	return s.bodyRepo.List(ctx, workspaceID, q)
 }
 
 // History aggregates completed workouts per week/month for trend charts.
-func (s *WorkoutService) History(ctx context.Context, userID, workspaceID uint, bucket string, limit int) ([]model.WorkoutHistoryBucket, error) {
+func (s *WorkoutService) History(ctx context.Context, userID, workspaceID string, bucket string, limit int) ([]model.WorkoutHistoryBucket, error) {
 	if bucket != "month" {
 		bucket = "week"
 	}
 	return s.repo.History(ctx, workspaceID, bucket, limit)
 }
 
-func (s *WorkoutService) UpdateMetric(ctx context.Context, userID, workspaceID, id uint, m *model.BodyMetric) (*model.BodyMetric, error) {
+func (s *WorkoutService) UpdateMetric(ctx context.Context, userID, workspaceID, id string, m *model.BodyMetric) (*model.BodyMetric, error) {
 	if _, err := s.bodyRepo.GetByID(ctx, workspaceID, id); err != nil {
 		return nil, ErrBodyMetricNotFound
 	}
@@ -394,7 +394,7 @@ func (s *WorkoutService) UpdateMetric(ctx context.Context, userID, workspaceID, 
 	return m, nil
 }
 
-func (s *WorkoutService) DeleteMetric(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *WorkoutService) DeleteMetric(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.bodyRepo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}
@@ -402,7 +402,7 @@ func (s *WorkoutService) DeleteMetric(ctx context.Context, userID, workspaceID, 
 	return nil
 }
 
-func (s *WorkoutService) BodySummary(ctx context.Context, userID, workspaceID uint) (model.BodyMetricSummary, error) {
+func (s *WorkoutService) BodySummary(ctx context.Context, userID, workspaceID string) (model.BodyMetricSummary, error) {
 	return s.bodyRepo.Summary(ctx, workspaceID)
 }
 
@@ -436,7 +436,7 @@ const maxMetricImportRecords = 1000
 // ImportMetrics bulk-creates external records, skipping any whose recorded_at
 // already exists (re-running the same export is a no-op). The source is noted
 // on each created record's Notes for provenance.
-func (s *WorkoutService) ImportMetrics(ctx context.Context, userID, workspaceID uint, source string, records []BodyMetricImport) (BodyMetricImportResult, error) {
+func (s *WorkoutService) ImportMetrics(ctx context.Context, userID, workspaceID string, source string, records []BodyMetricImport) (BodyMetricImportResult, error) {
 	var result BodyMetricImportResult
 	if len(records) > maxMetricImportRecords {
 		return result, fmt.Errorf("too many records: %d (max %d)", len(records), maxMetricImportRecords)

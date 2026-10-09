@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -27,7 +26,7 @@ func (r *TransactionRepo) Create(ctx context.Context, tx *model.Transaction) err
 	return nil
 }
 
-func (r *TransactionRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Transaction, error) {
+func (r *TransactionRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.Transaction, error) {
 	var tx model.Transaction
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&tx).Error; err != nil {
 		return nil, err
@@ -47,7 +46,7 @@ func applyDateRange(query *gorm.DB, from, to *time.Time) *gorm.DB {
 	return query
 }
 
-func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string, tagIDs []uint, from, to *time.Time) ([]model.Transaction, int64, error) {
+func (r *TransactionRepo) List(ctx context.Context, workspaceID string, page, pageSize int, txType *string, contactID *string, search string, tagIDs []string, from, to *time.Time) ([]model.Transaction, int64, error) {
 	var txs []model.Transaction
 	var total int64
 
@@ -64,7 +63,7 @@ func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, page
 		case "sqlite":
 			query = query.Where("EXISTS (SELECT 1 FROM json_each(contact_ids) WHERE value = ?)", *contactID)
 		default:
-			query = query.Where("JSON_CONTAINS(contact_ids, ?)", strconv.FormatUint(uint64(*contactID), 10))
+			query = query.Where("JSON_CONTAINS(contact_ids, ?)", fmt.Sprintf("%q", *contactID))
 		}
 	}
 
@@ -97,7 +96,7 @@ func (r *TransactionRepo) List(ctx context.Context, workspaceID uint, page, page
 	return txs, total, nil
 }
 
-func (r *TransactionRepo) ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Transaction, error) {
+func (r *TransactionRepo) ListByContactIDs(ctx context.Context, workspaceID string, contactIDs []string, limit int) ([]model.Transaction, error) {
 	if len(contactIDs) == 0 {
 		return nil, nil
 	}
@@ -123,7 +122,7 @@ func (r *TransactionRepo) ListByContactIDs(ctx context.Context, workspaceID uint
 	return txs, nil
 }
 
-func (r *TransactionRepo) Summary(ctx context.Context, workspaceID uint, from, to *time.Time) (income float64, expense float64, err error) {
+func (r *TransactionRepo) Summary(ctx context.Context, workspaceID string, from, to *time.Time) (income float64, expense float64, err error) {
 	var result []struct {
 		Type  string
 		Total float64
@@ -154,7 +153,7 @@ func (r *TransactionRepo) Summary(ctx context.Context, workspaceID uint, from, t
 // unbounded) it aggregates the whole range — the finance page's year selector
 // uses this; with both nil it falls back to the last `months` months
 // (including the current month) for the rolling dashboard window.
-func (r *TransactionRepo) Monthly(ctx context.Context, workspaceID uint, months int, from, to *time.Time) ([]model.TransactionMonthly, error) {
+func (r *TransactionRepo) Monthly(ctx context.Context, workspaceID string, months int, from, to *time.Time) ([]model.TransactionMonthly, error) {
 	if months < 1 {
 		months = 6
 	}
@@ -196,7 +195,7 @@ func (r *TransactionRepo) Monthly(ctx context.Context, workspaceID uint, months 
 // Yearly returns per-year income/expense totals for every year with data via a
 // single GROUP BY. Like Monthly, the year bucket reads the stored date text
 // (substr, not strftime) so a transaction stays in the year the user entered.
-func (r *TransactionRepo) Yearly(ctx context.Context, workspaceID uint) ([]model.TransactionYearly, error) {
+func (r *TransactionRepo) Yearly(ctx context.Context, workspaceID string) ([]model.TransactionYearly, error) {
 	yearExpr := "substr(date, 1, 4)"
 	if r.db.Dialector.Name() == "mysql" {
 		yearExpr = "DATE_FORMAT(date, '%Y')"
@@ -218,7 +217,7 @@ func (r *TransactionRepo) Yearly(ctx context.Context, workspaceID uint) ([]model
 
 // CategoryTotals returns per-category income/expense totals ("" = uncategorized)
 // via a single GROUP BY, optionally bounded to the half-open [from, to) range.
-func (r *TransactionRepo) CategoryTotals(ctx context.Context, workspaceID uint, from, to *time.Time) ([]model.TransactionCategoryTotal, error) {
+func (r *TransactionRepo) CategoryTotals(ctx context.Context, workspaceID string, from, to *time.Time) ([]model.TransactionCategoryTotal, error) {
 	query := r.db.WithContext(ctx).Model(&model.Transaction{}).
 		Where("workspace_id = ?", workspaceID)
 	query = applyDateRange(query, from, to)
@@ -244,7 +243,7 @@ func (r *TransactionRepo) Update(ctx context.Context, tx *model.Transaction) err
 	return nil
 }
 
-func (r *TransactionRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *TransactionRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Transaction{}).Error; err != nil {
 		return fmt.Errorf("delete transaction: %w", err)
 	}

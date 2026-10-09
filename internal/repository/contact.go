@@ -23,7 +23,7 @@ func (r *ContactRepo) Create(ctx context.Context, contact *model.Contact) error 
 	return nil
 }
 
-func (r *ContactRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Contact, error) {
+func (r *ContactRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.Contact, error) {
 	var contact model.Contact
 	err := r.db.WithContext(ctx).
 		Where("id = ? AND workspace_id = ?", id, workspaceID).
@@ -34,7 +34,7 @@ func (r *ContactRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model
 	return &contact, nil
 }
 
-func (r *ContactRepo) GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Contact, error) {
+func (r *ContactRepo) GetByIDs(ctx context.Context, workspaceID string, ids []string) ([]model.Contact, error) {
 	var contacts []model.Contact
 	err := r.db.WithContext(ctx).
 		Where("id IN ? AND workspace_id = ?", ids, workspaceID).
@@ -45,7 +45,7 @@ func (r *ContactRepo) GetByIDs(ctx context.Context, workspaceID uint, ids []uint
 	return contacts, nil
 }
 
-func (r *ContactRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error) {
+func (r *ContactRepo) List(ctx context.Context, workspaceID string, page, pageSize int, search string, tagIDs []string) ([]model.Contact, int64, error) {
 	var contacts []model.Contact
 	var total int64
 
@@ -84,7 +84,7 @@ func (r *ContactRepo) List(ctx context.Context, workspaceID uint, page, pageSize
 // (id, name, relationship labels, avatar) — without the Tags Preload that List
 // runs as a second query and the graph then discards. Capped at the same 1000
 // the previous call used.
-func (r *ContactRepo) ListGraphContacts(ctx context.Context, workspaceID uint) ([]model.Contact, error) {
+func (r *ContactRepo) ListGraphContacts(ctx context.Context, workspaceID string) ([]model.Contact, error) {
 	var contacts []model.Contact
 	if err := r.db.WithContext(ctx).
 		Select("id, name, relationship_labels, avatar_emoji, avatar_url").
@@ -109,7 +109,7 @@ func (r *ContactRepo) Update(ctx context.Context, contact *model.Contact) error 
 // ListWithBirthday returns every contact that has a birthday set. Unpaged by
 // design: the birthday occurrence (especially lunar) is computed in Go, and a
 // personal workspace's contact count fits comfortably in memory.
-func (r *ContactRepo) ListWithBirthday(ctx context.Context, workspaceID uint) ([]model.Contact, error) {
+func (r *ContactRepo) ListWithBirthday(ctx context.Context, workspaceID string) ([]model.Contact, error) {
 	var contacts []model.Contact
 	if err := r.db.WithContext(ctx).
 		Select("id, name, nickname, avatar_emoji, avatar_url, birthday, birthday_calendar").
@@ -124,7 +124,7 @@ func (r *ContactRepo) ListWithBirthday(ctx context.Context, workspaceID uint) ([
 // ReplaceTags swaps the polymorphic tag associations of a contact in one
 // transaction. Used by JSON import to restore tag links after re-creating
 // contacts (by name → freshly-created tag id).
-func (r *ContactRepo) ReplaceTags(ctx context.Context, contactID uint, tags []model.Tag) error {
+func (r *ContactRepo) ReplaceTags(ctx context.Context, contactID string, tags []model.Tag) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("target_type = ? AND target_id = ?", model.TagTargetContact, contactID).
 			Delete(&model.Tagging{}).Error; err != nil {
@@ -142,7 +142,7 @@ func (r *ContactRepo) ReplaceTags(ctx context.Context, contactID uint, tags []mo
 
 // GetTags returns the tags attached to a contact through the polymorphic
 // tagging table.
-func (r *ContactRepo) GetTags(ctx context.Context, workspaceID, contactID uint) ([]model.Tag, error) {
+func (r *ContactRepo) GetTags(ctx context.Context, workspaceID, contactID string) ([]model.Tag, error) {
 	var taggings []model.Tagging
 	if err := r.db.WithContext(ctx).
 		Where("workspace_id = ? AND target_type = ? AND target_id = ?", workspaceID, model.TagTargetContact, contactID).
@@ -152,7 +152,7 @@ func (r *ContactRepo) GetTags(ctx context.Context, workspaceID, contactID uint) 
 	if len(taggings) == 0 {
 		return nil, nil
 	}
-	tagIDs := make([]uint, len(taggings))
+	tagIDs := make([]string, len(taggings))
 	for i, tg := range taggings {
 		tagIDs[i] = tg.TagID
 	}
@@ -163,7 +163,7 @@ func (r *ContactRepo) GetTags(ctx context.Context, workspaceID, contactID uint) 
 	return tags, nil
 }
 
-func (r *ContactRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *ContactRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Contact{}).Error; err != nil {
 		return fmt.Errorf("delete contact: %w", err)
 	}

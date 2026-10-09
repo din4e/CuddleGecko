@@ -16,7 +16,7 @@ func (s *MCPServer) registerBuddyTools() {
 			"search":    map[string]interface{}{"type": "string", "description": "Search term for name/phone/email"},
 			"tag_ids":   map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "integer"}, "description": "Filter by tag IDs"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		page := getArgInt(args, "page", 1)
 		pageSize := getArgInt(args, "page_size", 20)
 		search := toString(getArg(args, "search"))
@@ -40,8 +40,8 @@ func (s *MCPServer) registerBuddyTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Contact ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		return s.contactSvc.GetByID(ctx, userID, workspaceID, id)
 	})
 
@@ -59,7 +59,7 @@ func (s *MCPServer) registerBuddyTools() {
 			"relationship_labels": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Relationship labels (e.g. friend, family)"},
 		},
 		"required": []string{"name"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		contact := &model.Contact{
 			Name:               toString(getArg(args, "name")),
 			Nickname:           toString(getArg(args, "nickname")),
@@ -89,8 +89,8 @@ func (s *MCPServer) registerBuddyTools() {
 			"relationship_labels": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Relationship labels"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		updates := &model.Contact{
 			Name:               toString(getArg(args, "name")),
 			Nickname:           toString(getArg(args, "nickname")),
@@ -111,8 +111,8 @@ func (s *MCPServer) registerBuddyTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Contact ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		err := s.contactSvc.Delete(ctx, userID, workspaceID, id)
 		if err != nil {
 			return nil, err
@@ -125,7 +125,7 @@ func (s *MCPServer) registerBuddyTools() {
 		"properties": map[string]interface{}{
 			"days": map[string]interface{}{"type": "integer", "description": "Look-ahead window in days (1-365, default 30)"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		days := getArgInt(args, "days", 30)
 		if days < 1 || days > 365 {
 			days = 30
@@ -139,8 +139,8 @@ func (s *MCPServer) registerBuddyTools() {
 			"contact_id": map[string]interface{}{"type": "integer", "description": "Contact ID"},
 		},
 		"required": []string{"contact_id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		contactID := toUint(getArg(args, "contact_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		contactID := toString(getArg(args, "contact_id"))
 		return s.contactSvc.CreateBirthdayReminder(ctx, userID, workspaceID, contactID, time.Now())
 	})
 
@@ -150,8 +150,8 @@ func (s *MCPServer) registerBuddyTools() {
 			"contact_id": map[string]interface{}{"type": "integer", "description": "Contact ID"},
 		},
 		"required": []string{"contact_id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		contactID := toUint(getArg(args, "contact_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		contactID := toString(getArg(args, "contact_id"))
 		return s.contactSvc.GetTags(ctx, userID, workspaceID, contactID)
 	})
 
@@ -162,8 +162,8 @@ func (s *MCPServer) registerBuddyTools() {
 			"tag_ids":    map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "integer"}, "description": "Tag IDs to assign"},
 		},
 		"required": []string{"contact_id", "tag_ids"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		contactID := toUint(getArg(args, "contact_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		contactID := toString(getArg(args, "contact_id"))
 		tagIDs := toUintSlice(getArg(args, "tag_ids"))
 		err := s.contactSvc.ReplaceTags(ctx, userID, workspaceID, contactID, tagIDs)
 		if err != nil {

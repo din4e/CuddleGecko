@@ -19,19 +19,19 @@ import (
 
 // contactNames returns id→name for all workspace contacts (CSV rows reference
 // contacts by name, not id, so files stay meaningful outside the app).
-func (s *ExportService) contactNames(ctx context.Context, workspaceID uint) (map[uint]string, error) {
+func (s *ExportService) contactNames(ctx context.Context, workspaceID string) (map[string]string, error) {
 	contacts, _, err := s.contactRepo.List(ctx, workspaceID, 1, 100000, "", nil)
 	if err != nil {
 		return nil, err
 	}
-	m := make(map[uint]string, len(contacts))
+	m := make(map[string]string, len(contacts))
 	for _, c := range contacts {
 		m[c.ID] = c.Name
 	}
 	return m, nil
 }
 
-func (s *ExportService) ExportTagsCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportTagsCSV(ctx context.Context, workspaceID string) (string, error) {
 	tags, _, err := s.tagRepo.List(ctx, workspaceID, 1, 100000)
 	if err != nil {
 		return "", fmt.Errorf("export tags csv: %w", err)
@@ -46,7 +46,7 @@ func (s *ExportService) ExportTagsCSV(ctx context.Context, workspaceID uint) (st
 	return buf.String(), nil
 }
 
-func (s *ExportService) ExportInteractionsCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportInteractionsCSV(ctx context.Context, workspaceID string) (string, error) {
 	interactions, err := s.interactionRepo.ListByWorkspace(ctx, workspaceID)
 	if err != nil {
 		return "", fmt.Errorf("export interactions csv: %w", err)
@@ -71,7 +71,7 @@ func (s *ExportService) ExportInteractionsCSV(ctx context.Context, workspaceID u
 	return buf.String(), nil
 }
 
-func (s *ExportService) ExportRelationsCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportRelationsCSV(ctx context.Context, workspaceID string) (string, error) {
 	relations, err := s.relationRepo.GetAllByWorkspace(ctx, workspaceID)
 	if err != nil {
 		return "", fmt.Errorf("export relations csv: %w", err)
@@ -90,7 +90,7 @@ func (s *ExportService) ExportRelationsCSV(ctx context.Context, workspaceID uint
 	return buf.String(), nil
 }
 
-func (s *ExportService) ExportRemindersCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportRemindersCSV(ctx context.Context, workspaceID string) (string, error) {
 	reminders, _, err := s.reminderRepo.List(ctx, workspaceID, "", nil, 1, 100000, nil)
 	if err != nil {
 		return "", fmt.Errorf("export reminders csv: %w", err)
@@ -104,7 +104,7 @@ func (s *ExportService) ExportRemindersCSV(ctx context.Context, workspaceID uint
 	csvWriteRow(w, []string{"title", "description", "remind_at", "status", "contact"})
 	for _, r := range reminders {
 		contact := ""
-		if r.ContactID != 0 {
+		if r.ContactID != "" {
 			contact = names[r.ContactID]
 		}
 		csvWriteRow(w, []string{r.Title, r.Description, r.RemindAt.Format(time.RFC3339), string(r.Status), contact})
@@ -116,7 +116,7 @@ func (s *ExportService) ExportRemindersCSV(ctx context.Context, workspaceID uint
 // ExportWorkoutsCSV renders one row per workout with exercises inlined as
 // "name|category|sets|reps|weight|distance_sec…" entries joined by "; " — the
 // same format ImportWorkoutsCSV parses back.
-func (s *ExportService) ExportWorkoutsCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportWorkoutsCSV(ctx context.Context, workspaceID string) (string, error) {
 	if s.workoutRepo == nil {
 		return "", fmt.Errorf("workout export not available")
 	}
@@ -124,9 +124,9 @@ func (s *ExportService) ExportWorkoutsCSV(ctx context.Context, workspaceID uint)
 	if err != nil {
 		return "", fmt.Errorf("export workouts csv: %w", err)
 	}
-	var exercisesByWorkout map[uint][]model.WorkoutExercise
+	var exercisesByWorkout map[string][]model.WorkoutExercise
 	if s.workoutExRepo != nil {
-		wIDs := make([]uint, 0, len(workouts))
+		wIDs := make([]string, 0, len(workouts))
 		for _, w := range workouts {
 			wIDs = append(wIDs, w.ID)
 		}
@@ -134,7 +134,7 @@ func (s *ExportService) ExportWorkoutsCSV(ctx context.Context, workspaceID uint)
 		if eerr != nil {
 			return "", fmt.Errorf("export workouts csv: %w", eerr)
 		}
-		exercisesByWorkout = make(map[uint][]model.WorkoutExercise, len(workouts))
+		exercisesByWorkout = make(map[string][]model.WorkoutExercise, len(workouts))
 		for _, e := range exs {
 			exercisesByWorkout[e.WorkoutID] = append(exercisesByWorkout[e.WorkoutID], e)
 		}
@@ -148,7 +148,7 @@ func (s *ExportService) ExportWorkoutsCSV(ctx context.Context, workspaceID uint)
 			exParts = append(exParts, exerciseCell(&e))
 		}
 		csvWriteRow(w, []string{
-			strconv.FormatUint(uint64(wk.ID), 10),
+			wk.ID,
 			wk.Name, wk.Type, wk.Status, wk.Intensity,
 			timeToStr(wk.ScheduledAt), intPtrToStr(wk.DurationMin), floatPtrToStr(wk.Calories),
 			wk.Color, wk.Location, wk.Notes, timeToStr(wk.CompletedAt),
@@ -177,7 +177,7 @@ func intPtrToStr(i *int) string {
 	return strconv.Itoa(*i)
 }
 
-func (s *ExportService) ExportBodyMetricsCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportBodyMetricsCSV(ctx context.Context, workspaceID string) (string, error) {
 	if s.bodyMetricRepo == nil {
 		return "", fmt.Errorf("body metric export not available")
 	}
@@ -202,7 +202,7 @@ func (s *ExportService) ExportBodyMetricsCSV(ctx context.Context, workspaceID ui
 
 // ExportHabitsCSV renders one row per habit with check-in dates inlined
 // ("; "-joined YYYY-MM-DD) so history survives the round-trip.
-func (s *ExportService) ExportHabitsCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportHabitsCSV(ctx context.Context, workspaceID string) (string, error) {
 	if s.habitRepo == nil {
 		return "", fmt.Errorf("habit export not available")
 	}
@@ -210,7 +210,7 @@ func (s *ExportService) ExportHabitsCSV(ctx context.Context, workspaceID uint) (
 	if err != nil {
 		return "", fmt.Errorf("export habits csv: %w", err)
 	}
-	logsByHabit := make(map[uint][]string)
+	logsByHabit := make(map[string][]string)
 	if s.habitLogRepo != nil {
 		logs, lerr := s.habitLogRepo.ListAllByWorkspace(ctx, workspaceID)
 		if lerr != nil {
@@ -234,7 +234,7 @@ func (s *ExportService) ExportHabitsCSV(ctx context.Context, workspaceID uint) (
 	return buf.String(), nil
 }
 
-func (s *ExportService) ExportPomodorosCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportPomodorosCSV(ctx context.Context, workspaceID string) (string, error) {
 	if s.pomodoroRepo == nil {
 		return "", fmt.Errorf("pomodoro export not available")
 	}
@@ -242,7 +242,7 @@ func (s *ExportService) ExportPomodorosCSV(ctx context.Context, workspaceID uint
 	if err != nil {
 		return "", fmt.Errorf("export pomodoros csv: %w", err)
 	}
-	todoTitles := make(map[uint]string)
+	todoTitles := make(map[string]string)
 	if s.todoRepo != nil {
 		todos, _, terr := s.todoRepo.List(ctx, workspaceID, model.TodoListQuery{Page: 1, PageSize: 100000})
 		if terr == nil {
@@ -271,7 +271,7 @@ func (s *ExportService) ExportPomodorosCSV(ctx context.Context, workspaceID uint
 // ExportFitnessCSV renders the exercise library (the flat part of the fitness
 // module). Templates/goals/set logs are structured — they round-trip through
 // the fitness JSON export.
-func (s *ExportService) ExportFitnessCSV(ctx context.Context, workspaceID uint) (string, error) {
+func (s *ExportService) ExportFitnessCSV(ctx context.Context, workspaceID string) (string, error) {
 	if s.exLibRepo == nil {
 		return "", fmt.Errorf("fitness export not available")
 	}

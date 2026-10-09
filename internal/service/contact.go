@@ -25,24 +25,24 @@ var (
 // TaggingRepository is the polymorphic tag-association store shared by every
 // taggable entity (contacts, todos, ...).
 type TaggingRepository interface {
-	SetTags(ctx context.Context, workspaceID uint, targetType string, targetID uint, tagIDs []uint) error
-	GetTags(ctx context.Context, workspaceID uint, targetType string, targetID uint) ([]model.Tag, error)
-	GetTagsByTargets(ctx context.Context, workspaceID uint, targetType string, targetIDs []uint) (map[uint][]model.Tag, error)
-	FilterTargetIDs(ctx context.Context, workspaceID uint, targetType string, tagIDs []uint) ([]uint, error)
-	RemoveAll(ctx context.Context, workspaceID uint, targetType string, targetID uint) error
+	SetTags(ctx context.Context, workspaceID string, targetType string, targetID string, tagIDs []string) error
+	GetTags(ctx context.Context, workspaceID string, targetType string, targetID string) ([]model.Tag, error)
+	GetTagsByTargets(ctx context.Context, workspaceID string, targetType string, targetIDs []string) (map[string][]model.Tag, error)
+	FilterTargetIDs(ctx context.Context, workspaceID string, targetType string, tagIDs []string) ([]string, error)
+	RemoveAll(ctx context.Context, workspaceID string, targetType string, targetID string) error
 }
 
 type ContactRepository interface {
 	Create(ctx context.Context, contact *model.Contact) error
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.Contact, error)
-	GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Contact, error)
-	List(ctx context.Context, workspaceID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error)
-	ListGraphContacts(ctx context.Context, workspaceID uint) ([]model.Contact, error)
-	ListWithBirthday(ctx context.Context, workspaceID uint) ([]model.Contact, error)
-	ReplaceTags(ctx context.Context, contactID uint, tags []model.Tag) error
-	GetTags(ctx context.Context, workspaceID, contactID uint) ([]model.Tag, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.Contact, error)
+	GetByIDs(ctx context.Context, workspaceID string, ids []string) ([]model.Contact, error)
+	List(ctx context.Context, workspaceID string, page, pageSize int, search string, tagIDs []string) ([]model.Contact, int64, error)
+	ListGraphContacts(ctx context.Context, workspaceID string) ([]model.Contact, error)
+	ListWithBirthday(ctx context.Context, workspaceID string) ([]model.Contact, error)
+	ReplaceTags(ctx context.Context, contactID string, tags []model.Tag) error
+	GetTags(ctx context.Context, workspaceID, contactID string) ([]model.Tag, error)
 	Update(ctx context.Context, contact *model.Contact) error
-	Delete(ctx context.Context, workspaceID, id uint) error
+	Delete(ctx context.Context, workspaceID, id string) error
 }
 
 // BirthdayOccurrence pairs a contact with their next birthday resolved to a
@@ -72,7 +72,7 @@ func NewContactService(repo ContactRepository, taggingRepo TaggingRepository, re
 	return &ContactService{repo: repo, taggingRepo: taggingRepo, reminderRepo: reminderRepo, notifier: firstNotifier(notifier)}
 }
 
-func (s *ContactService) Create(ctx context.Context, userID, workspaceID uint, contact *model.Contact) (*model.Contact, error) {
+func (s *ContactService) Create(ctx context.Context, userID, workspaceID string, contact *model.Contact) (*model.Contact, error) {
 	contact.UserID = userID
 	contact.WorkspaceID = workspaceID
 	if err := s.repo.Create(ctx, contact); err != nil {
@@ -82,7 +82,7 @@ func (s *ContactService) Create(ctx context.Context, userID, workspaceID uint, c
 	return contact, nil
 }
 
-func (s *ContactService) GetByID(ctx context.Context, userID, workspaceID, id uint) (*model.Contact, error) {
+func (s *ContactService) GetByID(ctx context.Context, userID, workspaceID, id string) (*model.Contact, error) {
 	contact, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrContactNotFound
@@ -91,7 +91,7 @@ func (s *ContactService) GetByID(ctx context.Context, userID, workspaceID, id ui
 	return contact, nil
 }
 
-func (s *ContactService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, search string, tagIDs []uint) ([]model.Contact, int64, error) {
+func (s *ContactService) List(ctx context.Context, userID, workspaceID string, page, pageSize int, search string, tagIDs []string) ([]model.Contact, int64, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -110,7 +110,7 @@ func (s *ContactService) List(ctx context.Context, userID, workspaceID uint, pag
 	return contacts, total, nil
 }
 
-func (s *ContactService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Contact) (*model.Contact, error) {
+func (s *ContactService) Update(ctx context.Context, userID, workspaceID, id string, updates *model.Contact) (*model.Contact, error) {
 	contact, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrContactNotFound
@@ -138,7 +138,7 @@ func (s *ContactService) Update(ctx context.Context, userID, workspaceID, id uin
 	return contact, nil
 }
 
-func (s *ContactService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *ContactService) Delete(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (s *ContactService) Delete(ctx context.Context, userID, workspaceID, id uin
 	return nil
 }
 
-func (s *ContactService) ReplaceTags(ctx context.Context, userID, workspaceID, contactID uint, tagIDs []uint) error {
+func (s *ContactService) ReplaceTags(ctx context.Context, userID, workspaceID, contactID string, tagIDs []string) error {
 	if _, err := s.repo.GetByID(ctx, workspaceID, contactID); err != nil {
 		return ErrContactNotFound
 	}
@@ -159,7 +159,7 @@ func (s *ContactService) ReplaceTags(ctx context.Context, userID, workspaceID, c
 	return nil
 }
 
-func (s *ContactService) GetTags(ctx context.Context, userID, workspaceID, contactID uint) ([]model.Tag, error) {
+func (s *ContactService) GetTags(ctx context.Context, userID, workspaceID, contactID string) ([]model.Tag, error) {
 	if _, err := s.repo.GetByID(ctx, workspaceID, contactID); err != nil {
 		return nil, ErrContactNotFound
 	}
@@ -167,11 +167,11 @@ func (s *ContactService) GetTags(ctx context.Context, userID, workspaceID, conta
 }
 
 // populateTags fills the virtual Tags field for a batch of contacts.
-func (s *ContactService) populateTags(ctx context.Context, workspaceID uint, contacts []*model.Contact) {
+func (s *ContactService) populateTags(ctx context.Context, workspaceID string, contacts []*model.Contact) {
 	if s.taggingRepo == nil || len(contacts) == 0 {
 		return
 	}
-	ids := make([]uint, len(contacts))
+	ids := make([]string, len(contacts))
 	for i, c := range contacts {
 		ids[i] = c.ID
 	}
@@ -191,7 +191,7 @@ func (s *ContactService) populateTags(ctx context.Context, workspaceID uint, con
 // UpcomingBirthdays returns every contact whose next birthday (solar, or the
 // solar date of a lunar birthday) falls within `days` days from now, sorted by
 // occurrence.
-func (s *ContactService) UpcomingBirthdays(ctx context.Context, userID, workspaceID uint, days int, now time.Time) ([]BirthdayOccurrence, error) {
+func (s *ContactService) UpcomingBirthdays(ctx context.Context, userID, workspaceID string, days int, now time.Time) ([]BirthdayOccurrence, error) {
 	contacts, err := s.repo.ListWithBirthday(ctx, workspaceID)
 	if err != nil {
 		return nil, err
@@ -258,7 +258,7 @@ func birthdayOccurrence(c *model.Contact, today time.Time) (BirthdayOccurrence, 
 // CreateBirthdayReminder creates a pending reminder at 09:00 (server-local)
 // on the contact's next birthday, lunar birthdays included. Returns
 // ErrBirthdayReminderExists when one is already scheduled for that date.
-func (s *ContactService) CreateBirthdayReminder(ctx context.Context, userID, workspaceID, contactID uint, now time.Time) (*model.Reminder, error) {
+func (s *ContactService) CreateBirthdayReminder(ctx context.Context, userID, workspaceID, contactID string, now time.Time) (*model.Reminder, error) {
 	contact, err := s.repo.GetByID(ctx, workspaceID, contactID)
 	if err != nil {
 		return nil, ErrContactNotFound

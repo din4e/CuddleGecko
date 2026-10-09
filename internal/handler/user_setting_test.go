@@ -20,7 +20,7 @@ import (
 // setupGraphSettingsRouter serves GET/PUT /api/settings/graph over an
 // in-memory DB. Requests act as *currentUser, swappable per test to verify
 // per-user isolation.
-func setupGraphSettingsRouter(t *testing.T) (*gin.Engine, *uint) {
+func setupGraphSettingsRouter(t *testing.T) (*gin.Engine, *string) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -34,7 +34,7 @@ func setupGraphSettingsRouter(t *testing.T) (*gin.Engine, *uint) {
 	svc := service.NewUserSettingService(repository.NewUserSettingRepo(db))
 	h := NewUserSettingHandler(svc)
 
-	userID := uint(1)
+	userID := "1"
 	r := gin.New()
 	r.Use(func(c *gin.Context) { c.Set("user_id", userID) })
 	r.GET("/api/settings/graph", h.GetGraph)
@@ -118,7 +118,7 @@ func TestGraphSettingsArePerUser(t *testing.T) {
 	r, currentUser := setupGraphSettingsRouter(t)
 	_, _ = doUpdateGraph(t, r, `{"nodeRadius":40}`)
 
-	*currentUser = 2
+	*currentUser = "2"
 	cfg := doGetGraph(t, r)
 	assert.Equal(t, defaultGraphConfig(), cfg, "another user must not see user 1's config")
 }

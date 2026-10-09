@@ -9,9 +9,9 @@ import (
 // Habit is a daily check-in tracker (滴答清单的"习惯打卡"). v1 supports daily
 // frequency; a check-in is one HabitLog row per habit per date.
 type Habit struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	UserID      uint           `gorm:"index;not null" json:"user_id"`
-	WorkspaceID uint           `gorm:"index;not null;default:0" json:"workspace_id"`
+	ID          string         `gorm:"primaryKey;type:char(36)" json:"id"`
+	UserID      string         `gorm:"size:36;index;not null" json:"user_id"`
+	WorkspaceID string         `gorm:"size:36;index;not null;default:0" json:"workspace_id"`
 	Name        string         `gorm:"size:100;not null" json:"name"`
 	Color       string         `gorm:"size:20" json:"color"`
 	Emoji       string         `gorm:"size:10" json:"emoji"`
@@ -30,3 +30,6 @@ type Habit struct {
 	Recent    []string `gorm:"-" json:"recent"` // checked-in dates (YYYY-MM-DD) for the heatmap window
 	Tags      []Tag    `gorm:"-" json:"tags"`   // from the polymorphic taggings table
 }
+
+// BeforeCreate assigns the UUID primary key on first insert.
+func (h *Habit) BeforeCreate(tx *gorm.DB) error { return ensureID(&h.ID, tx) }

@@ -41,21 +41,21 @@ func TestAIService_SystemPromptCache(t *testing.T) {
 	svc, db := newAICacheTestService(t)
 	ctx := context.Background()
 
-	require.NoError(t, db.Create(&model.Contact{UserID: 1, WorkspaceID: 1, Name: "Alice"}).Error)
+	require.NoError(t, db.Create(&model.Contact{UserID: "1", WorkspaceID: "1", Name: "Alice"}).Error)
 
-	p1, err := svc.buildSystemPrompt(ctx, 1, 1)
+	p1, err := svc.buildSystemPrompt(ctx, "1", "1")
 	require.NoError(t, err)
 	assert.Contains(t, p1, "Alice")
 
 	// A newly added contact must not surface while the cache is fresh.
-	require.NoError(t, db.Create(&model.Contact{UserID: 1, WorkspaceID: 1, Name: "Bobbian"}).Error)
-	p2, err := svc.buildSystemPrompt(ctx, 1, 1)
+	require.NoError(t, db.Create(&model.Contact{UserID: "1", WorkspaceID: "1", Name: "Bobbian"}).Error)
+	p2, err := svc.buildSystemPrompt(ctx, "1", "1")
 	require.NoError(t, err)
 	assert.Equal(t, p1, p2, "second call within TTL served from cache")
 	assert.NotContains(t, p2, "Bobbian", "cached prompt must be stale within TTL")
 
 	// A different workspace is cached independently and starts uncached.
-	p3, err := svc.buildSystemPrompt(ctx, 1, 2)
+	p3, err := svc.buildSystemPrompt(ctx, "1", "2")
 	require.NoError(t, err)
 	assert.NotEqual(t, p1, p3, "different workspace has its own (uncached) prompt")
 }

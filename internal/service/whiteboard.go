@@ -9,34 +9,34 @@ import (
 )
 
 var (
-	ErrWhiteboardNotFound = errors.New("whiteboard not found")
+	ErrWhiteboardNotFound     = errors.New("whiteboard not found")
 	ErrWhiteboardNodeNotFound = errors.New("whiteboard node not found")
 	ErrWhiteboardEdgeNotFound = errors.New("whiteboard edge not found")
-	ErrWhiteboardNameEmpty = errors.New("whiteboard name is empty")
-	ErrWhiteboardBadRef    = errors.New("invalid node ref")
-	ErrWhiteboardSelfEdge  = errors.New("edge endpoints must differ")
+	ErrWhiteboardNameEmpty    = errors.New("whiteboard name is empty")
+	ErrWhiteboardBadRef       = errors.New("invalid node ref")
+	ErrWhiteboardSelfEdge     = errors.New("edge endpoints must differ")
 )
 
 // WhiteboardRepository persists whiteboards and their nodes/edges.
 type WhiteboardRepository interface {
 	CreateBoard(ctx context.Context, b *model.Whiteboard) error
-	GetBoard(ctx context.Context, workspaceID, id uint) (*model.Whiteboard, error)
-	ListBoards(ctx context.Context, workspaceID uint) ([]model.Whiteboard, error)
+	GetBoard(ctx context.Context, workspaceID, id string) (*model.Whiteboard, error)
+	ListBoards(ctx context.Context, workspaceID string) ([]model.Whiteboard, error)
 	UpdateBoard(ctx context.Context, b *model.Whiteboard) error
-	DeleteBoard(ctx context.Context, workspaceID, id uint) error
-	TouchBoard(ctx context.Context, id uint) error
+	DeleteBoard(ctx context.Context, workspaceID, id string) error
+	TouchBoard(ctx context.Context, id string) error
 
-	ListNodes(ctx context.Context, boardID uint) ([]model.WhiteboardNode, error)
+	ListNodes(ctx context.Context, boardID string) ([]model.WhiteboardNode, error)
 	CreateNode(ctx context.Context, n *model.WhiteboardNode) error
-	GetNode(ctx context.Context, boardID, id uint) (*model.WhiteboardNode, error)
+	GetNode(ctx context.Context, boardID, id string) (*model.WhiteboardNode, error)
 	UpdateNode(ctx context.Context, n *model.WhiteboardNode) error
-	DeleteNode(ctx context.Context, boardID, id uint) error
+	DeleteNode(ctx context.Context, boardID, id string) error
 
-	ListEdges(ctx context.Context, boardID uint) ([]model.WhiteboardEdge, error)
+	ListEdges(ctx context.Context, boardID string) ([]model.WhiteboardEdge, error)
 	CreateEdge(ctx context.Context, e *model.WhiteboardEdge) error
-	DeleteEdge(ctx context.Context, boardID, id uint) error
+	DeleteEdge(ctx context.Context, boardID, id string) error
 
-	Related(ctx context.Context, workspaceID uint, refType string, refID uint) ([]model.WhiteboardRelated, error)
+	Related(ctx context.Context, workspaceID string, refType string, refID string) ([]model.WhiteboardRelated, error)
 }
 
 var validNodeRefTypes = map[string]bool{
@@ -56,7 +56,7 @@ func NewWhiteboardService(repo WhiteboardRepository, notifier ...ChangeNotifier)
 
 // --- Boards ---
 
-func (s *WhiteboardService) CreateBoard(ctx context.Context, userID, workspaceID uint, b *model.Whiteboard) (*model.Whiteboard, error) {
+func (s *WhiteboardService) CreateBoard(ctx context.Context, userID, workspaceID string, b *model.Whiteboard) (*model.Whiteboard, error) {
 	b.Name = strings.TrimSpace(b.Name)
 	if b.Name == "" {
 		return nil, ErrWhiteboardNameEmpty
@@ -70,11 +70,11 @@ func (s *WhiteboardService) CreateBoard(ctx context.Context, userID, workspaceID
 	return b, nil
 }
 
-func (s *WhiteboardService) ListBoards(ctx context.Context, userID, workspaceID uint) ([]model.Whiteboard, error) {
+func (s *WhiteboardService) ListBoards(ctx context.Context, userID, workspaceID string) ([]model.Whiteboard, error) {
 	return s.repo.ListBoards(ctx, workspaceID)
 }
 
-func (s *WhiteboardService) RenameBoard(ctx context.Context, userID, workspaceID, id uint, name string) (*model.Whiteboard, error) {
+func (s *WhiteboardService) RenameBoard(ctx context.Context, userID, workspaceID, id string, name string) (*model.Whiteboard, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, ErrWhiteboardNameEmpty
@@ -91,7 +91,7 @@ func (s *WhiteboardService) RenameBoard(ctx context.Context, userID, workspaceID
 	return b, nil
 }
 
-func (s *WhiteboardService) DeleteBoard(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *WhiteboardService) DeleteBoard(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.repo.DeleteBoard(ctx, workspaceID, id); err != nil {
 		return ErrWhiteboardNotFound
 	}
@@ -101,7 +101,7 @@ func (s *WhiteboardService) DeleteBoard(ctx context.Context, userID, workspaceID
 
 // Board returns the board plus its nodes and edges in one call — everything
 // the canvas needs to render.
-func (s *WhiteboardService) Board(ctx context.Context, userID, workspaceID, id uint) (*model.Whiteboard, []model.WhiteboardNode, []model.WhiteboardEdge, error) {
+func (s *WhiteboardService) Board(ctx context.Context, userID, workspaceID, id string) (*model.Whiteboard, []model.WhiteboardNode, []model.WhiteboardEdge, error) {
 	b, err := s.repo.GetBoard(ctx, workspaceID, id)
 	if err != nil {
 		return nil, nil, nil, ErrWhiteboardNotFound
@@ -119,14 +119,14 @@ func (s *WhiteboardService) Board(ctx context.Context, userID, workspaceID, id u
 
 // --- Nodes ---
 
-func (s *WhiteboardService) CreateNode(ctx context.Context, userID, workspaceID, boardID uint, n *model.WhiteboardNode) (*model.WhiteboardNode, error) {
+func (s *WhiteboardService) CreateNode(ctx context.Context, userID, workspaceID, boardID string, n *model.WhiteboardNode) (*model.WhiteboardNode, error) {
 	if err := s.ensureBoard(ctx, workspaceID, boardID); err != nil {
 		return nil, err
 	}
 	if err := validateNode(n); err != nil {
 		return nil, err
 	}
-	n.ID = 0
+	n.ID = ""
 	n.WhiteboardID = boardID
 	if err := s.repo.CreateNode(ctx, n); err != nil {
 		return nil, err
@@ -136,7 +136,7 @@ func (s *WhiteboardService) CreateNode(ctx context.Context, userID, workspaceID,
 	return n, nil
 }
 
-func (s *WhiteboardService) UpdateNode(ctx context.Context, userID, workspaceID, boardID, nodeID uint, n *model.WhiteboardNode) (*model.WhiteboardNode, error) {
+func (s *WhiteboardService) UpdateNode(ctx context.Context, userID, workspaceID, boardID, nodeID string, n *model.WhiteboardNode) (*model.WhiteboardNode, error) {
 	existing, err := s.ensureNode(ctx, workspaceID, boardID, nodeID)
 	if err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func (s *WhiteboardService) UpdateNode(ctx context.Context, userID, workspaceID,
 	return existing, nil
 }
 
-func (s *WhiteboardService) DeleteNode(ctx context.Context, userID, workspaceID, boardID, nodeID uint) error {
+func (s *WhiteboardService) DeleteNode(ctx context.Context, userID, workspaceID, boardID, nodeID string) error {
 	if _, err := s.ensureNode(ctx, workspaceID, boardID, nodeID); err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func (s *WhiteboardService) DeleteNode(ctx context.Context, userID, workspaceID,
 
 // --- Edges ---
 
-func (s *WhiteboardService) CreateEdge(ctx context.Context, userID, workspaceID, boardID uint, e *model.WhiteboardEdge) (*model.WhiteboardEdge, error) {
+func (s *WhiteboardService) CreateEdge(ctx context.Context, userID, workspaceID, boardID string, e *model.WhiteboardEdge) (*model.WhiteboardEdge, error) {
 	if err := s.ensureBoard(ctx, workspaceID, boardID); err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (s *WhiteboardService) CreateEdge(ctx context.Context, userID, workspaceID,
 	if _, err := s.ensureNode(ctx, workspaceID, boardID, e.ToNodeID); err != nil {
 		return nil, err
 	}
-	e.ID = 0
+	e.ID = ""
 	e.WhiteboardID = boardID
 	e.Label = strings.TrimSpace(e.Label)
 	if err := s.repo.CreateEdge(ctx, e); err != nil {
@@ -194,7 +194,7 @@ func (s *WhiteboardService) CreateEdge(ctx context.Context, userID, workspaceID,
 	return e, nil
 }
 
-func (s *WhiteboardService) DeleteEdge(ctx context.Context, userID, workspaceID, boardID, edgeID uint) error {
+func (s *WhiteboardService) DeleteEdge(ctx context.Context, userID, workspaceID, boardID, edgeID string) error {
 	if err := s.repo.DeleteEdge(ctx, boardID, edgeID); err != nil {
 		return ErrWhiteboardEdgeNotFound
 	}
@@ -206,7 +206,7 @@ func (s *WhiteboardService) DeleteEdge(ctx context.Context, userID, workspaceID,
 
 // Related lists the entities connected to a node's reference — candidates the
 // canvas can spawn as linked nodes ("expand").
-func (s *WhiteboardService) Related(ctx context.Context, userID, workspaceID, boardID, nodeID uint) ([]model.WhiteboardRelated, error) {
+func (s *WhiteboardService) Related(ctx context.Context, userID, workspaceID, boardID, nodeID string) ([]model.WhiteboardRelated, error) {
 	n, err := s.ensureNode(ctx, workspaceID, boardID, nodeID)
 	if err != nil {
 		return nil, err
@@ -219,7 +219,7 @@ func (s *WhiteboardService) Related(ctx context.Context, userID, workspaceID, bo
 
 // --- helpers ---
 
-func (s *WhiteboardService) ensureBoard(ctx context.Context, workspaceID, boardID uint) error {
+func (s *WhiteboardService) ensureBoard(ctx context.Context, workspaceID, boardID string) error {
 	_, err := s.repo.GetBoard(ctx, workspaceID, boardID)
 	if err != nil {
 		return ErrWhiteboardNotFound
@@ -227,7 +227,7 @@ func (s *WhiteboardService) ensureBoard(ctx context.Context, workspaceID, boardI
 	return nil
 }
 
-func (s *WhiteboardService) ensureNode(ctx context.Context, workspaceID, boardID, nodeID uint) (*model.WhiteboardNode, error) {
+func (s *WhiteboardService) ensureNode(ctx context.Context, workspaceID, boardID, nodeID string) (*model.WhiteboardNode, error) {
 	if err := s.ensureBoard(ctx, workspaceID, boardID); err != nil {
 		return nil, err
 	}
@@ -247,7 +247,7 @@ func validateNode(n *model.WhiteboardNode) error {
 	}
 	n.Label = strings.TrimSpace(n.Label)
 	if refType != "" && refType != model.NodeRefNote {
-		if n.RefID == nil || *n.RefID == 0 {
+		if n.RefID == nil || *n.RefID == "" {
 			return ErrWhiteboardBadRef
 		}
 	}

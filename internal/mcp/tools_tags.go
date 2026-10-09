@@ -8,9 +8,9 @@ import (
 
 func (s *MCPServer) registerTagTools() {
 	s.registerTool("list_tags", "List all tags in the current workspace.", map[string]interface{}{
-		"type": "object",
+		"type":       "object",
 		"properties": map[string]interface{}{},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		tags, _, err := s.tagSvc.List(ctx, userID, workspaceID, 1, 200)
 		return tags, err
 	})
@@ -22,7 +22,7 @@ func (s *MCPServer) registerTagTools() {
 			"color": map[string]interface{}{"type": "string", "description": "Tag color (hex, e.g. #ff0000)"},
 		},
 		"required": []string{"name"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		tag := &model.Tag{
 			Name:  toString(getArg(args, "name")),
 			Color: toString(getArg(args, "color")),
@@ -38,8 +38,8 @@ func (s *MCPServer) registerTagTools() {
 			"color": map[string]interface{}{"type": "string", "description": "Tag color (hex)"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		updates := &model.Tag{
 			Name:  toString(getArg(args, "name")),
 			Color: toString(getArg(args, "color")),
@@ -53,8 +53,8 @@ func (s *MCPServer) registerTagTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Tag ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		err := s.tagSvc.Delete(ctx, userID, workspaceID, id)
 		if err != nil {
 			return nil, err

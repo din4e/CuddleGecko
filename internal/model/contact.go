@@ -7,9 +7,9 @@ import (
 )
 
 type Contact struct {
-	ID                 uint           `gorm:"primaryKey" json:"id"`
-	UserID             uint           `gorm:"index;not null" json:"user_id"`
-	WorkspaceID        uint           `gorm:"index;not null;default:0;index:idx_contact_search;index:idx_contacts_workspace_created,priority:1" json:"workspace_id"`
+	ID                 string         `gorm:"primaryKey;type:char(36)" json:"id"`
+	UserID             string         `gorm:"size:36;index;not null" json:"user_id"`
+	WorkspaceID        string         `gorm:"size:36;index;not null;default:0;index:idx_contact_search;index:idx_contacts_workspace_created,priority:1" json:"workspace_id"`
 	Name               string         `gorm:"size:100;not null;index:idx_contact_search" json:"name"`
 	Nickname           string         `gorm:"size:100;index:idx_contact_search" json:"nickname"`
 	AvatarEmoji        string         `gorm:"size:10" json:"avatar_emoji"`
@@ -25,3 +25,6 @@ type Contact struct {
 	UpdatedAt          time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
 }
+
+// BeforeCreate assigns the UUID primary key on first insert.
+func (c *Contact) BeforeCreate(tx *gorm.DB) error { return ensureID(&c.ID, tx) }

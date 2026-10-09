@@ -24,20 +24,20 @@ var (
 
 type AIRepository interface {
 	CreateProvider(ctx context.Context, p *model.AIProvider) error
-	GetProviderByID(ctx context.Context, userID, id uint) (*model.AIProvider, error)
-	GetActiveProvider(ctx context.Context, userID uint) (*model.AIProvider, error)
-	GetProviderByType(ctx context.Context, userID uint, providerType string) (*model.AIProvider, error)
-	ListProviders(ctx context.Context, userID uint) ([]model.AIProvider, error)
+	GetProviderByID(ctx context.Context, userID, id string) (*model.AIProvider, error)
+	GetActiveProvider(ctx context.Context, userID string) (*model.AIProvider, error)
+	GetProviderByType(ctx context.Context, userID string, providerType string) (*model.AIProvider, error)
+	ListProviders(ctx context.Context, userID string) ([]model.AIProvider, error)
 	UpdateProvider(ctx context.Context, p *model.AIProvider) error
-	DeactivateAllProviders(ctx context.Context, userID uint) error
+	DeactivateAllProviders(ctx context.Context, userID string) error
 	CreateConversation(ctx context.Context, c *model.AIConversation) error
-	UpdateConversationTitle(ctx context.Context, userID, id uint, title string) error
-	GetConversationByID(ctx context.Context, userID, id uint) (*model.AIConversation, error)
-	ListConversations(ctx context.Context, userID uint, page, pageSize int) ([]model.AIConversation, int64, error)
-	DeleteConversation(ctx context.Context, userID, id uint) error
+	UpdateConversationTitle(ctx context.Context, userID, id string, title string) error
+	GetConversationByID(ctx context.Context, userID, id string) (*model.AIConversation, error)
+	ListConversations(ctx context.Context, userID string, page, pageSize int) ([]model.AIConversation, int64, error)
+	DeleteConversation(ctx context.Context, userID, id string) error
 	CreateMessage(ctx context.Context, m *model.AIMessage) error
-	ListMessagesByConversation(ctx context.Context, conversationID uint) ([]model.AIMessage, error)
-	ListRecentMessagesByConversation(ctx context.Context, conversationID uint, limit int) ([]model.AIMessage, error)
+	ListMessagesByConversation(ctx context.Context, conversationID string) ([]model.AIMessage, error)
+	ListRecentMessagesByConversation(ctx context.Context, conversationID string, limit int) ([]model.AIMessage, error)
 }
 
 // promptCacheEntry is a cached, workspace-scoped system prompt. The prompt is
@@ -59,7 +59,7 @@ type AIService struct {
 	httpClient      *http.Client
 	clientCache     map[string]*llm.Client
 	clientMu        sync.RWMutex
-	promptCache     map[uint]promptCacheEntry
+	promptCache     map[string]promptCacheEntry
 	promptCacheMu   sync.Mutex
 }
 
@@ -84,13 +84,13 @@ func NewAIService(
 			Timeout: 120 * time.Second,
 		},
 		clientCache: make(map[string]*llm.Client),
-		promptCache: make(map[uint]promptCacheEntry),
+		promptCache: make(map[string]promptCacheEntry),
 	}
 }
 
 // --- Provider management ---
 
-func (s *AIService) ListProviders(ctx context.Context, userID uint) ([]model.AIProvider, error) {
+func (s *AIService) ListProviders(ctx context.Context, userID string) ([]model.AIProvider, error) {
 	providers, err := s.aiRepo.ListProviders(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func (s *AIService) ListProviders(ctx context.Context, userID uint) ([]model.AIP
 	return providers, nil
 }
 
-func (s *AIService) SaveProvider(ctx context.Context, userID uint, providerType, apiKey, modelName, customBaseURL string) (*model.AIProvider, error) {
+func (s *AIService) SaveProvider(ctx context.Context, userID string, providerType, apiKey, modelName, customBaseURL string) (*model.AIProvider, error) {
 	preset, ok := GetPresetByType(providerType)
 	if !ok {
 		return nil, fmt.Errorf("unknown provider type: %s", providerType)
@@ -152,7 +152,7 @@ func (s *AIService) SaveProvider(ctx context.Context, userID uint, providerType,
 	return p, nil
 }
 
-func (s *AIService) ActivateProvider(ctx context.Context, userID, providerID uint) error {
+func (s *AIService) ActivateProvider(ctx context.Context, userID, providerID string) error {
 	provider, err := s.aiRepo.GetProviderByID(ctx, userID, providerID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -169,7 +169,7 @@ func (s *AIService) ActivateProvider(ctx context.Context, userID, providerID uin
 	return s.aiRepo.UpdateProvider(ctx, provider)
 }
 
-func (s *AIService) TestConnection(ctx context.Context, userID, providerID uint) error {
+func (s *AIService) TestConnection(ctx context.Context, userID, providerID string) error {
 	provider, err := s.aiRepo.GetProviderByID(ctx, userID, providerID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -182,7 +182,7 @@ func (s *AIService) TestConnection(ctx context.Context, userID, providerID uint)
 	return client.TestConnection(ctx)
 }
 
-func (s *AIService) getActiveClient(ctx context.Context, userID uint) (*llm.Client, error) {
+func (s *AIService) getActiveClient(ctx context.Context, userID string) (*llm.Client, error) {
 	provider, err := s.aiRepo.GetActiveProvider(ctx, userID)
 	if err == nil {
 		return s.cachedClient(provider.BaseURL, provider.APIKey, provider.Model), nil
@@ -229,7 +229,7 @@ func truncateMessages(messages []llm.Message) []llm.Message {
 
 // --- Conversation management ---
 
-func (s *AIService) CreateConversation(ctx context.Context, userID uint, title string) (*model.AIConversation, error) {
+func (s *AIService) CreateConversation(ctx context.Context, userID string, title string) (*model.AIConversation, error) {
 	conv := &model.AIConversation{
 		UserID: userID,
 		Title:  title,
@@ -240,11 +240,11 @@ func (s *AIService) CreateConversation(ctx context.Context, userID uint, title s
 	return conv, nil
 }
 
-func (s *AIService) ListConversations(ctx context.Context, userID uint, page, pageSize int) ([]model.AIConversation, int64, error) {
+func (s *AIService) ListConversations(ctx context.Context, userID string, page, pageSize int) ([]model.AIConversation, int64, error) {
 	return s.aiRepo.ListConversations(ctx, userID, page, pageSize)
 }
 
-func (s *AIService) GetMessages(ctx context.Context, userID, conversationID uint) ([]model.AIMessage, error) {
+func (s *AIService) GetMessages(ctx context.Context, userID, conversationID string) ([]model.AIMessage, error) {
 	_, err := s.aiRepo.GetConversationByID(ctx, userID, conversationID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -255,7 +255,7 @@ func (s *AIService) GetMessages(ctx context.Context, userID, conversationID uint
 	return s.aiRepo.ListMessagesByConversation(ctx, conversationID)
 }
 
-func (s *AIService) DeleteConversation(ctx context.Context, userID, id uint) error {
+func (s *AIService) DeleteConversation(ctx context.Context, userID, id string) error {
 	_, err := s.aiRepo.GetConversationByID(ctx, userID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -268,7 +268,7 @@ func (s *AIService) DeleteConversation(ctx context.Context, userID, id uint) err
 
 // --- Chat ---
 
-func (s *AIService) StreamChat(ctx context.Context, userID, workspaceID, conversationID uint, userMessage string) (<-chan llm.StreamChunk, error) {
+func (s *AIService) StreamChat(ctx context.Context, userID, workspaceID, conversationID string, userMessage string) (<-chan llm.StreamChunk, error) {
 	client, err := s.getActiveClient(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -353,7 +353,7 @@ func (s *AIService) StreamChat(ctx context.Context, userID, workspaceID, convers
 	return out, nil
 }
 
-func (s *AIService) Chat(ctx context.Context, userID, workspaceID, conversationID uint, userMessage string) (string, error) {
+func (s *AIService) Chat(ctx context.Context, userID, workspaceID, conversationID string, userMessage string) (string, error) {
 	client, err := s.getActiveClient(ctx, userID)
 	if err != nil {
 		return "", err
@@ -409,7 +409,7 @@ func (s *AIService) Chat(ctx context.Context, userID, workspaceID, conversationI
 
 // --- Analysis ---
 
-func (s *AIService) AnalyzeRelationship(ctx context.Context, userID, workspaceID, contactID uint) (string, error) {
+func (s *AIService) AnalyzeRelationship(ctx context.Context, userID, workspaceID, contactID string) (string, error) {
 	client, err := s.getActiveClient(ctx, userID)
 	if err != nil {
 		return "", err
@@ -465,7 +465,7 @@ func (s *AIService) AnalyzeRelationship(ctx context.Context, userID, workspaceID
 	return client.Chat(ctx, messages)
 }
 
-func (s *AIService) AnalyzeEvent(ctx context.Context, userID, workspaceID, eventID uint) (string, error) {
+func (s *AIService) AnalyzeEvent(ctx context.Context, userID, workspaceID, eventID string) (string, error) {
 	client, err := s.getActiveClient(ctx, userID)
 	if err != nil {
 		return "", err
@@ -517,7 +517,7 @@ const promptCacheTTL = 60 * time.Second
 // buildSystemPrompt returns a workspace's system prompt, serving a short-TTL
 // cache so an active conversation doesn't rebuild it (several queries) on every
 // message. The prompt is LLM context, so brief staleness is acceptable.
-func (s *AIService) buildSystemPrompt(ctx context.Context, userID, workspaceID uint) (string, error) {
+func (s *AIService) buildSystemPrompt(ctx context.Context, userID, workspaceID string) (string, error) {
 	s.promptCacheMu.Lock()
 	if entry, ok := s.promptCache[workspaceID]; ok && time.Since(entry.at) < promptCacheTTL {
 		s.promptCacheMu.Unlock()
@@ -536,7 +536,7 @@ func (s *AIService) buildSystemPrompt(ctx context.Context, userID, workspaceID u
 	return prompt, nil
 }
 
-func (s *AIService) buildSystemPromptUncached(ctx context.Context, userID, workspaceID uint) (string, error) {
+func (s *AIService) buildSystemPromptUncached(ctx context.Context, userID, workspaceID string) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("You are CuddleGecko AI, a personal CRM assistant. You help the user manage and understand their relationships. Answer questions about their data or provide relationship advice.\n\n")
 
@@ -544,7 +544,7 @@ func (s *AIService) buildSystemPromptUncached(ctx context.Context, userID, works
 	// that section from the prompt (logged), rather than failing the chat turn.
 	contacts, _, err := s.contactRepo.List(ctx, workspaceID, 1, 50, "", nil)
 	if err != nil {
-		log.Printf("ai: system prompt: load contacts (ws %d): %v", workspaceID, err)
+		log.Printf("ai: system prompt: load contacts (ws %s): %v", workspaceID, err)
 	}
 	if err == nil && len(contacts) > 0 {
 		sb.WriteString(fmt.Sprintf("## Contacts (%d shown)\n", len(contacts)))
@@ -564,7 +564,7 @@ func (s *AIService) buildSystemPromptUncached(ctx context.Context, userID, works
 
 	events, _, err := s.eventRepo.List(ctx, workspaceID, 1, 10, nil, nil, "", nil)
 	if err != nil {
-		log.Printf("ai: system prompt: load events (ws %d): %v", workspaceID, err)
+		log.Printf("ai: system prompt: load events (ws %s): %v", workspaceID, err)
 	}
 	if err == nil && len(events) > 0 {
 		sb.WriteString("## Recent Events\n")
@@ -576,7 +576,7 @@ func (s *AIService) buildSystemPromptUncached(ctx context.Context, userID, works
 
 	income, expense, err := s.transactionRepo.Summary(ctx, workspaceID, nil, nil)
 	if err != nil {
-		log.Printf("ai: system prompt: tx summary (ws %d): %v", workspaceID, err)
+		log.Printf("ai: system prompt: tx summary (ws %s): %v", workspaceID, err)
 	}
 	if err == nil {
 		sb.WriteString(fmt.Sprintf("## Financial Summary\n- Income: %.2f\n- Expense: %.2f\n- Balance: %.2f\n\n", income, expense, income-expense))
@@ -588,13 +588,13 @@ func (s *AIService) buildSystemPromptUncached(ctx context.Context, userID, works
 // --- Comprehensive Analysis ---
 
 type AnalyzeRequest struct {
-	Type       string `json:"type"`
-	ContactIDs []uint `json:"contact_ids"`
-	EventIDs   []uint `json:"event_ids"`
-	Question   string `json:"question"`
+	Type       string   `json:"type"`
+	ContactIDs []string `json:"contact_ids"`
+	EventIDs   []string `json:"event_ids"`
+	Question   string   `json:"question"`
 }
 
-func (s *AIService) AnalyzeComprehensive(ctx context.Context, userID, workspaceID uint, req AnalyzeRequest) (string, error) {
+func (s *AIService) AnalyzeComprehensive(ctx context.Context, userID, workspaceID string, req AnalyzeRequest) (string, error) {
 	client, err := s.getActiveClient(ctx, userID)
 	if err != nil {
 		return "", err
@@ -641,7 +641,7 @@ func (s *AIService) AnalyzeComprehensive(ctx context.Context, userID, workspaceI
 	return client.Chat(ctx, messages)
 }
 
-func (s *AIService) buildContactAnalysis(ctx context.Context, userID, workspaceID uint, contactIDs []uint, sb *strings.Builder) {
+func (s *AIService) buildContactAnalysis(ctx context.Context, userID, workspaceID string, contactIDs []string, sb *strings.Builder) {
 	if len(contactIDs) == 0 {
 		return
 	}
@@ -651,7 +651,7 @@ func (s *AIService) buildContactAnalysis(ctx context.Context, userID, workspaceI
 	if err != nil {
 		return
 	}
-	contactByID := make(map[uint]*model.Contact, len(contacts))
+	contactByID := make(map[string]*model.Contact, len(contacts))
 	for i := range contacts {
 		contactByID[contacts[i].ID] = &contacts[i]
 	}
@@ -660,7 +660,7 @@ func (s *AIService) buildContactAnalysis(ctx context.Context, userID, workspaceI
 	if err != nil {
 		interactions = nil
 	}
-	interactionsByContact := make(map[uint][]model.Interaction)
+	interactionsByContact := make(map[string][]model.Interaction)
 	for _, i := range interactions {
 		interactionsByContact[i.ContactID] = append(interactionsByContact[i.ContactID], i)
 	}
@@ -669,7 +669,7 @@ func (s *AIService) buildContactAnalysis(ctx context.Context, userID, workspaceI
 	if err != nil {
 		relations = nil
 	}
-	relationsByContact := make(map[uint][]model.ContactRelation)
+	relationsByContact := make(map[string][]model.ContactRelation)
 	for _, r := range relations {
 		relationsByContact[r.ContactIDA] = append(relationsByContact[r.ContactIDA], r)
 		relationsByContact[r.ContactIDB] = append(relationsByContact[r.ContactIDB], r)
@@ -679,7 +679,7 @@ func (s *AIService) buildContactAnalysis(ctx context.Context, userID, workspaceI
 	if err != nil {
 		txs = nil
 	}
-	txsByContact := make(map[uint][]model.Transaction)
+	txsByContact := make(map[string][]model.Transaction)
 	for _, tx := range txs {
 		for _, cid := range tx.ContactIDs {
 			txsByContact[cid] = append(txsByContact[cid], tx)
@@ -728,7 +728,7 @@ func (s *AIService) buildContactAnalysis(ctx context.Context, userID, workspaceI
 	}
 }
 
-func (s *AIService) buildEventAnalysis(ctx context.Context, userID, workspaceID uint, eventIDs []uint, sb *strings.Builder) {
+func (s *AIService) buildEventAnalysis(ctx context.Context, userID, workspaceID string, eventIDs []string, sb *strings.Builder) {
 	if len(eventIDs) == 0 {
 		return
 	}
@@ -739,8 +739,8 @@ func (s *AIService) buildEventAnalysis(ctx context.Context, userID, workspaceID 
 		return
 	}
 
-	allContactIDs := make([]uint, 0, 64)
-	seenContact := make(map[uint]struct{})
+	allContactIDs := make([]string, 0, 64)
+	seenContact := make(map[string]struct{})
 	for _, event := range events {
 		for _, cid := range event.ContactIDs {
 			if _, ok := seenContact[cid]; !ok {
@@ -754,7 +754,7 @@ func (s *AIService) buildEventAnalysis(ctx context.Context, userID, workspaceID 
 	if err != nil {
 		contacts = nil
 	}
-	contactByID := make(map[uint]*model.Contact, len(contacts))
+	contactByID := make(map[string]*model.Contact, len(contacts))
 	for i := range contacts {
 		contactByID[contacts[i].ID] = &contacts[i]
 	}
@@ -793,7 +793,7 @@ func (s *AIService) buildEventAnalysis(ctx context.Context, userID, workspaceID 
 	}
 }
 
-func (s *AIService) buildFinancialAnalysis(ctx context.Context, userID, workspaceID uint, sb *strings.Builder) {
+func (s *AIService) buildFinancialAnalysis(ctx context.Context, userID, workspaceID string, sb *strings.Builder) {
 	income, expense, err := s.transactionRepo.Summary(ctx, workspaceID, nil, nil)
 	if err != nil {
 		return

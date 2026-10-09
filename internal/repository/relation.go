@@ -23,7 +23,7 @@ func (r *RelationRepo) Create(ctx context.Context, relation *model.ContactRelati
 	return nil
 }
 
-func (r *RelationRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.ContactRelation, error) {
+func (r *RelationRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.ContactRelation, error) {
 	var relation model.ContactRelation
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&relation).Error; err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func (r *RelationRepo) GetByID(ctx context.Context, workspaceID, id uint) (*mode
 	return &relation, nil
 }
 
-func (r *RelationRepo) ListByContact(ctx context.Context, workspaceID, contactID uint) ([]model.ContactRelation, error) {
+func (r *RelationRepo) ListByContact(ctx context.Context, workspaceID, contactID string) ([]model.ContactRelation, error) {
 	var relations []model.ContactRelation
 	// An OR across two columns can't be served by one index and often degrades to
 	// a scan; UNION two index-backed SELECTs (idx_relation_a / idx_relation_b)
@@ -47,7 +47,7 @@ func (r *RelationRepo) ListByContact(ctx context.Context, workspaceID, contactID
 	return relations, nil
 }
 
-func (r *RelationRepo) ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint) ([]model.ContactRelation, error) {
+func (r *RelationRepo) ListByContactIDs(ctx context.Context, workspaceID string, contactIDs []string) ([]model.ContactRelation, error) {
 	var relations []model.ContactRelation
 	if len(contactIDs) == 0 {
 		return relations, nil
@@ -64,14 +64,14 @@ func (r *RelationRepo) ListByContactIDs(ctx context.Context, workspaceID uint, c
 	return relations, nil
 }
 
-func (r *RelationRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *RelationRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.ContactRelation{}).Error; err != nil {
 		return fmt.Errorf("delete relation: %w", err)
 	}
 	return nil
 }
 
-func (r *RelationRepo) GetAllByWorkspace(ctx context.Context, workspaceID uint) ([]model.ContactRelation, error) {
+func (r *RelationRepo) GetAllByWorkspace(ctx context.Context, workspaceID string) ([]model.ContactRelation, error) {
 	var relations []model.ContactRelation
 	if err := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID).Find(&relations).Error; err != nil {
 		return nil, fmt.Errorf("get all relations: %w", err)

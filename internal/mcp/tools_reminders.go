@@ -12,7 +12,7 @@ func (s *MCPServer) registerReminderTools() {
 		"properties": map[string]interface{}{
 			"status": map[string]interface{}{"type": "string", "description": "Filter by status: pending, done, or snoozed", "default": "pending"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		status := model.ReminderStatus(toString(getArg(args, "status")))
 		if status == "" {
 			status = model.ReminderPending
@@ -30,8 +30,8 @@ func (s *MCPServer) registerReminderTools() {
 			"remind_at":   map[string]interface{}{"type": "string", "description": "When to remind (RFC3339)"},
 		},
 		"required": []string{"contact_id", "title", "remind_at"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		contactID := toUint(getArg(args, "contact_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		contactID := toString(getArg(args, "contact_id"))
 		reminder := &model.Reminder{
 			Title:       toString(getArg(args, "title")),
 			Description: toString(getArg(args, "description")),
@@ -50,8 +50,8 @@ func (s *MCPServer) registerReminderTools() {
 			"status":      map[string]interface{}{"type": "string", "description": "Status: pending, done, or snoozed"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		updates := &model.Reminder{
 			Title:       toString(getArg(args, "title")),
 			Description: toString(getArg(args, "description")),
@@ -67,8 +67,8 @@ func (s *MCPServer) registerReminderTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Reminder ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		err := s.reminderSvc.Delete(ctx, userID, workspaceID, id)
 		if err != nil {
 			return nil, err

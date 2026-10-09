@@ -20,11 +20,11 @@ func TestTodoHandler_Move(t *testing.T) {
 	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1, WorkspaceID: 1}, nil)
-	repo.On("Move", mock.Anything, uint(1), uint(1), mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1", WorkspaceID: "1"}, nil)
+	repo.On("Move", mock.Anything, "1", "1", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("PATCH", "/api/todos/1/move", strings.NewReader(`{"parent_id":2}`))
+	req := httptest.NewRequest("PATCH", "/api/todos/1/move", strings.NewReader(`{"parent_id":"2"}`))
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 	repo.AssertExpectations(t)
@@ -36,11 +36,11 @@ func TestTodoHandler_Move_CycleReturns400(t *testing.T) {
 	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1, WorkspaceID: 1}, nil)
-	repo.On("Move", mock.Anything, uint(1), uint(1), mock.Anything, mock.Anything, mock.Anything).Return(repository.ErrTodoCycle)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1", WorkspaceID: "1"}, nil)
+	repo.On("Move", mock.Anything, "1", "1", mock.Anything, mock.Anything, mock.Anything).Return(repository.ErrTodoCycle)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("PATCH", "/api/todos/1/move", strings.NewReader(`{"parent_id":2}`))
+	req := httptest.NewRequest("PATCH", "/api/todos/1/move", strings.NewReader(`{"parent_id":"2"}`))
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "cannot move")
@@ -52,14 +52,14 @@ func TestTodoHandler_Move_PositionLast(t *testing.T) {
 	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1, WorkspaceID: 1}, nil)
-	repo.On("Move", mock.Anything, uint(1), uint(1), mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1", WorkspaceID: "1"}, nil)
+	repo.On("Move", mock.Anything, "1", "1", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("PATCH", "/api/todos/1/move", strings.NewReader(`{"parent_id":2,"position":"last"}`))
+	req := httptest.NewRequest("PATCH", "/api/todos/1/move", strings.NewReader(`{"parent_id":"2","position":"last"}`))
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
-	repo.AssertCalled(t, "Move", mock.Anything, uint(1), uint(1), mock.Anything, mock.Anything, "last")
+	repo.AssertCalled(t, "Move", mock.Anything, "1", "1", mock.Anything, mock.Anything, "last")
 }
 
 func TestTodoHandler_Move_InvalidPositionReturns400(t *testing.T) {
@@ -68,10 +68,10 @@ func TestTodoHandler_Move_InvalidPositionReturns400(t *testing.T) {
 	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1, WorkspaceID: 1}, nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1", WorkspaceID: "1"}, nil)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("PATCH", "/api/todos/1/move", strings.NewReader(`{"parent_id":2,"position":"middle"}`))
+	req := httptest.NewRequest("PATCH", "/api/todos/1/move", strings.NewReader(`{"parent_id":"2","position":"middle"}`))
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "position must be 'first' or 'last'")
@@ -84,8 +84,8 @@ func TestTodoHandler_IncrementPomodoro(t *testing.T) {
 	svc := service.NewTodoService(repo, eventRepo, repo)
 	router := setupTodoRouter(svc)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1, WorkspaceID: 1}, nil)
-	repo.On("IncrementPomodoro", mock.Anything, uint(1), uint(1)).Return(nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1", WorkspaceID: "1"}, nil)
+	repo.On("IncrementPomodoro", mock.Anything, "1", "1").Return(nil)
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, httptest.NewRequest("POST", "/api/todos/1/pomodoro", nil))

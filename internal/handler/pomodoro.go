@@ -19,12 +19,12 @@ func NewPomodoroHandler(svc *service.PomodoroService) *PomodoroHandler {
 }
 
 type createPomodoroRequest struct {
-	TodoID          *uint  `json:"todo_id"`
-	DurationSeconds int    `json:"duration_seconds" binding:"required,min=1"`
-	Kind            string `json:"kind"` // focus | break
-	Completed       bool   `json:"completed"`
-	StartedAt       string `json:"started_at"` // RFC3339
-	EndedAt         string `json:"ended_at"`   // RFC3339
+	TodoID          *string `json:"todo_id"`
+	DurationSeconds int     `json:"duration_seconds" binding:"required,min=1"`
+	Kind            string  `json:"kind"` // focus | break
+	Completed       bool    `json:"completed"`
+	StartedAt       string  `json:"started_at"` // RFC3339
+	EndedAt         string  `json:"ended_at"`   // RFC3339
 }
 
 func (h *PomodoroHandler) Create(c *gin.Context) {

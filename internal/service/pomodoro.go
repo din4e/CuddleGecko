@@ -9,8 +9,8 @@ import (
 
 type PomodoroRepository interface {
 	Create(ctx context.Context, p *model.PomodoroSession) error
-	List(ctx context.Context, workspaceID uint, from, to time.Time) ([]model.PomodoroSession, error)
-	Summary(ctx context.Context, workspaceID uint) (model.PomodoroSummary, error)
+	List(ctx context.Context, workspaceID string, from, to time.Time) ([]model.PomodoroSession, error)
+	Summary(ctx context.Context, workspaceID string) (model.PomodoroSummary, error)
 }
 
 type PomodoroService struct {
@@ -22,10 +22,10 @@ func NewPomodoroService(repo PomodoroRepository, notifier ...ChangeNotifier) *Po
 	return &PomodoroService{repo: repo, notifier: firstNotifier(notifier)}
 }
 
-func (s *PomodoroService) Create(ctx context.Context, userID, workspaceID uint, p *model.PomodoroSession) (*model.PomodoroSession, error) {
+func (s *PomodoroService) Create(ctx context.Context, userID, workspaceID string, p *model.PomodoroSession) (*model.PomodoroSession, error) {
 	p.UserID = userID
 	p.WorkspaceID = workspaceID
-	p.ID = 0
+	p.ID = ""
 	if p.Kind == "" {
 		p.Kind = "focus"
 	}
@@ -45,10 +45,10 @@ func (s *PomodoroService) Create(ctx context.Context, userID, workspaceID uint, 
 	return p, nil
 }
 
-func (s *PomodoroService) List(ctx context.Context, userID, workspaceID uint, from, to time.Time) ([]model.PomodoroSession, error) {
+func (s *PomodoroService) List(ctx context.Context, userID, workspaceID string, from, to time.Time) ([]model.PomodoroSession, error) {
 	return s.repo.List(ctx, workspaceID, from, to)
 }
 
-func (s *PomodoroService) Summary(ctx context.Context, userID, workspaceID uint) (model.PomodoroSummary, error) {
+func (s *PomodoroService) Summary(ctx context.Context, userID, workspaceID string) (model.PomodoroSummary, error) {
 	return s.repo.Summary(ctx, workspaceID)
 }

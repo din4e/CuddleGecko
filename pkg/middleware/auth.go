@@ -19,7 +19,7 @@ var ErrInvalidToken = errors.New("invalid or expired token")
 // upgrade handler (query-string token), so WS connections enforce the same
 // identity check even though browsers cannot set an Authorization header on the
 // WS handshake.
-func ParseAccessToken(tokenStr string, jwtCfg *config.JWTConfig) (uint, error) {
+func ParseAccessToken(tokenStr string, jwtCfg *config.JWTConfig) (string, error) {
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
@@ -27,17 +27,19 @@ func ParseAccessToken(tokenStr string, jwtCfg *config.JWTConfig) (uint, error) {
 		return []byte(jwtCfg.Secret), nil
 	})
 	if err != nil || !token.Valid {
-		return 0, ErrInvalidToken
+		return "", ErrInvalidToken
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return 0, ErrInvalidToken
+		return "", ErrInvalidToken
 	}
-	userID, ok := claims["user_id"].(float64)
-	if !ok {
-		return 0, ErrInvalidToken
+	// Entity ids are UUID strings. Numeric claims belong to pre-migration
+	// tokens, which no longer resolve to any user — treat them as invalid.
+	userID, ok := claims["user_id"].(string)
+	if !ok || userID == "" {
+		return "", ErrInvalidToken
 	}
-	return uint(userID), nil
+	return userID, nil
 }
 
 func JWTAuth(jwtCfg *config.JWTConfig) gin.HandlerFunc {
@@ -65,6 +67,6 @@ func JWTAuth(jwtCfg *config.JWTConfig) gin.HandlerFunc {
 	}
 }
 
-func GetUserID(c *gin.Context) uint {
-	return c.GetUint("user_id")
+func GetUserID(c *gin.Context) string {
+	return c.GetString("user_id")
 }

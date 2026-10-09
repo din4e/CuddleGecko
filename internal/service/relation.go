@@ -12,15 +12,15 @@ var ErrRelationNotFound = errors.New("relation not found")
 
 type RelationRepository interface {
 	Create(ctx context.Context, relation *model.ContactRelation) error
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.ContactRelation, error)
-	ListByContact(ctx context.Context, workspaceID, contactID uint) ([]model.ContactRelation, error)
-	ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint) ([]model.ContactRelation, error)
-	Delete(ctx context.Context, workspaceID, id uint) error
-	GetAllByWorkspace(ctx context.Context, workspaceID uint) ([]model.ContactRelation, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.ContactRelation, error)
+	ListByContact(ctx context.Context, workspaceID, contactID string) ([]model.ContactRelation, error)
+	ListByContactIDs(ctx context.Context, workspaceID string, contactIDs []string) ([]model.ContactRelation, error)
+	Delete(ctx context.Context, workspaceID, id string) error
+	GetAllByWorkspace(ctx context.Context, workspaceID string) ([]model.ContactRelation, error)
 }
 
 type GraphNode struct {
-	ID                 uint       `json:"id"`
+	ID                 string     `json:"id"`
 	Name               string     `json:"name"`
 	RelationshipLabels []string   `json:"relationship_labels"`
 	AvatarEmoji        string     `json:"avatar_emoji"`
@@ -29,8 +29,8 @@ type GraphNode struct {
 }
 
 type GraphEdge struct {
-	Source       uint       `json:"source"`
-	Target       uint       `json:"target"`
+	Source       string     `json:"source"`
+	Target       string     `json:"target"`
 	RelationType string     `json:"relation_type"`
 	CreatedAt    *time.Time `json:"created_at,omitempty"`
 }
@@ -51,7 +51,7 @@ func NewRelationService(relationRepo RelationRepository, contactRepo ContactRepo
 	return &RelationService{relationRepo: relationRepo, contactRepo: contactRepo, interactionRepo: interactionRepo, notifier: firstNotifier(notifier)}
 }
 
-func (s *RelationService) Create(ctx context.Context, userID, workspaceID, contactIDA uint, relation *model.ContactRelation) (*model.ContactRelation, error) {
+func (s *RelationService) Create(ctx context.Context, userID, workspaceID, contactIDA string, relation *model.ContactRelation) (*model.ContactRelation, error) {
 	relation.UserID = userID
 	relation.WorkspaceID = workspaceID
 	relation.ContactIDA = contactIDA
@@ -62,11 +62,11 @@ func (s *RelationService) Create(ctx context.Context, userID, workspaceID, conta
 	return relation, nil
 }
 
-func (s *RelationService) ListByContact(ctx context.Context, userID, workspaceID, contactID uint) ([]model.ContactRelation, error) {
+func (s *RelationService) ListByContact(ctx context.Context, userID, workspaceID, contactID string) ([]model.ContactRelation, error) {
 	return s.relationRepo.ListByContact(ctx, workspaceID, contactID)
 }
 
-func (s *RelationService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *RelationService) Delete(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.relationRepo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (s *RelationService) Delete(ctx context.Context, userID, workspaceID, id ui
 	return nil
 }
 
-func (s *RelationService) GetGraphData(ctx context.Context, userID, workspaceID uint) (*GraphData, error) {
+func (s *RelationService) GetGraphData(ctx context.Context, userID, workspaceID string) (*GraphData, error) {
 	// Project only the columns the graph nodes need (no Tags Preload — that ran a
 	// second query per request whose results were discarded).
 	contacts, err := s.contactRepo.ListGraphContacts(ctx, workspaceID)
@@ -88,7 +88,7 @@ func (s *RelationService) GetGraphData(ctx context.Context, userID, workspaceID 
 	}
 
 	// Per-contact last interaction time — powers the temporal coloring on the frontend.
-	lastInt := map[uint]time.Time{}
+	lastInt := map[string]time.Time{}
 	if s.interactionRepo != nil {
 		if m, err := s.interactionRepo.LastByContact(ctx, workspaceID); err == nil {
 			lastInt = m

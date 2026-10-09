@@ -37,26 +37,34 @@ func seedSearchFixtures(t *testing.T, db *gorm.DB, needle string) {
 		require.NoError(t, db.Create(v).Error)
 	}
 
-	mk(&model.Contact{UserID: 1, WorkspaceID: 1, Name: "Ada", Nickname: "小艾", Notes: "备注: " + needle, Phone: []string{"13800000000"}})
-	mk(&model.Contact{UserID: 2, WorkspaceID: 2, Name: "Other WS", Notes: needle})
-	mk(&model.Interaction{UserID: 1, WorkspaceID: 1, ContactID: 1, Type: model.InteractionMeeting, Title: "Kickoff", Content: "聊了 " + needle, OccurredAt: db.NowFunc()})
-	mk(&model.Reminder{UserID: 1, WorkspaceID: 1, ContactID: 1, Title: "回访", Description: needle + " 之后", RemindAt: db.NowFunc()})
-	mk(&model.Event{UserID: 1, WorkspaceID: 1, Title: "Trip", Location: needle, StartTime: db.NowFunc()})
-	mk(&model.Todo{UserID: 1, WorkspaceID: 1, Title: "Plan " + needle})
-	mk(&model.Todo{UserID: 1, WorkspaceID: 1, Title: "Hidden"})
-	mk(&model.TodoItem{TodoID: 2, Content: "subtask about " + needle})
-	mk(&model.Workout{UserID: 1, WorkspaceID: 1, Name: "Leg day", Notes: "focus on " + needle})
-	mk(&model.Workout{UserID: 1, WorkspaceID: 1, Name: "Arm day"})
-	mk(&model.WorkoutExercise{WorkoutID: 2, Name: "Curl " + needle})
-	mk(&model.Transaction{UserID: 1, WorkspaceID: 1, Title: "Lunch", Amount: 30, Type: "expense", Notes: needle, Date: db.NowFunc()})
-	mk(&model.Habit{UserID: 1, WorkspaceID: 1, Name: "Read " + needle})
-	mk(&model.Tag{UserID: 1, WorkspaceID: 1, Name: needle + "-tag"})
-	mk(&model.BodyMetric{UserID: 1, WorkspaceID: 1, Notes: needle, RecordedAt: db.NowFunc()})
-	mk(&model.Whiteboard{UserID: 1, WorkspaceID: 1, Name: "Ideas"})
-	mk(&model.WhiteboardNode{WhiteboardID: 1, Label: "card " + needle})
+	contact := &model.Contact{UserID: "1", WorkspaceID: "1", Name: "Ada", Nickname: "小艾", Notes: "备注: " + needle, Phone: []string{"13800000000"}}
+	mk(contact)
+	mk(&model.Contact{UserID: "2", WorkspaceID: "2", Name: "Other WS", Notes: needle})
+	mk(&model.Interaction{UserID: "1", WorkspaceID: "1", ContactID: contact.ID, Type: model.InteractionMeeting, Title: "Kickoff", Content: "聊了 " + needle, OccurredAt: db.NowFunc()})
+	mk(&model.Reminder{UserID: "1", WorkspaceID: "1", ContactID: contact.ID, Title: "回访", Description: needle + " 之后", RemindAt: db.NowFunc()})
+	mk(&model.Event{UserID: "1", WorkspaceID: "1", Title: "Trip", Location: needle, StartTime: db.NowFunc()})
+	plan := &model.Todo{UserID: "1", WorkspaceID: "1", Title: "Plan " + needle}
+	mk(plan)
+	// The subtask hangs off a DIFFERENT todo than the direct title match — the
+	// pre-uuid fixtures used autoincrement ids 1/2 to place it on "Hidden".
+	hidden := &model.Todo{UserID: "1", WorkspaceID: "1", Title: "Hidden"}
+	mk(hidden)
+	mk(&model.TodoItem{TodoID: hidden.ID, Content: "subtask about " + needle})
+	leg := &model.Workout{UserID: "1", WorkspaceID: "1", Name: "Leg day", Notes: "focus on " + needle}
+	mk(leg)
+	arm := &model.Workout{UserID: "1", WorkspaceID: "1", Name: "Arm day"}
+	mk(arm)
+	mk(&model.WorkoutExercise{WorkoutID: arm.ID, Name: "Curl " + needle})
+	mk(&model.Transaction{UserID: "1", WorkspaceID: "1", Title: "Lunch", Amount: 30, Type: "expense", Notes: needle, Date: db.NowFunc()})
+	mk(&model.Habit{UserID: "1", WorkspaceID: "1", Name: "Read " + needle})
+	mk(&model.Tag{UserID: "1", WorkspaceID: "1", Name: needle + "-tag"})
+	mk(&model.BodyMetric{UserID: "1", WorkspaceID: "1", Notes: needle, RecordedAt: db.NowFunc()})
+	board := &model.Whiteboard{UserID: "1", WorkspaceID: "1", Name: "Ideas"}
+	mk(board)
+	mk(&model.WhiteboardNode{WhiteboardID: board.ID, Label: "card " + needle})
 
 	// Soft-deleted twin: trash must not leak into global search.
-	deleted := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "deleted " + needle}
+	deleted := &model.Todo{UserID: "1", WorkspaceID: "1", Title: "deleted " + needle}
 	mk(deleted)
 	require.NoError(t, db.Delete(deleted).Error)
 }
@@ -67,7 +75,7 @@ func TestSearchRepo_AllEntityTypes(t *testing.T) {
 	repo := NewSearchRepo(db)
 	ctx := context.Background()
 
-	hits, err := repo.Search(ctx, 1, "needle", nil, 10)
+	hits, err := repo.Search(ctx, "1", "needle", nil, 10)
 	require.NoError(t, err)
 
 	byType := map[string][]model.SearchHit{}
@@ -132,7 +140,7 @@ func TestSearchRepo_TypeFilterAndCaseFold(t *testing.T) {
 	ctx := context.Background()
 
 	// The repo receives the service-lowercased query; case must not matter.
-	hits, err := repo.Search(ctx, 1, "needle", []string{model.SearchTypeContact}, 10)
+	hits, err := repo.Search(ctx, "1", "needle", []string{model.SearchTypeContact}, 10)
 	require.NoError(t, err)
 	require.Len(t, hits, 1)
 	assert.Equal(t, model.SearchTypeContact, hits[0].Type)
@@ -140,7 +148,7 @@ func TestSearchRepo_TypeFilterAndCaseFold(t *testing.T) {
 	assert.Equal(t, "小艾", hits[0].Subtitle)
 
 	// CJK substring matching.
-	hits, err = repo.Search(ctx, 1, "小艾", []string{model.SearchTypeContact}, 10)
+	hits, err = repo.Search(ctx, "1", "小艾", []string{model.SearchTypeContact}, 10)
 	require.NoError(t, err)
 	require.Len(t, hits, 1)
 	assert.Contains(t, hits[0].MatchedFields, "nickname")
@@ -149,11 +157,11 @@ func TestSearchRepo_TypeFilterAndCaseFold(t *testing.T) {
 func TestSearchRepo_PerTypeLimit(t *testing.T) {
 	db := newSearchTestDB(t)
 	for i := 0; i < 5; i++ {
-		require.NoError(t, db.Create(&model.Tag{UserID: 1, WorkspaceID: 1, Name: "lim-tag-" + string(rune('a'+i))}).Error)
+		require.NoError(t, db.Create(&model.Tag{UserID: "1", WorkspaceID: "1", Name: "lim-tag-" + string(rune('a'+i))}).Error)
 	}
 	repo := NewSearchRepo(db)
 
-	hits, err := repo.Search(context.Background(), 1, "lim-tag", []string{model.SearchTypeTag}, 3)
+	hits, err := repo.Search(context.Background(), "1", "lim-tag", []string{model.SearchTypeTag}, 3)
 	require.NoError(t, err)
 	assert.Len(t, hits, 3, "per-type limit must cap hits")
 }
@@ -161,10 +169,10 @@ func TestSearchRepo_PerTypeLimit(t *testing.T) {
 func TestSearchRepo_SnippetTruncatesLongText(t *testing.T) {
 	db := newSearchTestDB(t)
 	long := strings.Repeat("前", 200) + "needle" + strings.Repeat("后", 200)
-	require.NoError(t, db.Create(&model.Contact{UserID: 1, WorkspaceID: 1, Name: "Long", Notes: long}).Error)
+	require.NoError(t, db.Create(&model.Contact{UserID: "1", WorkspaceID: "1", Name: "Long", Notes: long}).Error)
 	repo := NewSearchRepo(db)
 
-	hits, err := repo.Search(context.Background(), 1, "needle", []string{model.SearchTypeContact}, 10)
+	hits, err := repo.Search(context.Background(), "1", "needle", []string{model.SearchTypeContact}, 10)
 	require.NoError(t, err)
 	require.Len(t, hits, 1)
 	snippet := []rune(hits[0].Snippet)

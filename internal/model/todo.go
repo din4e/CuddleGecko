@@ -7,62 +7,62 @@ import (
 )
 
 type Todo struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	UserID      uint           `gorm:"index;not null" json:"user_id"`
-	WorkspaceID uint           `gorm:"index;not null;default:0;index:idx_todo_ws_status_due" json:"workspace_id"`
-	Title       string         `gorm:"size:200;not null" json:"title"`
-	Description string         `gorm:"type:longtext" json:"description"`
-	Status      string         `gorm:"size:20;not null;default:'pending';index:idx_todo_ws_status_due" json:"status"`   // pending / done / abandoned
-	Priority    string     `gorm:"size:20;not null;default:'none'" json:"priority"`                               // none / low / normal / high
+	ID          string `gorm:"primaryKey;type:char(36)" json:"id"`
+	UserID      string `gorm:"size:36;index;not null" json:"user_id"`
+	WorkspaceID string `gorm:"size:36;index;not null;default:0;index:idx_todo_ws_status_due" json:"workspace_id"`
+	Title       string `gorm:"size:200;not null" json:"title"`
+	Description string `gorm:"type:longtext" json:"description"`
+	Status      string `gorm:"size:20;not null;default:'pending';index:idx_todo_ws_status_due" json:"status"` // pending / done / abandoned
+	Priority    string `gorm:"size:20;not null;default:'none'" json:"priority"`                               // none / low / normal / high
 	// Eisenhower-matrix axes, sharing priority's four-tier vocabulary
 	// (中 = normal). Quadrant side: normal/high counts as important/urgent.
-	Importance  string     `gorm:"size:20;not null;default:'none'" json:"importance"`
-	Urgency     string     `gorm:"size:20;not null;default:'none'" json:"urgency"`
-	Pinned       bool           `gorm:"not null;default:false" json:"pinned"`
-	DueTime     *time.Time     `gorm:"index:idx_todo_ws_status_due" json:"due_time"`
-	StartTime   *time.Time     `json:"start_time"`
+	Importance string     `gorm:"size:20;not null;default:'none'" json:"importance"`
+	Urgency    string     `gorm:"size:20;not null;default:'none'" json:"urgency"`
+	Pinned     bool       `gorm:"not null;default:false" json:"pinned"`
+	DueTime    *time.Time `gorm:"index:idx_todo_ws_status_due" json:"due_time"`
+	StartTime  *time.Time `json:"start_time"`
 	// Estimated effort in minutes (TickTick's 持续时长). 0 = unset.
-	Duration    int            `gorm:"not null;default:0" json:"duration"`
-	Amount      *float64       `json:"amount"`
-	AmountType  string         `gorm:"size:20" json:"amount_type"` // "" / income / expense
-	ContactIDs  []uint         `gorm:"type:longtext;serializer:json" json:"contact_ids"`
+	Duration   int      `gorm:"not null;default:0" json:"duration"`
+	Amount     *float64 `json:"amount"`
+	AmountType string   `gorm:"size:20" json:"amount_type"` // "" / income / expense
+	ContactIDs []string `gorm:"type:longtext;serializer:json" json:"contact_ids"`
 	// Links to related todos (jump targets). Deliberately separate from the
 	// parent/child tree: a link is a cross-reference, not a hierarchy edge.
-	TodoIDs     []uint         `gorm:"type:longtext;serializer:json" json:"todo_ids"`
-	Tags        []Tag          `gorm:"many2many:todo_tags" json:"tags"`
-	Color       string         `gorm:"size:20" json:"color"`
-	Repeat      string         `gorm:"size:20" json:"repeat"` // ""/daily/weekly/weekdays/monthly/yearly
-	RepeatInterval int         `gorm:"not null;default:1" json:"repeat_interval"`
-	SortOrder   int            `gorm:"not null;default:0" json:"sort_order"`
-	ParentID    *uint          `gorm:"index" json:"parent_id"`
-	CompletedAt *time.Time     `json:"completed_at"`
+	TodoIDs        []string   `gorm:"type:longtext;serializer:json" json:"todo_ids"`
+	Tags           []Tag      `gorm:"many2many:todo_tags" json:"tags"`
+	Color          string     `gorm:"size:20" json:"color"`
+	Repeat         string     `gorm:"size:20" json:"repeat"` // ""/daily/weekly/weekdays/monthly/yearly
+	RepeatInterval int        `gorm:"not null;default:1" json:"repeat_interval"`
+	SortOrder      int        `gorm:"not null;default:0" json:"sort_order"`
+	ParentID       *string    `gorm:"size:36;index" json:"parent_id"`
+	CompletedAt    *time.Time `json:"completed_at"`
 	// Status a todo held before a parent's completion cascade-completed it
 	// (pending/abandoned). Reopening the parent restores this status and
 	// clears the snapshot; any direct status change on the todo clears it too,
 	// so an explicit manual status always wins over a later parent reopen.
-	StatusBeforeCascade *string     `gorm:"size:20" json:"status_before_cascade"`
+	StatusBeforeCascade *string `gorm:"size:20" json:"status_before_cascade"`
 	// Denormalized checklist progress, kept in sync with TodoItem changes so
 	// list views can render progress badges without extra queries.
-	ItemTotal  int            `gorm:"not null;default:0" json:"item_total"`
-	ItemDone   int            `gorm:"not null;default:0" json:"item_done"`
+	ItemTotal int `gorm:"not null;default:0" json:"item_total"`
+	ItemDone  int `gorm:"not null;default:0" json:"item_done"`
 	// Pomodoros completed on this todo (25-min focus sessions).
-	PomodoroCount int         `gorm:"not null;default:0" json:"pomodoro_count"`
+	PomodoroCount int `gorm:"not null;default:0" json:"pomodoro_count"`
 	// Manual progress override in percent (0-100). NULL = not configured;
 	// views then fall back to status/subtask roll-up for display.
 	Progress *int `json:"progress"`
 	// Live count of direct children (computed subquery, read-only — never a
 	// stored column). Lets the lazy tree show the expand caret before the
 	// children have been fetched.
-	ChildCount  int64          `gorm:"->" json:"child_count"`
-	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	ChildCount int64          `gorm:"->" json:"child_count"`
+	CreatedAt  time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt  time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // TodoItem is a single checklist/subtask line belonging to a Todo.
 type TodoItem struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	TodoID    uint           `gorm:"index;not null" json:"todo_id"`
+	ID        string         `gorm:"primaryKey;type:char(36)" json:"id"`
+	TodoID    string         `gorm:"size:36;index;not null" json:"todo_id"`
 	Content   string         `gorm:"size:500;not null" json:"content"`
 	Done      bool           `gorm:"not null;default:false" json:"done"`
 	DueTime   *time.Time     `json:"due_time"`
@@ -76,9 +76,13 @@ type TodoItem struct {
 // when. Action is a short verb (created/updated/deleted/...); for field edits
 // Field carries the changed column with Old/New values (truncated).
 type TodoActivity struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	TodoID    uint      `gorm:"index;not null" json:"todo_id"`
-	UserID    uint      `gorm:"index;not null" json:"user_id"`
+	ID string `gorm:"primaryKey;type:char(36)" json:"id"`
+	// App-assigned monotonic sequence (unix-nano + batch offset): listing
+	// order is Seq DESC. Created_at alone can't order same-millisecond batch
+	// rows now that ids are random UUIDs (they used to autoincrement).
+	Seq       int64     `gorm:"index;not null;default:0" json:"-"`
+	TodoID    string    `gorm:"size:36;index;not null" json:"todo_id"`
+	UserID    string    `gorm:"size:36;index;not null" json:"user_id"`
 	Username  string    `gorm:"size:50;not null" json:"username"`
 	Action    string    `gorm:"size:30;not null" json:"action"`
 	Field     string    `gorm:"size:30" json:"field"`
@@ -89,15 +93,15 @@ type TodoActivity struct {
 
 // Todo activity action values.
 const (
-	TodoActivityCreated    = "created"
-	TodoActivityUpdated    = "updated"
-	TodoActivityCompleted  = "completed"
-	TodoActivityReopened   = "reopened"
-	TodoActivityPinned     = "pinned"
-	TodoActivityUnpinned   = "unpinned"
-	TodoActivityMoved      = "moved"
-	TodoActivityDeleted    = "deleted"
-	TodoActivityRestored   = "restored"
+	TodoActivityCreated   = "created"
+	TodoActivityUpdated   = "updated"
+	TodoActivityCompleted = "completed"
+	TodoActivityReopened  = "reopened"
+	TodoActivityPinned    = "pinned"
+	TodoActivityUnpinned  = "unpinned"
+	TodoActivityMoved     = "moved"
+	TodoActivityDeleted   = "deleted"
+	TodoActivityRestored  = "restored"
 )
 
 // TruncateActivityValue caps a recorded field value so a long description edit
@@ -119,22 +123,22 @@ type TodoListQuery struct {
 	Priority   string     // "low" | "normal" | "high" | "" (all)
 	Importance string     // Eisenhower importance tier | "" (all)
 	Urgency    string     // Eisenhower urgency tier | "" (all)
-	Search    string     // case-insensitive substring match on title OR description
-	DueBefore *time.Time // include todos due at or before this time
-	DueAfter  *time.Time // include todos due at or after this time
-	Overdue   bool       // pending todos whose due_time is in the past
-	Started   bool       // hide tasks whose start_time is still in the future
-	Deferred  bool       // only pending todos whose start_time is still in the future
-	NoDue     bool       // only todos without a due_time — the Inbox capture queue
-	DoneAfter *time.Time // completed_at at or after this time (done-today / done-this-week lists)
-	TagIDs    []uint     // only todos tagged with any of these
-	ParentID  *uint      // only direct children of this todo
-	RootsOnly bool       // only top-level todos (parent_id IS NULL) — lazy tree roots
-	LinkingTo *uint      // only todos whose todo_ids contain this id (backlinks)
-	Sort      string     // due_date (default) | priority | title | created
-	Order     string     // asc (default) | desc
-	Page      int
-	PageSize  int
+	Search     string     // case-insensitive substring match on title OR description
+	DueBefore  *time.Time // include todos due at or before this time
+	DueAfter   *time.Time // include todos due at or after this time
+	Overdue    bool       // pending todos whose due_time is in the past
+	Started    bool       // hide tasks whose start_time is still in the future
+	Deferred   bool       // only pending todos whose start_time is still in the future
+	NoDue      bool       // only todos without a due_time — the Inbox capture queue
+	DoneAfter  *time.Time // completed_at at or after this time (done-today / done-this-week lists)
+	TagIDs     []string   // only todos tagged with any of these
+	ParentID   *string    // only direct children of this todo
+	RootsOnly  bool       // only top-level todos (parent_id IS NULL) — lazy tree roots
+	LinkingTo  *string    // only todos whose todo_ids contain this id (backlinks)
+	Sort       string     // due_date (default) | priority | title | created
+	Order      string     // asc (default) | desc
+	Page       int
+	PageSize   int
 }
 
 // Todo sort keys.
@@ -221,3 +225,8 @@ func NextDueTime(rule string, interval int, from, now time.Time) (time.Time, boo
 	}
 	return next, true
 }
+
+// BeforeCreate assigns the UUID primary key on first insert.
+func (t *Todo) BeforeCreate(tx *gorm.DB) error         { return ensureID(&t.ID, tx) }
+func (t *TodoItem) BeforeCreate(tx *gorm.DB) error     { return ensureID(&t.ID, tx) }
+func (t *TodoActivity) BeforeCreate(tx *gorm.DB) error { return ensureID(&t.ID, tx) }

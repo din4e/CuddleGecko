@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/din4e/cuddlegecko/internal/service"
 	"github.com/din4e/cuddlegecko/pkg/config"
@@ -59,13 +58,9 @@ func (h *AIHandler) SaveProvider(c *gin.Context) {
 
 func (h *AIHandler) ActivateProvider(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid provider id")
-		return
-	}
+	id := c.Param("id")
 
-	if err := h.svc.ActivateProvider(c.Request.Context(), userID, uint(id)); err != nil {
+	if err := h.svc.ActivateProvider(c.Request.Context(), userID, id); err != nil {
 		if err == service.ErrProviderNotFound {
 			response.NotFound(c, "provider not found")
 			return
@@ -78,13 +73,9 @@ func (h *AIHandler) ActivateProvider(c *gin.Context) {
 
 func (h *AIHandler) TestConnection(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid provider id")
-		return
-	}
+	id := c.Param("id")
 
-	if err := h.svc.TestConnection(c.Request.Context(), userID, uint(id)); err != nil {
+	if err := h.svc.TestConnection(c.Request.Context(), userID, id); err != nil {
 		response.OK(c, gin.H{"success": false, "error": err.Error()})
 		return
 	}
@@ -124,13 +115,9 @@ func (h *AIHandler) CreateConversation(c *gin.Context) {
 
 func (h *AIHandler) GetMessages(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid conversation id")
-		return
-	}
+	id := c.Param("id")
 
-	messages, err := h.svc.GetMessages(c.Request.Context(), userID, uint(id))
+	messages, err := h.svc.GetMessages(c.Request.Context(), userID, id)
 	if err != nil {
 		if err == service.ErrConversationNotFound {
 			response.NotFound(c, "conversation not found")
@@ -144,13 +131,9 @@ func (h *AIHandler) GetMessages(c *gin.Context) {
 
 func (h *AIHandler) DeleteConversation(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid conversation id")
-		return
-	}
+	id := c.Param("id")
 
-	if err := h.svc.DeleteConversation(c.Request.Context(), userID, uint(id)); err != nil {
+	if err := h.svc.DeleteConversation(c.Request.Context(), userID, id); err != nil {
 		if err == service.ErrConversationNotFound {
 			response.NotFound(c, "conversation not found")
 			return
@@ -164,7 +147,7 @@ func (h *AIHandler) DeleteConversation(c *gin.Context) {
 // --- Chat (SSE streaming) ---
 
 type chatRequest struct {
-	ConversationID uint   `json:"conversation_id" binding:"required"`
+	ConversationID string `json:"conversation_id" binding:"required"`
 	Message        string `json:"message" binding:"required"`
 }
 
@@ -250,13 +233,9 @@ func (h *AIHandler) Chat(c *gin.Context) {
 func (h *AIHandler) AnalyzeRelationship(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	contactID, err := strconv.ParseUint(c.Param("contactId"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid contact id")
-		return
-	}
+	contactID := c.Param("contactId")
 
-	result, err := h.svc.AnalyzeRelationship(c.Request.Context(), userID, workspaceID, uint(contactID))
+	result, err := h.svc.AnalyzeRelationship(c.Request.Context(), userID, workspaceID, contactID)
 	if err != nil {
 		if err == service.ErrNoActiveProvider {
 			response.BadRequest(c, err.Error())
@@ -271,13 +250,9 @@ func (h *AIHandler) AnalyzeRelationship(c *gin.Context) {
 func (h *AIHandler) AnalyzeEvent(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	eventID, err := strconv.ParseUint(c.Param("eventId"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid event id")
-		return
-	}
+	eventID := c.Param("eventId")
 
-	result, err := h.svc.AnalyzeEvent(c.Request.Context(), userID, workspaceID, uint(eventID))
+	result, err := h.svc.AnalyzeEvent(c.Request.Context(), userID, workspaceID, eventID)
 	if err != nil {
 		if err == service.ErrNoActiveProvider {
 			response.BadRequest(c, err.Error())
@@ -292,10 +267,10 @@ func (h *AIHandler) AnalyzeEvent(c *gin.Context) {
 // --- Comprehensive Analysis ---
 
 type analyzeComprehensiveRequest struct {
-	Type       string `json:"type" binding:"required"`
-	ContactIDs []uint `json:"contact_ids"`
-	EventIDs   []uint `json:"event_ids"`
-	Question   string `json:"question"`
+	Type       string   `json:"type" binding:"required"`
+	ContactIDs []string `json:"contact_ids"`
+	EventIDs   []string `json:"event_ids"`
+	Question   string   `json:"question"`
 }
 
 func (h *AIHandler) AnalyzeComprehensive(c *gin.Context) {

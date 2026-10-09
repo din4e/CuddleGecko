@@ -31,7 +31,7 @@ func (m *mockUserRepo) GetUserByUsername(ctx context.Context, username string) (
 	return args.Get(0).(*model.User), args.Error(1)
 }
 
-func (m *mockUserRepo) GetUserByID(ctx context.Context, id uint) (*model.User, error) {
+func (m *mockUserRepo) GetUserByID(ctx context.Context, id string) (*model.User, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -43,7 +43,7 @@ func (m *mockUserRepo) CreateRefreshToken(ctx context.Context, token *model.Refr
 	return m.Called(ctx, token).Error(0)
 }
 
-func (m *mockUserRepo) DeleteExpiredRefreshTokens(ctx context.Context, userID uint) error {
+func (m *mockUserRepo) DeleteExpiredRefreshTokens(ctx context.Context, userID string) error {
 	return m.Called(ctx, userID).Error(0)
 }
 
@@ -59,7 +59,7 @@ func (m *mockUserRepo) RevokeRefreshToken(ctx context.Context, token string) err
 	return m.Called(ctx, token).Error(0)
 }
 
-func (m *mockUserRepo) RevokeAllUserRefreshTokens(ctx context.Context, userID uint) error {
+func (m *mockUserRepo) RevokeAllUserRefreshTokens(ctx context.Context, userID string) error {
 	return m.Called(ctx, userID).Error(0)
 }
 
@@ -78,7 +78,7 @@ func TestAuthService_Register_Success(t *testing.T) {
 	repo.On("GetUserByUsername", mock.Anything, "alice").Return(nil, gorm.ErrRecordNotFound)
 	repo.On("CreateUser", mock.Anything, mock.AnythingOfType("*model.User")).Return(nil)
 	repo.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*model.RefreshToken")).Return(nil)
-	repo.On("DeleteExpiredRefreshTokens", mock.Anything, mock.AnythingOfType("uint")).Return(nil)
+	repo.On("DeleteExpiredRefreshTokens", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
 	result, err := svc.Register(context.Background(), "alice", "alice@example.com", "password123")
 	assert.NoError(t, err)
@@ -104,10 +104,10 @@ func TestAuthService_Login_Success(t *testing.T) {
 
 	hashed, _ := HashPassword("password123")
 	repo.On("GetUserByUsername", mock.Anything, "alice").Return(&model.User{
-		ID: 1, Username: "alice", PasswordHash: hashed,
+		ID: "1", Username: "alice", PasswordHash: hashed,
 	}, nil)
 	repo.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*model.RefreshToken")).Return(nil)
-	repo.On("DeleteExpiredRefreshTokens", mock.Anything, mock.AnythingOfType("uint")).Return(nil)
+	repo.On("DeleteExpiredRefreshTokens", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
 	result, err := svc.Login(context.Background(), "alice", "password123")
 	assert.NoError(t, err)
@@ -121,7 +121,7 @@ func TestAuthService_Login_WrongPassword(t *testing.T) {
 
 	hashed, _ := HashPassword("password123")
 	repo.On("GetUserByUsername", mock.Anything, "alice").Return(&model.User{
-		ID: 1, Username: "alice", PasswordHash: hashed,
+		ID: "1", Username: "alice", PasswordHash: hashed,
 	}, nil)
 
 	_, err := svc.Login(context.Background(), "alice", "wrongpassword")
@@ -145,12 +145,12 @@ func TestAuthService_Refresh_Success_RotatesToken(t *testing.T) {
 	hashed, _ := HashPassword("password123")
 	raw := GenerateRefreshToken()
 	repo.On("GetRefreshToken", mock.Anything, HashRefreshToken(raw)).Return(&model.RefreshToken{
-		UserID: 1, Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(time.Hour),
+		UserID: "1", Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(time.Hour),
 	}, nil)
 	repo.On("RevokeRefreshToken", mock.Anything, HashRefreshToken(raw)).Return(nil)
-	repo.On("GetUserByID", mock.Anything, uint(1)).Return(&model.User{ID: 1, Username: "alice", PasswordHash: hashed}, nil)
+	repo.On("GetUserByID", mock.Anything, "1").Return(&model.User{ID: "1", Username: "alice", PasswordHash: hashed}, nil)
 	repo.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*model.RefreshToken")).Return(nil)
-	repo.On("DeleteExpiredRefreshTokens", mock.Anything, uint(1)).Return(nil)
+	repo.On("DeleteExpiredRefreshTokens", mock.Anything, "1").Return(nil)
 
 	result, err := svc.Refresh(context.Background(), raw)
 	assert.NoError(t, err)
@@ -174,7 +174,7 @@ func TestAuthService_Refresh_ExpiredToken(t *testing.T) {
 
 	raw := GenerateRefreshToken()
 	repo.On("GetRefreshToken", mock.Anything, HashRefreshToken(raw)).Return(&model.RefreshToken{
-		UserID: 1, Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(-time.Minute),
+		UserID: "1", Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(-time.Minute),
 	}, nil)
 
 	_, err := svc.Refresh(context.Background(), raw)
@@ -190,7 +190,7 @@ func TestAuthService_Refresh_ReplayWithinGrace_KeepsFamily(t *testing.T) {
 	raw := GenerateRefreshToken()
 	revokedAt := time.Now().Add(-2 * time.Second)
 	repo.On("GetRefreshToken", mock.Anything, HashRefreshToken(raw)).Return(&model.RefreshToken{
-		UserID: 1, Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(time.Hour),
+		UserID: "1", Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(time.Hour),
 		Revoked: true, RevokedAt: &revokedAt,
 	}, nil)
 
@@ -207,7 +207,7 @@ func TestAuthService_Refresh_ReplayedLegacyRow_KeepsFamily(t *testing.T) {
 
 	raw := GenerateRefreshToken()
 	repo.On("GetRefreshToken", mock.Anything, HashRefreshToken(raw)).Return(&model.RefreshToken{
-		UserID: 1, Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(time.Hour), Revoked: true,
+		UserID: "1", Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(time.Hour), Revoked: true,
 	}, nil)
 
 	_, err := svc.Refresh(context.Background(), raw)
@@ -224,10 +224,10 @@ func TestAuthService_Refresh_LateReplay_KillsFamily(t *testing.T) {
 	raw := GenerateRefreshToken()
 	revokedAt := time.Now().Add(-time.Hour)
 	repo.On("GetRefreshToken", mock.Anything, HashRefreshToken(raw)).Return(&model.RefreshToken{
-		UserID: 1, Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(time.Hour),
+		UserID: "1", Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(time.Hour),
 		Revoked: true, RevokedAt: &revokedAt,
 	}, nil)
-	repo.On("RevokeAllUserRefreshTokens", mock.Anything, uint(1)).Return(nil)
+	repo.On("RevokeAllUserRefreshTokens", mock.Anything, "1").Return(nil)
 
 	_, err := svc.Refresh(context.Background(), raw)
 	assert.ErrorIs(t, err, ErrInvalidToken)
@@ -242,7 +242,7 @@ func TestAuthService_Refresh_CASRace_KeepsFamily(t *testing.T) {
 
 	raw := GenerateRefreshToken()
 	repo.On("GetRefreshToken", mock.Anything, HashRefreshToken(raw)).Return(&model.RefreshToken{
-		UserID: 1, Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(time.Hour),
+		UserID: "1", Token: HashRefreshToken(raw), ExpiresAt: time.Now().Add(time.Hour),
 	}, nil)
 	repo.On("RevokeRefreshToken", mock.Anything, HashRefreshToken(raw)).Return(repository.ErrReplayedToken)
 
@@ -253,17 +253,17 @@ func TestAuthService_Refresh_CASRace_KeepsFamily(t *testing.T) {
 
 // fakeSessionStore is an in-memory UserSettingStore for session-TTL tests.
 type fakeSessionStore struct {
-	values map[uint]map[string]string
+	values map[string]map[string]string
 }
 
-func (f *fakeSessionStore) Get(_ context.Context, userID uint, name string) (string, bool, error) {
+func (f *fakeSessionStore) Get(_ context.Context, userID string, name string) (string, bool, error) {
 	v, ok := f.values[userID][name]
 	return v, ok, nil
 }
 
-func (f *fakeSessionStore) Set(_ context.Context, userID uint, name, value string) error {
+func (f *fakeSessionStore) Set(_ context.Context, userID string, name, value string) error {
 	if f.values == nil {
-		f.values = map[uint]map[string]string{}
+		f.values = map[string]map[string]string{}
 	}
 	if f.values[userID] == nil {
 		f.values[userID] = map[string]string{}
@@ -288,14 +288,14 @@ func TestAuthService_SessionTTL_DefaultNeverExpires(t *testing.T) {
 	svc := NewAuthService(repo, &config.JWTConfig{Secret: "test-secret", AccessTTL: 0, RefreshTTL: time.Hour}, nil)
 
 	hashed, _ := HashPassword("password123")
-	repo.On("GetUserByUsername", mock.Anything, "alice").Return(&model.User{ID: 1, Username: "alice", PasswordHash: hashed}, nil)
+	repo.On("GetUserByUsername", mock.Anything, "alice").Return(&model.User{ID: "1", Username: "alice", PasswordHash: hashed}, nil)
 	repo.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*model.RefreshToken")).Return(nil)
-	repo.On("DeleteExpiredRefreshTokens", mock.Anything, mock.AnythingOfType("uint")).Return(nil)
+	repo.On("DeleteExpiredRefreshTokens", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
 	result, err := svc.Login(context.Background(), "alice", "password123")
 	require.NoError(t, err)
 	claims := parseClaims(t, result.AccessToken)
-	assert.Equal(t, float64(1), claims["user_id"])
+	assert.Equal(t, "1", claims["user_id"])
 	_, hasExp := claims["exp"]
 	assert.False(t, hasExp, "ttl 0 omits exp — the token never expires")
 }
@@ -303,17 +303,17 @@ func TestAuthService_SessionTTL_DefaultNeverExpires(t *testing.T) {
 func TestAuthService_SessionTTL_UserSettingOverrides(t *testing.T) {
 	repo := new(mockUserRepo)
 	store := &fakeSessionStore{}
-	require.NoError(t, store.Set(context.Background(), 1, "session", `{"ttl_hours":2}`))
+	require.NoError(t, store.Set(context.Background(), "1", "session", `{"ttl_hours":2}`))
 	svc := NewAuthService(repo, &config.JWTConfig{Secret: "test-secret", AccessTTL: 0, RefreshTTL: time.Hour}, nil, WithAuthSessionSettings(store))
 
-	ttl, err := svc.SessionTTL(context.Background(), 1)
+	ttl, err := svc.SessionTTL(context.Background(), "1")
 	require.NoError(t, err)
 	assert.Equal(t, 2*time.Hour, ttl)
 
 	hashed, _ := HashPassword("password123")
-	repo.On("GetUserByUsername", mock.Anything, "alice").Return(&model.User{ID: 1, Username: "alice", PasswordHash: hashed}, nil)
+	repo.On("GetUserByUsername", mock.Anything, "alice").Return(&model.User{ID: "1", Username: "alice", PasswordHash: hashed}, nil)
 	repo.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*model.RefreshToken")).Return(nil)
-	repo.On("DeleteExpiredRefreshTokens", mock.Anything, mock.AnythingOfType("uint")).Return(nil)
+	repo.On("DeleteExpiredRefreshTokens", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
 	result, err := svc.Login(context.Background(), "alice", "password123")
 	require.NoError(t, err)
@@ -325,12 +325,12 @@ func TestAuthService_SessionTTL_UserSettingOverrides(t *testing.T) {
 
 func TestAuthService_SetSessionTTL_Validation(t *testing.T) {
 	svc := NewAuthService(new(mockUserRepo), testJWTConfig(), nil, WithAuthSessionSettings(&fakeSessionStore{}))
-	assert.Error(t, svc.SetSessionTTL(context.Background(), 1, -1))
-	assert.Error(t, svc.SetSessionTTL(context.Background(), 1, 24*365+1))
-	require.NoError(t, svc.SetSessionTTL(context.Background(), 1, 24))
-	ttl, err := svc.SessionTTL(context.Background(), 1)
+	assert.Error(t, svc.SetSessionTTL(context.Background(), "1", -1))
+	assert.Error(t, svc.SetSessionTTL(context.Background(), "1", 24*365+1))
+	require.NoError(t, svc.SetSessionTTL(context.Background(), "1", 24))
+	ttl, err := svc.SessionTTL(context.Background(), "1")
 	require.NoError(t, err)
 	assert.Equal(t, 24*time.Hour, ttl)
 	// Without a settings store the knob is unavailable (base deployments).
-	assert.Error(t, NewAuthService(new(mockUserRepo), testJWTConfig(), nil).SetSessionTTL(context.Background(), 1, 24))
+	assert.Error(t, NewAuthService(new(mockUserRepo), testJWTConfig(), nil).SetSessionTTL(context.Background(), "1", 24))
 }

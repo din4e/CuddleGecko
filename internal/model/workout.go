@@ -18,42 +18,42 @@ const (
 // WorkoutExercise rows; denormalized ItemTotal/ItemDone mirror that progress so
 // list views render a progress bar without extra queries.
 type Workout struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	UserID      uint           `gorm:"index;not null" json:"user_id"`
-	WorkspaceID uint           `gorm:"index;not null;default:0;index:idx_workout_ws_status_sched" json:"workspace_id"`
-	Name        string         `gorm:"size:200;not null" json:"name"`
-	Type        string         `gorm:"size:20;not null;default:'other'" json:"type"`      // strength|cardio|flexibility|balance|sport|other
-	Status      string         `gorm:"size:20;not null;default:'planned';index:idx_workout_ws_status_sched" json:"status"` // planned|in_progress|completed|skipped
-	Intensity   string         `gorm:"size:20" json:"intensity"`                         // ""|low|medium|high
-	ScheduledAt *time.Time     `gorm:"index:idx_workout_ws_status_sched" json:"scheduled_at"`
-	DurationMin *int           `json:"duration_min"`
-	Calories    *float64       `json:"calories"`
-	Color       string         `gorm:"size:20" json:"color"`
-	Location    string         `gorm:"size:200" json:"location"`
-	Notes       string         `gorm:"type:longtext" json:"notes"`
-	SortOrder   int            `gorm:"not null;default:0" json:"sort_order"`
-	CompletedAt *time.Time     `json:"completed_at"`
+	ID          string     `gorm:"primaryKey;type:char(36)" json:"id"`
+	UserID      string     `gorm:"size:36;index;not null" json:"user_id"`
+	WorkspaceID string     `gorm:"size:36;index;not null;default:0;index:idx_workout_ws_status_sched" json:"workspace_id"`
+	Name        string     `gorm:"size:200;not null" json:"name"`
+	Type        string     `gorm:"size:20;not null;default:'other'" json:"type"`                                       // strength|cardio|flexibility|balance|sport|other
+	Status      string     `gorm:"size:20;not null;default:'planned';index:idx_workout_ws_status_sched" json:"status"` // planned|in_progress|completed|skipped
+	Intensity   string     `gorm:"size:20" json:"intensity"`                                                           // ""|low|medium|high
+	ScheduledAt *time.Time `gorm:"index:idx_workout_ws_status_sched" json:"scheduled_at"`
+	DurationMin *int       `json:"duration_min"`
+	Calories    *float64   `json:"calories"`
+	Color       string     `gorm:"size:20" json:"color"`
+	Location    string     `gorm:"size:200" json:"location"`
+	Notes       string     `gorm:"type:longtext" json:"notes"`
+	SortOrder   int        `gorm:"not null;default:0" json:"sort_order"`
+	CompletedAt *time.Time `json:"completed_at"`
 	// Denormalized exercise progress, kept in sync with WorkoutExercise changes.
-	ItemTotal  int            `gorm:"not null;default:0" json:"item_total"`
-	ItemDone   int            `gorm:"not null;default:0" json:"item_done"`
+	ItemTotal int `gorm:"not null;default:0" json:"item_total"`
+	ItemDone  int `gorm:"not null;default:0" json:"item_done"`
 	// Virtual (not DB) — populated from the polymorphic taggings table.
-	Tags       []Tag          `gorm:"-" json:"tags"`
-	CreatedAt  time.Time      `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt  time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+	Tags      []Tag          `gorm:"-" json:"tags"`
+	CreatedAt time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // WorkoutExercise is a single movement within a workout (sets/reps/weight/
 // distance/duration). Modeled like TodoItem, with a Done flag and manual order.
 type WorkoutExercise struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	WorkoutID   uint           `gorm:"index;not null" json:"workout_id"`
+	ID          string         `gorm:"primaryKey;type:char(36)" json:"id"`
+	WorkoutID   string         `gorm:"size:36;index;not null" json:"workout_id"`
 	Name        string         `gorm:"size:200;not null" json:"name"`
 	Category    string         `gorm:"size:20" json:"category"` // ""|strength|cardio|stretch|...
 	Sets        *int           `json:"sets"`
 	Reps        *int           `json:"reps"`
-	Weight      *float64       `json:"weight"`     // kg
-	Distance    *float64       `json:"distance"`   // km (cardio)
+	Weight      *float64       `json:"weight"`   // kg
+	Distance    *float64       `json:"distance"` // km (cardio)
 	DurationSec *int           `json:"duration_sec"`
 	RestSec     *int           `json:"rest_sec"`
 	Done        bool           `gorm:"not null;default:false" json:"done"`
@@ -67,13 +67,13 @@ type WorkoutExercise struct {
 // BodyMetric is a timestamped snapshot of personal body / health measurements.
 // Time-series: list ordered by RecordedAt desc; BMI is derived, never stored.
 type BodyMetric struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	UserID      uint           `gorm:"index;not null" json:"user_id"`
-	WorkspaceID uint           `gorm:"index;not null;default:0" json:"workspace_id"`
+	ID          string         `gorm:"primaryKey;type:char(36)" json:"id"`
+	UserID      string         `gorm:"size:36;index;not null" json:"user_id"`
+	WorkspaceID string         `gorm:"size:36;index;not null;default:0" json:"workspace_id"`
 	RecordedAt  time.Time      `gorm:"index;not null" json:"recorded_at"`
-	Weight      *float64       `json:"weight"`    // kg
-	Height      *float64       `json:"height"`    // cm
-	BodyFat     *float64       `json:"body_fat"`  // %
+	Weight      *float64       `json:"weight"`      // kg
+	Height      *float64       `json:"height"`      // cm
+	BodyFat     *float64       `json:"body_fat"`    // %
 	MuscleMass  *float64       `json:"muscle_mass"` // kg
 	RestingHR   *int           `json:"resting_hr"`
 	Systolic    *int           `json:"systolic"`  // mmHg
@@ -98,7 +98,7 @@ type WorkoutListQuery struct {
 	Search     string     // case-insensitive substring match on name
 	DateAfter  *time.Time // scheduled_at >=
 	DateBefore *time.Time // scheduled_at <=
-	TagIDs     []uint     // workouts carrying any of these tags (taggings table)
+	TagIDs     []string   // workouts carrying any of these tags (taggings table)
 	Sort       string     // scheduled (default) | created | manual
 	Order      string     // asc (default) | desc
 	Page       int
@@ -142,13 +142,13 @@ type MetricTrend struct {
 
 // BodyMetricSummary is an overview derived from the latest body records.
 type BodyMetricSummary struct {
-	Latest       *BodyMetric              `json:"latest"`
-	LatestWeight *float64                 `json:"latest_weight"`
-	PrevWeight   *float64                 `json:"prev_weight"`
-	WeightTrend  string                   `json:"weight_trend"` // up|down|flat|none
-	Count        int64                    `json:"count"`
-	FirstAt      *time.Time               `json:"first_at"`
-	LastAt       *time.Time               `json:"last_at"`
+	Latest       *BodyMetric `json:"latest"`
+	LatestWeight *float64    `json:"latest_weight"`
+	PrevWeight   *float64    `json:"prev_weight"`
+	WeightTrend  string      `json:"weight_trend"` // up|down|flat|none
+	Count        int64       `json:"count"`
+	FirstAt      *time.Time  `json:"first_at"`
+	LastAt       *time.Time  `json:"last_at"`
 	// Per-metric latest/prev/trend for every tracked body metric (weight is in
 	// the top-level fields for backward compatibility).
 	Metrics map[string]MetricTrend `json:"metrics,omitempty"`
@@ -164,3 +164,8 @@ func BMI(weightKg, heightCm float64) float64 {
 	m := heightCm / 100
 	return weightKg / (m * m)
 }
+
+// BeforeCreate assigns the UUID primary key on first insert.
+func (w *Workout) BeforeCreate(tx *gorm.DB) error         { return ensureID(&w.ID, tx) }
+func (w *WorkoutExercise) BeforeCreate(tx *gorm.DB) error { return ensureID(&w.ID, tx) }
+func (b *BodyMetric) BeforeCreate(tx *gorm.DB) error      { return ensureID(&b.ID, tx) }

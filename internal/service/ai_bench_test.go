@@ -11,7 +11,7 @@ import (
 	"github.com/din4e/cuddlegecko/pkg/database"
 )
 
-func openStressDB(b *testing.B) (*AIService, []uint, []uint) {
+func openStressDB(b *testing.B) (*AIService, []string, []string) {
 	b.Helper()
 	if _, err := os.Stat("../../data/cuddlegecko.db"); err != nil {
 		b.Skip("stress database not found")
@@ -25,11 +25,11 @@ func openStressDB(b *testing.B) (*AIService, []uint, []uint) {
 		b.Fatalf("init db: %v", err)
 	}
 
-	var contactIDs []uint
+	var contactIDs []string
 	if err := db.Table("contacts").Where("workspace_id = 1").Order("id ASC").Limit(10).Pluck("id", &contactIDs).Error; err != nil {
 		b.Fatalf("get contact ids: %v", err)
 	}
-	var eventIDs []uint
+	var eventIDs []string
 	if err := db.Table("events").Where("workspace_id = 1").Order("id ASC").Limit(10).Pluck("id", &eventIDs).Error; err != nil {
 		b.Fatalf("get event ids: %v", err)
 	}
@@ -51,7 +51,7 @@ func BenchmarkBuildContactAnalysis(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var sb strings.Builder
-		svc.buildContactAnalysis(ctx, 1, 1, contactIDs, &sb)
+		svc.buildContactAnalysis(ctx, "1", "1", contactIDs, &sb)
 	}
 }
 
@@ -61,6 +61,6 @@ func BenchmarkBuildEventAnalysis(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var sb strings.Builder
-		svc.buildEventAnalysis(ctx, 1, 1, eventIDs, &sb)
+		svc.buildEventAnalysis(ctx, "1", "1", eventIDs, &sb)
 	}
 }

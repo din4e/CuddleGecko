@@ -24,7 +24,7 @@ func newTransactionTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func ptrUint(v uint) *uint { return &v }
+func ptrString(v string) *string { return &v }
 
 // Regression: the contact_id query filter used to reference a non-existent
 // scalar column. Transactions store their buddies as a JSON array in
@@ -33,12 +33,12 @@ func TestTransactionRepo_List_ContactIDFilter(t *testing.T) {
 	db := newTransactionTestDB(t)
 	repo := NewTransactionRepo(db)
 	ctx := context.Background()
-	const ws uint = 1
+	const ws = "1"
 	day := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	create := func(title string, cids []uint) {
+	create := func(title string, cids []string) {
 		require.NoError(t, repo.Create(ctx, &model.Transaction{
-			UserID:      1,
+			UserID:      "1",
 			WorkspaceID: ws,
 			Title:       title,
 			Amount:      10,
@@ -48,20 +48,20 @@ func TestTransactionRepo_List_ContactIDFilter(t *testing.T) {
 		}))
 	}
 
-	create("shared", []uint{5, 7}) // contains contact 5
-	create("other", []uint{9})     // does not contain 5
-	create("none", []uint{})       // no buddies
-	create("solo", []uint{5})      // contains contact 5
+	create("shared", []string{"5", "7"}) // contains contact "5"
+	create("other", []string{"9"})     // does not contain 5
+	create("none", []string{})         // no buddies
+	create("solo", []string{"5"})      // contains contact "5"
 
 	// Filter by contact 5 -> only the two transactions that include it.
-	txs, total, err := repo.List(ctx, ws, 1, 100, nil, ptrUint(5), "", nil, nil, nil)
+	txs, total, err := repo.List(ctx, ws, 1, 100, nil, ptrString("5"), "", nil, nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), total)
 	assert.Len(t, txs, 2)
 	assert.ElementsMatch(t, []string{"shared", "solo"}, []string{txs[0].Title, txs[1].Title})
 
 	// Filter by a contact nobody shares -> empty, no error.
-	txs, total, err = repo.List(ctx, ws, 1, 100, nil, ptrUint(999), "", nil, nil, nil)
+	txs, total, err = repo.List(ctx, ws, 1, 100, nil, ptrString("999"), "", nil, nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), total)
 	assert.Empty(t, txs)
@@ -86,12 +86,12 @@ func TestTransactionRepo_Monthly(t *testing.T) {
 	db := newTransactionTestDB(t)
 	repo := NewTransactionRepo(db)
 	ctx := context.Background()
-	const ws uint = 1
+	const ws = "1"
 	now := time.Now()
 
 	mk := func(amount float64, txType string, when time.Time) {
 		require.NoError(t, repo.Create(ctx, &model.Transaction{
-			UserID: 1, WorkspaceID: ws, Title: "t", Amount: amount, Type: txType, Date: when,
+			UserID: "1", WorkspaceID: ws, Title: "t", Amount: amount, Type: txType, Date: when,
 		}))
 	}
 
@@ -134,11 +134,11 @@ func TestTransactionRepo_Monthly_Range(t *testing.T) {
 	db := newTransactionTestDB(t)
 	repo := NewTransactionRepo(db)
 	ctx := context.Background()
-	const ws uint = 1
+	const ws = "1"
 
 	mk := func(amount float64, txType string, when time.Time) {
 		require.NoError(t, repo.Create(ctx, &model.Transaction{
-			UserID: 1, WorkspaceID: ws, Title: "t", Amount: amount, Type: txType, Date: when,
+			UserID: "1", WorkspaceID: ws, Title: "t", Amount: amount, Type: txType, Date: when,
 		}))
 	}
 
@@ -172,11 +172,11 @@ func TestTransactionRepo_Yearly(t *testing.T) {
 	db := newTransactionTestDB(t)
 	repo := NewTransactionRepo(db)
 	ctx := context.Background()
-	const ws uint = 1
+	const ws = "1"
 
 	mk := func(amount float64, txType, category string, when time.Time) {
 		require.NoError(t, repo.Create(ctx, &model.Transaction{
-			UserID: 1, WorkspaceID: ws, Title: "t", Amount: amount, Type: txType,
+			UserID: "1", WorkspaceID: ws, Title: "t", Amount: amount, Type: txType,
 			Category: category, Date: when,
 		}))
 	}
@@ -208,11 +208,11 @@ func TestTransactionRepo_CategoryTotals(t *testing.T) {
 	db := newTransactionTestDB(t)
 	repo := NewTransactionRepo(db)
 	ctx := context.Background()
-	const ws uint = 1
+	const ws = "1"
 
 	mk := func(amount float64, txType, category string, when time.Time) {
 		require.NoError(t, repo.Create(ctx, &model.Transaction{
-			UserID: 1, WorkspaceID: ws, Title: "t", Amount: amount, Type: txType,
+			UserID: "1", WorkspaceID: ws, Title: "t", Amount: amount, Type: txType,
 			Category: category, Date: when,
 		}))
 	}
@@ -263,11 +263,11 @@ func TestTransactionRepo_List_DateRange(t *testing.T) {
 	db := newTransactionTestDB(t)
 	repo := NewTransactionRepo(db)
 	ctx := context.Background()
-	const ws uint = 1
+	const ws = "1"
 
 	mk := func(title string, when time.Time) {
 		require.NoError(t, repo.Create(ctx, &model.Transaction{
-			UserID: 1, WorkspaceID: ws, Title: title, Amount: 10, Type: "expense", Date: when,
+			UserID: "1", WorkspaceID: ws, Title: title, Amount: 10, Type: "expense", Date: when,
 		}))
 	}
 	mk("before", time.Date(2025, 12, 31, 23, 0, 0, 0, time.UTC))
@@ -296,11 +296,11 @@ func TestTransactionRepo_Summary_Range(t *testing.T) {
 	db := newTransactionTestDB(t)
 	repo := NewTransactionRepo(db)
 	ctx := context.Background()
-	const ws uint = 1
+	const ws = "1"
 
 	mk := func(amount float64, txType string, when time.Time) {
 		require.NoError(t, repo.Create(ctx, &model.Transaction{
-			UserID: 1, WorkspaceID: ws, Title: "t", Amount: amount, Type: txType, Date: when,
+			UserID: "1", WorkspaceID: ws, Title: "t", Amount: amount, Type: txType, Date: when,
 		}))
 	}
 	mk(100, "income", time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC))
@@ -328,23 +328,23 @@ func TestTransactionRepo_ListByContactIDs_SQLFilter(t *testing.T) {
 	db := newTransactionTestDB(t)
 	repo := NewTransactionRepo(db)
 	ctx := context.Background()
-	mk := func(cids []uint, title string) {
+	mk := func(cids []string, title string) {
 		require.NoError(t, db.Create(&model.Transaction{
-			UserID: 1, WorkspaceID: 1, Title: title, Amount: 10, Type: "expense",
+			UserID: "1", WorkspaceID: "1", Title: title, Amount: 10, Type: "expense",
 			ContactIDs: cids, Date: time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC),
 		}).Error)
 	}
-	mk([]uint{1}, "c1-a")
-	mk([]uint{1}, "c1-b")
-	mk([]uint{1}, "c1-c")
-	mk([]uint{2}, "c2-a")
-	mk([]uint{2}, "c2-b")
-	mk([]uint{3}, "c3") // not in the query set
-	mk([]uint{}, "none")
+	mk([]string{"1"}, "c1-a")
+	mk([]string{"1"}, "c1-b")
+	mk([]string{"1"}, "c1-c")
+	mk([]string{"2"}, "c2-a")
+	mk([]string{"2"}, "c2-b")
+	mk([]string{"3"}, "c3") // not in the query set
+	mk([]string{}, "none")
 
 	// No limit -> all 5 matching (3 for contact 1 + 2 for contact 2); the old
 	// impl would also have returned these only by luck of row order.
-	got, err := repo.ListByContactIDs(ctx, 1, []uint{1, 2}, 0)
+	got, err := repo.ListByContactIDs(ctx, "1", []string{"1", "2"}, 0)
 	require.NoError(t, err)
 	assert.Len(t, got, 5, "should return exactly the matching transactions")
 	for _, tx := range got {
@@ -352,12 +352,12 @@ func TestTransactionRepo_ListByContactIDs_SQLFilter(t *testing.T) {
 	}
 
 	// Limit applies to MATCHES, not to a pre-filter sample.
-	got, err = repo.ListByContactIDs(ctx, 1, []uint{1, 2}, 2)
+	got, err = repo.ListByContactIDs(ctx, "1", []string{"1", "2"}, 2)
 	require.NoError(t, err)
 	assert.Len(t, got, 2, "limit should bound the matching set")
 
 	// Empty contactIDs -> nil, no error.
-	got, err = repo.ListByContactIDs(ctx, 1, nil, 0)
+	got, err = repo.ListByContactIDs(ctx, "1", nil, 0)
 	require.NoError(t, err)
 	assert.Empty(t, got)
 }

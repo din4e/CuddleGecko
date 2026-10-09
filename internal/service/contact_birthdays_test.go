@@ -44,20 +44,20 @@ func TestUpcomingBirthdays_SolarAndLunar(t *testing.T) {
 		{Name: "SolarSoon", Birthday: bd(1995, 8, 23), BirthdayCalendar: lunar.CalendarSolar},
 		{Name: "LunarSoon", Birthday: bd(1990, 7, 15), BirthdayCalendar: lunar.CalendarLunar}, // lunar 7/15 → 2026-08-27
 		{Name: "Today", Birthday: bd(2000, 8, 20), BirthdayCalendar: lunar.CalendarSolar},
-		{Name: "FarAway", Birthday: bd(1998, 1, 1), BirthdayCalendar: lunar.CalendarSolar},   // next 2027-01-01
+		{Name: "FarAway", Birthday: bd(1998, 1, 1), BirthdayCalendar: lunar.CalendarSolar}, // next 2027-01-01
 		{Name: "NoBirthday"},
 	}
 	for i := range seed {
-		seed[i].UserID, seed[i].WorkspaceID = 1, 1
+		seed[i].UserID, seed[i].WorkspaceID = "1", "1"
 		require.NoError(t, svc.repo.Create(ctx, &seed[i]))
 	}
 
 	// Another workspace must be invisible.
-	foreign := model.Contact{Name: "Foreign", Birthday: bd(1995, 8, 21), UserID: 2, WorkspaceID: 99}
+	foreign := model.Contact{Name: "Foreign", Birthday: bd(1995, 8, 21), UserID: "2", WorkspaceID: "99"}
 	require.NoError(t, svc.repo.Create(ctx, &foreign))
 
 	now := time.Date(2026, 8, 20, 10, 0, 0, 0, time.Local)
-	occ, err := svc.UpcomingBirthdays(ctx, 1, 1, 30, now)
+	occ, err := svc.UpcomingBirthdays(ctx, "1", "1", 30, now)
 	require.NoError(t, err)
 
 	names := make([]string, len(occ))
@@ -81,7 +81,7 @@ func TestUpcomingBirthdays_SolarAndLunar(t *testing.T) {
 	assert.Equal(t, "2026-08-27", byName["LunarSoon"].NextBirthday.Format("2006-01-02"))
 
 	// A 3-day window drops the lunar birthday but keeps the others.
-	occ, err = svc.UpcomingBirthdays(ctx, 1, 1, 3, now)
+	occ, err = svc.UpcomingBirthdays(ctx, "1", "1", 3, now)
 	require.NoError(t, err)
 	assert.Len(t, occ, 2)
 }
@@ -90,30 +90,30 @@ func TestCreateBirthdayReminder_Lunar(t *testing.T) {
 	svc, _ := newBirthdayServiceWithDB(t)
 	ctx := context.Background()
 
-	contact := model.Contact{Name: "妈妈", Birthday: bd(1965, 7, 15), BirthdayCalendar: lunar.CalendarLunar, UserID: 1, WorkspaceID: 1}
+	contact := model.Contact{Name: "妈妈", Birthday: bd(1965, 7, 15), BirthdayCalendar: lunar.CalendarLunar, UserID: "1", WorkspaceID: "1"}
 	require.NoError(t, svc.repo.Create(ctx, &contact))
 
 	now := time.Date(2026, 8, 20, 10, 0, 0, 0, time.Local)
-	reminder, err := svc.CreateBirthdayReminder(ctx, 1, 1, contact.ID, now)
+	reminder, err := svc.CreateBirthdayReminder(ctx, "1", "1", contact.ID, now)
 	require.NoError(t, err)
 
 	// 09:00 on the converted solar date of lunar 7/15.
 	assert.Equal(t, "2026-08-27 09:00:00", reminder.RemindAt.Format("2006-01-02 15:04:05"))
 	assert.Equal(t, model.ReminderPending, reminder.Status)
-	assert.Equal(t, uint(1), reminder.ContactID)
+	assert.Equal(t, contact.ID, reminder.ContactID)
 	assert.Contains(t, reminder.Title, "妈妈")
 	assert.Contains(t, reminder.Title, "生日")
 	assert.Contains(t, reminder.Description, "农历七月十五")
 	assert.Contains(t, reminder.Description, "2026-08-27")
 
 	// Duplicate pending birthday reminder is rejected.
-	_, err = svc.CreateBirthdayReminder(ctx, 1, 1, contact.ID, now)
+	_, err = svc.CreateBirthdayReminder(ctx, "1", "1", contact.ID, now)
 	assert.ErrorIs(t, err, ErrBirthdayReminderExists)
 
 	// A done reminder does not block re-creation.
-	done := model.Reminder{UserID: 1, WorkspaceID: 1, ContactID: contact.ID, Title: "🎂 妈妈的生日", RemindAt: reminder.RemindAt, Status: model.ReminderDone}
+	done := model.Reminder{UserID: "1", WorkspaceID: "1", ContactID: contact.ID, Title: "🎂 妈妈的生日", RemindAt: reminder.RemindAt, Status: model.ReminderDone}
 	require.NoError(t, svc.reminderRepo.Create(ctx, &done))
-	_, err = svc.CreateBirthdayReminder(ctx, 1, 1, contact.ID, now)
+	_, err = svc.CreateBirthdayReminder(ctx, "1", "1", contact.ID, now)
 	assert.ErrorIs(t, err, ErrBirthdayReminderExists) // pending one still exists
 }
 
@@ -121,18 +121,18 @@ func TestCreateBirthdayReminder_Errors(t *testing.T) {
 	svc, _ := newBirthdayServiceWithDB(t)
 	ctx := context.Background()
 
-	noBirthday := model.Contact{Name: "NoBirthday", UserID: 1, WorkspaceID: 1}
+	noBirthday := model.Contact{Name: "NoBirthday", UserID: "1", WorkspaceID: "1"}
 	require.NoError(t, svc.repo.Create(ctx, &noBirthday))
-	_, err := svc.CreateBirthdayReminder(ctx, 1, 1, noBirthday.ID, time.Now())
+	_, err := svc.CreateBirthdayReminder(ctx, "1", "1", noBirthday.ID, time.Now())
 	assert.ErrorIs(t, err, ErrContactBirthdayMissing)
 
-	_, err = svc.CreateBirthdayReminder(ctx, 1, 1, 424242, time.Now())
+	_, err = svc.CreateBirthdayReminder(ctx, "1", "1", "424242", time.Now())
 	assert.ErrorIs(t, err, ErrContactNotFound)
 }
 
 func TestReminderServiceCreateRequiresRemindAt(t *testing.T) {
 	reminderSvc := NewReminderService(nil, nil)
-	_, err := reminderSvc.Create(context.Background(), 1, 1, 1, &model.Reminder{Title: "x"})
+	_, err := reminderSvc.Create(context.Background(), "1", "1", "1", &model.Reminder{Title: "x"})
 	assert.ErrorIs(t, err, ErrInvalidReminder)
 }
 
@@ -140,19 +140,19 @@ func TestContactUpdateBirthdayCalendar(t *testing.T) {
 	svc, _ := newBirthdayServiceWithDB(t)
 	ctx := context.Background()
 
-	contact := model.Contact{Name: "A", Birthday: bd(1990, 7, 15), BirthdayCalendar: lunar.CalendarLunar, UserID: 1, WorkspaceID: 1}
+	contact := model.Contact{Name: "A", Birthday: bd(1990, 7, 15), BirthdayCalendar: lunar.CalendarLunar, UserID: "1", WorkspaceID: "1"}
 	require.NoError(t, svc.repo.Create(ctx, &contact))
 
 	// Full-form update flips the calendar and normalizes junk to solar.
-	_, err := svc.Update(ctx, 1, 1, contact.ID, &model.Contact{Name: "A", Birthday: contact.Birthday, BirthdayCalendar: "solar"})
+	_, err := svc.Update(ctx, "1", "1", contact.ID, &model.Contact{Name: "A", Birthday: contact.Birthday, BirthdayCalendar: "solar"})
 	require.NoError(t, err)
-	got, err := svc.GetByID(ctx, 1, 1, contact.ID)
+	got, err := svc.GetByID(ctx, "1", "1", contact.ID)
 	require.NoError(t, err)
 	assert.Equal(t, lunar.CalendarSolar, got.BirthdayCalendar)
 
-	_, err = svc.Update(ctx, 1, 1, contact.ID, &model.Contact{Name: "A", Birthday: contact.Birthday, BirthdayCalendar: lunar.CalendarLunar})
+	_, err = svc.Update(ctx, "1", "1", contact.ID, &model.Contact{Name: "A", Birthday: contact.Birthday, BirthdayCalendar: lunar.CalendarLunar})
 	require.NoError(t, err)
-	got, err = svc.GetByID(ctx, 1, 1, contact.ID)
+	got, err = svc.GetByID(ctx, "1", "1", contact.ID)
 	require.NoError(t, err)
 	assert.Equal(t, lunar.CalendarLunar, got.BirthdayCalendar)
 }

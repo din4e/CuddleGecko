@@ -24,7 +24,7 @@ func (r *TagRepo) Create(ctx context.Context, tag *model.Tag) error {
 	return nil
 }
 
-func (r *TagRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Tag, error) {
+func (r *TagRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.Tag, error) {
 	var tag model.Tag
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&tag).Error; err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func (r *TagRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Tag
 	return &tag, nil
 }
 
-func (r *TagRepo) List(ctx context.Context, workspaceID uint, page, pageSize int, search ...string) ([]model.Tag, int64, error) {
+func (r *TagRepo) List(ctx context.Context, workspaceID string, page, pageSize int, search ...string) ([]model.Tag, int64, error) {
 	var tags []model.Tag
 	query := r.db.WithContext(ctx).Model(&model.Tag{}).Where("workspace_id = ?", workspaceID)
 	if len(search) > 0 && strings.TrimSpace(search[0]) != "" {
@@ -51,7 +51,7 @@ func (r *TagRepo) List(ctx context.Context, workspaceID uint, page, pageSize int
 	page, pageSize = clampPage(page, pageSize)
 	offset := (page - 1) * pageSize
 
-	if err := query.Order("id ASC").Limit(pageSize).Offset(offset).Find(&tags).Error; err != nil {
+	if err := query.Order("created_at ASC, id ASC").Limit(pageSize).Offset(offset).Find(&tags).Error; err != nil {
 		return nil, 0, fmt.Errorf("list tags: %w", err)
 	}
 	return tags, total, nil
@@ -66,14 +66,14 @@ func (r *TagRepo) Update(ctx context.Context, tag *model.Tag) error {
 	return nil
 }
 
-func (r *TagRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *TagRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Tag{}).Error; err != nil {
 		return fmt.Errorf("delete tag: %w", err)
 	}
 	return nil
 }
 
-func (r *TagRepo) GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Tag, error) {
+func (r *TagRepo) GetByIDs(ctx context.Context, workspaceID string, ids []string) ([]model.Tag, error) {
 	var tags []model.Tag
 	if err := r.db.WithContext(ctx).Where("workspace_id = ? AND id IN ?", workspaceID, ids).Find(&tags).Error; err != nil {
 		return nil, fmt.Errorf("get tags by ids: %w", err)

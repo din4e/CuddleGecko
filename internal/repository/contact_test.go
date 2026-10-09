@@ -30,13 +30,13 @@ func TestContactRepo_ListGraphContacts(t *testing.T) {
 	repo := NewContactRepo(db)
 	ctx := context.Background()
 
-	c := &model.Contact{UserID: 1, WorkspaceID: 1, Name: "Ada", AvatarEmoji: "🦎", RelationshipLabels: []string{"friend"}}
+	c := &model.Contact{UserID: "1", WorkspaceID: "1", Name: "Ada", AvatarEmoji: "🦎", RelationshipLabels: []string{"friend"}}
 	require.NoError(t, repo.Create(ctx, c))
 
 	// Attach a tag so we can prove the graph projection does NOT load it.
-	require.NoError(t, repo.ReplaceTags(ctx, c.ID, []model.Tag{{WorkspaceID: 1, Name: "vip"}}))
+	require.NoError(t, repo.ReplaceTags(ctx, c.ID, []model.Tag{{WorkspaceID: "1", Name: "vip"}}))
 
-	got, err := repo.ListGraphContacts(ctx, 1)
+	got, err := repo.ListGraphContacts(ctx, "1")
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	assert.Equal(t, c.ID, got[0].ID)

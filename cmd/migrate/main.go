@@ -35,7 +35,7 @@ func main() {
 	workspaceSvc := service.NewWorkspaceService(workspaceRepo)
 
 	for _, user := range users {
-		fmt.Printf("Processing user %d (%s)...\n", user.ID, user.Username)
+		fmt.Printf("Processing user %s (%s)...\n", user.ID, user.Username)
 
 		// 2. Create default workspace if not exists
 		ws, err := workspaceSvc.GetDefaultWorkspace(ctx, user.ID)
@@ -43,12 +43,12 @@ func main() {
 			// No default workspace yet — create one
 			ws, err = workspaceSvc.CreateDefaultWorkspace(ctx, user.ID)
 			if err != nil {
-				log.Printf("  Failed to create default workspace for user %d: %v", user.ID, err)
+				log.Printf("  Failed to create default workspace for user %s: %v", user.ID, err)
 				continue
 			}
-			fmt.Printf("  Created default workspace %d\n", ws.ID)
+			fmt.Printf("  Created default workspace %s\n", ws.ID)
 		} else {
-			fmt.Printf("  Default workspace already exists: %d\n", ws.ID)
+			fmt.Printf("  Default workspace already exists: %s\n", ws.ID)
 		}
 
 		wsID := ws.ID
@@ -72,7 +72,7 @@ func main() {
 				Where("user_id = ? AND workspace_id = 0", user.ID).
 				Update("workspace_id", wsID)
 			if result.Error != nil {
-				log.Printf("  Failed to backfill %s for user %d: %v", t.name, user.ID, result.Error)
+				log.Printf("  Failed to backfill %s for user %s: %v", t.name, user.ID, result.Error)
 			} else if result.RowsAffected > 0 {
 				fmt.Printf("  Backfilled %d rows in %s\n", result.RowsAffected, t.name)
 			}

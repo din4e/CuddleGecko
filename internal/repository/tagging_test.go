@@ -27,40 +27,40 @@ func TestTaggingRepo_SetTagsValidatesWorkspaceAndReplacesAtomically(t *testing.T
 	repo := NewTaggingRepo(db)
 	ctx := context.Background()
 
-	own := model.Tag{UserID: 1, WorkspaceID: 1, Name: "own"}
-	foreign := model.Tag{UserID: 2, WorkspaceID: 2, Name: "foreign"}
+	own := model.Tag{UserID: "1", WorkspaceID: "1", Name: "own"}
+	foreign := model.Tag{UserID: "2", WorkspaceID: "2", Name: "foreign"}
 	for _, tag := range []*model.Tag{&own, &foreign} {
 		require.NoError(t, db.Create(tag).Error)
 	}
 
 	// Foreign or missing ids are rejected and nothing is written.
-	for _, bad := range [][]uint{{foreign.ID}, {9999}} {
-		require.ErrorIs(t, repo.SetTags(ctx, 1, model.TagTargetEvent, 7, bad), model.ErrInvalidTagIDs)
-		tags, err := repo.GetTags(ctx, 1, model.TagTargetEvent, 7)
+	for _, bad := range [][]string{{foreign.ID}, {"9999"}} {
+		require.ErrorIs(t, repo.SetTags(ctx, "1", model.TagTargetEvent, "7", bad), model.ErrInvalidTagIDs)
+		tags, err := repo.GetTags(ctx, "1", model.TagTargetEvent, "7")
 		require.NoError(t, err)
 		assert.Empty(t, tags)
 	}
 
 	// Duplicates and zeros collapse into one association.
-	require.NoError(t, repo.SetTags(ctx, 1, model.TagTargetEvent, 7, []uint{own.ID, own.ID, 0}))
-	tags, err := repo.GetTags(ctx, 1, model.TagTargetEvent, 7)
+	require.NoError(t, repo.SetTags(ctx, "1", model.TagTargetEvent, "7", []string{own.ID, own.ID, ""}))
+	tags, err := repo.GetTags(ctx, "1", model.TagTargetEvent, "7")
 	require.NoError(t, err)
 	require.Len(t, tags, 1)
 	assert.Equal(t, own.ID, tags[0].ID)
 
 	// A later replace with an invalid id keeps the previous set untouched.
-	require.ErrorIs(t, repo.SetTags(ctx, 1, model.TagTargetEvent, 7, []uint{foreign.ID}), model.ErrInvalidTagIDs)
-	tags, err = repo.GetTags(ctx, 1, model.TagTargetEvent, 7)
+	require.ErrorIs(t, repo.SetTags(ctx, "1", model.TagTargetEvent, "7", []string{foreign.ID}), model.ErrInvalidTagIDs)
+	tags, err = repo.GetTags(ctx, "1", model.TagTargetEvent, "7")
 	require.NoError(t, err)
 	assert.Len(t, tags, 1)
 
 	// Empty list clears.
-	require.NoError(t, repo.SetTags(ctx, 1, model.TagTargetEvent, 7, nil))
-	tags, err = repo.GetTags(ctx, 1, model.TagTargetEvent, 7)
+	require.NoError(t, repo.SetTags(ctx, "1", model.TagTargetEvent, "7", nil))
+	tags, err = repo.GetTags(ctx, "1", model.TagTargetEvent, "7")
 	require.NoError(t, err)
 	assert.Empty(t, tags)
 
-	require.NoError(t, repo.RemoveAll(ctx, 1, model.TagTargetEvent, 7))
+	require.NoError(t, repo.RemoveAll(ctx, "1", model.TagTargetEvent, "7"))
 }
 
 // Every newly taggable entity filters its List by tag and enriches rows with
@@ -70,18 +70,18 @@ func TestTaggingRepo_FilterTargetIDsScopesByTargetType(t *testing.T) {
 	repo := NewTaggingRepo(db)
 	ctx := context.Background()
 
-	tag := model.Tag{UserID: 1, WorkspaceID: 1, Name: "work"}
+	tag := model.Tag{UserID: "1", WorkspaceID: "1", Name: "work"}
 	require.NoError(t, db.Create(&tag).Error)
 	// Same tag on an event and a habit; only events match the event filter.
-	require.NoError(t, repo.SetTags(ctx, 1, model.TagTargetEvent, 11, []uint{tag.ID}))
-	require.NoError(t, repo.SetTags(ctx, 1, model.TagTargetHabit, 12, []uint{tag.ID}))
+	require.NoError(t, repo.SetTags(ctx, "1", model.TagTargetEvent, "11", []string{tag.ID}))
+	require.NoError(t, repo.SetTags(ctx, "1", model.TagTargetHabit, "12", []string{tag.ID}))
 
-	ids, err := repo.FilterTargetIDs(ctx, 1, model.TagTargetEvent, []uint{tag.ID})
+	ids, err := repo.FilterTargetIDs(ctx, "1", model.TagTargetEvent, []string{tag.ID})
 	require.NoError(t, err)
-	assert.Equal(t, []uint{11}, ids)
+	assert.Equal(t, []string{"11"}, ids)
 
-	byTargets, err := repo.GetTagsByTargets(ctx, 1, model.TagTargetEvent, []uint{11, 12})
+	byTargets, err := repo.GetTagsByTargets(ctx, "1", model.TagTargetEvent, []string{"11", "12"})
 	require.NoError(t, err)
-	assert.Len(t, byTargets[11], 1)
-	assert.Nil(t, byTargets[12])
+	assert.Len(t, byTargets["11"], 1)
+	assert.Nil(t, byTargets["12"])
 }

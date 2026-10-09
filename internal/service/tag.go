@@ -28,11 +28,11 @@ func validateTag(tag *model.Tag, requireName bool) error {
 
 type TagRepository interface {
 	Create(ctx context.Context, tag *model.Tag) error
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.Tag, error)
-	List(ctx context.Context, workspaceID uint, page, pageSize int, search ...string) ([]model.Tag, int64, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.Tag, error)
+	List(ctx context.Context, workspaceID string, page, pageSize int, search ...string) ([]model.Tag, int64, error)
 	Update(ctx context.Context, tag *model.Tag) error
-	Delete(ctx context.Context, workspaceID, id uint) error
-	GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Tag, error)
+	Delete(ctx context.Context, workspaceID, id string) error
+	GetByIDs(ctx context.Context, workspaceID string, ids []string) ([]model.Tag, error)
 }
 
 type TagService struct {
@@ -44,7 +44,7 @@ func NewTagService(repo TagRepository, notifier ...ChangeNotifier) *TagService {
 	return &TagService{repo: repo, notifier: firstNotifier(notifier)}
 }
 
-func (s *TagService) Create(ctx context.Context, userID, workspaceID uint, tag *model.Tag) (*model.Tag, error) {
+func (s *TagService) Create(ctx context.Context, userID, workspaceID string, tag *model.Tag) (*model.Tag, error) {
 	tag.Name = strings.TrimSpace(tag.Name)
 	if err := validateTag(tag, true); err != nil {
 		return nil, err
@@ -58,11 +58,11 @@ func (s *TagService) Create(ctx context.Context, userID, workspaceID uint, tag *
 	return tag, nil
 }
 
-func (s *TagService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, search ...string) ([]model.Tag, int64, error) {
+func (s *TagService) List(ctx context.Context, userID, workspaceID string, page, pageSize int, search ...string) ([]model.Tag, int64, error) {
 	return s.repo.List(ctx, workspaceID, page, pageSize, search...)
 }
 
-func (s *TagService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Tag) (*model.Tag, error) {
+func (s *TagService) Update(ctx context.Context, userID, workspaceID, id string, updates *model.Tag) (*model.Tag, error) {
 	requireName := updates.Name != ""
 	updates.Name = strings.TrimSpace(updates.Name)
 	if err := validateTag(updates, requireName); err != nil {
@@ -83,7 +83,7 @@ func (s *TagService) Update(ctx context.Context, userID, workspaceID, id uint, u
 	return tag, nil
 }
 
-func (s *TagService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *TagService) Delete(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}

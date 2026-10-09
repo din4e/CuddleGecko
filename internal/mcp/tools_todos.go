@@ -20,7 +20,7 @@ func (s *MCPServer) registerTodoTools() {
 			"order":      map[string]interface{}{"type": "string", "description": "Sort order: asc (default) or desc"},
 			"overdue":    map[string]interface{}{"type": "boolean", "description": "Only pending todos whose due time is in the past"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		q := model.TodoListQuery{
 			Status:     toString(getArg(args, "status")),
 			Priority:   toString(getArg(args, "priority")),
@@ -42,30 +42,28 @@ func (s *MCPServer) registerTodoTools() {
 	s.registerTool("create_todo", "Create a new todo.", map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
-			"title":        map[string]interface{}{"type": "string", "description": "Todo title"},
-			"description":  map[string]interface{}{"type": "string", "description": "Todo description"},
-			"status":       map[string]interface{}{"type": "string", "description": "Status: pending, done or abandoned (default pending)"},
+			"title":       map[string]interface{}{"type": "string", "description": "Todo title"},
+			"description": map[string]interface{}{"type": "string", "description": "Todo description"},
+			"status":      map[string]interface{}{"type": "string", "description": "Status: pending, done or abandoned (default pending)"},
 			"priority":    map[string]interface{}{"type": "string", "description": "Priority: none, low, normal or high (default none)"},
 			"importance":  map[string]interface{}{"type": "string", "description": "Eisenhower importance: none, low, normal or high (default none)"},
 			"urgency":     map[string]interface{}{"type": "string", "description": "Eisenhower urgency: none, low, normal or high (default none)"},
-			"due_time":     map[string]interface{}{"type": "string", "description": "Due time (RFC3339)"},
-			"duration":     map[string]interface{}{"type": "integer", "description": "Estimated effort in minutes (0 = unset)"},
-			"amount":       map[string]interface{}{"type": "number", "description": "Associated amount"},
-			"amount_type":  map[string]interface{}{"type": "string", "description": "Amount type: income or expense"},
-			"progress":     map[string]interface{}{"type": "integer", "description": "Manual progress in percent (0-100; omit for none)"},
-			"contact_ids":  map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "integer"}, "description": "Related contact IDs"},
-			"todo_ids":     map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "integer"}, "description": "Related todo IDs to link (jump targets; must exist in this workspace)"},
-			"color":        map[string]interface{}{"type": "string", "description": "Todo color"},
-			"repeat":       map[string]interface{}{"type": "string", "description": "Recurrence: daily, weekly, weekdays, monthly or yearly (empty to disable)"},
-			"parent_id":    map[string]interface{}{"type": "integer", "description": "Parent todo ID to nest under (omit/0 for top level)"},
+			"due_time":    map[string]interface{}{"type": "string", "description": "Due time (RFC3339)"},
+			"duration":    map[string]interface{}{"type": "integer", "description": "Estimated effort in minutes (0 = unset)"},
+			"amount":      map[string]interface{}{"type": "number", "description": "Associated amount"},
+			"amount_type": map[string]interface{}{"type": "string", "description": "Amount type: income or expense"},
+			"progress":    map[string]interface{}{"type": "integer", "description": "Manual progress in percent (0-100; omit for none)"},
+			"contact_ids": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "integer"}, "description": "Related contact IDs"},
+			"todo_ids":    map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "integer"}, "description": "Related todo IDs to link (jump targets; must exist in this workspace)"},
+			"color":       map[string]interface{}{"type": "string", "description": "Todo color"},
+			"repeat":      map[string]interface{}{"type": "string", "description": "Recurrence: daily, weekly, weekdays, monthly or yearly (empty to disable)"},
+			"parent_id":   map[string]interface{}{"type": "integer", "description": "Parent todo ID to nest under (omit/0 for top level)"},
 		},
 		"required": []string{"title"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		var parentID *uint
-		if v := getArg(args, "parent_id"); v != nil {
-			if u := toUint(v); u != 0 {
-				parentID = &u
-			}
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		var parentID *string
+		if v := toString(getArg(args, "parent_id")); v != "" {
+			parentID = &v
 		}
 		todo := &model.Todo{
 			Title:       toString(getArg(args, "title")),
@@ -113,8 +111,8 @@ func (s *MCPServer) registerTodoTools() {
 			"repeat":         map[string]interface{}{"type": "string", "description": "Recurrence: daily, weekly, weekdays, monthly or yearly (empty to disable)"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		updates := &model.Todo{
 			Title:       toString(getArg(args, "title")),
 			Description: toString(getArg(args, "description")),
@@ -147,8 +145,8 @@ func (s *MCPServer) registerTodoTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Todo ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		return s.todoSvc.ToggleStatus(ctx, userID, workspaceID, id)
 	})
 
@@ -159,8 +157,8 @@ func (s *MCPServer) registerTodoTools() {
 			"status": map[string]interface{}{"type": "string", "description": "New status: pending, done or abandoned"},
 		},
 		"required": []string{"id", "status"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		return s.todoSvc.SetStatus(ctx, userID, workspaceID, id, toString(getArg(args, "status")))
 	})
 
@@ -170,8 +168,8 @@ func (s *MCPServer) registerTodoTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Todo ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		return s.todoSvc.SyncToEvent(ctx, userID, workspaceID, id)
 	})
 
@@ -181,8 +179,8 @@ func (s *MCPServer) registerTodoTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Todo ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		err := s.todoSvc.Delete(ctx, userID, workspaceID, id)
 		if err != nil {
 			return nil, err
@@ -198,8 +196,8 @@ func (s *MCPServer) registerTodoTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Todo ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		return s.todoSvc.ListItems(ctx, userID, workspaceID, id)
 	})
 
@@ -210,8 +208,8 @@ func (s *MCPServer) registerTodoTools() {
 			"content": map[string]interface{}{"type": "string", "description": "Item content"},
 		},
 		"required": []string{"id", "content"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		return s.todoSvc.CreateItem(ctx, userID, workspaceID, id, toString(getArg(args, "content")))
 	})
 
@@ -225,9 +223,9 @@ func (s *MCPServer) registerTodoTools() {
 			"clear_due_time": map[string]interface{}{"type": "boolean", "description": "Clear the item's due time"},
 		},
 		"required": []string{"id", "item_id", "content"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
-		itemID := toUint(getArg(args, "item_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
+		itemID := toString(getArg(args, "item_id"))
 		return s.todoSvc.UpdateItem(ctx, userID, workspaceID, id, itemID, toString(getArg(args, "content")), toTimePtr(getArg(args, "due_time")), toBool(getArg(args, "clear_due_time")))
 	})
 
@@ -238,9 +236,9 @@ func (s *MCPServer) registerTodoTools() {
 			"item_id": map[string]interface{}{"type": "integer", "description": "Todo item ID"},
 		},
 		"required": []string{"id", "item_id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
-		itemID := toUint(getArg(args, "item_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
+		itemID := toString(getArg(args, "item_id"))
 		return s.todoSvc.ToggleItem(ctx, userID, workspaceID, id, itemID)
 	})
 
@@ -251,9 +249,9 @@ func (s *MCPServer) registerTodoTools() {
 			"item_id": map[string]interface{}{"type": "integer", "description": "Todo item ID"},
 		},
 		"required": []string{"id", "item_id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
-		itemID := toUint(getArg(args, "item_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
+		itemID := toString(getArg(args, "item_id"))
 		if err := s.todoSvc.DeleteItem(ctx, userID, workspaceID, id, itemID); err != nil {
 			return nil, err
 		}
@@ -268,8 +266,8 @@ func (s *MCPServer) registerTodoTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Todo ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		return s.todoSvc.TogglePin(ctx, userID, workspaceID, id)
 	})
 
@@ -279,8 +277,8 @@ func (s *MCPServer) registerTodoTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Todo ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		return s.todoSvc.Duplicate(ctx, userID, workspaceID, id)
 	})
 
@@ -291,12 +289,11 @@ func (s *MCPServer) registerTodoTools() {
 			"after_id": map[string]interface{}{"type": "integer", "description": "Todo ID to place it after (omit for top)"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
-		var afterID *uint
-		if v := getArg(args, "after_id"); v != nil {
-			u := toUint(v)
-			afterID = &u
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
+		var afterID *string
+		if v := toString(getArg(args, "after_id")); v != "" {
+			afterID = &v
 		}
 		if err := s.todoSvc.Reorder(ctx, userID, workspaceID, id, afterID); err != nil {
 			return nil, err
@@ -313,18 +310,15 @@ func (s *MCPServer) registerTodoTools() {
 			"position":  map[string]interface{}{"type": "string", "enum": []string{"first", "last"}, "description": "Position among siblings when after_id is omitted: 'last' appends at the end, 'first' (default) at the top"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
-		var parentID *uint
-		if v := getArg(args, "parent_id"); v != nil {
-			if u := toUint(v); u != 0 {
-				parentID = &u
-			}
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
+		var parentID *string
+		if v := toString(getArg(args, "parent_id")); v != "" {
+			parentID = &v
 		}
-		var afterID *uint
-		if v := getArg(args, "after_id"); v != nil {
-			u := toUint(v)
-			afterID = &u
+		var afterID *string
+		if v := toString(getArg(args, "after_id")); v != "" {
+			afterID = &v
 		}
 		if err := s.todoSvc.Move(ctx, userID, workspaceID, id, parentID, afterID, toString(getArg(args, "position"))); err != nil {
 			return nil, err
@@ -338,7 +332,7 @@ func (s *MCPServer) registerTodoTools() {
 			"ids": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "integer"}, "description": "Todo IDs"},
 		},
 		"required": []string{"ids"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		ids := toUintSlice(getArg(args, "ids"))
 		affected, err := s.todoSvc.BulkAction(ctx, userID, workspaceID, ids, "complete", service.BulkActionOptions{})
 		if err != nil {
@@ -348,9 +342,9 @@ func (s *MCPServer) registerTodoTools() {
 	})
 
 	s.registerTool("list_trashed_todos", "List soft-deleted todos (the trash).", map[string]interface{}{
-		"type": "object",
+		"type":       "object",
 		"properties": map[string]interface{}{},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		return s.todoSvc.ListTrash(ctx, userID, workspaceID)
 	})
 
@@ -360,8 +354,8 @@ func (s *MCPServer) registerTodoTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Todo ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		if err := s.todoSvc.Restore(ctx, userID, workspaceID, toUint(getArg(args, "id"))); err != nil {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		if err := s.todoSvc.Restore(ctx, userID, workspaceID, toString(getArg(args, "id"))); err != nil {
 			return nil, err
 		}
 		return map[string]interface{}{"success": true, "message": "todo restored"}, nil

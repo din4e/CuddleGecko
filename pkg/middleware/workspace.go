@@ -2,15 +2,14 @@ package middleware
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/din4e/cuddlegecko/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
 type WorkspaceMemberChecker interface {
-	IsMember(ctx context.Context, workspaceID, userID uint) bool
-	GetDefaultWorkspaceID(ctx context.Context, userID uint) (uint, error)
+	IsMember(ctx context.Context, workspaceID, userID string) bool
+	GetDefaultWorkspaceID(ctx context.Context, userID string) (string, error)
 }
 
 func WorkspaceAuth(checker WorkspaceMemberChecker) gin.HandlerFunc {
@@ -20,7 +19,7 @@ func WorkspaceAuth(checker WorkspaceMemberChecker) gin.HandlerFunc {
 	checker = NewCachingWorkspaceChecker(checker, memberTTL)
 	return func(c *gin.Context) {
 		userID := GetUserID(c)
-		if userID == 0 {
+		if userID == "" {
 			response.Unauthorized(c, "missing user context")
 			c.Abort()
 			return
@@ -28,16 +27,11 @@ func WorkspaceAuth(checker WorkspaceMemberChecker) gin.HandlerFunc {
 
 		ctx := c.Request.Context()
 		headerVal := c.GetHeader("X-Workspace-ID")
-		var workspaceID uint
+		var workspaceID string
 
 		if headerVal != "" {
-			id, err := strconv.ParseUint(headerVal, 10, 32)
-			if err != nil {
-				response.BadRequest(c, "invalid workspace id")
-				c.Abort()
-				return
-			}
-			workspaceID = uint(id)
+			// Entity ids are UUIDs now — opaque strings straight from the header.
+			workspaceID = headerVal
 		} else {
 			wsID, err := checker.GetDefaultWorkspaceID(ctx, userID)
 			if err != nil {
@@ -59,6 +53,6 @@ func WorkspaceAuth(checker WorkspaceMemberChecker) gin.HandlerFunc {
 	}
 }
 
-func GetWorkspaceID(c *gin.Context) uint {
-	return c.GetUint("workspace_id")
+func GetWorkspaceID(c *gin.Context) string {
+	return c.GetString("workspace_id")
 }

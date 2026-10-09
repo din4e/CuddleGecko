@@ -1,11 +1,15 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type RefreshToken struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	UserID    uint      `gorm:"index;not null" json:"user_id"`
-	Token     string    `gorm:"uniqueIndex;size:255;not null" json:"token"`
+	ID        string    `gorm:"primaryKey;type:char(36)" json:"id"`
+	UserID    string    `gorm:"size:36;index;not null" json:"user_id"`
+	Token     string    `gorm:"size:36;uniqueIndex;size:255;not null" json:"token"`
 	ExpiresAt time.Time `gorm:"not null" json:"expires_at"`
 	Revoked   bool      `gorm:"default:false" json:"revoked"`
 	// RevokedAt records when the CAS revoke happened; the replay check uses it
@@ -14,3 +18,6 @@ type RefreshToken struct {
 	RevokedAt *time.Time `json:"revoked_at"`
 	CreatedAt time.Time  `gorm:"autoCreateTime" json:"created_at"`
 }
+
+// BeforeCreate assigns the UUID primary key on first insert.
+func (r *RefreshToken) BeforeCreate(tx *gorm.DB) error { return ensureID(&r.ID, tx) }

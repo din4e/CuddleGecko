@@ -14,13 +14,13 @@ import (
 // TodoActivityRepository persists the per-todo audit log.
 type TodoActivityRepository interface {
 	CreateBatch(ctx context.Context, activities []model.TodoActivity) error
-	List(ctx context.Context, todoID uint, limit int) ([]model.TodoActivity, error)
+	List(ctx context.Context, todoID string, limit int) ([]model.TodoActivity, error)
 }
 
 // TodoUserLookup resolves the actor's username for the activity log. Satisfied
 // by repository.UserRepo.
 type TodoUserLookup interface {
-	GetUserByID(ctx context.Context, id uint) (*model.User, error)
+	GetUserByID(ctx context.Context, id string) (*model.User, error)
 }
 
 // TodoHistoryOption wires the audit-log + username resolution dependencies.
@@ -44,36 +44,36 @@ func WithTodoHistory(activities TodoActivityRepository, users TodoUserLookup) To
 // usernames effectively unique per id, so the cache never needs invalidation.
 type usernameCache struct {
 	mu   sync.RWMutex
-	name map[uint]string
+	name map[string]string
 }
 
-func (c *usernameCache) get(id uint) (string, bool) {
+func (c *usernameCache) get(id string) (string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	name, ok := c.name[id]
 	return name, ok
 }
 
-func (c *usernameCache) put(id uint, name string) {
+func (c *usernameCache) put(id string, name string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.name == nil {
-		c.name = make(map[uint]string)
+		c.name = make(map[string]string)
 	}
 	c.name[id] = name
 }
 
 // resolveUsername maps a userID to a display name, tolerating lookup failures
 // (deleted user) by falling back to the numeric id rendered as a string.
-func (s *TodoService) resolveUsername(ctx context.Context, userID uint) string {
+func (s *TodoService) resolveUsername(ctx context.Context, userID string) string {
 	if s.userLookup == nil {
-		return fmt.Sprintf("user#%d", userID)
+		return fmt.Sprintf("user#%s", userID)
 	}
 	if name, ok := s.usernames.get(userID); ok {
 		return name
 	}
 	user, err := s.userLookup.GetUserByID(ctx, userID)
-	name := fmt.Sprintf("user#%d", userID)
+	name := fmt.Sprintf("user#%s", userID)
 	if err == nil && user != nil && user.Username != "" {
 		name = user.Username
 	}
@@ -83,15 +83,21 @@ func (s *TodoService) resolveUsername(ctx context.Context, userID uint) string {
 
 // recordActivity appends audit lines for a todo mutation. Best-effort: history
 // failures never fail the mutation that produced them.
-func (s *TodoService) recordActivity(ctx context.Context, userID, todoID uint, entries []model.TodoActivity) {
+func (s *TodoService) recordActivity(ctx context.Context, userID, todoID string, entries []model.TodoActivity) {
 	if s.activityRepo == nil || len(entries) == 0 {
 		return
 	}
 	username := s.resolveUsername(ctx, userID)
+	// Seq orders the log: unix-nano at batch start plus the row offset, so
+	// batch rows stay in diff order and later batches always sort after
+	// earlier ones — created_at DESC, id DESC used to rely on autoincrement
+	// ids for this, which random UUIDs can't provide.
+	base := time.Now().UnixNano()
 	for i := range entries {
 		entries[i].TodoID = todoID
 		entries[i].UserID = userID
 		entries[i].Username = username
+		entries[i].Seq = base + int64(i)
 	}
 	// Errors are intentionally swallowed: the log must not break the write path.
 	_ = s.activityRepo.CreateBatch(ctx, entries)
@@ -189,7 +195,7 @@ func amountPtrString(a *float64) string {
 	return fmt.Sprintf("%g", *a)
 }
 
-func uintPtrEqual(a, b *uint) bool {
+func idPtrEqual(a, b *string) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
@@ -198,11 +204,11 @@ func uintPtrEqual(a, b *uint) bool {
 
 // uintSlicesEqual compares two id sets order-insensitively — link edits are
 // replaces, and the picker may hand back the same set in a different order.
-func uintSlicesEqual(a, b []uint) bool {
+func uintSlicesEqual(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	seen := make(map[uint]int, len(a))
+	seen := make(map[string]int, len(a))
 	for _, id := range a {
 		seen[id]++
 	}
@@ -215,26 +221,26 @@ func uintSlicesEqual(a, b []uint) bool {
 	return true
 }
 
-func uintSliceString(ids []uint) string {
+func uintSliceString(ids []string) string {
 	if len(ids) == 0 {
 		return ""
 	}
 	parts := make([]string, 0, len(ids))
 	for _, id := range ids {
-		parts = append(parts, fmt.Sprintf("%d", id))
+		parts = append(parts, fmt.Sprintf("%s", id))
 	}
 	return strings.Join(parts, ",")
 }
 
-func uintPtrString(u *uint) string {
+func idPtrString(u *string) string {
 	if u == nil {
 		return ""
 	}
-	return fmt.Sprintf("%d", *u)
+	return *u
 }
 
 // ListActivities returns the todo's audit log, newest first.
-func (s *TodoService) ListActivities(ctx context.Context, userID, workspaceID, todoID uint, limit int) ([]model.TodoActivity, error) {
+func (s *TodoService) ListActivities(ctx context.Context, userID, workspaceID, todoID string, limit int) ([]model.TodoActivity, error) {
 	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
 		return nil, err
 	}

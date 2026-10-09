@@ -18,7 +18,7 @@ func (m *mockTodoRepo) Create(ctx context.Context, todo *model.Todo) error {
 	return m.Called(ctx, todo).Error(0)
 }
 
-func (m *mockTodoRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Todo, error) {
+func (m *mockTodoRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.Todo, error) {
 	args := m.Called(ctx, workspaceID, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -26,19 +26,19 @@ func (m *mockTodoRepo) GetByID(ctx context.Context, workspaceID, id uint) (*mode
 	return args.Get(0).(*model.Todo), args.Error(1)
 }
 
-func (m *mockTodoRepo) ExistingIDs(ctx context.Context, workspaceID uint, ids []uint) ([]uint, error) {
+func (m *mockTodoRepo) ExistingIDs(ctx context.Context, workspaceID string, ids []string) ([]string, error) {
 	args := m.Called(ctx, workspaceID, ids)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]uint), args.Error(1)
+	return args.Get(0).([]string), args.Error(1)
 }
 
-func (m *mockTodoRepo) SetTodoIDs(ctx context.Context, workspaceID, id uint, ids []uint) error {
+func (m *mockTodoRepo) SetTodoIDs(ctx context.Context, workspaceID, id string, ids []string) error {
 	return m.Called(ctx, workspaceID, id, ids).Error(0)
 }
 
-func (m *mockTodoRepo) List(ctx context.Context, workspaceID uint, q model.TodoListQuery) ([]model.Todo, int64, error) {
+func (m *mockTodoRepo) List(ctx context.Context, workspaceID string, q model.TodoListQuery) ([]model.Todo, int64, error) {
 	args := m.Called(ctx, workspaceID, q)
 	if args.Get(0) == nil {
 		return nil, 0, args.Error(2)
@@ -50,11 +50,11 @@ func (m *mockTodoRepo) Update(ctx context.Context, todo *model.Todo) error {
 	return m.Called(ctx, todo).Error(0)
 }
 
-func (m *mockTodoRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (m *mockTodoRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	return m.Called(ctx, workspaceID, id).Error(0)
 }
 
-func (m *mockTodoRepo) ListItems(ctx context.Context, todoID uint) ([]model.TodoItem, error) {
+func (m *mockTodoRepo) ListItems(ctx context.Context, todoID string) ([]model.TodoItem, error) {
 	args := m.Called(ctx, todoID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -62,7 +62,7 @@ func (m *mockTodoRepo) ListItems(ctx context.Context, todoID uint) ([]model.Todo
 	return args.Get(0).([]model.TodoItem), args.Error(1)
 }
 
-func (m *mockTodoRepo) ListItemsByTodoIDs(ctx context.Context, todoIDs []uint) ([]model.TodoItem, error) {
+func (m *mockTodoRepo) ListItemsByTodoIDs(ctx context.Context, todoIDs []string) ([]model.TodoItem, error) {
 	args := m.Called(ctx, todoIDs)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -70,7 +70,7 @@ func (m *mockTodoRepo) ListItemsByTodoIDs(ctx context.Context, todoIDs []uint) (
 	return args.Get(0).([]model.TodoItem), args.Error(1)
 }
 
-func (m *mockTodoRepo) GetItem(ctx context.Context, todoID, itemID uint) (*model.TodoItem, error) {
+func (m *mockTodoRepo) GetItem(ctx context.Context, todoID, itemID string) (*model.TodoItem, error) {
 	args := m.Called(ctx, todoID, itemID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -82,23 +82,23 @@ func (m *mockTodoRepo) CreateItem(ctx context.Context, item *model.TodoItem) err
 	return m.Called(ctx, item).Error(0)
 }
 
-func (m *mockTodoRepo) UpdateItem(ctx context.Context, todoID uint, item *model.TodoItem) error {
+func (m *mockTodoRepo) UpdateItem(ctx context.Context, todoID string, item *model.TodoItem) error {
 	return m.Called(ctx, todoID, item).Error(0)
 }
 
-func (m *mockTodoRepo) SetItemDone(ctx context.Context, todoID, itemID uint, done bool) error {
+func (m *mockTodoRepo) SetItemDone(ctx context.Context, todoID, itemID string, done bool) error {
 	return m.Called(ctx, todoID, itemID, done).Error(0)
 }
 
-func (m *mockTodoRepo) DeleteItem(ctx context.Context, todoID, itemID uint) error {
+func (m *mockTodoRepo) DeleteItem(ctx context.Context, todoID, itemID string) error {
 	return m.Called(ctx, todoID, itemID).Error(0)
 }
 
-func (m *mockTodoRepo) ReorderItem(ctx context.Context, todoID, itemID uint, afterItemID *uint) error {
+func (m *mockTodoRepo) ReorderItem(ctx context.Context, todoID, itemID string, afterItemID *string) error {
 	return m.Called(ctx, todoID, itemID, afterItemID).Error(0)
 }
 
-func (m *mockTodoRepo) ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error) {
+func (m *mockTodoRepo) ListTrash(ctx context.Context, workspaceID string) ([]model.Todo, error) {
 	args := m.Called(ctx, workspaceID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -106,16 +106,16 @@ func (m *mockTodoRepo) ListTrash(ctx context.Context, workspaceID uint) ([]model
 	return args.Get(0).([]model.Todo), args.Error(1)
 }
 
-func (m *mockTodoRepo) Restore(ctx context.Context, workspaceID, id uint) error {
+func (m *mockTodoRepo) Restore(ctx context.Context, workspaceID, id string) error {
 	return m.Called(ctx, workspaceID, id).Error(0)
 }
 
-func (m *mockTodoRepo) EmptyTrash(ctx context.Context, workspaceID uint) (int64, error) {
+func (m *mockTodoRepo) EmptyTrash(ctx context.Context, workspaceID string) (int64, error) {
 	args := m.Called(ctx, workspaceID)
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *mockTodoRepo) PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID uint) (*model.Todo, error) {
+func (m *mockTodoRepo) PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID string) (*model.Todo, error) {
 	args := m.Called(ctx, userID, workspaceID, todoID, itemID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -123,7 +123,7 @@ func (m *mockTodoRepo) PromoteItem(ctx context.Context, userID, workspaceID, tod
 	return args.Get(0).(*model.Todo), args.Error(1)
 }
 
-func (m *mockTodoRepo) Duplicate(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error) {
+func (m *mockTodoRepo) Duplicate(ctx context.Context, userID, workspaceID, id string) (*model.Todo, error) {
 	args := m.Called(ctx, userID, workspaceID, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -131,36 +131,36 @@ func (m *mockTodoRepo) Duplicate(ctx context.Context, userID, workspaceID, id ui
 	return args.Get(0).(*model.Todo), args.Error(1)
 }
 
-func (m *mockTodoRepo) BulkAction(ctx context.Context, workspaceID uint, ids []uint, action, priority string) (int64, error) {
+func (m *mockTodoRepo) BulkAction(ctx context.Context, workspaceID string, ids []string, action, priority string) (int64, error) {
 	args := m.Called(ctx, workspaceID, ids, action, priority)
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *mockTodoRepo) SetPinned(ctx context.Context, workspaceID, id uint, pinned bool) error {
+func (m *mockTodoRepo) SetPinned(ctx context.Context, workspaceID, id string, pinned bool) error {
 	return m.Called(ctx, workspaceID, id, pinned).Error(0)
 }
 
-func (m *mockTodoRepo) IncrementPomodoro(ctx context.Context, workspaceID, id uint) error {
+func (m *mockTodoRepo) IncrementPomodoro(ctx context.Context, workspaceID, id string) error {
 	return m.Called(ctx, workspaceID, id).Error(0)
 }
 
-func (m *mockTodoRepo) SetProgress(ctx context.Context, workspaceID, id uint, progress *int) error {
+func (m *mockTodoRepo) SetProgress(ctx context.Context, workspaceID, id string, progress *int) error {
 	return m.Called(ctx, workspaceID, id, progress).Error(0)
 }
 
-func (m *mockTodoRepo) SetParent(ctx context.Context, workspaceID, id uint, parentID *uint) error {
+func (m *mockTodoRepo) SetParent(ctx context.Context, workspaceID, id string, parentID *string) error {
 	return m.Called(ctx, workspaceID, id, parentID).Error(0)
 }
 
-func (m *mockTodoRepo) UpdateCreatedAt(ctx context.Context, id uint, at time.Time) error {
+func (m *mockTodoRepo) UpdateCreatedAt(ctx context.Context, id string, at time.Time) error {
 	return m.Called(ctx, id, at).Error(0)
 }
 
-func (m *mockTodoRepo) ReplaceTags(ctx context.Context, todoID uint, tags []model.Tag) error {
+func (m *mockTodoRepo) ReplaceTags(ctx context.Context, todoID string, tags []model.Tag) error {
 	return m.Called(ctx, todoID, tags).Error(0)
 }
 
-func (m *mockTodoRepo) GetTags(ctx context.Context, todoID uint) ([]model.Tag, error) {
+func (m *mockTodoRepo) GetTags(ctx context.Context, todoID string) ([]model.Tag, error) {
 	args := m.Called(ctx, todoID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -168,25 +168,25 @@ func (m *mockTodoRepo) GetTags(ctx context.Context, todoID uint) ([]model.Tag, e
 	return args.Get(0).([]model.Tag), args.Error(1)
 }
 
-func (m *mockTodoRepo) Stats(ctx context.Context, workspaceID uint) (model.TodoStats, error) {
+func (m *mockTodoRepo) Stats(ctx context.Context, workspaceID string) (model.TodoStats, error) {
 	args := m.Called(ctx, workspaceID)
 	return args.Get(0).(model.TodoStats), args.Error(1)
 }
 
-func (m *mockTodoRepo) Reorder(ctx context.Context, workspaceID, id uint, afterID *uint) error {
+func (m *mockTodoRepo) Reorder(ctx context.Context, workspaceID, id string, afterID *string) error {
 	return m.Called(ctx, workspaceID, id, afterID).Error(0)
 }
 
-func (m *mockTodoRepo) Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint, position string) error {
+func (m *mockTodoRepo) Move(ctx context.Context, workspaceID, id string, parentID, afterID *string, position string) error {
 	return m.Called(ctx, workspaceID, id, parentID, afterID, position).Error(0)
 }
 
-func (m *mockTodoRepo) CascadeComplete(ctx context.Context, workspaceID uint, parentIDs []uint, now time.Time) (int64, error) {
+func (m *mockTodoRepo) CascadeComplete(ctx context.Context, workspaceID string, parentIDs []string, now time.Time) (int64, error) {
 	args := m.Called(ctx, workspaceID, parentIDs, now)
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *mockTodoRepo) CascadeRestore(ctx context.Context, workspaceID uint, parentIDs []uint) (int64, error) {
+func (m *mockTodoRepo) CascadeRestore(ctx context.Context, workspaceID string, parentIDs []string) (int64, error) {
 	args := m.Called(ctx, workspaceID, parentIDs)
 	return args.Get(0).(int64), args.Error(1)
 }
@@ -206,10 +206,10 @@ func TestTodoService_Create(t *testing.T) {
 
 	repo.On("Create", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
 
-	todo, err := svc.Create(context.Background(), 1, 2, &model.Todo{Title: "test"})
+	todo, err := svc.Create(context.Background(), "1", "2", &model.Todo{Title: "test"})
 	assert.NoError(t, err)
-	assert.Equal(t, uint(1), todo.UserID)
-	assert.Equal(t, uint(2), todo.WorkspaceID)
+	assert.Equal(t, "1", todo.UserID)
+	assert.Equal(t, "2", todo.WorkspaceID)
 	assert.Equal(t, "pending", todo.Status)
 	assert.Equal(t, "none", todo.Priority)
 	repo.AssertExpectations(t)
@@ -221,10 +221,10 @@ func TestTodoService_List(t *testing.T) {
 	svc := NewTodoService(repo, eventRepo, repo)
 
 	q := model.TodoListQuery{Page: 1, PageSize: 50}
-	expected := []model.Todo{{ID: 1, Title: "a"}, {ID: 2, Title: "b"}}
-	repo.On("List", mock.Anything, uint(1), q).Return(expected, int64(2), nil)
+	expected := []model.Todo{{ID: "1", Title: "a"}, {ID: "2", Title: "b"}}
+	repo.On("List", mock.Anything, "1", q).Return(expected, int64(2), nil)
 
-	todos, total, err := svc.List(context.Background(), 1, 1, q)
+	todos, total, err := svc.List(context.Background(), "1", "1", q)
 	assert.NoError(t, err)
 	assert.Len(t, todos, 2)
 	assert.Equal(t, int64(2), total)
@@ -236,11 +236,11 @@ func TestTodoService_Update(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	existing := &model.Todo{ID: 1, Title: "old", Priority: "normal", Status: "pending"}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	existing := &model.Todo{ID: "1", Title: "old", Priority: "normal", Status: "pending"}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
 
-	updated, err := svc.Update(context.Background(), 1, 1, 1, &model.Todo{Title: "new", Priority: "high"}, TodoClear{})
+	updated, err := svc.Update(context.Background(), "1", "1", "1", &model.Todo{Title: "new", Priority: "high"}, TodoClear{})
 	assert.NoError(t, err)
 	assert.Equal(t, "new", updated.Title)
 	assert.Equal(t, "high", updated.Priority)
@@ -253,13 +253,13 @@ func TestTodoService_Update_ClearDueTime(t *testing.T) {
 	svc := NewTodoService(repo, eventRepo, repo)
 
 	due := time.Date(2026, 5, 25, 10, 0, 0, 0, time.UTC)
-	existing := &model.Todo{ID: 1, Title: "task", DueTime: &due}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	existing := &model.Todo{ID: "1", Title: "task", DueTime: &due}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.MatchedBy(func(t *model.Todo) bool {
 		return t.DueTime == nil
 	})).Return(nil)
 
-	updated, err := svc.Update(context.Background(), 1, 1, 1, &model.Todo{}, TodoClear{DueTime: true})
+	updated, err := svc.Update(context.Background(), "1", "1", "1", &model.Todo{}, TodoClear{DueTime: true})
 	assert.NoError(t, err)
 	assert.Nil(t, updated.DueTime)
 	repo.AssertExpectations(t)
@@ -270,9 +270,9 @@ func TestTodoService_Update_NotFound(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(99)).Return(nil, ErrTodoNotFound)
+	repo.On("GetByID", mock.Anything, "1", "99").Return(nil, ErrTodoNotFound)
 
-	_, err := svc.Update(context.Background(), 1, 1, 99, &model.Todo{Title: "new"}, TodoClear{})
+	_, err := svc.Update(context.Background(), "1", "1", "99", &model.Todo{Title: "new"}, TodoClear{})
 	assert.ErrorIs(t, err, ErrTodoNotFound)
 }
 
@@ -281,12 +281,12 @@ func TestTodoService_ToggleStatus_PendingToDone(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	existing := &model.Todo{ID: 1, Status: "pending"}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	existing := &model.Todo{ID: "1", Status: "pending"}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
-	repo.On("CascadeComplete", mock.Anything, uint(1), mock.Anything, mock.Anything).Return(int64(0), nil)
+	repo.On("CascadeComplete", mock.Anything, "1", mock.Anything, mock.Anything).Return(int64(0), nil)
 
-	todo, err := svc.ToggleStatus(context.Background(), 1, 1, 1)
+	todo, err := svc.ToggleStatus(context.Background(), "1", "1", "1")
 	assert.NoError(t, err)
 	assert.Equal(t, "done", todo.Status)
 	assert.NotNil(t, todo.CompletedAt)
@@ -299,12 +299,12 @@ func TestTodoService_ToggleStatus_DoneToPending(t *testing.T) {
 	svc := NewTodoService(repo, eventRepo, repo)
 
 	now := time.Now()
-	existing := &model.Todo{ID: 1, Status: "done", CompletedAt: &now}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	existing := &model.Todo{ID: "1", Status: "done", CompletedAt: &now}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
-	repo.On("CascadeRestore", mock.Anything, uint(1), mock.Anything).Return(int64(0), nil)
+	repo.On("CascadeRestore", mock.Anything, "1", mock.Anything).Return(int64(0), nil)
 
-	todo, err := svc.ToggleStatus(context.Background(), 1, 1, 1)
+	todo, err := svc.ToggleStatus(context.Background(), "1", "1", "1")
 	assert.NoError(t, err)
 	assert.Equal(t, "pending", todo.Status)
 	assert.Nil(t, todo.CompletedAt)
@@ -315,9 +315,9 @@ func TestTodoService_ToggleStatus_NotFound(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(99)).Return(nil, ErrTodoNotFound)
+	repo.On("GetByID", mock.Anything, "1", "99").Return(nil, ErrTodoNotFound)
 
-	_, err := svc.ToggleStatus(context.Background(), 1, 1, 99)
+	_, err := svc.ToggleStatus(context.Background(), "1", "1", "99")
 	assert.ErrorIs(t, err, ErrTodoNotFound)
 }
 
@@ -326,13 +326,13 @@ func TestTodoService_SetStatus_Abandon(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	existing := &model.Todo{ID: 1, Status: "pending"}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	existing := &model.Todo{ID: "1", Status: "pending"}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.MatchedBy(func(td *model.Todo) bool {
 		return td.Status == "abandoned" && td.CompletedAt == nil
 	})).Return(nil)
 
-	todo, err := svc.SetStatus(context.Background(), 1, 1, 1, "abandoned")
+	todo, err := svc.SetStatus(context.Background(), "1", "1", "1", "abandoned")
 	assert.NoError(t, err)
 	assert.Equal(t, "abandoned", todo.Status)
 	assert.Nil(t, todo.CompletedAt, "abandoned tasks never count as completed")
@@ -345,12 +345,12 @@ func TestTodoService_SetStatus_AbandonClearsCompletionTime(t *testing.T) {
 	svc := NewTodoService(repo, eventRepo, repo)
 
 	completed := time.Now()
-	existing := &model.Todo{ID: 1, Status: "done", CompletedAt: &completed}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	existing := &model.Todo{ID: "1", Status: "done", CompletedAt: &completed}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
-	repo.On("CascadeRestore", mock.Anything, uint(1), mock.Anything).Return(int64(0), nil)
+	repo.On("CascadeRestore", mock.Anything, "1", mock.Anything).Return(int64(0), nil)
 
-	todo, err := svc.SetStatus(context.Background(), 1, 1, 1, "abandoned")
+	todo, err := svc.SetStatus(context.Background(), "1", "1", "1", "abandoned")
 	assert.NoError(t, err)
 	assert.Equal(t, "abandoned", todo.Status)
 	assert.Nil(t, todo.CompletedAt, "abandoning a done task drops it from done stats")
@@ -361,12 +361,12 @@ func TestTodoService_SetStatus_DoneSetsCompletionTime(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	existing := &model.Todo{ID: 1, Status: "abandoned"}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	existing := &model.Todo{ID: "1", Status: "abandoned"}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil)
-	repo.On("CascadeComplete", mock.Anything, uint(1), mock.Anything, mock.Anything).Return(int64(0), nil)
+	repo.On("CascadeComplete", mock.Anything, "1", mock.Anything, mock.Anything).Return(int64(0), nil)
 
-	todo, err := svc.SetStatus(context.Background(), 1, 1, 1, "done")
+	todo, err := svc.SetStatus(context.Background(), "1", "1", "1", "done")
 	assert.NoError(t, err)
 	assert.Equal(t, "done", todo.Status)
 	assert.NotNil(t, todo.CompletedAt)
@@ -377,10 +377,10 @@ func TestTodoService_SetStatus_Invalid(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	_, err := svc.SetStatus(context.Background(), 1, 1, 1, "bogus")
+	_, err := svc.SetStatus(context.Background(), "1", "1", "1", "bogus")
 	assert.ErrorIs(t, err, ErrInvalidTodo)
 
-	_, err = svc.SetStatus(context.Background(), 1, 1, 1, "")
+	_, err = svc.SetStatus(context.Background(), "1", "1", "1", "")
 	assert.ErrorIs(t, err, ErrInvalidTodo)
 	repo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
 }
@@ -390,9 +390,9 @@ func TestTodoService_SetStatus_NotFound(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(99)).Return(nil, ErrTodoNotFound)
+	repo.On("GetByID", mock.Anything, "1", "99").Return(nil, ErrTodoNotFound)
 
-	_, err := svc.SetStatus(context.Background(), 1, 1, 99, "done")
+	_, err := svc.SetStatus(context.Background(), "1", "1", "99", "done")
 	assert.ErrorIs(t, err, ErrTodoNotFound)
 }
 
@@ -401,7 +401,7 @@ func TestTodoService_Create_RejectsInvalidStatus(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	_, err := svc.Create(context.Background(), 1, 1, &model.Todo{Title: "t", Status: "bogus"})
+	_, err := svc.Create(context.Background(), "1", "1", &model.Todo{Title: "t", Status: "bogus"})
 	assert.ErrorIs(t, err, ErrInvalidTodo)
 	repo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
 }
@@ -415,7 +415,7 @@ func TestTodoService_Create_DoneGetsCompletionTime(t *testing.T) {
 		return td.Status == "done" && td.CompletedAt != nil
 	})).Return(nil)
 
-	todo, err := svc.Create(context.Background(), 1, 1, &model.Todo{Title: "t", Status: "done"})
+	todo, err := svc.Create(context.Background(), "1", "1", &model.Todo{Title: "t", Status: "done"})
 	assert.NoError(t, err)
 	assert.Equal(t, "done", todo.Status)
 	assert.NotNil(t, todo.CompletedAt)
@@ -427,7 +427,7 @@ func TestTodoService_Update_RejectsInvalidStatus(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	_, err := svc.Update(context.Background(), 1, 1, 1, &model.Todo{Status: "bogus"}, TodoClear{})
+	_, err := svc.Update(context.Background(), "1", "1", "1", &model.Todo{Status: "bogus"}, TodoClear{})
 	assert.ErrorIs(t, err, ErrInvalidTodo)
 	repo.AssertNotCalled(t, "GetByID", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -439,7 +439,7 @@ func TestTodoService_Create_ImportanceUrgencyDefaultNone(t *testing.T) {
 
 	repo.On("Create", mock.Anything, mock.Anything).Return(nil)
 
-	todo, err := svc.Create(context.Background(), 1, 1, &model.Todo{Title: "t"})
+	todo, err := svc.Create(context.Background(), "1", "1", &model.Todo{Title: "t"})
 	assert.NoError(t, err)
 	assert.Equal(t, "none", todo.Importance)
 	assert.Equal(t, "none", todo.Urgency)
@@ -451,7 +451,7 @@ func TestTodoService_Create_RejectsInvalidImportance(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	_, err := svc.Create(context.Background(), 1, 1, &model.Todo{Title: "t", Importance: "very"})
+	_, err := svc.Create(context.Background(), "1", "1", &model.Todo{Title: "t", Importance: "very"})
 	assert.ErrorIs(t, err, ErrInvalidTodo)
 	repo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
 }
@@ -461,7 +461,7 @@ func TestTodoService_Create_RejectsInvalidUrgency(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	_, err := svc.Create(context.Background(), 1, 1, &model.Todo{Title: "t", Urgency: "asap"})
+	_, err := svc.Create(context.Background(), "1", "1", &model.Todo{Title: "t", Urgency: "asap"})
 	assert.ErrorIs(t, err, ErrInvalidTodo)
 	repo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
 }
@@ -471,7 +471,7 @@ func TestTodoService_Update_RejectsInvalidUrgency(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	_, err := svc.Update(context.Background(), 1, 1, 1, &model.Todo{Urgency: "soon"}, TodoClear{})
+	_, err := svc.Update(context.Background(), "1", "1", "1", &model.Todo{Urgency: "soon"}, TodoClear{})
 	assert.ErrorIs(t, err, ErrInvalidTodo)
 	repo.AssertNotCalled(t, "GetByID", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -481,13 +481,13 @@ func TestTodoService_Update_AppliesImportanceAndUrgency(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	existing := &model.Todo{ID: 1, Title: "task", Status: "pending", Importance: "none", Urgency: "high"}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	existing := &model.Todo{ID: "1", Title: "task", Status: "pending", Importance: "none", Urgency: "high"}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.MatchedBy(func(td *model.Todo) bool {
 		return td.Importance == "high" && td.Urgency == "high"
 	})).Return(nil)
 
-	updated, err := svc.Update(context.Background(), 1, 1, 1, &model.Todo{Importance: "high"}, TodoClear{})
+	updated, err := svc.Update(context.Background(), "1", "1", "1", &model.Todo{Importance: "high"}, TodoClear{})
 	assert.NoError(t, err)
 	assert.Equal(t, "high", updated.Importance)
 	assert.Equal(t, "high", updated.Urgency, "empty update payload leaves urgency untouched")
@@ -499,14 +499,14 @@ func TestTodoService_Update_StatusSyncsCompletionTime(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	existing := &model.Todo{ID: 1, Title: "task", Status: "done"}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	existing := &model.Todo{ID: "1", Title: "task", Status: "done"}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.MatchedBy(func(td *model.Todo) bool {
 		return td.Status == "pending" && td.CompletedAt == nil
 	})).Return(nil)
-	repo.On("CascadeRestore", mock.Anything, uint(1), mock.Anything).Return(int64(0), nil)
+	repo.On("CascadeRestore", mock.Anything, "1", mock.Anything).Return(int64(0), nil)
 
-	updated, err := svc.Update(context.Background(), 1, 1, 1, &model.Todo{Status: "pending"}, TodoClear{})
+	updated, err := svc.Update(context.Background(), "1", "1", "1", &model.Todo{Status: "pending"}, TodoClear{})
 	assert.NoError(t, err)
 	assert.Equal(t, "pending", updated.Status)
 	assert.Nil(t, updated.CompletedAt)
@@ -520,17 +520,17 @@ func TestTodoService_SyncToEvent(t *testing.T) {
 
 	dueTime := time.Date(2026, 5, 25, 10, 0, 0, 0, time.UTC)
 	existing := &model.Todo{
-		ID: 1, Title: "meeting", Description: "desc",
-		DueTime: &dueTime, ContactIDs: []uint{10, 20}, Color: "#ff0000",
+		ID: "1", Title: "meeting", Description: "desc",
+		DueTime: &dueTime, ContactIDs: []string{"10", "20"}, Color: "#ff0000",
 	}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	eventRepo.On("Create", mock.Anything, mock.AnythingOfType("*model.Event")).Return(nil)
 
-	event, err := svc.SyncToEvent(context.Background(), 1, 1, 1)
+	event, err := svc.SyncToEvent(context.Background(), "1", "1", "1")
 	assert.NoError(t, err)
 	assert.Equal(t, "meeting", event.Title)
 	assert.Equal(t, "desc", event.Description)
-	assert.Equal(t, []uint{10, 20}, event.ContactIDs)
+	assert.Equal(t, []string{"10", "20"}, event.ContactIDs)
 	assert.Equal(t, "#ff0000", event.Color)
 	assert.Equal(t, dueTime, event.StartTime)
 	repo.AssertExpectations(t)
@@ -542,11 +542,11 @@ func TestTodoService_SyncToEvent_NoDueTime(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	existing := &model.Todo{ID: 1, Title: "task", DueTime: nil}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	existing := &model.Todo{ID: "1", Title: "task", DueTime: nil}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	eventRepo.On("Create", mock.Anything, mock.AnythingOfType("*model.Event")).Return(nil)
 
-	event, err := svc.SyncToEvent(context.Background(), 1, 1, 1)
+	event, err := svc.SyncToEvent(context.Background(), "1", "1", "1")
 	assert.NoError(t, err)
 	assert.False(t, event.StartTime.IsZero())
 }
@@ -556,9 +556,9 @@ func TestTodoService_SyncToEvent_NotFound(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(99)).Return(nil, ErrTodoNotFound)
+	repo.On("GetByID", mock.Anything, "1", "99").Return(nil, ErrTodoNotFound)
 
-	_, err := svc.SyncToEvent(context.Background(), 1, 1, 99)
+	_, err := svc.SyncToEvent(context.Background(), "1", "1", "99")
 	assert.ErrorIs(t, err, ErrTodoNotFound)
 }
 
@@ -567,9 +567,9 @@ func TestTodoService_Delete(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("Delete", mock.Anything, uint(1), uint(1)).Return(nil)
+	repo.On("Delete", mock.Anything, "1", "1").Return(nil)
 
-	err := svc.Delete(context.Background(), 1, 1, 1)
+	err := svc.Delete(context.Background(), "1", "1", "1")
 	assert.NoError(t, err)
 	repo.AssertExpectations(t)
 }
@@ -579,9 +579,9 @@ func TestTodoService_GetByID_NotFound(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(99)).Return(nil, ErrTodoNotFound)
+	repo.On("GetByID", mock.Anything, "1", "99").Return(nil, ErrTodoNotFound)
 
-	_, err := svc.GetByID(context.Background(), 1, 1, 99)
+	_, err := svc.GetByID(context.Background(), "1", "1", "99")
 	assert.ErrorIs(t, err, ErrTodoNotFound)
 }
 
@@ -590,13 +590,13 @@ func TestTodoService_CreateItem(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1, Title: "task"}, nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1", Title: "task"}, nil)
 	repo.On("CreateItem", mock.Anything, mock.AnythingOfType("*model.TodoItem")).Return(nil)
 
-	item, err := svc.CreateItem(context.Background(), 1, 1, 1, "  buy milk  ")
+	item, err := svc.CreateItem(context.Background(), "1", "1", "1", "  buy milk  ")
 	assert.NoError(t, err)
 	assert.Equal(t, "buy milk", item.Content)
-	assert.Equal(t, uint(1), item.TodoID)
+	assert.Equal(t, "1", item.TodoID)
 	repo.AssertExpectations(t)
 }
 
@@ -605,9 +605,9 @@ func TestTodoService_CreateItem_EmptyContent(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1"}, nil)
 
-	_, err := svc.CreateItem(context.Background(), 1, 1, 1, "   ")
+	_, err := svc.CreateItem(context.Background(), "1", "1", "1", "   ")
 	assert.ErrorIs(t, err, ErrTodoItemEmpty)
 }
 
@@ -616,9 +616,9 @@ func TestTodoService_CreateItem_TodoNotFound(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(99)).Return(nil, ErrTodoNotFound)
+	repo.On("GetByID", mock.Anything, "1", "99").Return(nil, ErrTodoNotFound)
 
-	_, err := svc.CreateItem(context.Background(), 1, 1, 99, "x")
+	_, err := svc.CreateItem(context.Background(), "1", "1", "99", "x")
 	assert.ErrorIs(t, err, ErrTodoNotFound)
 }
 
@@ -627,11 +627,11 @@ func TestTodoService_ToggleItem(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
-	repo.On("GetItem", mock.Anything, uint(1), uint(5)).Return(&model.TodoItem{ID: 5, TodoID: 1, Done: false}, nil)
-	repo.On("SetItemDone", mock.Anything, uint(1), uint(5), true).Return(nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1"}, nil)
+	repo.On("GetItem", mock.Anything, "1", "5").Return(&model.TodoItem{ID: "5", TodoID: "1", Done: false}, nil)
+	repo.On("SetItemDone", mock.Anything, "1", "5", true).Return(nil)
 
-	item, err := svc.ToggleItem(context.Background(), 1, 1, 1, 5)
+	item, err := svc.ToggleItem(context.Background(), "1", "1", "1", "5")
 	assert.NoError(t, err)
 	assert.True(t, item.Done)
 	repo.AssertExpectations(t)
@@ -642,11 +642,11 @@ func TestTodoService_DeleteItem(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
-	repo.On("GetItem", mock.Anything, uint(1), uint(5)).Return(&model.TodoItem{ID: 5, Done: true}, nil)
-	repo.On("DeleteItem", mock.Anything, uint(1), uint(5)).Return(nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1"}, nil)
+	repo.On("GetItem", mock.Anything, "1", "5").Return(&model.TodoItem{ID: "5", Done: true}, nil)
+	repo.On("DeleteItem", mock.Anything, "1", "5").Return(nil)
 
-	err := svc.DeleteItem(context.Background(), 1, 1, 1, 5)
+	err := svc.DeleteItem(context.Background(), "1", "1", "1", "5")
 	assert.NoError(t, err)
 	repo.AssertExpectations(t)
 }
@@ -656,12 +656,12 @@ func TestTodoService_ReorderItem(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	after := uint(2)
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
-	repo.On("GetItem", mock.Anything, uint(1), uint(5)).Return(&model.TodoItem{ID: 5}, nil)
-	repo.On("ReorderItem", mock.Anything, uint(1), uint(5), &after).Return(nil)
+	after := "2"
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1"}, nil)
+	repo.On("GetItem", mock.Anything, "1", "5").Return(&model.TodoItem{ID: "5"}, nil)
+	repo.On("ReorderItem", mock.Anything, "1", "5", &after).Return(nil)
 
-	err := svc.ReorderItem(context.Background(), 1, 1, 1, 5, &after)
+	err := svc.ReorderItem(context.Background(), "1", "1", "1", "5", &after)
 	assert.NoError(t, err)
 	repo.AssertExpectations(t)
 }
@@ -671,11 +671,11 @@ func TestTodoService_PromoteItem(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
-	repo.On("GetItem", mock.Anything, uint(1), uint(5)).Return(&model.TodoItem{ID: 5, Content: "step"}, nil)
-	repo.On("PromoteItem", mock.Anything, uint(1), uint(1), uint(1), uint(5)).Return(&model.Todo{ID: 9, Title: "step"}, nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1"}, nil)
+	repo.On("GetItem", mock.Anything, "1", "5").Return(&model.TodoItem{ID: "5", Content: "step"}, nil)
+	repo.On("PromoteItem", mock.Anything, "1", "1", "1", "5").Return(&model.Todo{ID: "9", Title: "step"}, nil)
 
-	todo, err := svc.PromoteItem(context.Background(), 1, 1, 1, 5)
+	todo, err := svc.PromoteItem(context.Background(), "1", "1", "1", "5")
 	assert.NoError(t, err)
 	assert.Equal(t, "step", todo.Title)
 	repo.AssertExpectations(t)
@@ -686,10 +686,10 @@ func TestTodoService_Duplicate(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1, Title: "original"}, nil)
-	repo.On("Duplicate", mock.Anything, uint(1), uint(1), uint(1)).Return(&model.Todo{ID: 9, Title: "original", Status: "pending"}, nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1", Title: "original"}, nil)
+	repo.On("Duplicate", mock.Anything, "1", "1", "1").Return(&model.Todo{ID: "9", Title: "original", Status: "pending"}, nil)
 
-	clone, err := svc.Duplicate(context.Background(), 1, 1, 1)
+	clone, err := svc.Duplicate(context.Background(), "1", "1", "1")
 	assert.NoError(t, err)
 	assert.Equal(t, "pending", clone.Status)
 	repo.AssertExpectations(t)
@@ -700,9 +700,9 @@ func TestTodoService_BulkAction(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("BulkAction", mock.Anything, uint(1), []uint{1, 2}, "delete", "").Return(int64(2), nil)
+	repo.On("BulkAction", mock.Anything, "1", []string{"1", "2"}, "delete", "").Return(int64(2), nil)
 
-	affected, err := svc.BulkAction(context.Background(), 1, 1, []uint{1, 2}, "delete", BulkActionOptions{})
+	affected, err := svc.BulkAction(context.Background(), "1", "1", []string{"1", "2"}, "delete", BulkActionOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2), affected)
 	repo.AssertExpectations(t)
@@ -713,21 +713,21 @@ func TestTodoService_BulkAction_Priority(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("BulkAction", mock.Anything, uint(1), []uint{1, 2}, "priority", "high").Return(int64(2), nil)
+	repo.On("BulkAction", mock.Anything, "1", []string{"1", "2"}, "priority", "high").Return(int64(2), nil)
 
-	affected, err := svc.BulkAction(context.Background(), 1, 1, []uint{1, 2}, "priority", BulkActionOptions{Priority: "high"})
+	affected, err := svc.BulkAction(context.Background(), "1", "1", []string{"1", "2"}, "priority", BulkActionOptions{Priority: "high"})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2), affected)
 	repo.AssertExpectations(t)
 
 	// Unknown tiers are rejected before touching the repo.
-	_, err = svc.BulkAction(context.Background(), 1, 1, []uint{1, 2}, "priority", BulkActionOptions{Priority: "urgent"})
+	_, err = svc.BulkAction(context.Background(), "1", "1", []string{"1", "2"}, "priority", BulkActionOptions{Priority: "urgent"})
 	assert.ErrorIs(t, err, ErrInvalidTodo)
 
 	// So are unknown actions.
-	_, err = svc.BulkAction(context.Background(), 1, 1, []uint{1, 2}, "explode", BulkActionOptions{})
+	_, err = svc.BulkAction(context.Background(), "1", "1", []string{"1", "2"}, "explode", BulkActionOptions{})
 	assert.ErrorIs(t, err, ErrInvalidTodo)
-	repo.AssertNotCalled(t, "BulkAction", mock.Anything, uint(1), []uint{1, 2}, "priority", "urgent")
+	repo.AssertNotCalled(t, "BulkAction", mock.Anything, "1", []string{"1", "2"}, "priority", "urgent")
 }
 
 func TestTodoService_Update_Duration(t *testing.T) {
@@ -735,15 +735,15 @@ func TestTodoService_Update_Duration(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	existing := &model.Todo{ID: 1, Title: "task", Status: "pending"}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil).Twice()
+	existing := &model.Todo{ID: "1", Title: "task", Status: "pending"}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil).Twice()
 	repo.On("Update", mock.Anything, mock.AnythingOfType("*model.Todo")).Return(nil).Twice()
 
-	updated, err := svc.Update(context.Background(), 1, 1, 1, &model.Todo{Title: "task", Duration: 90}, TodoClear{})
+	updated, err := svc.Update(context.Background(), "1", "1", "1", &model.Todo{Title: "task", Duration: 90}, TodoClear{})
 	assert.NoError(t, err)
 	assert.Equal(t, 90, updated.Duration)
 
-	updated, err = svc.Update(context.Background(), 1, 1, 1, &model.Todo{Title: "task"}, TodoClear{Duration: true})
+	updated, err = svc.Update(context.Background(), "1", "1", "1", &model.Todo{Title: "task"}, TodoClear{Duration: true})
 	assert.NoError(t, err)
 	assert.Equal(t, 0, updated.Duration)
 	repo.AssertExpectations(t)
@@ -754,10 +754,10 @@ func TestTodoService_Create_RejectsInvalidDuration(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	_, err := svc.Create(context.Background(), 1, 1, &model.Todo{Title: "task", Duration: -5})
+	_, err := svc.Create(context.Background(), "1", "1", &model.Todo{Title: "task", Duration: -5})
 	assert.ErrorIs(t, err, ErrInvalidTodo)
 
-	_, err = svc.Create(context.Background(), 1, 1, &model.Todo{Title: "task", Duration: 31 * 24 * 60})
+	_, err = svc.Create(context.Background(), "1", "1", &model.Todo{Title: "task", Duration: 31 * 24 * 60})
 	assert.ErrorIs(t, err, ErrInvalidTodo)
 	repo.AssertNotCalled(t, "Create")
 }
@@ -767,10 +767,10 @@ func TestTodoService_TogglePin(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1, Pinned: false}, nil)
-	repo.On("SetPinned", mock.Anything, uint(1), uint(1), true).Return(nil)
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1", Pinned: false}, nil)
+	repo.On("SetPinned", mock.Anything, "1", "1", true).Return(nil)
 
-	todo, err := svc.TogglePin(context.Background(), 1, 1, 1)
+	todo, err := svc.TogglePin(context.Background(), "1", "1", "1")
 	assert.NoError(t, err)
 	assert.True(t, todo.Pinned)
 	repo.AssertExpectations(t)
@@ -781,12 +781,12 @@ func TestTodoService_ReplaceTags(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(&model.Todo{ID: 1}, nil)
-	repo.On("ReplaceTags", mock.Anything, uint(1), mock.MatchedBy(func(tags []model.Tag) bool {
-		return len(tags) == 2 && tags[0].ID == 7 && tags[1].ID == 8
+	repo.On("GetByID", mock.Anything, "1", "1").Return(&model.Todo{ID: "1"}, nil)
+	repo.On("ReplaceTags", mock.Anything, "1", mock.MatchedBy(func(tags []model.Tag) bool {
+		return len(tags) == 2 && tags[0].ID == "7" && tags[1].ID == "8"
 	})).Return(nil)
 
-	err := svc.ReplaceTags(context.Background(), 1, 1, 1, []uint{7, 8})
+	err := svc.ReplaceTags(context.Background(), "1", "1", "1", []string{"7", "8"})
 	assert.NoError(t, err)
 	repo.AssertExpectations(t)
 }
@@ -796,11 +796,11 @@ func TestTodoService_Reorder(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	after := uint(2)
-	repo.On("GetByID", mock.Anything, uint(1), uint(3)).Return(&model.Todo{ID: 3}, nil)
-	repo.On("Reorder", mock.Anything, uint(1), uint(3), &after).Return(nil)
+	after := "2"
+	repo.On("GetByID", mock.Anything, "1", "3").Return(&model.Todo{ID: "3"}, nil)
+	repo.On("Reorder", mock.Anything, "1", "3", &after).Return(nil)
 
-	err := svc.Reorder(context.Background(), 1, 1, 3, &after)
+	err := svc.Reorder(context.Background(), "1", "1", "3", &after)
 	assert.NoError(t, err)
 	repo.AssertExpectations(t)
 }
@@ -810,10 +810,10 @@ func TestTodoService_Reorder_ToTop(t *testing.T) {
 	eventRepo := new(mockEventRepoForSync)
 	svc := NewTodoService(repo, eventRepo, repo)
 
-	repo.On("GetByID", mock.Anything, uint(1), uint(3)).Return(&model.Todo{ID: 3}, nil)
-	repo.On("Reorder", mock.Anything, uint(1), uint(3), (*uint)(nil)).Return(nil)
+	repo.On("GetByID", mock.Anything, "1", "3").Return(&model.Todo{ID: "3"}, nil)
+	repo.On("Reorder", mock.Anything, "1", "3", (*string)(nil)).Return(nil)
 
-	err := svc.Reorder(context.Background(), 1, 1, 3, nil)
+	err := svc.Reorder(context.Background(), "1", "1", "3", nil)
 	assert.NoError(t, err)
 	repo.AssertExpectations(t)
 }
@@ -876,13 +876,13 @@ func TestTodoService_ToggleStatus_RecurringAdvances(t *testing.T) {
 	svc := NewTodoService(repo, eventRepo, repo)
 
 	due := time.Date(2026, 1, 1, 9, 0, 0, 0, time.UTC)
-	existing := &model.Todo{ID: 1, Status: "pending", Repeat: "daily", DueTime: &due}
-	repo.On("GetByID", mock.Anything, uint(1), uint(1)).Return(existing, nil)
+	existing := &model.Todo{ID: "1", Status: "pending", Repeat: "daily", DueTime: &due}
+	repo.On("GetByID", mock.Anything, "1", "1").Return(existing, nil)
 	repo.On("Update", mock.Anything, mock.MatchedBy(func(td *model.Todo) bool {
 		return td.Status == "pending" && td.DueTime != nil && td.DueTime.After(due) && td.CompletedAt == nil
 	})).Return(nil)
 
-	todo, err := svc.ToggleStatus(context.Background(), 1, 1, 1)
+	todo, err := svc.ToggleStatus(context.Background(), "1", "1", "1")
 	assert.NoError(t, err)
 	assert.Equal(t, "pending", todo.Status)
 	assert.True(t, todo.DueTime.After(due))

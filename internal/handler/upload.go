@@ -104,4 +104,3 @@ func validateImageHeader(r io.Reader) bool {
 	}
 	return false
 }
-

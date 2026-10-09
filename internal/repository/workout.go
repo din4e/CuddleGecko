@@ -30,7 +30,7 @@ func (r *WorkoutRepo) Create(ctx context.Context, w *model.Workout) error {
 	return nil
 }
 
-func (r *WorkoutRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Workout, error) {
+func (r *WorkoutRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.Workout, error) {
 	var w model.Workout
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&w).Error; err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func (r *WorkoutRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model
 	return &w, nil
 }
 
-func (r *WorkoutRepo) List(ctx context.Context, workspaceID uint, q model.WorkoutListQuery) ([]model.Workout, int64, error) {
+func (r *WorkoutRepo) List(ctx context.Context, workspaceID string, q model.WorkoutListQuery) ([]model.Workout, int64, error) {
 	q.Page, q.PageSize = clampPage(q.Page, q.PageSize)
 
 	query := r.db.WithContext(ctx).Model(&model.Workout{}).Where("workspace_id = ?", workspaceID)
@@ -90,14 +90,14 @@ func workoutOrderClause(sort, order string) string {
 	}
 
 	const (
-		completedLast    = "CASE WHEN status IN ('completed','skipped') THEN 1 ELSE 0 END"
+		completedLast      = "CASE WHEN status IN ('completed','skipped') THEN 1 ELSE 0 END"
 		scheduledNullsLast = "scheduled_at IS NULL"
-		createdTie       = "id DESC"
+		createdTie         = "id DESC"
 	)
 
 	switch sort {
 	case model.WorkoutSortManual:
-		return "sort_order ASC, id ASC"
+		return "sort_order ASC, created_at ASC, id ASC"
 	case model.WorkoutSortCreated:
 		return completedLast + ", created_at " + dir + ", " + createdTie
 	default: // WorkoutSortScheduled
@@ -122,7 +122,7 @@ func (r *WorkoutRepo) CreateWithExercises(ctx context.Context, w *model.Workout,
 			return fmt.Errorf("create workout: %w", err)
 		}
 		for i := range exercises {
-			exercises[i].ID = 0
+			exercises[i].ID = ""
 			exercises[i].WorkoutID = w.ID
 			exercises[i].SortOrder = i + 1
 			if err := tx.Create(&exercises[i]).Error; err != nil {
@@ -136,7 +136,7 @@ func (r *WorkoutRepo) CreateWithExercises(ctx context.Context, w *model.Workout,
 }
 
 // Delete soft-deletes a workout along with its exercises and set logs.
-func (r *WorkoutRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *WorkoutRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("workout_id = ?", id).Delete(&model.WorkoutExercise{}).Error; err != nil {
 			return fmt.Errorf("delete workout exercises: %w", err)
@@ -157,11 +157,11 @@ func (r *WorkoutRepo) Delete(ctx context.Context, workspaceID, id uint) error {
 
 // Reorder moves a workout within the workspace's manual order, after the workout
 // with afterID (or to the top when nil). The whole list is renumbered in one tx.
-func (r *WorkoutRepo) Reorder(ctx context.Context, workspaceID, id uint, afterID *uint) error {
+func (r *WorkoutRepo) Reorder(ctx context.Context, workspaceID, id string, afterID *string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var all []model.Workout
 		if err := tx.Where("workspace_id = ?", workspaceID).
-			Order("sort_order ASC, id ASC").Find(&all).Error; err != nil {
+			Order("sort_order ASC, created_at ASC, id ASC").Find(&all).Error; err != nil {
 			return fmt.Errorf("load workouts for reorder: %w", err)
 		}
 
@@ -193,7 +193,7 @@ func (r *WorkoutRepo) Reorder(ctx context.Context, workspaceID, id uint, afterID
 		ordered = append(ordered, all[movedIdx])
 		ordered = append(ordered, rest[insertAt:]...)
 
-		ids := make([]uint, len(ordered))
+		ids := make([]string, len(ordered))
 		for i, t := range ordered {
 			ids[i] = t.ID
 		}
@@ -205,7 +205,7 @@ func (r *WorkoutRepo) Reorder(ctx context.Context, workspaceID, id uint, afterID
 }
 
 // Stats computes a fitness overview for the workspace.
-func (r *WorkoutRepo) Stats(ctx context.Context, workspaceID uint) (model.WorkoutStats, error) {
+func (r *WorkoutRepo) Stats(ctx context.Context, workspaceID string) (model.WorkoutStats, error) {
 	now := time.Now()
 	startToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	daysSinceMonday := int(now.Weekday()) - int(time.Monday)
@@ -311,7 +311,7 @@ func isoWeekKey(year, week int) string {
 // ("2026-08"). One query fetches the raw rows; bucketing happens in Go so the
 // grouping works identically on SQLite and MySQL (no dialect-specific date
 // formatting in GROUP BY).
-func (r *WorkoutRepo) History(ctx context.Context, workspaceID uint, bucket string, limit int) ([]model.WorkoutHistoryBucket, error) {
+func (r *WorkoutRepo) History(ctx context.Context, workspaceID string, bucket string, limit int) ([]model.WorkoutHistoryBucket, error) {
 	if limit <= 0 {
 		limit = 12
 	}
@@ -381,10 +381,10 @@ func NewWorkoutExerciseRepo(db *gorm.DB) *WorkoutExerciseRepo {
 	return &WorkoutExerciseRepo{db: db}
 }
 
-func (r *WorkoutExerciseRepo) ListExercises(ctx context.Context, workoutID uint) ([]model.WorkoutExercise, error) {
+func (r *WorkoutExerciseRepo) ListExercises(ctx context.Context, workoutID string) ([]model.WorkoutExercise, error) {
 	var items []model.WorkoutExercise
 	if err := r.db.WithContext(ctx).Where("workout_id = ?", workoutID).
-		Order("sort_order ASC, id ASC").Find(&items).Error; err != nil {
+		Order("sort_order ASC, created_at ASC, id ASC").Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("list exercises: %w", err)
 	}
 	return items, nil
@@ -393,19 +393,19 @@ func (r *WorkoutExerciseRepo) ListExercises(ctx context.Context, workoutID uint)
 // ListExercisesByWorkoutIDs is the bulk counterpart to ListExercises: it fetches
 // movements for many workouts in one query (ordered so per-workout grouping
 // stays stable), used by export to avoid an N+1 of one query per workout.
-func (r *WorkoutExerciseRepo) ListExercisesByWorkoutIDs(ctx context.Context, workoutIDs []uint) ([]model.WorkoutExercise, error) {
+func (r *WorkoutExerciseRepo) ListExercisesByWorkoutIDs(ctx context.Context, workoutIDs []string) ([]model.WorkoutExercise, error) {
 	if len(workoutIDs) == 0 {
 		return nil, nil
 	}
 	var items []model.WorkoutExercise
 	if err := r.db.WithContext(ctx).Where("workout_id IN ?", workoutIDs).
-		Order("workout_id ASC, sort_order ASC, id ASC").Find(&items).Error; err != nil {
+		Order("workout_id ASC, sort_order ASC, created_at ASC, id ASC").Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("list exercises by workout ids: %w", err)
 	}
 	return items, nil
 }
 
-func (r *WorkoutExerciseRepo) GetExercise(ctx context.Context, workoutID, exerciseID uint) (*model.WorkoutExercise, error) {
+func (r *WorkoutExerciseRepo) GetExercise(ctx context.Context, workoutID, exerciseID string) (*model.WorkoutExercise, error) {
 	var ex model.WorkoutExercise
 	if err := r.db.WithContext(ctx).Where("id = ? AND workout_id = ?", exerciseID, workoutID).First(&ex).Error; err != nil {
 		return nil, err
@@ -442,7 +442,7 @@ func (r *WorkoutExerciseRepo) CreateExercise(ctx context.Context, ex *model.Work
 
 // UpdateExercise writes the descriptive fields (done is toggled separately via
 // SetExerciseDone so the parent progress counter never drifts).
-func (r *WorkoutExerciseRepo) UpdateExercise(ctx context.Context, workoutID uint, ex *model.WorkoutExercise) error {
+func (r *WorkoutExerciseRepo) UpdateExercise(ctx context.Context, workoutID string, ex *model.WorkoutExercise) error {
 	if err := r.db.WithContext(ctx).Model(&model.WorkoutExercise{}).
 		Where("id = ? AND workout_id = ?", ex.ID, workoutID).
 		Updates(map[string]interface{}{
@@ -463,7 +463,7 @@ func (r *WorkoutExerciseRepo) UpdateExercise(ctx context.Context, workoutID uint
 
 // SetExerciseDone flips the done flag and adjusts the parent's item_done counter
 // inside one transaction.
-func (r *WorkoutExerciseRepo) SetExerciseDone(ctx context.Context, workoutID, exerciseID uint, done bool) error {
+func (r *WorkoutExerciseRepo) SetExerciseDone(ctx context.Context, workoutID, exerciseID string, done bool) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var prev model.WorkoutExercise
 		if err := tx.Where("id = ? AND workout_id = ?", exerciseID, workoutID).First(&prev).Error; err != nil {
@@ -490,7 +490,7 @@ func (r *WorkoutExerciseRepo) SetExerciseDone(ctx context.Context, workoutID, ex
 
 // DeleteExercise removes an exercise and rebases the parent counts. When the
 // removed exercise was done, item_done is decremented alongside item_total.
-func (r *WorkoutExerciseRepo) DeleteExercise(ctx context.Context, workoutID, exerciseID uint) error {
+func (r *WorkoutExerciseRepo) DeleteExercise(ctx context.Context, workoutID, exerciseID string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var prev model.WorkoutExercise
 		if err := tx.Where("id = ? AND workout_id = ?", exerciseID, workoutID).First(&prev).Error; err != nil {
@@ -518,11 +518,11 @@ func (r *WorkoutExerciseRepo) DeleteExercise(ctx context.Context, workoutID, exe
 }
 
 // ReorderExercise moves an exercise within its workout's manual order.
-func (r *WorkoutExerciseRepo) ReorderExercise(ctx context.Context, workoutID, exerciseID uint, afterExerciseID *uint) error {
+func (r *WorkoutExerciseRepo) ReorderExercise(ctx context.Context, workoutID, exerciseID string, afterExerciseID *string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var all []model.WorkoutExercise
 		if err := tx.Where("workout_id = ?", workoutID).
-			Order("sort_order ASC, id ASC").Find(&all).Error; err != nil {
+			Order("sort_order ASC, created_at ASC, id ASC").Find(&all).Error; err != nil {
 			return fmt.Errorf("load exercises for reorder: %w", err)
 		}
 
@@ -554,7 +554,7 @@ func (r *WorkoutExerciseRepo) ReorderExercise(ctx context.Context, workoutID, ex
 		ordered = append(ordered, all[movedIdx])
 		ordered = append(ordered, rest[insertAt:]...)
 
-		ids := make([]uint, len(ordered))
+		ids := make([]string, len(ordered))
 		for i, t := range ordered {
 			ids[i] = t.ID
 		}
@@ -584,7 +584,7 @@ func (r *BodyMetricRepo) Create(ctx context.Context, m *model.BodyMetric) error 
 	return nil
 }
 
-func (r *BodyMetricRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.BodyMetric, error) {
+func (r *BodyMetricRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.BodyMetric, error) {
 	var m model.BodyMetric
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&m).Error; err != nil {
 		return nil, err
@@ -592,7 +592,7 @@ func (r *BodyMetricRepo) GetByID(ctx context.Context, workspaceID, id uint) (*mo
 	return &m, nil
 }
 
-func (r *BodyMetricRepo) List(ctx context.Context, workspaceID uint, q model.BodyMetricListQuery) ([]model.BodyMetric, int64, error) {
+func (r *BodyMetricRepo) List(ctx context.Context, workspaceID string, q model.BodyMetricListQuery) ([]model.BodyMetric, int64, error) {
 	q.Page, q.PageSize = clampPage(q.Page, q.PageSize)
 	query := r.db.WithContext(ctx).Model(&model.BodyMetric{}).Where("workspace_id = ?", workspaceID)
 	if q.DateAfter != nil {
@@ -627,7 +627,7 @@ func (r *BodyMetricRepo) Update(ctx context.Context, m *model.BodyMetric) error 
 
 // ExistsByRecordedAt reports whether a record already exists at exactly this
 // timestamp — the dedupe key for idempotent platform imports.
-func (r *BodyMetricRepo) ExistsByRecordedAt(ctx context.Context, workspaceID uint, recordedAt time.Time) (bool, error) {
+func (r *BodyMetricRepo) ExistsByRecordedAt(ctx context.Context, workspaceID string, recordedAt time.Time) (bool, error) {
 	var count int64
 	if err := r.db.WithContext(ctx).Model(&model.BodyMetric{}).
 		Where("workspace_id = ? AND recorded_at = ?", workspaceID, recordedAt).
@@ -637,7 +637,7 @@ func (r *BodyMetricRepo) ExistsByRecordedAt(ctx context.Context, workspaceID uin
 	return count > 0, nil
 }
 
-func (r *BodyMetricRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *BodyMetricRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	res := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.BodyMetric{})
 	if res.Error != nil {
 		return fmt.Errorf("delete body metric: %w", res.Error)
@@ -650,7 +650,7 @@ func (r *BodyMetricRepo) Delete(ctx context.Context, workspaceID, id uint) error
 
 // Summary derives an overview from the recorded history: latest snapshot, the
 // previous weight (for trend direction), total count and time span.
-func (r *BodyMetricRepo) Summary(ctx context.Context, workspaceID uint) (model.BodyMetricSummary, error) {
+func (r *BodyMetricRepo) Summary(ctx context.Context, workspaceID string) (model.BodyMetricSummary, error) {
 	var sum model.BodyMetricSummary
 
 	if err := r.db.WithContext(ctx).Model(&model.BodyMetric{}).
@@ -707,7 +707,7 @@ var trendFlatDeltas = map[string]float64{
 // bodyMetricTrends walks the most recent records (newest first) and, per
 // metric, captures the latest and previous non-null values, then classifies
 // the direction. One extra query total.
-func bodyMetricTrends(db *gorm.DB, workspaceID uint) map[string]model.MetricTrend {
+func bodyMetricTrends(db *gorm.DB, workspaceID string) map[string]model.MetricTrend {
 	var rows []model.BodyMetric
 	if err := db.Where("workspace_id = ?", workspaceID).
 		Order("recorded_at DESC, id DESC").Limit(200).Find(&rows).Error; err != nil {

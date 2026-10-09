@@ -23,7 +23,7 @@ func (r *ReminderRepo) Create(ctx context.Context, reminder *model.Reminder) err
 	return nil
 }
 
-func (r *ReminderRepo) GetByID(ctx context.Context, workspaceID, id uint) (*model.Reminder, error) {
+func (r *ReminderRepo) GetByID(ctx context.Context, workspaceID, id string) (*model.Reminder, error) {
 	var reminder model.Reminder
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).First(&reminder).Error; err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func (r *ReminderRepo) GetByID(ctx context.Context, workspaceID, id uint) (*mode
 	return &reminder, nil
 }
 
-func (r *ReminderRepo) List(ctx context.Context, workspaceID uint, status model.ReminderStatus, contactID *uint, page, pageSize int, tagIDs []uint) ([]model.Reminder, int64, error) {
+func (r *ReminderRepo) List(ctx context.Context, workspaceID string, status model.ReminderStatus, contactID *string, page, pageSize int, tagIDs []string) ([]model.Reminder, int64, error) {
 	var reminders []model.Reminder
 	query := r.db.WithContext(ctx).Model(&model.Reminder{}).Where("workspace_id = ?", workspaceID)
 	if status != "" {
@@ -71,7 +71,7 @@ func (r *ReminderRepo) Update(ctx context.Context, reminder *model.Reminder) err
 	return nil
 }
 
-func (r *ReminderRepo) Delete(ctx context.Context, workspaceID, id uint) error {
+func (r *ReminderRepo) Delete(ctx context.Context, workspaceID, id string) error {
 	if err := r.db.WithContext(ctx).Where("id = ? AND workspace_id = ?", id, workspaceID).Delete(&model.Reminder{}).Error; err != nil {
 		return fmt.Errorf("delete reminder: %w", err)
 	}

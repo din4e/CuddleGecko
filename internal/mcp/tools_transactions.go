@@ -16,7 +16,7 @@ func (s *MCPServer) registerTransactionTools() {
 			"contact_id": map[string]interface{}{"type": "integer", "description": "Filter by contact ID"},
 			"search":     map[string]interface{}{"type": "string", "description": "Case-insensitive substring match on title"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		page := getArgInt(args, "page", 1)
 		pageSize := getArgInt(args, "page_size", 20)
 		search := toString(getArg(args, "search"))
@@ -25,10 +25,9 @@ func (s *MCPServer) registerTransactionTools() {
 			s := toString(v)
 			txType = &s
 		}
-		var contactID *uint
-		if v := getArg(args, "contact_id"); v != nil {
-			u := toUint(v)
-			contactID = &u
+		var contactID *string
+		if v := toString(getArg(args, "contact_id")); v != "" {
+			contactID = &v
 		}
 
 		txs, total, err := s.transactionSvc.List(ctx, userID, workspaceID, page, pageSize, txType, contactID, search, nil, nil, nil)
@@ -44,9 +43,9 @@ func (s *MCPServer) registerTransactionTools() {
 	})
 
 	s.registerTool("get_transaction_summary", "Get financial summary (total income and expense).", map[string]interface{}{
-		"type": "object",
+		"type":       "object",
 		"properties": map[string]interface{}{},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		income, expense, err := s.transactionSvc.Summary(ctx, userID, workspaceID, nil, nil)
 		if err != nil {
 			return nil, err
@@ -70,7 +69,7 @@ func (s *MCPServer) registerTransactionTools() {
 			"notes":       map[string]interface{}{"type": "string", "description": "Additional notes"},
 		},
 		"required": []string{"title", "amount", "type", "date"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		tx := &model.Transaction{
 			Title:      toString(getArg(args, "title")),
 			Amount:     toFloat64(getArg(args, "amount")),
@@ -96,8 +95,8 @@ func (s *MCPServer) registerTransactionTools() {
 			"notes":       map[string]interface{}{"type": "string", "description": "Additional notes"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		updates := &model.Transaction{
 			Title:      toString(getArg(args, "title")),
 			Amount:     toFloat64(getArg(args, "amount")),
@@ -116,8 +115,8 @@ func (s *MCPServer) registerTransactionTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Transaction ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		err := s.transactionSvc.Delete(ctx, userID, workspaceID, id)
 		if err != nil {
 			return nil, err

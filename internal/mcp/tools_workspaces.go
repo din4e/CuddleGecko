@@ -6,9 +6,9 @@ import (
 
 func (s *MCPServer) registerWorkspaceTools() {
 	s.registerTool("list_workspaces", "List all workspaces for the current user.", map[string]interface{}{
-		"type": "object",
+		"type":       "object",
 		"properties": map[string]interface{}{},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		// workspaceSvc.List does NOT take workspaceID
 		return s.workspaceSvc.List(ctx, userID)
 	})
@@ -19,8 +19,8 @@ func (s *MCPServer) registerWorkspaceTools() {
 			"workspace_id": map[string]interface{}{"type": "integer", "description": "Workspace ID to switch to"},
 		},
 		"required": []string{"workspace_id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		targetID := toUint(getArg(args, "workspace_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		targetID := toString(getArg(args, "workspace_id"))
 		return s.workspaceSvc.Switch(ctx, userID, targetID)
 	})
 }

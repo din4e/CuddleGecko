@@ -44,26 +44,26 @@ func TestExport_TodoRoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	// Seed workspace 1: a tag, a contact, and a todo with an item + tag + contact link.
-	tag := &model.Tag{UserID: 1, WorkspaceID: 1, Name: "work"}
+	tag := &model.Tag{UserID: "1", WorkspaceID: "1", Name: "work"}
 	require.NoError(t, tagRepo.Create(ctx, tag))
-	contact := &model.Contact{UserID: 1, WorkspaceID: 1, Name: "Alice"}
+	contact := &model.Contact{UserID: "1", WorkspaceID: "1", Name: "Alice"}
 	require.NoError(t, contactRepo.Create(ctx, contact))
 	todo := &model.Todo{
-		UserID: 1, WorkspaceID: 1, Title: "ship", Status: "pending", Priority: "high",
-		ContactIDs: []uint{contact.ID}, Color: "#ff0000", Repeat: "daily", RepeatInterval: 2, Pinned: true,
+		UserID: "1", WorkspaceID: "1", Title: "ship", Status: "pending", Priority: "high",
+		ContactIDs: []string{contact.ID}, Color: "#ff0000", Repeat: "daily", RepeatInterval: 2, Pinned: true,
 	}
 	require.NoError(t, todoRepo.Create(ctx, todo))
 	require.NoError(t, todoRepo.ReplaceTags(ctx, todo.ID, []model.Tag{*tag}))
 	require.NoError(t, todoRepo.CreateItem(ctx, &model.TodoItem{TodoID: todo.ID, Content: "step1", Done: true}))
 
-	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
+	jsonStr, err := svc.ExportJSON(ctx, "1", "1")
 	require.NoError(t, err)
 	require.NotEmpty(t, jsonStr)
 
 	// Import into a fresh workspace.
-	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
+	require.NoError(t, svc.ImportJSON(ctx, "2", "2", jsonStr))
 
-	todos, total, err := todoRepo.List(ctx, 2, model.TodoListQuery{Page: 1, PageSize: 100})
+	todos, total, err := todoRepo.List(ctx, "2", model.TodoListQuery{Page: 1, PageSize: 100})
 	require.NoError(t, err)
 	require.Equal(t, int64(1), total)
 	require.Len(t, todos, 1)
@@ -79,10 +79,10 @@ func TestExport_TodoRoundTrip(t *testing.T) {
 	assert.Equal(t, "work", got.Tags[0].Name)
 
 	// Contact link remapped to the new contact's id in workspace 2.
-	contacts2, _, err := contactRepo.List(ctx, 2, 1, 100, "", nil)
+	contacts2, _, err := contactRepo.List(ctx, "2", 1, 100, "", nil)
 	require.NoError(t, err)
 	require.Len(t, contacts2, 1)
-	assert.Equal(t, []uint{contacts2[0].ID}, got.ContactIDs)
+	assert.Equal(t, []string{contacts2[0].ID}, got.ContactIDs)
 
 	// Item imported and counts synced.
 	items, err := todoRepo.ListItems(ctx, got.ID)
@@ -109,21 +109,21 @@ func TestExport_TodoNestingRoundTrip(t *testing.T) {
 	svc := NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo)
 	ctx := context.Background()
 
-	parent := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "parent", Status: "pending", Priority: "normal"}
-	child := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "child", Status: "pending", Priority: "normal"}
-	grand := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "grand", Status: "pending", Priority: "normal"}
+	parent := &model.Todo{UserID: "1", WorkspaceID: "1", Title: "parent", Status: "pending", Priority: "normal"}
+	child := &model.Todo{UserID: "1", WorkspaceID: "1", Title: "child", Status: "pending", Priority: "normal"}
+	grand := &model.Todo{UserID: "1", WorkspaceID: "1", Title: "grand", Status: "pending", Priority: "normal"}
 	require.NoError(t, todoRepo.Create(ctx, parent))
 	require.NoError(t, todoRepo.Create(ctx, child))
 	require.NoError(t, todoRepo.Create(ctx, grand))
-	require.NoError(t, todoRepo.Move(ctx, 1, child.ID, &parent.ID, nil, "")) // child under parent
-	require.NoError(t, todoRepo.Move(ctx, 1, grand.ID, &child.ID, nil, ""))  // grand under child
+	require.NoError(t, todoRepo.Move(ctx, "1", child.ID, &parent.ID, nil, "")) // child under parent
+	require.NoError(t, todoRepo.Move(ctx, "1", grand.ID, &child.ID, nil, ""))  // grand under child
 
-	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
+	jsonStr, err := svc.ExportJSON(ctx, "1", "1")
 	require.NoError(t, err)
 
-	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
+	require.NoError(t, svc.ImportJSON(ctx, "2", "2", jsonStr))
 
-	todos, _, err := todoRepo.List(ctx, 2, model.TodoListQuery{Page: 1, PageSize: 100})
+	todos, _, err := todoRepo.List(ctx, "2", model.TodoListQuery{Page: 1, PageSize: 100})
 	require.NoError(t, err)
 	require.Len(t, todos, 3)
 	byTitle := make(map[string]model.Todo, len(todos))
@@ -156,20 +156,20 @@ func TestExport_TodoLinksRoundTrip(t *testing.T) {
 	svc := NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo)
 	ctx := context.Background()
 
-	hub := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "hub", Status: "pending", Priority: "normal"}
-	spoke := &model.Todo{UserID: 1, WorkspaceID: 1, Title: "spoke", Status: "pending", Priority: "normal"}
+	hub := &model.Todo{UserID: "1", WorkspaceID: "1", Title: "hub", Status: "pending", Priority: "normal"}
+	spoke := &model.Todo{UserID: "1", WorkspaceID: "1", Title: "spoke", Status: "pending", Priority: "normal"}
 	require.NoError(t, todoRepo.Create(ctx, hub))
 	require.NoError(t, todoRepo.Create(ctx, spoke))
 	// Hub links to spoke via the struct path (what the service writes).
-	hub.TodoIDs = []uint{spoke.ID}
+	hub.TodoIDs = []string{spoke.ID}
 	require.NoError(t, todoRepo.Update(ctx, hub))
 
-	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
+	jsonStr, err := svc.ExportJSON(ctx, "1", "1")
 	require.NoError(t, err)
 
-	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
+	require.NoError(t, svc.ImportJSON(ctx, "2", "2", jsonStr))
 
-	todos, _, err := todoRepo.List(ctx, 2, model.TodoListQuery{Page: 1, PageSize: 100})
+	todos, _, err := todoRepo.List(ctx, "2", model.TodoListQuery{Page: 1, PageSize: 100})
 	require.NoError(t, err)
 	require.Len(t, todos, 2)
 	byTitle := make(map[string]model.Todo, len(todos))
@@ -182,8 +182,8 @@ func TestExport_TodoLinksRoundTrip(t *testing.T) {
 	// The remapped link must point at the NEW spoke, and the backlink filter
 	// must see the relationship (proves the re-link pass used serializer-
 	// compatible bytes).
-	assert.Equal(t, []uint{s2.ID}, h2.TodoIDs, "imported hub links to the imported spoke")
-	_, total, err := todoRepo.List(ctx, 2, model.TodoListQuery{LinkingTo: &s2.ID})
+	assert.Equal(t, []string{s2.ID}, h2.TodoIDs, "imported hub links to the imported spoke")
+	_, total, err := todoRepo.List(ctx, "2", model.TodoListQuery{LinkingTo: &s2.ID})
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, total, "backlink filter finds the imported hub")
 }
@@ -203,11 +203,11 @@ func TestExport_TodosCSV(t *testing.T) {
 	ctx := context.Background()
 
 	require.NoError(t, todoRepo.Create(ctx, &model.Todo{
-		UserID: 1, WorkspaceID: 1, Title: "ship it", Status: "pending", Priority: "high",
+		UserID: "1", WorkspaceID: "1", Title: "ship it", Status: "pending", Priority: "high",
 		Description: "desc, with comma",
 	}))
 
-	out, err := svc.ExportTodosCSV(ctx, 1)
+	out, err := svc.ExportTodosCSV(ctx, "1")
 	require.NoError(t, err)
 	require.NotEmpty(t, out)
 
@@ -238,11 +238,11 @@ func TestExport_TodosCSVImport(t *testing.T) {
 		"ship it,desc,pending,high\n" +
 		",blank skipped,,\n" +
 		"second,,done,low\n"
-	n, err := svc.ImportTodosCSV(ctx, 5, 9, csv)
+	n, err := svc.ImportTodosCSV(ctx, "5", "9", csv)
 	require.NoError(t, err)
 	assert.Equal(t, ImportStats{Imported: 2, Skipped: 1}, n, "two non-blank rows imported, one skipped")
 
-	todos, _, err := todoRepo.List(ctx, 9, model.TodoListQuery{Page: 1, PageSize: 100})
+	todos, _, err := todoRepo.List(ctx, "9", model.TodoListQuery{Page: 1, PageSize: 100})
 	require.NoError(t, err)
 	require.Len(t, todos, 2, "blank-title row should be skipped")
 	byTitle := make(map[string]model.Todo, len(todos))
@@ -250,7 +250,7 @@ func TestExport_TodosCSVImport(t *testing.T) {
 		byTitle[td.Title] = td
 	}
 	first := byTitle["ship it"]
-	assert.Equal(t, uint(9), first.WorkspaceID)
+	assert.Equal(t, "9", first.WorkspaceID)
 	assert.Equal(t, "high", first.Priority)
 	assert.Equal(t, "desc", first.Description)
 	assert.Equal(t, "pending", first.Status)
@@ -272,17 +272,17 @@ func TestExport_Import_EmitsNotifier(t *testing.T) {
 	svc := NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo, WithExportNotifier(n))
 	ctx := context.Background()
 
-	_, err := svc.ImportTodosCSV(ctx, 1, 1, "title,status\nimported,pending\n")
+	_, err := svc.ImportTodosCSV(ctx, "1", "1", "title,status\nimported,pending\n")
 	require.NoError(t, err)
 	require.NotEmpty(t, n.events, "CSV import should emit a workspace-wide refresh")
 	assert.Equal(t, ChangeBulk, n.events[0].kind)
 	assert.Equal(t, ResourceTodo, n.events[0].resource)
-	assert.Equal(t, uint(1), n.events[0].workspaceID)
+	assert.Equal(t, "1", n.events[0].workspaceID)
 
 	n.events = nil
-	jsonStr, err := svc.ExportJSON(ctx, 1, 1) // export some data
+	jsonStr, err := svc.ExportJSON(ctx, "1", "1") // export some data
 	require.NoError(t, err)
-	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
+	require.NoError(t, svc.ImportJSON(ctx, "2", "2", jsonStr))
 	require.NotEmpty(t, n.events, "JSON import should also emit a refresh")
 }
 
@@ -301,11 +301,11 @@ func TestExport_ContactsCSV(t *testing.T) {
 	ctx := context.Background()
 
 	require.NoError(t, contactRepo.Create(ctx, &model.Contact{
-		UserID: 1, WorkspaceID: 1, Name: "Alice", Nickname: "Al",
+		UserID: "1", WorkspaceID: "1", Name: "Alice", Nickname: "Al",
 		Email: []string{"a@x.com", "b@x.com"}, Phone: []string{"123"}, Notes: "note, with comma",
 	}))
 
-	out, err := svc.ExportContactsCSV(ctx, 1)
+	out, err := svc.ExportContactsCSV(ctx, "1")
 	require.NoError(t, err)
 	require.NotEmpty(t, out)
 	assert.Contains(t, out, "name", "header present")
@@ -331,15 +331,15 @@ func TestExport_ContactsCSVImport(t *testing.T) {
 	csv := "name,nickname,emails,phones\n" +
 		"Bob,Bobby,b@x.com; c@x.com,555-1234\n" +
 		",skipme,\n"
-	cn, cerr := svc.ImportContactsCSV(ctx, 1, 7, csv)
+	cn, cerr := svc.ImportContactsCSV(ctx, "1", "7", csv)
 	require.NoError(t, cerr)
 	assert.Equal(t, ImportStats{Imported: 1, Skipped: 1}, cn, "one non-blank contact imported, one skipped")
 
-	contacts, _, err := contactRepo.List(ctx, 7, 1, 100, "", nil)
+	contacts, _, err := contactRepo.List(ctx, "7", 1, 100, "", nil)
 	require.NoError(t, err)
 	require.Len(t, contacts, 1, "blank-name row should be skipped")
 	c := contacts[0]
-	assert.Equal(t, uint(7), c.WorkspaceID)
+	assert.Equal(t, "7", c.WorkspaceID)
 	assert.Equal(t, "Bob", c.Name)
 	assert.Equal(t, "Bobby", c.Nickname)
 	assert.Equal(t, []string{"b@x.com", "c@x.com"}, c.Email)
@@ -361,10 +361,10 @@ func TestExport_TransactionsCSV(t *testing.T) {
 	ctx := context.Background()
 
 	require.NoError(t, txRepo.Create(ctx, &model.Transaction{
-		UserID: 1, WorkspaceID: 1, Title: "Coffee", Amount: 4.5, Type: "expense", Category: "food", Date: time.Now(),
+		UserID: "1", WorkspaceID: "1", Title: "Coffee", Amount: 4.5, Type: "expense", Category: "food", Date: time.Now(),
 	}))
 
-	out, err := svc.ExportTransactionsCSV(ctx, 1)
+	out, err := svc.ExportTransactionsCSV(ctx, "1")
 	require.NoError(t, err)
 	assert.Contains(t, out, "title")
 	assert.Contains(t, out, "Coffee")
@@ -388,15 +388,15 @@ func TestExport_TransactionsJSONRoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	require.NoError(t, txRepo.Create(ctx, &model.Transaction{
-		UserID: 1, WorkspaceID: 1, Title: "Salary", Amount: 1000, Type: "income", Date: time.Now(),
+		UserID: "1", WorkspaceID: "1", Title: "Salary", Amount: 1000, Type: "income", Date: time.Now(),
 	}))
 
-	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
+	jsonStr, err := svc.ExportJSON(ctx, "1", "1")
 	require.NoError(t, err)
 	require.Contains(t, jsonStr, "Salary", "transactions present in JSON export")
 
-	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
-	txs, _, err := txRepo.List(ctx, 2, 1, 100, nil, nil, "", nil, nil, nil)
+	require.NoError(t, svc.ImportJSON(ctx, "2", "2", jsonStr))
+	txs, _, err := txRepo.List(ctx, "2", 1, 100, nil, nil, "", nil, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, txs, 1)
 	assert.Equal(t, "Salary", txs[0].Title)
@@ -418,10 +418,10 @@ func TestExport_EventsCSV(t *testing.T) {
 	ctx := context.Background()
 
 	require.NoError(t, eventRepo.Create(ctx, &model.Event{
-		UserID: 1, WorkspaceID: 1, Title: "Standup", StartTime: time.Now(), Location: "Zoom",
+		UserID: "1", WorkspaceID: "1", Title: "Standup", StartTime: time.Now(), Location: "Zoom",
 	}))
 
-	out, err := svc.ExportEventsCSV(ctx, 1)
+	out, err := svc.ExportEventsCSV(ctx, "1")
 	require.NoError(t, err)
 	assert.Contains(t, out, "title")
 	assert.Contains(t, out, "Standup")
@@ -444,15 +444,15 @@ func TestExport_EventsJSONRoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	require.NoError(t, eventRepo.Create(ctx, &model.Event{
-		UserID: 1, WorkspaceID: 1, Title: "Dentist", StartTime: time.Now(), Location: "Clinic",
+		UserID: "1", WorkspaceID: "1", Title: "Dentist", StartTime: time.Now(), Location: "Clinic",
 	}))
 
-	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
+	jsonStr, err := svc.ExportJSON(ctx, "1", "1")
 	require.NoError(t, err)
 	require.Contains(t, jsonStr, "Dentist", "events present in JSON export")
 
-	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
-	events, _, err := eventRepo.List(ctx, 2, 1, 100, nil, nil, "", nil)
+	require.NoError(t, svc.ImportJSON(ctx, "2", "2", jsonStr))
+	events, _, err := eventRepo.List(ctx, "2", 1, 100, nil, nil, "", nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	assert.Equal(t, "Dentist", events[0].Title)
@@ -473,20 +473,20 @@ func TestExport_ContactTagsRoundTrip(t *testing.T) {
 	svc := NewExportService(contactRepo, tagRepo, interactionRepo, reminderRepo, relationRepo, todoRepo, todoRepo)
 	ctx := context.Background()
 
-	tag := &model.Tag{UserID: 1, WorkspaceID: 1, Name: "vip", Color: "#ff0000"}
+	tag := &model.Tag{UserID: "1", WorkspaceID: "1", Name: "vip", Color: "#ff0000"}
 	require.NoError(t, tagRepo.Create(ctx, tag))
-	contact := &model.Contact{UserID: 1, WorkspaceID: 1, Name: "Tagged Buddy"}
+	contact := &model.Contact{UserID: "1", WorkspaceID: "1", Name: "Tagged Buddy"}
 	require.NoError(t, contactRepo.Create(ctx, contact))
 	require.NoError(t, contactRepo.ReplaceTags(ctx, contact.ID, []model.Tag{*tag}))
 
-	jsonStr, err := svc.ExportJSON(ctx, 1, 1)
+	jsonStr, err := svc.ExportJSON(ctx, "1", "1")
 	require.NoError(t, err)
-	require.NoError(t, svc.ImportJSON(ctx, 2, 2, jsonStr))
+	require.NoError(t, svc.ImportJSON(ctx, "2", "2", jsonStr))
 
-	contacts2, _, err := contactRepo.List(ctx, 2, 1, 100, "", nil)
+	contacts2, _, err := contactRepo.List(ctx, "2", 1, 100, "", nil)
 	require.NoError(t, err)
 	require.Len(t, contacts2, 1)
-	tags, err := contactRepo.GetTags(ctx, 2, contacts2[0].ID)
+	tags, err := contactRepo.GetTags(ctx, "2", contacts2[0].ID)
 	require.NoError(t, err)
 	require.Len(t, tags, 1, "contact tag association should survive the round-trip")
 	assert.Equal(t, "vip", tags[0].Name)
@@ -512,11 +512,11 @@ func TestExport_TransactionsCSVImport(t *testing.T) {
 		"Coffee,expense,4.5,餐饮\n" +
 		",skip,10,x\n" +
 		"badrow,expense,notanumber,x\n"
-	n, err := svc.ImportTransactionsCSV(ctx, 1, 1, csv)
+	n, err := svc.ImportTransactionsCSV(ctx, "1", "1", csv)
 	require.NoError(t, err)
 	assert.Equal(t, ImportStats{Imported: 2, Skipped: 2}, n, "two valid rows (blank-title and bad-amount skipped)")
 
-	txs, _, err := txRepo.List(ctx, 1, 1, 100, nil, nil, "", nil, nil, nil)
+	txs, _, err := txRepo.List(ctx, "1", 1, 100, nil, nil, "", nil, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, txs, 2)
 	byTitle := make(map[string]model.Transaction, len(txs))

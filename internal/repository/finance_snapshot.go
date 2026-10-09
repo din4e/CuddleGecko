@@ -22,7 +22,7 @@ func NewFinanceSnapshotRepo(db *gorm.DB) *FinanceSnapshotRepo {
 // semantics). Re-running the same push is idempotent: same dates, same rows.
 // Dates are normalized to UTC midnight so the unique index sees one row per
 // calendar day regardless of the pushed timestamp's time-of-day.
-func (r *FinanceSnapshotRepo) ImportBundle(ctx context.Context, workspaceID uint, snapshots []model.FinanceSnapshot, accounts []model.FinanceSnapshotAccount, mortgages []model.FinanceMortgage) error {
+func (r *FinanceSnapshotRepo) ImportBundle(ctx context.Context, workspaceID string, snapshots []model.FinanceSnapshot, accounts []model.FinanceSnapshotAccount, mortgages []model.FinanceMortgage) error {
 	dates := map[string]time.Time{}
 	collect := func(t time.Time) {
 		dates[t.UTC().Format("2006-01-02")] = time.Date(t.UTC().Year(), t.UTC().Month(), t.UTC().Day(), 0, 0, 0, 0, time.UTC)
@@ -80,7 +80,7 @@ func (r *FinanceSnapshotRepo) ImportBundle(ctx context.Context, workspaceID uint
 }
 
 // ListSnapshots returns the whole net-worth series, oldest first.
-func (r *FinanceSnapshotRepo) ListSnapshots(ctx context.Context, workspaceID uint) ([]model.FinanceSnapshot, error) {
+func (r *FinanceSnapshotRepo) ListSnapshots(ctx context.Context, workspaceID string) ([]model.FinanceSnapshot, error) {
 	var rows []model.FinanceSnapshot
 	if err := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID).
 		Order("date ASC").Find(&rows).Error; err != nil {
@@ -91,7 +91,7 @@ func (r *FinanceSnapshotRepo) ListSnapshots(ctx context.Context, workspaceID uin
 
 // ListAccounts returns one snapshot day's account rows — for `date` when
 // given, else for the latest day that has any.
-func (r *FinanceSnapshotRepo) ListAccounts(ctx context.Context, workspaceID uint, date *time.Time) ([]model.FinanceSnapshotAccount, error) {
+func (r *FinanceSnapshotRepo) ListAccounts(ctx context.Context, workspaceID string, date *time.Time) ([]model.FinanceSnapshotAccount, error) {
 	query := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID)
 	if date != nil {
 		day := time.Date(date.UTC().Year(), date.UTC().Month(), date.UTC().Day(), 0, 0, 0, 0, time.UTC)
@@ -107,7 +107,7 @@ func (r *FinanceSnapshotRepo) ListAccounts(ctx context.Context, workspaceID uint
 }
 
 // ListMortgages returns the mortgage trend, oldest first.
-func (r *FinanceSnapshotRepo) ListMortgages(ctx context.Context, workspaceID uint) ([]model.FinanceMortgage, error) {
+func (r *FinanceSnapshotRepo) ListMortgages(ctx context.Context, workspaceID string) ([]model.FinanceMortgage, error) {
 	var rows []model.FinanceMortgage
 	if err := r.db.WithContext(ctx).Where("workspace_id = ?", workspaceID).
 		Order("date ASC").Find(&rows).Error; err != nil {

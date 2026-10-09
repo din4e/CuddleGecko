@@ -14,10 +14,10 @@ import (
 
 // fakeUserLookup satisfies TodoUserLookup without a users table.
 type fakeUserLookup struct {
-	names map[uint]string
+	names map[string]string
 }
 
-func (f fakeUserLookup) GetUserByID(_ context.Context, id uint) (*model.User, error) {
+func (f fakeUserLookup) GetUserByID(_ context.Context, id string) (*model.User, error) {
 	name, ok := f.names[id]
 	if !ok {
 		return nil, gorm.ErrRecordNotFound
@@ -39,13 +39,13 @@ func newTodoServiceWithHistory(t *testing.T) (*TodoService, *gorm.DB) {
 	repo := repository.NewTodoRepo(db)
 	activityRepo := repository.NewTodoActivityRepo(db)
 	svc := NewTodoService(repo, noopEventRepo{}, repo,
-		WithTodoHistory(activityRepo, fakeUserLookup{names: map[uint]string{1: "alice", 2: "bob"}}))
+		WithTodoHistory(activityRepo, fakeUserLookup{names: map[string]string{"1": "alice", "2": "bob"}}))
 	return svc, db
 }
 
-func listActivities(t *testing.T, svc *TodoService, todoID uint) []model.TodoActivity {
+func listActivities(t *testing.T, svc *TodoService, todoID string) []model.TodoActivity {
 	t.Helper()
-	activities, err := svc.ListActivities(context.Background(), 1, 1, todoID, 200)
+	activities, err := svc.ListActivities(context.Background(), "1", "1", todoID, 200)
 	require.NoError(t, err)
 	return activities
 }
@@ -54,16 +54,16 @@ func TestServiceActivity_RecordsCreateUpdateToggle(t *testing.T) {
 	svc, _ := newTodoServiceWithHistory(t)
 	ctx := context.Background()
 
-	todo, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "orig", Description: "d1", Priority: "normal"})
+	todo, err := svc.Create(ctx, "1", "1", &model.Todo{Title: "orig", Description: "d1", Priority: "normal"})
 	require.NoError(t, err)
 
-	updated, err := svc.Update(ctx, 1, 1, todo.ID, &model.Todo{
+	updated, err := svc.Update(ctx, "1", "1", todo.ID, &model.Todo{
 		Title: "renamed", Description: "d1", Priority: "high", Status: "pending",
 	}, TodoClear{})
 	require.NoError(t, err)
 	require.Equal(t, "renamed", updated.Title)
 
-	_, err = svc.ToggleStatus(ctx, 1, 1, todo.ID)
+	_, err = svc.ToggleStatus(ctx, "1", "1", todo.ID)
 	require.NoError(t, err)
 
 	activities := listActivities(t, svc, todo.ID)
@@ -92,10 +92,10 @@ func TestServiceActivity_SkipUnchangedUpdate(t *testing.T) {
 	svc, _ := newTodoServiceWithHistory(t)
 	ctx := context.Background()
 
-	todo, err := svc.Create(ctx, 1, 1, &model.Todo{Title: "same"})
+	todo, err := svc.Create(ctx, "1", "1", &model.Todo{Title: "same"})
 	require.NoError(t, err)
 
-	_, err = svc.Update(ctx, 1, 1, todo.ID, &model.Todo{Title: "same"}, TodoClear{})
+	_, err = svc.Update(ctx, "1", "1", todo.ID, &model.Todo{Title: "same"}, TodoClear{})
 	require.NoError(t, err)
 
 	activities := listActivities(t, svc, todo.ID)
@@ -107,12 +107,12 @@ func TestServiceActivity_PinnedAndDeleted(t *testing.T) {
 	svc, db := newTodoServiceWithHistory(t)
 	ctx := context.Background()
 
-	todo, err := svc.Create(ctx, 2, 1, &model.Todo{Title: "pin me"})
+	todo, err := svc.Create(ctx, "2", "1", &model.Todo{Title: "pin me"})
 	require.NoError(t, err)
 
-	_, err = svc.TogglePin(ctx, 2, 1, todo.ID)
+	_, err = svc.TogglePin(ctx, "2", "1", todo.ID)
 	require.NoError(t, err)
-	require.NoError(t, svc.Delete(ctx, 2, 1, todo.ID))
+	require.NoError(t, svc.Delete(ctx, "2", "1", todo.ID))
 
 	// After a soft delete the todo is no longer addressable through the
 	// service (ownership check), so read the log straight from the repo.
@@ -129,6 +129,6 @@ func TestServiceActivity_UnknownTodo(t *testing.T) {
 	svc, _ := newTodoServiceWithHistory(t)
 	ctx := context.Background()
 
-	_, err := svc.ListActivities(ctx, 1, 1, 999, 10)
+	_, err := svc.ListActivities(ctx, "1", "1", "999", 10)
 	assert.ErrorIs(t, err, ErrTodoNotFound)
 }

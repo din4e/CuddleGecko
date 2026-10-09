@@ -11,11 +11,11 @@ var ErrEventNotFound = errors.New("event not found")
 
 type EventRepository interface {
 	Create(ctx context.Context, event *model.Event) error
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.Event, error)
-	GetByIDs(ctx context.Context, workspaceID uint, ids []uint) ([]model.Event, error)
-	List(ctx context.Context, workspaceID uint, page, pageSize int, startAfter, endBefore *string, search string, tagIDs []uint) ([]model.Event, int64, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.Event, error)
+	GetByIDs(ctx context.Context, workspaceID string, ids []string) ([]model.Event, error)
+	List(ctx context.Context, workspaceID string, page, pageSize int, startAfter, endBefore *string, search string, tagIDs []string) ([]model.Event, int64, error)
 	Update(ctx context.Context, event *model.Event) error
-	Delete(ctx context.Context, workspaceID, id uint) error
+	Delete(ctx context.Context, workspaceID, id string) error
 }
 
 type EventService struct {
@@ -28,7 +28,7 @@ func NewEventService(repo EventRepository, taggingRepo TaggingRepository, notifi
 	return &EventService{repo: repo, taggingRepo: taggingRepo, notifier: firstNotifier(notifier)}
 }
 
-func (s *EventService) Create(ctx context.Context, userID, workspaceID uint, event *model.Event) (*model.Event, error) {
+func (s *EventService) Create(ctx context.Context, userID, workspaceID string, event *model.Event) (*model.Event, error) {
 	event.UserID = userID
 	event.WorkspaceID = workspaceID
 	if err := validateEvent(event); err != nil {
@@ -41,7 +41,7 @@ func (s *EventService) Create(ctx context.Context, userID, workspaceID uint, eve
 	return event, nil
 }
 
-func (s *EventService) GetByID(ctx context.Context, userID, workspaceID, id uint) (*model.Event, error) {
+func (s *EventService) GetByID(ctx context.Context, userID, workspaceID, id string) (*model.Event, error) {
 	event, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (s *EventService) GetByID(ctx context.Context, userID, workspaceID, id uint
 	return event, nil
 }
 
-func (s *EventService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, startAfter, endBefore *string, search string, tagIDs []uint) ([]model.Event, int64, error) {
+func (s *EventService) List(ctx context.Context, userID, workspaceID string, page, pageSize int, startAfter, endBefore *string, search string, tagIDs []string) ([]model.Event, int64, error) {
 	events, total, err := s.repo.List(ctx, workspaceID, page, pageSize, startAfter, endBefore, search, tagIDs)
 	if err != nil {
 		return nil, 0, err
@@ -63,7 +63,7 @@ func (s *EventService) List(ctx context.Context, userID, workspaceID uint, page,
 	return events, total, nil
 }
 
-func (s *EventService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Event) (*model.Event, error) {
+func (s *EventService) Update(ctx context.Context, userID, workspaceID, id string, updates *model.Event) (*model.Event, error) {
 	event, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrEventNotFound
@@ -91,7 +91,7 @@ func (s *EventService) Update(ctx context.Context, userID, workspaceID, id uint,
 	return event, nil
 }
 
-func (s *EventService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *EventService) Delete(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (s *EventService) Delete(ctx context.Context, userID, workspaceID, id uint)
 	return nil
 }
 
-func (s *EventService) ReplaceTags(ctx context.Context, userID, workspaceID, eventID uint, tagIDs []uint) error {
+func (s *EventService) ReplaceTags(ctx context.Context, userID, workspaceID, eventID string, tagIDs []string) error {
 	if _, err := s.repo.GetByID(ctx, workspaceID, eventID); err != nil {
 		return ErrEventNotFound
 	}
@@ -112,7 +112,7 @@ func (s *EventService) ReplaceTags(ctx context.Context, userID, workspaceID, eve
 	return nil
 }
 
-func (s *EventService) GetTags(ctx context.Context, userID, workspaceID, eventID uint) ([]model.Tag, error) {
+func (s *EventService) GetTags(ctx context.Context, userID, workspaceID, eventID string) ([]model.Tag, error) {
 	if _, err := s.repo.GetByID(ctx, workspaceID, eventID); err != nil {
 		return nil, ErrEventNotFound
 	}
@@ -120,11 +120,11 @@ func (s *EventService) GetTags(ctx context.Context, userID, workspaceID, eventID
 }
 
 // populateTags fills the virtual Tags field for a batch of events.
-func (s *EventService) populateTags(ctx context.Context, workspaceID uint, events []*model.Event) {
+func (s *EventService) populateTags(ctx context.Context, workspaceID string, events []*model.Event) {
 	if s.taggingRepo == nil || len(events) == 0 {
 		return
 	}
-	ids := make([]uint, len(events))
+	ids := make([]string, len(events))
 	for i, e := range events {
 		ids[i] = e.ID
 	}

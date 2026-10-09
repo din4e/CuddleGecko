@@ -16,20 +16,20 @@ func (s *MCPServer) registerPomodoroTools() {
 			"completed":        map[string]interface{}{"type": "boolean", "description": "Whether it ran to completion"},
 		},
 		"required": []string{"duration_seconds"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		p := &model.PomodoroSession{
 			DurationSeconds: getArgInt(args, "duration_seconds", 0),
 			Kind:            toString(getArg(args, "kind")),
-			TodoID:          toUintPtr(getArg(args, "todo_id")),
+			TodoID:          toStringPtr(getArg(args, "todo_id")),
 			Completed:       toString(getArg(args, "completed")) == "true",
 		}
 		return s.pomodoroSvc.Create(ctx, userID, workspaceID, p)
 	})
 
 	s.registerTool("get_pomodoro_summary", "Get today's and all-time focus-session totals.", map[string]interface{}{
-		"type": "object",
+		"type":       "object",
 		"properties": map[string]interface{}{},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		return s.pomodoroSvc.Summary(ctx, userID, workspaceID)
 	})
 }

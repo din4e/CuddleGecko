@@ -12,15 +12,15 @@ var ErrTransactionNotFound = errors.New("transaction not found")
 
 type TransactionRepository interface {
 	Create(ctx context.Context, tx *model.Transaction) error
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.Transaction, error)
-	List(ctx context.Context, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string, tagIDs []uint, from, to *time.Time) ([]model.Transaction, int64, error)
-	ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Transaction, error)
-	Summary(ctx context.Context, workspaceID uint, from, to *time.Time) (income float64, expense float64, err error)
-	Monthly(ctx context.Context, workspaceID uint, months int, from, to *time.Time) ([]model.TransactionMonthly, error)
-	Yearly(ctx context.Context, workspaceID uint) ([]model.TransactionYearly, error)
-	CategoryTotals(ctx context.Context, workspaceID uint, from, to *time.Time) ([]model.TransactionCategoryTotal, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.Transaction, error)
+	List(ctx context.Context, workspaceID string, page, pageSize int, txType *string, contactID *string, search string, tagIDs []string, from, to *time.Time) ([]model.Transaction, int64, error)
+	ListByContactIDs(ctx context.Context, workspaceID string, contactIDs []string, limit int) ([]model.Transaction, error)
+	Summary(ctx context.Context, workspaceID string, from, to *time.Time) (income float64, expense float64, err error)
+	Monthly(ctx context.Context, workspaceID string, months int, from, to *time.Time) ([]model.TransactionMonthly, error)
+	Yearly(ctx context.Context, workspaceID string) ([]model.TransactionYearly, error)
+	CategoryTotals(ctx context.Context, workspaceID string, from, to *time.Time) ([]model.TransactionCategoryTotal, error)
 	Update(ctx context.Context, tx *model.Transaction) error
-	Delete(ctx context.Context, workspaceID, id uint) error
+	Delete(ctx context.Context, workspaceID, id string) error
 }
 
 type TransactionService struct {
@@ -33,7 +33,7 @@ func NewTransactionService(repo TransactionRepository, taggingRepo TaggingReposi
 	return &TransactionService{repo: repo, taggingRepo: taggingRepo, notifier: firstNotifier(notifier)}
 }
 
-func (s *TransactionService) Create(ctx context.Context, userID, workspaceID uint, tx *model.Transaction) (*model.Transaction, error) {
+func (s *TransactionService) Create(ctx context.Context, userID, workspaceID string, tx *model.Transaction) (*model.Transaction, error) {
 	tx.UserID = userID
 	tx.WorkspaceID = workspaceID
 	if err := validateTransactionForCreate(tx); err != nil {
@@ -46,7 +46,7 @@ func (s *TransactionService) Create(ctx context.Context, userID, workspaceID uin
 	return tx, nil
 }
 
-func (s *TransactionService) GetByID(ctx context.Context, userID, workspaceID, id uint) (*model.Transaction, error) {
+func (s *TransactionService) GetByID(ctx context.Context, userID, workspaceID, id string) (*model.Transaction, error) {
 	tx, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func (s *TransactionService) GetByID(ctx context.Context, userID, workspaceID, i
 	return tx, nil
 }
 
-func (s *TransactionService) List(ctx context.Context, userID, workspaceID uint, page, pageSize int, txType *string, contactID *uint, search string, tagIDs []uint, from, to *time.Time) ([]model.Transaction, int64, error) {
+func (s *TransactionService) List(ctx context.Context, userID, workspaceID string, page, pageSize int, txType *string, contactID *string, search string, tagIDs []string, from, to *time.Time) ([]model.Transaction, int64, error) {
 	txs, total, err := s.repo.List(ctx, workspaceID, page, pageSize, txType, contactID, search, tagIDs, from, to)
 	if err != nil {
 		return nil, 0, err
@@ -68,23 +68,23 @@ func (s *TransactionService) List(ctx context.Context, userID, workspaceID uint,
 	return txs, total, nil
 }
 
-func (s *TransactionService) Summary(ctx context.Context, userID, workspaceID uint, from, to *time.Time) (income float64, expense float64, err error) {
+func (s *TransactionService) Summary(ctx context.Context, userID, workspaceID string, from, to *time.Time) (income float64, expense float64, err error) {
 	return s.repo.Summary(ctx, workspaceID, from, to)
 }
 
-func (s *TransactionService) Monthly(ctx context.Context, userID, workspaceID uint, months int, from, to *time.Time) ([]model.TransactionMonthly, error) {
+func (s *TransactionService) Monthly(ctx context.Context, userID, workspaceID string, months int, from, to *time.Time) ([]model.TransactionMonthly, error) {
 	return s.repo.Monthly(ctx, workspaceID, months, from, to)
 }
 
-func (s *TransactionService) Yearly(ctx context.Context, userID, workspaceID uint) ([]model.TransactionYearly, error) {
+func (s *TransactionService) Yearly(ctx context.Context, userID, workspaceID string) ([]model.TransactionYearly, error) {
 	return s.repo.Yearly(ctx, workspaceID)
 }
 
-func (s *TransactionService) CategoryTotals(ctx context.Context, userID, workspaceID uint, from, to *time.Time) ([]model.TransactionCategoryTotal, error) {
+func (s *TransactionService) CategoryTotals(ctx context.Context, userID, workspaceID string, from, to *time.Time) ([]model.TransactionCategoryTotal, error) {
 	return s.repo.CategoryTotals(ctx, workspaceID, from, to)
 }
 
-func (s *TransactionService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Transaction) (*model.Transaction, error) {
+func (s *TransactionService) Update(ctx context.Context, userID, workspaceID, id string, updates *model.Transaction) (*model.Transaction, error) {
 	if err := validateTransactionForUpdate(updates); err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (s *TransactionService) Update(ctx context.Context, userID, workspaceID, id
 	return tx, nil
 }
 
-func (s *TransactionService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *TransactionService) Delete(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func (s *TransactionService) Delete(ctx context.Context, userID, workspaceID, id
 	return nil
 }
 
-func (s *TransactionService) ReplaceTags(ctx context.Context, userID, workspaceID, txID uint, tagIDs []uint) error {
+func (s *TransactionService) ReplaceTags(ctx context.Context, userID, workspaceID, txID string, tagIDs []string) error {
 	if _, err := s.repo.GetByID(ctx, workspaceID, txID); err != nil {
 		return ErrTransactionNotFound
 	}
@@ -137,7 +137,7 @@ func (s *TransactionService) ReplaceTags(ctx context.Context, userID, workspaceI
 	return nil
 }
 
-func (s *TransactionService) GetTags(ctx context.Context, userID, workspaceID, txID uint) ([]model.Tag, error) {
+func (s *TransactionService) GetTags(ctx context.Context, userID, workspaceID, txID string) ([]model.Tag, error) {
 	if _, err := s.repo.GetByID(ctx, workspaceID, txID); err != nil {
 		return nil, ErrTransactionNotFound
 	}
@@ -145,11 +145,11 @@ func (s *TransactionService) GetTags(ctx context.Context, userID, workspaceID, t
 }
 
 // populateTags fills the virtual Tags field for a batch of transactions.
-func (s *TransactionService) populateTags(ctx context.Context, workspaceID uint, txs []*model.Transaction) {
+func (s *TransactionService) populateTags(ctx context.Context, workspaceID string, txs []*model.Transaction) {
 	if s.taggingRepo == nil || len(txs) == 0 {
 		return
 	}
-	ids := make([]uint, len(txs))
+	ids := make([]string, len(txs))
 	for i, t := range txs {
 		ids[i] = t.ID
 	}

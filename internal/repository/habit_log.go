@@ -18,7 +18,7 @@ func NewHabitLogRepo(db *gorm.DB) *HabitLogRepo {
 
 // Toggle checks in for a date if absent (returns true), or removes the
 // check-in if present (returns false). Idempotent and transactional.
-func (r *HabitLogRepo) Toggle(ctx context.Context, userID, workspaceID, habitID uint, date string) (bool, error) {
+func (r *HabitLogRepo) Toggle(ctx context.Context, userID, workspaceID, habitID string, date string) (bool, error) {
 	var checked bool
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var existing model.HabitLog
@@ -50,7 +50,7 @@ func (r *HabitLogRepo) Toggle(ctx context.Context, userID, workspaceID, habitID 
 }
 
 // ListAllByWorkspace returns every check-in log in the workspace (for stats).
-func (r *HabitLogRepo) ListAllByWorkspace(ctx context.Context, workspaceID uint) ([]model.HabitLog, error) {
+func (r *HabitLogRepo) ListAllByWorkspace(ctx context.Context, workspaceID string) ([]model.HabitLog, error) {
 	var logs []model.HabitLog
 	if err := r.db.WithContext(ctx).
 		Where("workspace_id = ?", workspaceID).
@@ -61,7 +61,7 @@ func (r *HabitLogRepo) ListAllByWorkspace(ctx context.Context, workspaceID uint)
 	return logs, nil
 }
 
-func (r *HabitLogRepo) DeleteByHabit(ctx context.Context, workspaceID, habitID uint) error {
+func (r *HabitLogRepo) DeleteByHabit(ctx context.Context, workspaceID, habitID string) error {
 	if err := r.db.WithContext(ctx).
 		Where("workspace_id = ? AND habit_id = ?", workspaceID, habitID).
 		Delete(&model.HabitLog{}).Error; err != nil {

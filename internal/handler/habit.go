@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"strconv"
 
 	"github.com/din4e/cuddlegecko/internal/model"
 	"github.com/din4e/cuddlegecko/internal/service"
@@ -55,13 +54,9 @@ func (h *HabitHandler) List(c *gin.Context) {
 func (h *HabitHandler) GetTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid habit id")
-		return
-	}
+	id := c.Param("id")
 
-	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, uint(id))
+	tags, err := h.svc.GetTags(c.Request.Context(), userID, workspaceID, id)
 	if err != nil {
 		response.NotFound(c, "habit not found")
 		return
@@ -72,11 +67,7 @@ func (h *HabitHandler) GetTags(c *gin.Context) {
 func (h *HabitHandler) ReplaceTags(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid habit id")
-		return
-	}
+	id := c.Param("id")
 
 	var req replaceTagsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -84,7 +75,7 @@ func (h *HabitHandler) ReplaceTags(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, uint(id), req.TagIDs); err != nil {
+	if err := h.svc.ReplaceTags(c.Request.Context(), userID, workspaceID, id, req.TagIDs); err != nil {
 		if errors.Is(err, model.ErrInvalidTagIDs) {
 			response.BadRequest(c, err.Error())
 			return
@@ -116,11 +107,7 @@ func (h *HabitHandler) Create(c *gin.Context) {
 func (h *HabitHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid habit id")
-		return
-	}
+	id := c.Param("id")
 	var req updateHabitRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -130,7 +117,7 @@ func (h *HabitHandler) Update(c *gin.Context) {
 	if req.Archived != nil {
 		updates.Archived = *req.Archived
 	}
-	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, uint(id), updates)
+	result, err := h.svc.Update(c.Request.Context(), userID, workspaceID, id, updates)
 	if err != nil {
 		if err == service.ErrHabitNotFound {
 			response.NotFound(c, "habit not found")
@@ -145,12 +132,8 @@ func (h *HabitHandler) Update(c *gin.Context) {
 func (h *HabitHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid habit id")
-		return
-	}
-	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, uint(id)); err != nil {
+	id := c.Param("id")
+	if err := h.svc.Delete(c.Request.Context(), userID, workspaceID, id); err != nil {
 		response.NotFound(c, "habit not found")
 		return
 	}
@@ -161,13 +144,9 @@ func (h *HabitHandler) Delete(c *gin.Context) {
 func (h *HabitHandler) CheckIn(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	workspaceID := middleware.GetWorkspaceID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid habit id")
-		return
-	}
+	id := c.Param("id")
 	date := c.Query("date")
-	checked, err := h.svc.Toggle(c.Request.Context(), userID, workspaceID, uint(id), date)
+	checked, err := h.svc.Toggle(c.Request.Context(), userID, workspaceID, id, date)
 	if err != nil {
 		if err == service.ErrHabitNotFound {
 			response.NotFound(c, "habit not found")

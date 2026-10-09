@@ -27,42 +27,42 @@ const (
 
 type TodoRepository interface {
 	Create(ctx context.Context, todo *model.Todo) error
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.Todo, error)
-	ExistingIDs(ctx context.Context, workspaceID uint, ids []uint) ([]uint, error)
-	SetTodoIDs(ctx context.Context, workspaceID, id uint, ids []uint) error
-	List(ctx context.Context, workspaceID uint, q model.TodoListQuery) ([]model.Todo, int64, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.Todo, error)
+	ExistingIDs(ctx context.Context, workspaceID string, ids []string) ([]string, error)
+	SetTodoIDs(ctx context.Context, workspaceID, id string, ids []string) error
+	List(ctx context.Context, workspaceID string, q model.TodoListQuery) ([]model.Todo, int64, error)
 	Update(ctx context.Context, todo *model.Todo) error
-	Delete(ctx context.Context, workspaceID, id uint) error
-	ReplaceTags(ctx context.Context, todoID uint, tags []model.Tag) error
-	GetTags(ctx context.Context, todoID uint) ([]model.Tag, error)
-	Stats(ctx context.Context, workspaceID uint) (model.TodoStats, error)
-	Reorder(ctx context.Context, workspaceID, id uint, afterID *uint) error
-	Move(ctx context.Context, workspaceID, id uint, parentID, afterID *uint, position string) error
-	PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID uint) (*model.Todo, error)
-	Duplicate(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error)
-	SetPinned(ctx context.Context, workspaceID, id uint, pinned bool) error
-	SetParent(ctx context.Context, workspaceID, id uint, parentID *uint) error
-	UpdateCreatedAt(ctx context.Context, id uint, at time.Time) error
-	IncrementPomodoro(ctx context.Context, workspaceID, id uint) error
-	SetProgress(ctx context.Context, workspaceID, id uint, progress *int) error
-	BulkAction(ctx context.Context, workspaceID uint, ids []uint, action, priority string) (int64, error)
-	CascadeComplete(ctx context.Context, workspaceID uint, parentIDs []uint, now time.Time) (int64, error)
-	CascadeRestore(ctx context.Context, workspaceID uint, parentIDs []uint) (int64, error)
-	ListTrash(ctx context.Context, workspaceID uint) ([]model.Todo, error)
-	Restore(ctx context.Context, workspaceID, id uint) error
-	EmptyTrash(ctx context.Context, workspaceID uint) (int64, error)
+	Delete(ctx context.Context, workspaceID, id string) error
+	ReplaceTags(ctx context.Context, todoID string, tags []model.Tag) error
+	GetTags(ctx context.Context, todoID string) ([]model.Tag, error)
+	Stats(ctx context.Context, workspaceID string) (model.TodoStats, error)
+	Reorder(ctx context.Context, workspaceID, id string, afterID *string) error
+	Move(ctx context.Context, workspaceID, id string, parentID, afterID *string, position string) error
+	PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID string) (*model.Todo, error)
+	Duplicate(ctx context.Context, userID, workspaceID, id string) (*model.Todo, error)
+	SetPinned(ctx context.Context, workspaceID, id string, pinned bool) error
+	SetParent(ctx context.Context, workspaceID, id string, parentID *string) error
+	UpdateCreatedAt(ctx context.Context, id string, at time.Time) error
+	IncrementPomodoro(ctx context.Context, workspaceID, id string) error
+	SetProgress(ctx context.Context, workspaceID, id string, progress *int) error
+	BulkAction(ctx context.Context, workspaceID string, ids []string, action, priority string) (int64, error)
+	CascadeComplete(ctx context.Context, workspaceID string, parentIDs []string, now time.Time) (int64, error)
+	CascadeRestore(ctx context.Context, workspaceID string, parentIDs []string) (int64, error)
+	ListTrash(ctx context.Context, workspaceID string) ([]model.Todo, error)
+	Restore(ctx context.Context, workspaceID, id string) error
+	EmptyTrash(ctx context.Context, workspaceID string) (int64, error)
 }
 
 // TodoItemRepository handles checklist (subtask) persistence for a todo.
 type TodoItemRepository interface {
-	ListItems(ctx context.Context, todoID uint) ([]model.TodoItem, error)
-	ListItemsByTodoIDs(ctx context.Context, todoIDs []uint) ([]model.TodoItem, error)
-	GetItem(ctx context.Context, todoID, itemID uint) (*model.TodoItem, error)
+	ListItems(ctx context.Context, todoID string) ([]model.TodoItem, error)
+	ListItemsByTodoIDs(ctx context.Context, todoIDs []string) ([]model.TodoItem, error)
+	GetItem(ctx context.Context, todoID, itemID string) (*model.TodoItem, error)
 	CreateItem(ctx context.Context, item *model.TodoItem) error
-	UpdateItem(ctx context.Context, todoID uint, item *model.TodoItem) error
-	SetItemDone(ctx context.Context, todoID, itemID uint, done bool) error
-	DeleteItem(ctx context.Context, todoID, itemID uint) error
-	ReorderItem(ctx context.Context, todoID, itemID uint, afterItemID *uint) error
+	UpdateItem(ctx context.Context, todoID string, item *model.TodoItem) error
+	SetItemDone(ctx context.Context, todoID, itemID string, done bool) error
+	DeleteItem(ctx context.Context, todoID, itemID string) error
+	ReorderItem(ctx context.Context, todoID, itemID string, afterItemID *string) error
 }
 
 // TodoClear flags which nullable fields should be explicitly cleared during an
@@ -124,7 +124,7 @@ func NewTodoService(repo TodoRepository, eventRepo EventRepositoryForSync, itemR
 // clients can patch caches without a refetch (pass nil todo for id-only
 // changes). Best-effort: it never returns an error and is only called after the
 // underlying repo mutation has succeeded.
-func (s *TodoService) notify(ctx context.Context, workspaceID uint, kind ChangeKind, id uint, todo *model.Todo) {
+func (s *TodoService) notify(ctx context.Context, workspaceID string, kind ChangeKind, id string, todo *model.Todo) {
 	var entity any
 	if todo != nil {
 		entity = todo
@@ -134,7 +134,7 @@ func (s *TodoService) notify(ctx context.Context, workspaceID uint, kind ChangeK
 	}
 }
 
-func (s *TodoService) Create(ctx context.Context, userID, workspaceID uint, todo *model.Todo) (*model.Todo, error) {
+func (s *TodoService) Create(ctx context.Context, userID, workspaceID string, todo *model.Todo) (*model.Todo, error) {
 	todo.UserID = userID
 	todo.WorkspaceID = workspaceID
 	if todo.Status == "" {
@@ -179,7 +179,7 @@ func (s *TodoService) Create(ctx context.Context, userID, workspaceID uint, todo
 			return nil, ErrTodoInvalidParent
 		}
 	}
-	links, err := s.normalizeTodoLinks(ctx, workspaceID, 0, todo.TodoIDs)
+	links, err := s.normalizeTodoLinks(ctx, workspaceID, "", todo.TodoIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (s *TodoService) Create(ctx context.Context, userID, workspaceID uint, todo
 	return todo, nil
 }
 
-func (s *TodoService) GetByID(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error) {
+func (s *TodoService) GetByID(ctx context.Context, userID, workspaceID, id string) (*model.Todo, error) {
 	todo, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrTodoNotFound
@@ -203,14 +203,14 @@ func (s *TodoService) GetByID(ctx context.Context, userID, workspaceID, id uint)
 // normalizeTodoLinks validates and canonicalizes a todo's link set: drops
 // duplicates, rejects a self-link, and requires every target to exist (live)
 // in the same workspace. Returns the normalized slice ready to persist.
-func (s *TodoService) normalizeTodoLinks(ctx context.Context, workspaceID, selfID uint, ids []uint) ([]uint, error) {
+func (s *TodoService) normalizeTodoLinks(ctx context.Context, workspaceID, selfID string, ids []string) ([]string, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	seen := make(map[uint]struct{}, len(ids))
-	unique := make([]uint, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	unique := make([]string, 0, len(ids))
 	for _, id := range ids {
-		if id == 0 {
+		if id == "" {
 			return nil, fmt.Errorf("%w: linked todo id must not be 0", ErrInvalidTodo)
 		}
 		if id == selfID {
@@ -227,24 +227,24 @@ func (s *TodoService) normalizeTodoLinks(ctx context.Context, workspaceID, selfI
 		return nil, err
 	}
 	if len(existing) != len(unique) {
-		known := make(map[uint]struct{}, len(existing))
+		known := make(map[string]struct{}, len(existing))
 		for _, id := range existing {
 			known[id] = struct{}{}
 		}
 		for _, id := range unique {
 			if _, ok := known[id]; !ok {
-				return nil, fmt.Errorf("%w: linked todo %d not found in this workspace", ErrInvalidTodo, id)
+				return nil, fmt.Errorf("%w: linked todo %s not found in this workspace", ErrInvalidTodo, id)
 			}
 		}
 	}
 	return unique, nil
 }
 
-func (s *TodoService) List(ctx context.Context, userID, workspaceID uint, q model.TodoListQuery) ([]model.Todo, int64, error) {
+func (s *TodoService) List(ctx context.Context, userID, workspaceID string, q model.TodoListQuery) ([]model.Todo, int64, error) {
 	return s.repo.List(ctx, workspaceID, q)
 }
 
-func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Todo, clear TodoClear) (*model.Todo, error) {
+func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id string, updates *model.Todo, clear TodoClear) (*model.Todo, error) {
 	if err := validateTodoPriority(updates.Priority); err != nil {
 		return nil, err
 	}
@@ -337,7 +337,7 @@ func (s *TodoService) Update(ctx context.Context, userID, workspaceID, id uint, 
 	return todo, nil
 }
 
-func (s *TodoService) ToggleStatus(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error) {
+func (s *TodoService) ToggleStatus(ctx context.Context, userID, workspaceID, id string) (*model.Todo, error) {
 	todo, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrTodoNotFound
@@ -386,7 +386,7 @@ func (s *TodoService) ToggleStatus(ctx context.Context, userID, workspaceID, id 
 // and kanban drops onto arbitrary status columns. Unlike ToggleStatus it never
 // advances recurring tasks; the client keeps using the toggle for the
 // complete-a-recurring-task flow.
-func (s *TodoService) SetStatus(ctx context.Context, userID, workspaceID, id uint, status string) (*model.Todo, error) {
+func (s *TodoService) SetStatus(ctx context.Context, userID, workspaceID, id string, status string) (*model.Todo, error) {
 	if status == "" {
 		return nil, fmt.Errorf("%w: status is required", ErrInvalidTodo)
 	}
@@ -443,7 +443,7 @@ func applyStatus(todo *model.Todo, status string) {
 // they were. A best-effort failure never fails the parent's own mutation; a
 // workspace-wide refresh notification papers over the partial state on other
 // devices.
-func (s *TodoService) applyCascade(ctx context.Context, workspaceID, id uint, prevStatus, nextStatus string) {
+func (s *TodoService) applyCascade(ctx context.Context, workspaceID, id string, prevStatus, nextStatus string) {
 	if prevStatus == nextStatus {
 		return
 	}
@@ -452,12 +452,12 @@ func (s *TodoService) applyCascade(ctx context.Context, workspaceID, id uint, pr
 		err error
 	)
 	if nextStatus == "done" {
-		n, err = s.repo.CascadeComplete(ctx, workspaceID, []uint{id}, time.Now())
+		n, err = s.repo.CascadeComplete(ctx, workspaceID, []string{id}, time.Now())
 	} else if prevStatus == "done" {
-		n, err = s.repo.CascadeRestore(ctx, workspaceID, []uint{id})
+		n, err = s.repo.CascadeRestore(ctx, workspaceID, []string{id})
 	}
 	if err == nil && n > 0 {
-		s.notify(ctx, workspaceID, ChangeBulk, 0, nil)
+		s.notify(ctx, workspaceID, ChangeBulk, "", nil)
 	}
 }
 
@@ -466,7 +466,7 @@ func markDone(todo *model.Todo) {
 	applyStatus(todo, "done")
 }
 
-func (s *TodoService) SyncToEvent(ctx context.Context, userID, workspaceID, id uint) (*model.Event, error) {
+func (s *TodoService) SyncToEvent(ctx context.Context, userID, workspaceID, id string) (*model.Event, error) {
 	todo, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrTodoNotFound
@@ -493,7 +493,7 @@ func (s *TodoService) SyncToEvent(ctx context.Context, userID, workspaceID, id u
 	return event, nil
 }
 
-func (s *TodoService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *TodoService) Delete(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}
@@ -503,17 +503,17 @@ func (s *TodoService) Delete(ctx context.Context, userID, workspaceID, id uint) 
 }
 
 // Stats returns a productivity overview for the workspace.
-func (s *TodoService) Stats(ctx context.Context, userID, workspaceID uint) (model.TodoStats, error) {
+func (s *TodoService) Stats(ctx context.Context, userID, workspaceID string) (model.TodoStats, error) {
 	return s.repo.Stats(ctx, workspaceID)
 }
 
 // ListTrash returns soft-deleted todos for the workspace.
-func (s *TodoService) ListTrash(ctx context.Context, userID, workspaceID uint) ([]model.Todo, error) {
+func (s *TodoService) ListTrash(ctx context.Context, userID, workspaceID string) ([]model.Todo, error) {
 	return s.repo.ListTrash(ctx, workspaceID)
 }
 
 // Restore un-deletes a soft-deleted todo.
-func (s *TodoService) Restore(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *TodoService) Restore(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.repo.Restore(ctx, workspaceID, id); err != nil {
 		return ErrTodoNotFound
 	}
@@ -525,27 +525,27 @@ func (s *TodoService) Restore(ctx context.Context, userID, workspaceID, id uint)
 // EmptyTrash permanently deletes every soft-deleted todo in the workspace and
 // returns how many were purged. The purged rows' audit trail goes with them,
 // so no activity entry is recorded — the point is that nothing remains.
-func (s *TodoService) EmptyTrash(ctx context.Context, userID, workspaceID uint) (int64, error) {
+func (s *TodoService) EmptyTrash(ctx context.Context, userID, workspaceID string) (int64, error) {
 	count, err := s.repo.EmptyTrash(ctx, workspaceID)
 	if err != nil {
 		return 0, err
 	}
 	// Bulk-style refresh: trash listings and any cached lists on other devices
 	// must drop the purged rows.
-	s.notify(ctx, workspaceID, ChangeBulk, 0, nil)
+	s.notify(ctx, workspaceID, ChangeBulk, "", nil)
 	return count, nil
 }
 
 // Reorder moves a todo within the workspace's manual order, after the todo with
 // the given id (or to the top when afterID is nil).
-func (s *TodoService) Reorder(ctx context.Context, userID, workspaceID, id uint, afterID *uint) error {
+func (s *TodoService) Reorder(ctx context.Context, userID, workspaceID, id string, afterID *string) error {
 	if err := s.ensureTodoOwned(ctx, workspaceID, id); err != nil {
 		return err
 	}
 	if err := s.repo.Reorder(ctx, workspaceID, id, afterID); err != nil {
 		return err
 	}
-	s.notify(ctx, workspaceID, ChangeBulk, 0, nil)
+	s.notify(ctx, workspaceID, ChangeBulk, "", nil)
 	return nil
 }
 
@@ -553,7 +553,7 @@ func (s *TodoService) Reorder(ctx context.Context, userID, workspaceID, id uint,
 // siblings. Position among the siblings: after afterID when set, else "last"
 // appends at the end and ""/"first" lands at the top. Emits a workspace-wide
 // refresh because the sibling ordering of both the old and new parent can shift.
-func (s *TodoService) Move(ctx context.Context, userID, workspaceID, id uint, parentID, afterID *uint, position string) error {
+func (s *TodoService) Move(ctx context.Context, userID, workspaceID, id string, parentID, afterID *string, position string) error {
 	if position != "" && position != TodoMoveFirst && position != TodoMoveLast {
 		return fmt.Errorf("%w: position must be 'first' or 'last'", ErrInvalidTodo)
 	}
@@ -565,17 +565,17 @@ func (s *TodoService) Move(ctx context.Context, userID, workspaceID, id uint, pa
 	if err := s.repo.Move(ctx, workspaceID, id, parentID, afterID, position); err != nil {
 		return err
 	}
-	if !uintPtrEqual(prevParent, parentID) {
+	if !idPtrEqual(prevParent, parentID) {
 		s.recordActivity(ctx, userID, id, []model.TodoActivity{
-			activityEntry(model.TodoActivityMoved, "parent", uintPtrString(prevParent), uintPtrString(parentID)),
+			activityEntry(model.TodoActivityMoved, "parent", idPtrString(prevParent), idPtrString(parentID)),
 		})
 	}
-	s.notify(ctx, workspaceID, ChangeBulk, 0, nil)
+	s.notify(ctx, workspaceID, ChangeBulk, "", nil)
 	return nil
 }
 
 // PromoteItem turns a checklist item into a standalone todo.
-func (s *TodoService) PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID uint) (*model.Todo, error) {
+func (s *TodoService) PromoteItem(ctx context.Context, userID, workspaceID, todoID, itemID string) (*model.Todo, error) {
 	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
 		return nil, err
 	}
@@ -592,7 +592,7 @@ func (s *TodoService) PromoteItem(ctx context.Context, userID, workspaceID, todo
 }
 
 // Duplicate clones a todo into a new pending todo.
-func (s *TodoService) Duplicate(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error) {
+func (s *TodoService) Duplicate(ctx context.Context, userID, workspaceID, id string) (*model.Todo, error) {
 	if err := s.ensureTodoOwned(ctx, workspaceID, id); err != nil {
 		return nil, err
 	}
@@ -608,7 +608,7 @@ func (s *TodoService) Duplicate(ctx context.Context, userID, workspaceID, id uin
 // complete | delete | postpone (+1 day, keeping the time of day; undated tasks
 // land at tomorrow 23:59 — same rule as the card's postpone action) | priority
 // (set every selected todo to opts.Priority).
-func (s *TodoService) BulkAction(ctx context.Context, userID, workspaceID uint, ids []uint, action string, opts BulkActionOptions) (int64, error) {
+func (s *TodoService) BulkAction(ctx context.Context, userID, workspaceID string, ids []string, action string, opts BulkActionOptions) (int64, error) {
 	switch action {
 	case "complete", "delete", "postpone":
 	case "priority":
@@ -622,12 +622,12 @@ func (s *TodoService) BulkAction(ctx context.Context, userID, workspaceID uint, 
 	if err != nil || affected == 0 {
 		return affected, err
 	}
-	s.notify(ctx, workspaceID, ChangeBulk, 0, nil)
+	s.notify(ctx, workspaceID, ChangeBulk, "", nil)
 	return affected, err
 }
 
 // TogglePin flips a todo's pinned (starred) state.
-func (s *TodoService) TogglePin(ctx context.Context, userID, workspaceID, id uint) (*model.Todo, error) {
+func (s *TodoService) TogglePin(ctx context.Context, userID, workspaceID, id string) (*model.Todo, error) {
 	todo, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrTodoNotFound
@@ -649,7 +649,7 @@ func (s *TodoService) TogglePin(ctx context.Context, userID, workspaceID, id uin
 // IncrementPomodoro records one completed focus session on a todo (the client
 // calls it when a 25-min Pomodoro finishes). Emits an update so other devices
 // see the new count.
-func (s *TodoService) IncrementPomodoro(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *TodoService) IncrementPomodoro(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.ensureTodoOwned(ctx, workspaceID, id); err != nil {
 		return err
 	}
@@ -661,7 +661,7 @@ func (s *TodoService) IncrementPomodoro(ctx context.Context, userID, workspaceID
 }
 
 // SetProgress updates only the manual percent (row-bar drag). nil clears it.
-func (s *TodoService) SetProgress(ctx context.Context, userID, workspaceID, id uint, progress *int) error {
+func (s *TodoService) SetProgress(ctx context.Context, userID, workspaceID, id string, progress *int) error {
 	if err := validateTodoProgress(progress); err != nil {
 		return err
 	}
@@ -677,14 +677,14 @@ func (s *TodoService) SetProgress(ctx context.Context, userID, workspaceID, id u
 
 // --- Tag associations ---
 
-func (s *TodoService) GetTags(ctx context.Context, userID, workspaceID, todoID uint) ([]model.Tag, error) {
+func (s *TodoService) GetTags(ctx context.Context, userID, workspaceID, todoID string) ([]model.Tag, error) {
 	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
 		return nil, err
 	}
 	return s.repo.GetTags(ctx, todoID)
 }
 
-func (s *TodoService) ReplaceTags(ctx context.Context, userID, workspaceID, todoID uint, tagIDs []uint) error {
+func (s *TodoService) ReplaceTags(ctx context.Context, userID, workspaceID, todoID string, tagIDs []string) error {
 	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
 		return err
 	}
@@ -706,21 +706,21 @@ func (s *TodoService) ReplaceTags(ctx context.Context, userID, workspaceID, todo
 
 // ensureTodoOwned returns ErrTodoNotFound when the todo does not belong to the
 // workspace, so item endpoints inherit the same ownership scoping as the todo.
-func (s *TodoService) ensureTodoOwned(ctx context.Context, workspaceID, todoID uint) error {
+func (s *TodoService) ensureTodoOwned(ctx context.Context, workspaceID, todoID string) error {
 	if _, err := s.repo.GetByID(ctx, workspaceID, todoID); err != nil {
 		return ErrTodoNotFound
 	}
 	return nil
 }
 
-func (s *TodoService) ListItems(ctx context.Context, userID, workspaceID, todoID uint) ([]model.TodoItem, error) {
+func (s *TodoService) ListItems(ctx context.Context, userID, workspaceID, todoID string) ([]model.TodoItem, error) {
 	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
 		return nil, err
 	}
 	return s.itemRepo.ListItems(ctx, todoID)
 }
 
-func (s *TodoService) CreateItem(ctx context.Context, userID, workspaceID, todoID uint, content string) (*model.TodoItem, error) {
+func (s *TodoService) CreateItem(ctx context.Context, userID, workspaceID, todoID string, content string) (*model.TodoItem, error) {
 	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
 		return nil, err
 	}
@@ -736,7 +736,7 @@ func (s *TodoService) CreateItem(ctx context.Context, userID, workspaceID, todoI
 	return item, nil
 }
 
-func (s *TodoService) UpdateItem(ctx context.Context, userID, workspaceID, todoID, itemID uint, content string, dueTime *time.Time, clearDueTime bool) (*model.TodoItem, error) {
+func (s *TodoService) UpdateItem(ctx context.Context, userID, workspaceID, todoID, itemID string, content string, dueTime *time.Time, clearDueTime bool) (*model.TodoItem, error) {
 	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
 		return nil, err
 	}
@@ -764,7 +764,7 @@ func (s *TodoService) UpdateItem(ctx context.Context, userID, workspaceID, todoI
 	return item, nil
 }
 
-func (s *TodoService) ToggleItem(ctx context.Context, userID, workspaceID, todoID, itemID uint) (*model.TodoItem, error) {
+func (s *TodoService) ToggleItem(ctx context.Context, userID, workspaceID, todoID, itemID string) (*model.TodoItem, error) {
 	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
 		return nil, err
 	}
@@ -781,7 +781,7 @@ func (s *TodoService) ToggleItem(ctx context.Context, userID, workspaceID, todoI
 	return current, nil
 }
 
-func (s *TodoService) DeleteItem(ctx context.Context, userID, workspaceID, todoID, itemID uint) error {
+func (s *TodoService) DeleteItem(ctx context.Context, userID, workspaceID, todoID, itemID string) error {
 	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
 		return err
 	}
@@ -796,7 +796,7 @@ func (s *TodoService) DeleteItem(ctx context.Context, userID, workspaceID, todoI
 }
 
 // ReorderItem moves a checklist item within its todo's manual order.
-func (s *TodoService) ReorderItem(ctx context.Context, userID, workspaceID, todoID, itemID uint, afterItemID *uint) error {
+func (s *TodoService) ReorderItem(ctx context.Context, userID, workspaceID, todoID, itemID string, afterItemID *string) error {
 	if err := s.ensureTodoOwned(ctx, workspaceID, todoID); err != nil {
 		return err
 	}

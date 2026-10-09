@@ -12,13 +12,13 @@ var ErrInteractionNotFound = errors.New("interaction not found")
 
 type InteractionRepository interface {
 	Create(ctx context.Context, interaction *model.Interaction) error
-	GetByID(ctx context.Context, workspaceID, id uint) (*model.Interaction, error)
-	ListByContact(ctx context.Context, workspaceID, contactID uint, page, pageSize int) ([]model.Interaction, int64, error)
-	ListByContactIDs(ctx context.Context, workspaceID uint, contactIDs []uint, limit int) ([]model.Interaction, error)
-	ListByWorkspace(ctx context.Context, workspaceID uint) ([]model.Interaction, error)
-	LastByContact(ctx context.Context, workspaceID uint) (map[uint]time.Time, error)
+	GetByID(ctx context.Context, workspaceID, id string) (*model.Interaction, error)
+	ListByContact(ctx context.Context, workspaceID, contactID string, page, pageSize int) ([]model.Interaction, int64, error)
+	ListByContactIDs(ctx context.Context, workspaceID string, contactIDs []string, limit int) ([]model.Interaction, error)
+	ListByWorkspace(ctx context.Context, workspaceID string) ([]model.Interaction, error)
+	LastByContact(ctx context.Context, workspaceID string) (map[string]time.Time, error)
 	Update(ctx context.Context, interaction *model.Interaction) error
-	Delete(ctx context.Context, workspaceID, id uint) error
+	Delete(ctx context.Context, workspaceID, id string) error
 }
 
 type InteractionService struct {
@@ -30,7 +30,7 @@ func NewInteractionService(repo InteractionRepository, notifier ...ChangeNotifie
 	return &InteractionService{repo: repo, notifier: firstNotifier(notifier)}
 }
 
-func (s *InteractionService) Create(ctx context.Context, userID, workspaceID, contactID uint, interaction *model.Interaction) (*model.Interaction, error) {
+func (s *InteractionService) Create(ctx context.Context, userID, workspaceID, contactID string, interaction *model.Interaction) (*model.Interaction, error) {
 	interaction.UserID = userID
 	interaction.WorkspaceID = workspaceID
 	interaction.ContactID = contactID
@@ -41,7 +41,7 @@ func (s *InteractionService) Create(ctx context.Context, userID, workspaceID, co
 	return interaction, nil
 }
 
-func (s *InteractionService) ListByContact(ctx context.Context, userID, workspaceID, contactID uint, page, pageSize int) ([]model.Interaction, int64, error) {
+func (s *InteractionService) ListByContact(ctx context.Context, userID, workspaceID, contactID string, page, pageSize int) ([]model.Interaction, int64, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -51,7 +51,7 @@ func (s *InteractionService) ListByContact(ctx context.Context, userID, workspac
 	return s.repo.ListByContact(ctx, workspaceID, contactID, page, pageSize)
 }
 
-func (s *InteractionService) Update(ctx context.Context, userID, workspaceID, id uint, updates *model.Interaction) (*model.Interaction, error) {
+func (s *InteractionService) Update(ctx context.Context, userID, workspaceID, id string, updates *model.Interaction) (*model.Interaction, error) {
 	interaction, err := s.repo.GetByID(ctx, workspaceID, id)
 	if err != nil {
 		return nil, ErrInteractionNotFound
@@ -75,7 +75,7 @@ func (s *InteractionService) Update(ctx context.Context, userID, workspaceID, id
 	return interaction, nil
 }
 
-func (s *InteractionService) Delete(ctx context.Context, userID, workspaceID, id uint) error {
+func (s *InteractionService) Delete(ctx context.Context, userID, workspaceID, id string) error {
 	if err := s.repo.Delete(ctx, workspaceID, id); err != nil {
 		return err
 	}

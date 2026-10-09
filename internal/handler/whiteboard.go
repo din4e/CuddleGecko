@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"github.com/din4e/cuddlegecko/internal/model"
 	"github.com/din4e/cuddlegecko/internal/service"
 	"github.com/din4e/cuddlegecko/pkg/middleware"
@@ -115,7 +113,7 @@ func (h *WhiteboardHandler) DeleteBoard(c *gin.Context) {
 
 type wbNodeRequest struct {
 	RefType string   `json:"ref_type"`
-	RefID   *uint    `json:"ref_id"`
+	RefID   *string  `json:"ref_id"`
 	Label   string   `json:"label"`
 	Note    string   `json:"note"`
 	X       *float64 `json:"x"`
@@ -123,14 +121,14 @@ type wbNodeRequest struct {
 	Color   string   `json:"color"`
 }
 
-func (r wbNodeRequest) toModel(id uint) *model.WhiteboardNode {
+func (r wbNodeRequest) toModel(id string) *model.WhiteboardNode {
 	n := &model.WhiteboardNode{
-		ID:          id,
-		RefType:     r.RefType,
-		RefID:       r.RefID,
-		Label:       r.Label,
-		Note:        r.Note,
-		Color:       r.Color,
+		ID:      id,
+		RefType: r.RefType,
+		RefID:   r.RefID,
+		Label:   r.Label,
+		Note:    r.Note,
+		Color:   r.Color,
 	}
 	if r.X != nil {
 		n.X = *r.X
@@ -153,7 +151,7 @@ func (h *WhiteboardHandler) CreateNode(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	n, err := h.svc.CreateNode(c.Request.Context(), userID, workspaceID, boardID, req.toModel(0))
+	n, err := h.svc.CreateNode(c.Request.Context(), userID, workspaceID, boardID, req.toModel(""))
 	if err != nil {
 		mapWhiteboardError(c, err)
 		return
@@ -204,8 +202,8 @@ func (h *WhiteboardHandler) DeleteNode(c *gin.Context) {
 }
 
 type wbEdgeRequest struct {
-	FromNodeID uint   `json:"from_node_id"`
-	ToNodeID   uint   `json:"to_node_id"`
+	FromNodeID string `json:"from_node_id"`
+	ToNodeID   string `json:"to_node_id"`
 	Label      string `json:"label"`
 }
 
@@ -270,13 +268,13 @@ func (h *WhiteboardHandler) ExpandNode(c *gin.Context) {
 }
 
 // parseUintParam reads a numeric path param, replying 400 on garbage.
-func parseUintParam(c *gin.Context, name string) (uint, bool) {
-	id, err := strconv.ParseUint(c.Param(name), 10, 32)
-	if err != nil {
+func parseUintParam(c *gin.Context, name string) (string, bool) {
+	id := c.Param(name)
+	if id == "" {
 		response.BadRequest(c, "invalid "+name)
-		return 0, false
+		return "", false
 	}
-	return uint(id), true
+	return id, true
 }
 
 func mapWhiteboardError(c *gin.Context, err error) {

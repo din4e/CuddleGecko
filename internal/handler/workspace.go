@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"github.com/din4e/cuddlegecko/internal/service"
 	"github.com/din4e/cuddlegecko/pkg/middleware"
 	"github.com/din4e/cuddlegecko/pkg/response"
@@ -57,11 +55,7 @@ func (h *WorkspaceHandler) Create(c *gin.Context) {
 
 func (h *WorkspaceHandler) Update(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid workspace id")
-		return
-	}
+	id := c.Param("id")
 
 	var req updateWorkspaceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -69,7 +63,7 @@ func (h *WorkspaceHandler) Update(c *gin.Context) {
 		return
 	}
 
-	ws, err := h.svc.Update(c.Request.Context(), userID, uint(id), req.Name, req.Description, req.Icon)
+	ws, err := h.svc.Update(c.Request.Context(), userID, id, req.Name, req.Description, req.Icon)
 	if err != nil {
 		if err == service.ErrWorkspaceNotFound {
 			response.NotFound(c, "workspace not found")
@@ -87,13 +81,9 @@ func (h *WorkspaceHandler) Update(c *gin.Context) {
 
 func (h *WorkspaceHandler) Delete(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid workspace id")
-		return
-	}
+	id := c.Param("id")
 
-	if err := h.svc.Delete(c.Request.Context(), userID, uint(id)); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, id); err != nil {
 		if err == service.ErrWorkspaceNotFound {
 			response.NotFound(c, "workspace not found")
 			return
@@ -110,13 +100,9 @@ func (h *WorkspaceHandler) Delete(c *gin.Context) {
 
 func (h *WorkspaceHandler) Switch(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		response.BadRequest(c, "invalid workspace id")
-		return
-	}
+	id := c.Param("id")
 
-	ws, err := h.svc.Switch(c.Request.Context(), userID, uint(id))
+	ws, err := h.svc.Switch(c.Request.Context(), userID, id)
 	if err != nil {
 		if err == service.ErrNotWorkspaceMember || err == service.ErrWorkspaceNotFound {
 			response.NotFound(c, "workspace not found")

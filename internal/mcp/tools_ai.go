@@ -13,8 +13,8 @@ func (s *MCPServer) registerAITools() {
 			"contact_id": map[string]interface{}{"type": "integer", "description": "Contact ID to analyze"},
 		},
 		"required": []string{"contact_id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		contactID := toUint(getArg(args, "contact_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		contactID := toString(getArg(args, "contact_id"))
 		result, err := s.aiSvc.AnalyzeRelationship(ctx, userID, workspaceID, contactID)
 		if err != nil {
 			return nil, err
@@ -28,8 +28,8 @@ func (s *MCPServer) registerAITools() {
 			"event_id": map[string]interface{}{"type": "integer", "description": "Event ID to analyze"},
 		},
 		"required": []string{"event_id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		eventID := toUint(getArg(args, "event_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		eventID := toString(getArg(args, "event_id"))
 		result, err := s.aiSvc.AnalyzeEvent(ctx, userID, workspaceID, eventID)
 		if err != nil {
 			return nil, err
@@ -46,7 +46,7 @@ func (s *MCPServer) registerAITools() {
 			"question":    map[string]interface{}{"type": "string", "description": "Custom question for the AI"},
 		},
 		"required": []string{"type"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		req := service.AnalyzeRequest{
 			Type:       toString(getArg(args, "type")),
 			ContactIDs: toUintSlice(getArg(args, "contact_ids")),

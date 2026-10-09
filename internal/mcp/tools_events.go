@@ -16,7 +16,7 @@ func (s *MCPServer) registerEventTools() {
 			"end_before":  map[string]interface{}{"type": "string", "description": "Filter events ending before this date (RFC3339)"},
 			"search":      map[string]interface{}{"type": "string", "description": "Case-insensitive substring match on title"},
 		},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		page := getArgInt(args, "page", 1)
 		pageSize := getArgInt(args, "page_size", 20)
 		search := toString(getArg(args, "search"))
@@ -55,7 +55,7 @@ func (s *MCPServer) registerEventTools() {
 			"color":       map[string]interface{}{"type": "string", "description": "Event color"},
 		},
 		"required": []string{"title", "start_time"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
 		event := &model.Event{
 			Title:       toString(getArg(args, "title")),
 			Description: toString(getArg(args, "description")),
@@ -81,8 +81,8 @@ func (s *MCPServer) registerEventTools() {
 			"color":       map[string]interface{}{"type": "string", "description": "Event color"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		updates := &model.Event{
 			Title:       toString(getArg(args, "title")),
 			Description: toString(getArg(args, "description")),
@@ -101,8 +101,8 @@ func (s *MCPServer) registerEventTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Event ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		err := s.eventSvc.Delete(ctx, userID, workspaceID, id)
 		if err != nil {
 			return nil, err

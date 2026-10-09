@@ -200,7 +200,7 @@ func main() {
 		}
 		tagsFor := func(row didaRow) []model.Tag {
 			var out []model.Tag
-			seen := map[uint]bool{}
+			seen := map[string]bool{}
 			add := func(n string) {
 				n = strings.TrimSpace(n)
 				if n == "" {
@@ -218,7 +218,7 @@ func main() {
 			return out
 		}
 
-		didaIDToTodo := map[string]uint{}
+		didaIDToTodo := map[string]string{}
 		for _, row := range rows {
 			status := "pending"
 			var completedAt *time.Time

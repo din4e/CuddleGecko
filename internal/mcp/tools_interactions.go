@@ -15,8 +15,8 @@ func (s *MCPServer) registerInteractionTools() {
 			"page_size":  map[string]interface{}{"type": "integer", "description": "Items per page (default 20)", "default": 20},
 		},
 		"required": []string{"contact_id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		contactID := toUint(getArg(args, "contact_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		contactID := toString(getArg(args, "contact_id"))
 		page := getArgInt(args, "page", 1)
 		pageSize := getArgInt(args, "page_size", 20)
 
@@ -42,8 +42,8 @@ func (s *MCPServer) registerInteractionTools() {
 			"occurred_at": map[string]interface{}{"type": "string", "description": "When the interaction occurred (RFC3339)"},
 		},
 		"required": []string{"contact_id", "type", "title", "occurred_at"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		contactID := toUint(getArg(args, "contact_id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		contactID := toString(getArg(args, "contact_id"))
 		interaction := &model.Interaction{
 			Type:       model.InteractionType(toString(getArg(args, "type"))),
 			Title:      toString(getArg(args, "title")),
@@ -63,8 +63,8 @@ func (s *MCPServer) registerInteractionTools() {
 			"occurred_at": map[string]interface{}{"type": "string", "description": "When the interaction occurred (RFC3339)"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		updates := &model.Interaction{
 			Type:       model.InteractionType(toString(getArg(args, "type"))),
 			Title:      toString(getArg(args, "title")),
@@ -80,8 +80,8 @@ func (s *MCPServer) registerInteractionTools() {
 			"id": map[string]interface{}{"type": "integer", "description": "Interaction ID"},
 		},
 		"required": []string{"id"},
-	}, func(ctx context.Context, userID, workspaceID uint, args map[string]interface{}) (interface{}, error) {
-		id := toUint(getArg(args, "id"))
+	}, func(ctx context.Context, userID, workspaceID string, args map[string]interface{}) (interface{}, error) {
+		id := toString(getArg(args, "id"))
 		err := s.interactionSvc.Delete(ctx, userID, workspaceID, id)
 		if err != nil {
 			return nil, err

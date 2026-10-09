@@ -10,8 +10,8 @@ import (
 )
 
 type AuthHandler struct {
-	svc       *service.AuthService
-	captcha   *service.CaptchaService
+	svc     *service.AuthService
+	captcha *service.CaptchaService
 }
 
 func NewAuthHandler(svc *service.AuthService, captcha *service.CaptchaService) *AuthHandler {

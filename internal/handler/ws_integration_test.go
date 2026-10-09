@@ -42,7 +42,7 @@ func TestTodoHTTP_Create_BroadcastsOverWS(t *testing.T) {
 
 	// Reuse the todo routes (fake user_id=1 / workspace_id=1) and bolt on /api/ws.
 	r := setupTodoRouter(svc)
-	checker := &fakeWSChecker{member: map[[2]uint]bool{{1, 1}: true}, def: 1}
+	checker := &fakeWSChecker{member: map[[2]string]bool{{"1", "1"}: true}, def: "1"}
 	wsHandler := NewWSHandler(hub, &config.JWTConfig{Secret: wsTestSecret}, checker, gin.DebugMode, nil)
 	r.GET("/api/ws", wsHandler.Connect)
 
@@ -50,7 +50,7 @@ func TestTodoHTTP_Create_BroadcastsOverWS(t *testing.T) {
 	defer srv.Close()
 
 	// 1. Open a WS connection as user 1 in workspace 1.
-	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/ws?token=" + mintWSToken(t, 1) + "&workspace_id=1"
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/ws?token=" + mintWSToken(t, "1") + "&workspace_id=1"
 	dctx, dcancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer dcancel()
 	conn, resp, err := websocket.Dial(dctx, wsURL, nil)
@@ -78,7 +78,7 @@ func TestTodoHTTP_Create_BroadcastsOverWS(t *testing.T) {
 	var f realtime.Frame
 	require.NoError(t, json.Unmarshal(data, &f))
 	assert.Equal(t, realtime.FrameDataChanged, f.Type)
-	assert.Equal(t, uint(1), f.WorkspaceID)
+	assert.Equal(t, "1", f.WorkspaceID)
 	assert.Equal(t, "created", f.Kind)
 	assert.NotZero(t, f.ID, "created frame should carry the new todo id")
 }
@@ -100,14 +100,14 @@ func TestTodoHTTP_Broadcast_WorkspaceIsolation(t *testing.T) {
 
 	// setupTodoRouter pins mutations to workspace 1; connect a client to workspace 2.
 	r := setupTodoRouter(svc)
-	checker := &fakeWSChecker{member: map[[2]uint]bool{{1, 1}: true, {2, 1}: true}, def: 1}
+	checker := &fakeWSChecker{member: map[[2]string]bool{{"1", "1"}: true, {"2", "1"}: true}, def: "1"}
 	wsHandler := NewWSHandler(hub, &config.JWTConfig{Secret: wsTestSecret}, checker, gin.DebugMode, nil)
 	r.GET("/api/ws", wsHandler.Connect)
 
 	srv := httptest.NewServer(r)
 	defer srv.Close()
 
-	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/ws?token=" + mintWSToken(t, 1) + "&workspace_id=2"
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/ws?token=" + mintWSToken(t, "1") + "&workspace_id=2"
 	dctx, dcancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer dcancel()
 	conn, resp, err := websocket.Dial(dctx, wsURL, nil)

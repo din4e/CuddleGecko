@@ -15,8 +15,8 @@ func init() {
 	gin.SetMode(gin.TestMode)
 }
 
-func makeToken(secret string, userID uint, ttl time.Duration) string {
-	claims := jwt.MapClaims{"user_id": float64(userID), "exp": time.Now().Add(ttl).Unix()}
+func makeToken(secret string, userID string, ttl time.Duration) string {
+	claims := jwt.MapClaims{"user_id": userID, "exp": time.Now().Add(ttl).Unix()}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	s, _ := token.SignedString([]byte(secret))
 	return s
@@ -27,7 +27,7 @@ func TestJWTAuth_ValidToken(t *testing.T) {
 	r := gin.New()
 	r.Use(JWTAuth(jwtCfg))
 	r.GET("/test", func(c *gin.Context) { c.JSON(200, gin.H{"user_id": GetUserID(c)}) })
-	token := makeToken("test-secret", 42, 15*time.Minute)
+	token := makeToken("test-secret", "42", 15*time.Minute)
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
@@ -69,7 +69,7 @@ func TestJWTAuth_ExpiredToken(t *testing.T) {
 	r := gin.New()
 	r.Use(JWTAuth(jwtCfg))
 	r.GET("/test", func(c *gin.Context) { c.Status(200) })
-	token := makeToken("test-secret", 42, -1*time.Hour)
+	token := makeToken("test-secret", "42", -1*time.Hour)
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
@@ -86,7 +86,7 @@ func TestJWTAuth_NoExpiryToken(t *testing.T) {
 	r := gin.New()
 	r.Use(JWTAuth(jwtCfg))
 	r.GET("/test", func(c *gin.Context) { c.Status(200) })
-	claims := jwt.MapClaims{"user_id": 42}
+	claims := jwt.MapClaims{"user_id": "42"}
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("test-secret"))
 	if err != nil {
 		t.Fatal(err)

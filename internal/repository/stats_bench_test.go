@@ -38,7 +38,7 @@ func benchSeedTodos(b *testing.B, db *gorm.DB, n int) {
 			status = "done"
 		}
 		items = append(items, model.Todo{
-			UserID: 1, WorkspaceID: 1,
+			UserID: "1", WorkspaceID: "1",
 			Title: fmt.Sprintf("todo %d", i), Status: status, Priority: "normal",
 			DueTime: &now,
 		})
@@ -59,7 +59,7 @@ func BenchmarkTodoStats(b *testing.B) {
 	ctx := context.Background()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := repo.Stats(ctx, 1); err != nil {
+		if _, err := repo.Stats(ctx, "1"); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -71,7 +71,7 @@ func BenchmarkWorkoutStats(b *testing.B) {
 	batch := make([]model.Workout, 0, 500)
 	for i := 0; i < 1000; i++ {
 		batch = append(batch, model.Workout{
-			UserID: 1, WorkspaceID: 1,
+			UserID: "1", WorkspaceID: "1",
 			Name: fmt.Sprintf("w %d", i), Type: "strength",
 			Status: model.WorkoutStatusCompleted, ScheduledAt: &now,
 		})
@@ -81,7 +81,7 @@ func BenchmarkWorkoutStats(b *testing.B) {
 	ctx := context.Background()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := repo.Stats(ctx, 1); err != nil {
+		if _, err := repo.Stats(ctx, "1"); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -96,7 +96,7 @@ func BenchmarkTransactionMonthly(b *testing.B) {
 			ty = "expense"
 		}
 		batch = append(batch, model.Transaction{
-			UserID: 1, WorkspaceID: 1,
+			UserID: "1", WorkspaceID: "1",
 			Title: fmt.Sprintf("tx %d", i), Amount: 10, Type: ty,
 			Date: time.Now().AddDate(0, 0, -i%180),
 		})
@@ -106,7 +106,7 @@ func BenchmarkTransactionMonthly(b *testing.B) {
 	ctx := context.Background()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := repo.Monthly(ctx, 1, 6, nil, nil); err != nil {
+		if _, err := repo.Monthly(ctx, "1", 6, nil, nil); err != nil {
 			b.Fatal(err)
 		}
 	}

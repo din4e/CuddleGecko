@@ -49,7 +49,7 @@ var todoImporters = map[string]todoImporter{
 // ("dida" = 滴答清单). Tags are created on demand; the platform's list name and
 // tag column both become tags. Parent/child links are restored via the
 // platform's own task ids after all rows exist.
-func (s *ExportService) ImportTodosFromPlatform(ctx context.Context, userID, workspaceID uint, platform, csvString string) (*TodoImportResult, error) {
+func (s *ExportService) ImportTodosFromPlatform(ctx context.Context, userID, workspaceID string, platform, csvString string) (*TodoImportResult, error) {
 	importer, ok := todoImporters[strings.ToLower(strings.TrimSpace(platform))]
 	if !ok {
 		return nil, fmt.Errorf("unsupported platform %q", platform)
@@ -60,7 +60,7 @@ func (s *ExportService) ImportTodosFromPlatform(ctx context.Context, userID, wor
 	}
 
 	// Resolve/create tags by name once, up front.
-	tagNameToID := make(map[string]uint)
+	tagNameToID := make(map[string]string)
 	if len(todos) > 0 {
 		// Full tag set: matches the repo's deliberate maxPageSize cap so no
 		// existing tag is missed (duplicates would be created otherwise).
@@ -86,7 +86,7 @@ func (s *ExportService) ImportTodosFromPlatform(ctx context.Context, userID, wor
 	}
 
 	imported := 0
-	extIDToID := make(map[string]uint, len(todos))
+	extIDToID := make(map[string]string, len(todos))
 	for _, et := range todos {
 		if et.Title == "" {
 			skipped++
@@ -122,7 +122,7 @@ func (s *ExportService) ImportTodosFromPlatform(ctx context.Context, userID, wor
 		if et.ExternalID != "" {
 			extIDToID[et.ExternalID] = todo.ID
 		}
-		tagIDs := make([]uint, 0, len(et.TagNames))
+		tagIDs := make([]string, 0, len(et.TagNames))
 		for _, name := range et.TagNames {
 			if id, ok := tagNameToID[name]; ok {
 				tagIDs = append(tagIDs, id)

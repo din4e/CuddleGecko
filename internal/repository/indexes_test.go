@@ -24,8 +24,8 @@ func TestCompositeIndexesCreated(t *testing.T) {
 	))
 
 	cases := []struct {
-		table  string
-		index  string
+		table   string
+		index   string
 		columns string // expected column order, comma-separated as in CREATE INDEX
 	}{
 		{"todos", "idx_todo_ws_status_due", "workspace_id, status, due_time"},

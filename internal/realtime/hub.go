@@ -16,11 +16,11 @@ import (
 // services can broadcast mutations without depending on realtime details.
 type Hub struct {
 	mu      sync.RWMutex
-	clients map[uint]map[*client]struct{} // workspaceID -> connected clients
+	clients map[string]map[*client]struct{} // workspaceID -> connected clients
 }
 
 func NewHub() *Hub {
-	return &Hub{clients: make(map[uint]map[*client]struct{})}
+	return &Hub{clients: make(map[string]map[*client]struct{})}
 }
 
 // Register adds a client to its workspace's client set.
@@ -52,7 +52,7 @@ func (h *Hub) Unregister(c *client) {
 // BroadcastToWorkspace delivers payload to every client in the workspace. Sends
 // are non-blocking: a client whose send buffer is full (slow consumer) is
 // evicted so a broadcaster never blocks on one stalled reader.
-func (h *Hub) BroadcastToWorkspace(workspaceID uint, payload []byte) {
+func (h *Hub) BroadcastToWorkspace(workspaceID string, payload []byte) {
 	h.mu.RLock()
 	set := h.clients[workspaceID]
 	snapshot := make([]*client, 0, len(set))
@@ -73,7 +73,7 @@ func (h *Hub) BroadcastToWorkspace(workspaceID uint, payload []byte) {
 // NotifyChange satisfies service.ChangeNotifier. It is fire-and-forget: it
 // marshals a Frame (embedding the entity when given) and broadcasts it to the
 // workspace; it never blocks on the caller (each client send is non-blocking).
-func (h *Hub) NotifyChange(_ context.Context, workspaceID uint, resource string, kind service.ChangeKind, id uint, entity any) {
+func (h *Hub) NotifyChange(_ context.Context, workspaceID string, resource string, kind service.ChangeKind, id string, entity any) {
 	frame := Frame{
 		Type:        FrameDataChanged,
 		WorkspaceID: workspaceID,
@@ -102,7 +102,7 @@ func (h *Hub) NotifyChange(_ context.Context, workspaceID uint, resource string,
 func (h *Hub) Close() {
 	h.mu.Lock()
 	all := h.clients
-	h.clients = make(map[uint]map[*client]struct{})
+	h.clients = make(map[string]map[*client]struct{})
 	h.mu.Unlock()
 	for _, set := range all {
 		for c := range set {
