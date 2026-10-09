@@ -10,9 +10,10 @@ import { DialogFooter } from './ui/dialog'
 import { Markdown } from './Markdown'
 import BuddyPicker from './BuddyPicker'
 import TodoParentPicker from './TodoParentPicker'
-import TodoLinkPicker from './TodoLinkPicker'
 import LabelPicker from './LabelPicker'
+import { TodoLinkSuggestions } from './TodoLinkSuggestions'
 import { useCreateTodo, useUpdateTodo, useReplaceTodoTags, useMoveTodo } from '../hooks/api/useTodos'
+import { useTodoLinkMention } from '../hooks/useTodoLinkMention'
 import { descendantIds } from '../lib/buildTodoTree'
 import type { Todo, Contact, Tag, TodoStatus, TodoUpdateInput } from '../types'
 
@@ -41,9 +42,6 @@ export interface TodoFormProps {
   contacts: Contact[]
   tags: Tag[]
   parentCandidates?: Todo[]
-  /** Loaded todos offered to the link picker; falls back to parentCandidates
-   *  (both are "the todos the current view has loaded"). */
-  linkCandidates?: Todo[]
   onContactsChange: (contacts: Contact[]) => void
   onClose: () => void
   /** Prefilled due time for create (local datetime-local string) — the
@@ -71,7 +69,6 @@ interface FormValues {
   amount: string
   amountType: '' | 'income' | 'expense'
   contactIds: number[]
-  todoIds: number[]
   color: string
   repeat: string
   repeatInterval: number
@@ -93,7 +90,6 @@ function initialFormValues(editing: Todo | null, initialDueTime?: string): FormV
     amount: editing?.amount != null ? String(editing.amount) : '',
     amountType: editing?.amount_type ?? '',
     contactIds: editing?.contact_ids ?? [],
-    todoIds: editing?.todo_ids ?? [],
     color: editing?.color ?? '',
     repeat: editing?.repeat ?? '',
     repeatInterval: editing?.repeat_interval && editing.repeat_interval > 0 ? editing.repeat_interval : 1,
@@ -119,7 +115,6 @@ function snapshotOf(v: FormValues): string {
     amount: v.amount,
     amount_type: v.amountType,
     contact_ids: [...v.contactIds].sort((a, b) => a - b),
-    todo_ids: [...v.todoIds].sort((a, b) => a - b),
     color: v.color,
     repeat: v.repeat,
     repeat_interval: v.repeatInterval,
@@ -131,7 +126,7 @@ function snapshotOf(v: FormValues): string {
 /** Shared todo create/edit fields — hosted by TodoFormDialog (create modal)
  *  and TodoDetailDrawer (right slide-over). State initializes from `editing`
  *  once per mount; both shells remount via a key on the todo id. */
-export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandidates, onContactsChange, onClose, initialDueTime, autoSave }: TodoFormProps) {
+export function TodoForm({ editing, contacts, tags, parentCandidates, onContactsChange, onClose, initialDueTime, autoSave }: TodoFormProps) {
   const { t } = useTranslation()
   const formId = useId()
   const createTodo = useCreateTodo()
@@ -153,7 +148,6 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandid
   const [formAmount, setFormAmount] = useState(init.amount)
   const [formAmountType, setFormAmountType] = useState<'' | 'income' | 'expense'>(init.amountType)
   const [formContactIds, setFormContactIds] = useState<number[]>(init.contactIds)
-  const [formTodoIds, setFormTodoIds] = useState<number[]>(init.todoIds)
   const [formColor, setFormColor] = useState(init.color)
   const [formRepeat, setFormRepeat] = useState<string>(init.repeat)
   const [formRepeatInterval, setFormRepeatInterval] = useState<number>(init.repeatInterval)
@@ -182,7 +176,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandid
     title: formTitle, desc: formDesc, status: formStatus, priority: formPriority,
     importance: formImportance, urgency: formUrgency,
     dueTime: formDueTime, startTime: formStartTime, duration: formDuration, amount: formAmount,
-    amountType: formAmountType, contactIds: formContactIds, todoIds: formTodoIds, color: formColor, repeat: formRepeat,
+    amountType: formAmountType, contactIds: formContactIds, color: formColor, repeat: formRepeat,
     repeatInterval: formRepeatInterval, tagIds: formTagIds, parentId: formParentId,
   })
   const currentSnapshotRef = useRef(currentSnapshot)
@@ -212,12 +206,19 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandid
     () => (editing ? new Set([editing.id, ...descendantIds(parentCandidates ?? [], editing.id)]) : new Set<number>()),
     [editing, parentCandidates],
   )
-  // Links are cross-references, not hierarchy — only self is disallowed.
-  const blockedLinks = useMemo(
-    () => (editing ? new Set([editing.id]) : new Set<number>()),
-    [editing],
-  )
-  const linkPool = linkCandidates ?? parentCandidates
+
+  // "[[" task autocomplete for the title and description fields — the way
+  // todo→todo links are authored: the picked task lands in the text as a
+  // markdown link [标题](todo:<id>), which the views render as an in-app jump.
+  const mentionCandidates = parentCandidates ?? []
+  const titleMention = useTodoLinkMention({
+    candidates: mentionCandidates,
+    onApply: (value) => setFormTitle(value),
+  })
+  const descMention = useTodoLinkMention({
+    candidates: mentionCandidates,
+    onApply: (value) => setFormDesc(value),
+  })
 
   /** Persists the form. `close: false` (auto-save) keeps the form mounted —
    *  only an explicit Save (create dialog / Enter) closes the shell. */
@@ -244,7 +245,6 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandid
             amount: formAmount ? parseFloat(formAmount) : null,
             amount_type: formAmountType,
             contact_ids: formContactIds,
-            todo_ids: formTodoIds,
             color: formColor,
             repeat: formRepeat,
             repeat_interval: formRepeatInterval,
@@ -271,7 +271,6 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandid
             amount: formAmount ? parseFloat(formAmount) : undefined,
             amount_type: formAmountType,
             contact_ids: formContactIds,
-            todo_ids: formTodoIds.length > 0 ? formTodoIds : undefined,
             color: formColor,
             repeat: formRepeat || undefined,
             repeat_interval: formRepeatInterval || undefined,
@@ -301,7 +300,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandid
           title: formTitle, desc: formDesc, status: formStatus, priority: formPriority,
           importance: formImportance, urgency: formUrgency,
           dueTime: formDueTime, startTime: formStartTime, duration: formDuration, amount: formAmount,
-          amountType: formAmountType, contactIds: formContactIds, todoIds: formTodoIds, color: formColor, repeat: formRepeat,
+          amountType: formAmountType, contactIds: formContactIds, color: formColor, repeat: formRepeat,
           repeatInterval: formRepeatInterval, tagIds: formTagIds, parentId: formParentId,
         })
         if (close) onClose()
@@ -316,7 +315,7 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandid
     const p = run()
     inFlightRef.current = p
     await p
-  }, [labelCreating, formTitle, formDesc, formStatus, formPriority, formImportance, formUrgency, formDueTime, formStartTime, formDuration, formAmount, formAmountType, formContactIds, formTodoIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
+  }, [labelCreating, formTitle, formDesc, formStatus, formPriority, formImportance, formUrgency, formDueTime, formStartTime, formDuration, formAmount, formAmountType, formContactIds, formColor, formRepeat, formRepeatInterval, formTagIds, formParentId, updateTodo, createTodo, replaceTags, moveTodo, onClose])
 
   // Keep the "latest value" refs current after every render (effect order
   // matters: this runs before the auto-save/flush effects below, so they and
@@ -361,24 +360,40 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandid
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-1">
         <div className="space-y-1">
           <Label htmlFor={`${formId}-title`}>{t('todos.title_field')} *</Label>
-          <Input
-            id={`${formId}-title`}
-            value={formTitle}
-            onChange={(e) => setFormTitle(e.target.value)}
-            // Fast create flow: focus the title on open, Enter submits.
-            // In the auto-save drawer Enter just flushes the pending save
-            // (immediately) instead of closing the slide-over.
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing && formTitle.trim()) {
-                e.preventDefault()
-                void handleSave({ close: !autoSaveOn })
-              }
-            }}
-            onCompositionStart={() => setComposing(true)}
-            onCompositionEnd={() => setComposing(false)}
-            maxLength={200}
-          />
+          <div className="relative">
+            <Input
+              id={`${formId}-title`}
+              value={formTitle}
+              onChange={(e) => {
+                setFormTitle(e.target.value)
+                titleMention.handleChange(e)
+              }}
+              // Fast create flow: focus the title on open, Enter submits.
+              // In the auto-save drawer Enter just flushes the pending save
+              // (immediately) instead of closing the slide-over. While the
+              // "[[" link popover is open, its keys take over instead.
+              autoFocus
+              onKeyDown={(e) => {
+                titleMention.handleKeyDown(e)
+                if (e.defaultPrevented) return
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing && formTitle.trim()) {
+                  e.preventDefault()
+                  void handleSave({ close: !autoSaveOn })
+                }
+              }}
+              onCompositionStart={() => setComposing(true)}
+              onCompositionEnd={() => setComposing(false)}
+              maxLength={200}
+            />
+            <TodoLinkSuggestions
+              open={titleMention.open}
+              items={titleMention.items}
+              highlight={titleMention.highlight}
+              isFetching={titleMention.isFetching}
+              onPick={titleMention.insert}
+              onHighlight={titleMention.setHighlight}
+            />
+          </div>
         </div>
         <div className="space-y-1">
           <div className="flex items-center justify-between">
@@ -403,14 +418,28 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandid
               <Markdown content={formDesc} />
             </div>
           ) : (
-            <Textarea
-              value={formDesc}
-              onChange={(e) => setFormDesc(e.target.value)}
-              onCompositionStart={() => setComposing(true)}
-              onCompositionEnd={() => setComposing(false)}
-              rows={2}
-              placeholder={t('todos.descMarkdownHint')}
-            />
+            <div className="relative">
+              <Textarea
+                value={formDesc}
+                onChange={(e) => {
+                  setFormDesc(e.target.value)
+                  descMention.handleChange(e)
+                }}
+                onKeyDown={descMention.handleKeyDown}
+                onCompositionStart={() => setComposing(true)}
+                onCompositionEnd={() => setComposing(false)}
+                rows={2}
+                placeholder={t('todos.descMarkdownHint')}
+              />
+              <TodoLinkSuggestions
+                open={descMention.open}
+                items={descMention.items}
+                highlight={descMention.highlight}
+                isFetching={descMention.isFetching}
+                onPick={descMention.insert}
+                onHighlight={descMention.setHighlight}
+              />
+            </div>
           )}
         </div>
         {parentCandidates && (
@@ -424,21 +453,6 @@ export function TodoForm({ editing, contacts, tags, parentCandidates, linkCandid
               onChange={setFormParentId}
               candidates={parentCandidates}
               blocked={blockedParents}
-            />
-          </div>
-        )}
-        {linkPool && (
-          <div className="space-y-1">
-            <Label>{t('todos.links')}</Label>
-            {/* Multi-select cross-references — clicking a chip elsewhere jumps
-                to the target todo's drawer. Same search model as the parent
-                picker; only self is excluded (links aren't hierarchy). */}
-            <TodoLinkPicker
-              value={formTodoIds}
-              onChange={setFormTodoIds}
-              candidates={linkPool}
-              blocked={blockedLinks}
-              disabled={saving}
             />
           </div>
         )}

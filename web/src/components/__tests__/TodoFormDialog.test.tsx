@@ -27,12 +27,10 @@ vi.mock('../../hooks/api/useTodos', () => ({
   useUpdateTodo: () => ({ mutateAsync: mocks.updateTodo, isPending: false }),
   useReplaceTodoTags: () => ({ mutateAsync: mocks.replaceTags }),
   useMoveTodo: () => ({ mutateAsync: mocks.moveTodo, isPending: false }),
-  // Parent picker search: no results by default (overridable per test).
+  // Parent picker + "[[" link mention search: no results by default (overridable per test).
   useTodosList: (params: Record<string, unknown>, options?: { enabled?: boolean }) => mocks.list(params, options),
   // Parent picker by-id fallback: unresolved by default.
   useTodo: (id: number | null) => mocks.get(id),
-  // Link picker title resolution for targets outside the loaded candidates.
-  useTodoDetails: () => ({ todos: new Map(), pending: new Set<number>() }),
 }))
 
 vi.mock('../../api/contacts', () => ({
@@ -104,6 +102,39 @@ describe('TodoFormDialog', () => {
     // Save kept the title payload intact and reparented via the move endpoint.
     expect(mocks.updateTodo).toHaveBeenCalledTimes(1)
     expect(mocks.moveTodo).toHaveBeenCalledWith({ id: 1, parentId: 7, afterId: null })
+  })
+
+  it('typing "[[" in title/description offers tasks and inserts a markdown todo link', async () => {
+    const user = userEvent.setup()
+    render(
+      <TodoFormDialog
+        open
+        editing={null}
+        contacts={[]}
+        tags={[]}
+        parentCandidates={[todo({ id: 7, title: 'Alpha task' }), todo({ id: 9, title: 'Beta task' })]}
+        onContactsChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    // "[[" opens the mention popover over loaded candidates; typing filters.
+    // ("[[[[" — in userEvent.type strings "[[" is the escape for a literal
+    // "[", so two brackets need four; ASCII text because CJK can't go through
+    // the keyboard map.)
+    const title = screen.getByLabelText('todos.title_field *')
+    await user.type(title, 'see [[[[alph')
+    const option = await screen.findByRole('option', { name: /Alpha task/ })
+    expect(option).toBeInTheDocument()
+    // Enter picks the highlighted row and replaces "[[alph" with the link.
+    await user.type(title, '{Enter}')
+    expect(title).toHaveValue('see [Alpha task](todo:7)')
+
+    // Same flow in the description textarea, with a mouse pick this time.
+    const desc = screen.getByPlaceholderText('todos.descMarkdownHint')
+    await user.type(desc, 'ref [[[[bet')
+    await user.click(await screen.findByRole('option', { name: /Beta task/ }))
+    expect(desc).toHaveValue('ref [Beta task](todo:9)')
   })
 
   it('keeps the parent unchanged when the picker is never touched', async () => {
