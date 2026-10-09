@@ -212,7 +212,13 @@ func migrateTable(db *sql.DB, sp tableSpec, maps map[string]map[string]string) {
 	var mods []string
 	for _, c := range cols {
 		if idCols[c] {
-			mods = append(mods, "MODIFY `"+c+"` CHAR(36) NOT NULL")
+			// Polymorphic ref columns (whiteboard note nodes) legitimately
+			// hold NULL — only the hard keys get NOT NULL.
+			null := " NOT NULL"
+			if _, isPoly := sp.poly[c]; isPoly {
+				null = " NULL"
+			}
+			mods = append(mods, "MODIFY `"+c+"` CHAR(36)"+null)
 		}
 	}
 	if _, err := db.Exec("CREATE TABLE `" + sp.name + "__uuid` LIKE `" + sp.name + "`"); err != nil {
